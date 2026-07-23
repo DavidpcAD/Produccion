@@ -126,102 +126,44 @@ export function AppShell({ role, children }: { role: Role; children: React.React
     .filter((x) => x.len > 0)
     .sort((a, b) => b.len - a.len)[0]?.href ?? "";  // sin match → no se marca ninguna (no cae al home)
 
+  // Embebido en Produccion: NO renderizamos chrome propio (topbar/barra oscura) para no
+  // duplicar el del shell de la base. Solo una fila de tabs (sub-navegación del módulo)
+  // con el estilo del Design System, y el contenido.
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        {/* Con riel presente, la marca vive en el tope del riel oscuro. Sin riel,
-            se muestra acá en el encabezado. */}
-        {!hasNav && (
-          <Link href={meta.home} className="topbar__brand">
-            <span className="topbar__logo">A</span>
-            <span>Compras Adelante</span>
-          </Link>
-        )}
-        <div className="topbar__spacer" />
-        <div className="topbar__user">
-          {/* Acción primaria del rol — solo en el dashboard del rol (hace mucho
-              ruido en el resto de pantallas; ahí se usa desde el sidebar). */}
-          {meta.action && pathname === meta.home && (
-            <button className="ds-btn ds-btn--green ds-btn--sm topbar__action" onClick={() => router.push(meta.action!.href)}>
-              <IconPlus size={20} /><span>{meta.action.label}</span>
+    <div className="px-6 py-6 md:px-8">
+      {hasNav && (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          {meta.nav.map((n) => {
+            const active = activeHref === n.href;
+            return (
+              <button
+                key={n.href}
+                type="button"
+                onClick={() => router.push(n.href)}
+                aria-current={active ? "page" : undefined}
+                className={
+                  "inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition " +
+                  (active
+                    ? "bg-black text-white"
+                    : "bg-white text-ds-gray-500 border border-ds-gray-200 hover:bg-ds-gray-100")
+                }
+              >
+                {n.label}
+              </button>
+            );
+          })}
+          {meta.action && (
+            <button
+              type="button"
+              onClick={() => router.push(meta.action!.href)}
+              className="ml-auto inline-flex items-center gap-1 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-black"
+            >
+              <IconPlus size={18} /> {meta.action.label}
             </button>
           )}
-          {/* Campanita de notificaciones */}
-          <div style={{ position: "relative" }}>
-            <button className="notif-bell" title="Notificaciones" onClick={toggleNotif} aria-label="Notificaciones">
-              <IconBell size={20} />{noLeidas > 0 && <span className="notif-bell__dot">{noLeidas > 9 ? "9+" : noLeidas}</span>}
-            </button>
-            {notifOpen && (
-              <>
-                <div className="notif-overlay" onClick={() => setNotifOpen(false)} />
-                <div className="notif-panel">
-                  <div className="notif-panel__head">
-                    <span className="notif-panel__title">Notificaciones</span>
-                    {noLeidas > 0 && (
-                      <button type="button" className="notif-panel__mark" onClick={() => marcarNotifsLeidas()}>
-                        {noLeidas} sin leer · Marcar todas
-                      </button>
-                    )}
-                  </div>
-                  {notifsRol.length === 0 ? (
-                    <div className="notif-empty">
-                      <span className="notif-empty__icon"><IconBell size={22} /></span>
-                      Sin notificaciones
-                    </div>
-                  ) : (
-                    <div className="notif-list">
-                      {notifsRol.slice(0, 30).map((n) => (
-                        <button key={n.id} className={`notif-item ${n.leida ? "" : "is-unread"}`}
-                          onClick={() => { marcarNotifLeida(n.id); setNotifOpen(false); if (n.href) router.push(n.href); }}>
-                          <span className={`notif-item__icon notif-item__icon--${n.tipo}`}>{NOTIF_ICON[n.tipo]}</span>
-                          <span className="notif-item__body">
-                            <span className="notif-item__msg">{n.mensaje}</span>
-                            <span className="notif-item__date">{formatDate(n.fecha)}</span>
-                          </span>
-                          {!n.leida && <span className="notif-item__dot" aria-hidden />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <div className="topbar__identity" style={{ background: "var(--ds-color-black)", color: "var(--ds-color-white)" }}>
-            <span className="topbar__avatar">{(usuario ?? meta.persona).slice(0, 2).toUpperCase()}</span>
-            <span>{cap(usuario ?? meta.persona)} · {meta.label}</span>
-          </div>
         </div>
-      </header>
-      <div className="app-body">
-        {hasNav && (
-          <aside className="app-nav" aria-label="Secciones">
-            <Link href={meta.home} className="app-nav__brand" title="Compras Adelante">
-              <span className="topbar__logo">A</span>
-              <span className="app-nav__brand-name">Compras Adelante</span>
-            </Link>
-            {meta.nav.map((n) => {
-              const Icon = n.icon;
-              const active = activeHref === n.href;
-              return (
-                <button key={n.href} className={`app-nav__item${active ? " is-active" : ""}`}
-                  title={n.label}
-                  onClick={() => router.push(n.href)} aria-current={active ? "page" : undefined}>
-                  <span className="app-nav__ic"><Icon size={20} /></span>
-                  <span className="app-nav__label">{n.label}</span>
-                </button>
-              );
-            })}
-            <button className="app-nav__item app-nav__salir" style={{ marginTop: "auto" }}
-              title="Salir"
-              onClick={() => { setRole(null); setUsuario(null); router.replace("/"); }}>
-              <span className="app-nav__ic"><IconLogout size={20} /></span>
-              <span className="app-nav__label">Salir</span>
-            </button>
-          </aside>
-        )}
-        <div className="app-content">{children}</div>
-      </div>
+      )}
+      {children}
     </div>
   );
 }

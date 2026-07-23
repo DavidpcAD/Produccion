@@ -10,7 +10,9 @@ export default function ComprasLayout({ children }: { children: React.ReactNode 
   const useApi = process.env.USE_API === '1' || process.env.NEXT_PUBLIC_USE_API === '1';
   return (
     <StoreProvider useApi={useApi}>
-      <ToastProvider>{children}</ToastProvider>
+      {/* .oc-scope confina TODOS los estilos de compras.css a este módulo para que no
+          pisen el Design System de la base (sidebar, etc.). */}
+      <ToastProvider><div className="oc-scope">{children}</div></ToastProvider>
     </StoreProvider>
   );
 }
