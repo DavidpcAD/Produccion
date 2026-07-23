@@ -5,7 +5,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Modal, Textarea, Tile, useToast } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
-import { SlideConfirm } from "@/components/compras/slide-confirm";
+import { AprobarControl } from "@/components/compras/aprobar-control";
 import { money, formatDate, num, ordenLineaImporte } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
@@ -87,7 +87,7 @@ export default function AprobacionPage() {
             </div>
             {sel.size > 0 ? (
               <div style={{ flex: "1 1 300px", minWidth: 240, maxWidth: 420 }}>
-                <SlideConfirm oneWay busy={lote} height={56} threshold={0.75}
+                <AprobarControl oneWay busy={lote}
                   approveLabel={`Aprobar y lanzar (${sel.size})`} onApprove={aprobarSeleccionadas} />
               </div>
             ) : (
@@ -149,8 +149,9 @@ export default function AprobacionPage() {
                 {/* Aprobar/Rechazar SIEMPRE al fondo de la tarjeta: al expandir queda
                     debajo de las líneas (mejor en celular y en PC). */}
                 <div className="mt-3" style={{ maxWidth: 460, marginLeft: "auto" }}>
-                  <SlideConfirm
+                  <AprobarControl
                     busy={aprobandoId === o.id}
+                    approveLabel="Aprobar y lanzar"
                     onApprove={() => aprobar(o)}
                     onReject={() => { setMotivo(""); setRechObj({ id: o.id, numero: o.numero }); }}
                   />
