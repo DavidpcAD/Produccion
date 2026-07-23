@@ -1,0 +1,25 @@
+import { NextResponse } from "next/server";
+import { getOrden, setOrdenEstado } from "@/lib/compras/repo";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const o = await getOrden(Number((await params).id));
+    if (!o) return NextResponse.json({ error: "no encontrada" }, { status: 404 });
+    return NextResponse.json(o);
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { estado, usuario, rol, motivo, bcNumber } = await req.json();
+    await setOrdenEstado(Number((await params).id), estado, usuario, rol, motivo, bcNumber);
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+  }
+}
