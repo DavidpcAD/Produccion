@@ -13,8 +13,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: 'Adelante Desarrollos — Control de Usuarios',
-  description: 'Sistema de gestión de colaboradores, proyectos y cuadrillas',
+  title: 'Adelante Desarrollos — Producción',
+  description: 'Sistema de producción de obra: obras, partidas, cuadrillas, presupuestos, pedidos y aprobaciones',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

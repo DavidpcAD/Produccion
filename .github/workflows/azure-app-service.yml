@@ -9,9 +9,11 @@ name: Deploy a Azure App Service
 #   2) Subir el publish profile como secret AZURE_WEBAPP_PUBLISH_PROFILE en GitHub.
 #   3) Ajustar AZURE_WEBAPP_NAME abajo al nombre EXACTO del Web App creado.
 
-# Deploy DESACTIVADO por ahora: estamos probando en local. Cuando querás activar el
-# CD, volvé a agregar el trigger `push: branches: [main]`. Por ahora solo corre manual.
+# CD activo: cada push a main compila y despliega a usuarios-ad (el App Service que
+# sirve usuarios.adelante.cr / produccion.adelante.cr). También se puede correr manual.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 # Serializa los deploys: si llegan dos pushes seguidos, el segundo espera a que
@@ -21,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AZURE_WEBAPP_NAME: produccion-ad   # Web App propio de Produccion (crear con scripts/azure-setup.ps1). Dominio destino: produccion.adelante.cr
+  AZURE_WEBAPP_NAME: usuarios-ad   # App Service reutilizado (rg-controlusuarios). Sirve usuarios.adelante.cr + produccion.adelante.cr
   NODE_VERSION: "22.x"
 
 jobs:

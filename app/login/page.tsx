@@ -104,11 +104,10 @@ export default function LoginPage() {
           <div>
             <p className="text-brand text-sm font-semibold uppercase tracking-widest mb-3">Sistema Interno</p>
             <h1 className="text-5xl font-bold text-white mb-4 leading-tight">
-              Control de<br />
-              <span className="text-brand">Usuarios</span>
+              <span className="text-brand">Producción</span>
             </h1>
             <p className="text-white/50 text-lg mb-10 leading-relaxed">
-              Gestión centralizada de colaboradores,<br />proyectos y cuadrillas de trabajo.
+              Gestión de obra: obras, partidas, cuadrillas,<br />presupuestos, pedidos y aprobaciones.
             </p>
 
             <div className="flex flex-col gap-3">
