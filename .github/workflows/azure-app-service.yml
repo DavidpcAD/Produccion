@@ -9,9 +9,9 @@ name: Deploy a Azure App Service
 #   2) Subir el publish profile como secret AZURE_WEBAPP_PUBLISH_PROFILE en GitHub.
 #   3) Ajustar AZURE_WEBAPP_NAME abajo al nombre EXACTO del Web App creado.
 
+# Deploy DESACTIVADO por ahora: estamos probando en local. Cuando querás activar el
+# CD, volvé a agregar el trigger `push: branches: [main]`. Por ahora solo corre manual.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 # Serializa los deploys: si llegan dos pushes seguidos, el segundo espera a que
