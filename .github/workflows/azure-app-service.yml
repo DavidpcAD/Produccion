@@ -1,0 +1,65 @@
+name: Deploy a Azure App Service
+
+# Despliega Produccion (Next.js standalone) a App Service en cada push a main.
+# El build (npm ci + next build) corre acá; App Service solo recibe el paquete ya
+# compilado. Auth del deploy: publish profile en el secret AZURE_WEBAPP_PUBLISH_PROFILE.
+#
+# Antes del primer deploy:
+#   1) Correr scripts/azure-setup.ps1 (crea el Web App y carga las env vars).
+#   2) Subir el publish profile como secret AZURE_WEBAPP_PUBLISH_PROFILE en GitHub.
+#   3) Ajustar AZURE_WEBAPP_NAME abajo al nombre EXACTO del Web App creado.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Serializa los deploys: si llegan dos pushes seguidos, el segundo espera a que
+# termine el primero en vez de chocar con Azure OneDeploy (409 Conflict).
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  AZURE_WEBAPP_NAME: produccion-ad   # Web App propio de Produccion (crear con scripts/azure-setup.ps1). Dominio destino: produccion.adelante.cr
+  NODE_VERSION: "22.x"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build (Next standalone)
+        run: npm run build
+
+      - name: Empaquetar standalone
+        # `next build` con output:standalone deja server.js + node_modules mínimos en
+        # .next/standalone, pero NO copia .next/static ni public: se arman a mano.
+        run: |
+          mkdir -p deploy-package
+          cp -r .next/standalone/. deploy-package/
+          mkdir -p deploy-package/.next
+          cp -r .next/static deploy-package/.next/static
+          if [ -d public ]; then cp -r public deploy-package/public; fi
+
+      - name: Deploy a Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: deploy-package

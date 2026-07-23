@@ -1,0 +1,83 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Adelante / Introducción" />
+
+<div style={{ fontFamily: 'Roboto, sans-serif', maxWidth: 800, margin: '0 auto', padding: '40px 24px' }}>
+
+# Adelante Design System
+
+<div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#ADD010', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 0 rgba(0,0,0,0.16)' }}>
+    <svg width="24" height="24" fill="none" stroke="black" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+    </svg>
+  </div>
+  <div>
+    <div style={{ fontSize: 24, fontWeight: 700, color: '#000' }}>Adelante Desarrollos</div>
+    <div style={{ fontSize: 14, color: '#747B86' }}>Sistema Losa Flotante · v1.0</div>
+  </div>
+</div>
+
+Sistema de diseño oficial de Adelante Desarrollos, basado en el sistema **Losa Flotante**.
+Todos los componentes están construidos sobre los tokens del Figma y reflejan el diseño aprobado.
+
+---
+
+## Tokens del sistema
+
+### Colores
+
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, margin: '16px 0 32px' }}>
+  {[
+    { name: 'brand',       hex: '#ADD010', dark: false },
+    { name: 'brand-200',   hex: '#88A024', dark: true  },
+    { name: 'black',       hex: '#000000', dark: true  },
+    { name: 'ds-gray-500', hex: '#5D636C', dark: true  },
+    { name: 'ds-gray-400', hex: '#747B86', dark: true  },
+    { name: 'ds-gray-300', hex: '#AAAFB6', dark: false },
+    { name: 'ds-gray-200', hex: '#D9D9D9', dark: false },
+    { name: 'ds-gray-100', hex: '#EBEBEB', dark: false },
+    { name: 'ds-bg',       hex: '#F3F3F3', dark: false },
+    { name: 'ds-red',      hex: '#C96C6C', dark: true  },
+    { name: 'ds-yellow',   hex: '#F0C802', dark: false },
+  ].map(c => (
+    <div key={c.hex} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #E5E7EB' }}>
+      <div style={{ height: 60, background: c.hex }} />
+      <div style={{ padding: '8px 10px', background: '#fff' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#111' }}>{c.name}</div>
+        <div style={{ fontSize: 11, color: '#747B86', fontFamily: 'monospace' }}>{c.hex}</div>
+      </div>
+    </div>
+  ))}
+</div>
+
+### Tipografía
+
+| Token | Size | Line Height | Weight |
+|-------|------|-------------|--------|
+| `body-sm` | 12px | 16px | 400 |
+| `body` | 16px | 24px | 400 |
+| `sub-sm` | 20px | 24px | 600 |
+| `sub` | 24px | 24px | 600 |
+| `heading` | 32px | 40px | 700 |
+
+### Bordes & Sombras
+
+| Token | Valor |
+|-------|-------|
+| `rounded-ds-sm` | 4px |
+| `rounded-ds` | 8px |
+| `rounded-ds-lg` | 16px |
+| `rounded-ds-xl` | 32px |
+| `shadow-ds-01` | 0 4px 8px rgba(170,175,182,0.25) |
+| `shadow-ds-02` | 0 6px 0 rgba(0,0,0,0.16) |
+| `shadow-ds-03` | ds-02 + 0 2px 4px rgba(0,0,0,0.16) |
+
+---
+
+## Figma
+
+El sistema de diseño completo está disponible en:
+[**Losa Flotante — Figma**](https://www.figma.com/design/oRDLRL9OUNcTQ0k6G5MBPS/Losa-Flotante)
+
+</div>

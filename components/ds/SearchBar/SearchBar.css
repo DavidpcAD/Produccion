@@ -1,0 +1,164 @@
+/* SearchBar — alineado al Figma. Solo tokens var(--ds-*). */
+
+/* Wrapper para layouts con suggestions/close (label/normal/expanded) */
+.ds-search-shell {
+  display: inline-flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.ds-search-shell--expanded {
+  gap: var(--ds-space-2);
+}
+
+.ds-search {
+  display: inline-flex;
+  align-items: center;
+  height: 59px;
+  background: var(--ds-color-white);
+  color: var(--ds-color-black);
+  border-radius: var(--ds-radius-2xl);
+  border: 0;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Icon-only variant: 65px round-pill button */
+.ds-search--icon {
+  width: 65px;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--ds-shadow-03-big);
+}
+
+/* Pill variants — label / normal / expanded comparten geometría */
+.ds-search--label,
+.ds-search--normal,
+.ds-search--expanded {
+  width: 100%;
+  min-width: 280px;
+  gap: var(--ds-space-2);
+  padding: 0 var(--ds-space-5);
+  box-shadow: var(--ds-shadow-01);
+}
+
+/* Pressed para variantes pill — solo cambia la sombra */
+.ds-search--pressed {
+  box-shadow: var(--ds-shadow-03-big);
+}
+
+/* Pressed icon — replica fiel del Figma:
+ *   border: 8px solid surface  +  drop-shadow: 0 0 3px / 0 2px 2px rgba(0,0,0,.16)
+ *
+ * En CSS, box-shadows no se acumulan (cada capa parte del border-box del elemento),
+ * así que para que la sombra se "proyecte" desde el borde exterior del anillo de 8px
+ * le sumamos spread: 8px. Esto hace que el halo sea visible incluso cuando el anillo
+ * blendea con el fondo (ej. surface sobre surface) — el halo lo crea la sombra. */
+.ds-search--icon.ds-search--pressed,
+.ds-search--icon:active {
+  box-shadow:
+    0 0 0 8px var(--ds-color-surface),
+    0 0 3px 8px rgba(0, 0, 0, 0.16),
+    0 2px 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.ds-search__icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-black);
+}
+
+.ds-search__input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ds-color-black);
+  min-width: 0;
+}
+
+.ds-search__input::placeholder {
+  color: var(--ds-color-gray-300);
+}
+
+.ds-search__right {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-gray-500);
+}
+
+/* Figma close button: plain 20x20 icon, gray-300 fill, no background circle */
+.ds-search__close {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ds-color-gray-300);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+ * Expanded — panel de sugerencias adjunto bajo el pill
+ * ============================================================ */
+
+.ds-search__panel {
+  list-style: none;
+  margin: 0;
+  padding: var(--ds-space-4) var(--ds-space-6);
+  background: var(--ds-color-white);
+  border-radius: var(--ds-radius-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.ds-search__hit {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: 0;
+  background: transparent;
+  border-radius: var(--ds-radius-md);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--ds-font-size-body-sm);
+  line-height: var(--ds-line-height-body-sm);
+  color: var(--ds-color-black);
+  font-weight: var(--ds-font-weight-regular);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ds-search__hit:hover {
+  background: var(--ds-color-surface);
+}
+
+.ds-search__hit-name {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* Match resaltado: semibold (sin background, fiel al Figma) */
+.ds-search__match {
+  font-weight: var(--ds-font-weight-semibold);
+  letter-spacing: var(--ds-letter-spacing-wide);
+}
+

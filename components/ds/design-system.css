@@ -1,0 +1,887 @@
+/* ============================================================
+   Adelante Design System — Global Tokens + Component Styles
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;600&display=swap");
+
+:root {
+  /* ── Colors ── */
+  --ds-color-green-100: #add010;
+  --ds-color-green-200: #88a024;
+  --ds-color-red-100:   #c96c6c;
+  --ds-color-red-200:   #bb4a4a;
+  --ds-color-gray-500:  #5d636c;
+  --ds-color-gray-400:  #747b86;
+  --ds-color-gray-300:  #aaafb6;
+  --ds-color-gray-200:  #d9d9d9;
+  --ds-color-gray-100:  #ebebeb;
+  --ds-color-black:     #000000;
+  --ds-color-black-100: rgba(0, 0, 0, 0.8);  /* Figma black-100, used in pressed halos */
+  --ds-color-white:     #ffffff;
+  --ds-color-surface:   #f3f3f3;
+  --ds-color-yellow:    #f0c802;
+
+  /* ── Typography ── */
+  --ds-font-family:          "Roboto", "Segoe UI", sans-serif;
+  --ds-font-size-body-sm:    12px;
+  --ds-font-size-label:      14px;   /* Figma: font size/font size 14 */
+  --ds-font-size-body-md:    16px;
+  --ds-font-size-subtitle:    20px;
+  --ds-font-size-subtitle-lg:  24px;
+  --ds-font-size-heading:      32px;
+  --ds-line-height-body-sm:  16px;
+  --ds-line-height-label:    20px;   /* Figma: line height/line height 20 */
+  --ds-line-height-body-md:  24px;
+  --ds-line-height-subtitle:    24px;
+  --ds-line-height-subtitle-lg:  24px;
+  --ds-line-height-heading:      40px;
+  --ds-letter-spacing-default: 0;
+  --ds-letter-spacing-tight: 0.25px; /* Figma: font spacing/font sapcing 0,25 */
+  --ds-letter-spacing-wide:  0.4px;
+  --ds-font-weight-regular:  400;
+  --ds-font-weight-semibold: 600;
+
+  /* ── Spacing ── */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-10: 40px;  /* Figma: spacing/spacing 40 */
+
+  /* ── Radius ── */
+  --ds-radius-sm: 4px;
+  --ds-radius-md: 8px;
+  --ds-radius-lg: 16px;
+  --ds-radius-xl: 32px;
+  --ds-radius-2xl: var(--ds-radius-xl); /* alias — usa xl directamente */
+
+  /* ── Shadows ── */
+  --ds-shadow-01:      0 4px 8px rgba(170, 175, 182, 0.25);
+  --ds-shadow-02-soft: 0 0 6px rgba(0, 0, 0, 0.16);
+  --ds-shadow-03-big:  0 2px 4px rgba(0, 0, 0, 0.16), 0 0 6px rgba(0, 0, 0, 0.16);
+}
+
+/* ── Base ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: var(--ds-font-family);
+  background: var(--ds-color-surface);
+  color: var(--ds-color-black);
+  margin: 0;
+}
+
+/* ============================================================
+   BUTTON  (ds-btn)
+   ============================================================ */
+
+.ds-btn {
+  position:        relative;
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             var(--ds-space-2);
+  border:          none;
+  border-radius:   var(--ds-radius-lg);
+  padding:         var(--ds-space-4);
+  min-height:      56px;
+  font-family:     var(--ds-font-family);
+  font-size:       var(--ds-font-size-body-md);
+  font-weight:     var(--ds-font-weight-semibold);
+  line-height:     var(--ds-line-height-body-md);
+  letter-spacing:  0;
+  box-shadow:      var(--ds-shadow-03-big);
+  cursor:          pointer;
+  transition:      box-shadow 120ms ease, background 100ms ease;
+  white-space:     nowrap;
+  user-select:     none;
+  overflow:        visible;
+}
+
+/* Colors */
+.ds-btn--green  { background: var(--ds-color-green-100); color: var(--ds-color-black); }
+.ds-btn--red    { background: var(--ds-color-red-100);   color: var(--ds-color-white); }
+.ds-btn--white  { background: var(--ds-color-white);     color: var(--ds-color-black); }
+.ds-btn--black  { background: var(--ds-color-black);     color: var(--ds-color-white); }
+.ds-btn--gray,
+.ds-btn:disabled { background: var(--ds-color-gray-200); color: var(--ds-color-gray-300); cursor: not-allowed; pointer-events: none; }
+
+/* States — Figma pressed: body stays same color, 8px outward stroke ring */
+.ds-btn--pressed.ds-btn--green { background: var(--ds-color-green-100);  box-shadow: 0 0 0 8px var(--ds-color-green-200), var(--ds-shadow-03-big); }
+.ds-btn--pressed.ds-btn--red   { background: var(--ds-color-red-200);    box-shadow: 0 0 0 8px var(--ds-color-red-100),   var(--ds-shadow-03-big); }
+.ds-btn--pressed.ds-btn--black { background: var(--ds-color-black);      box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.8),       var(--ds-shadow-03-big); }
+.ds-btn--pressed.ds-btn--white { background: var(--ds-color-white);      box-shadow: 0 0 0 8px var(--ds-color-surface),   var(--ds-shadow-03-big); }
+.ds-btn--pressed.ds-btn--gray  { background: var(--ds-color-gray-200);    box-shadow: 0 0 0 2px var(--ds-color-gray-100),   var(--ds-shadow-03-big); }
+
+/* Layout */
+.ds-btn--full { width: 100%; }
+.ds-btn--layout-icon { padding: var(--ds-space-4); width: 56px; height: 56px; }
+
+/* size="md" (default — sin cambios) */
+.ds-btn--md { /* ya definido por .ds-btn */ }
+
+/* size="sm" — 44 px compacto, sombra ligera */
+.ds-btn--sm {
+  min-height:    44px;
+  padding:       var(--ds-space-2) var(--ds-space-4);
+  font-size:     var(--ds-font-size-body-sm);
+  box-shadow:    var(--ds-shadow-01);
+  border-radius: var(--ds-radius-xl);
+}
+
+/* sm + icon-only → círculo */
+.ds-btn--sm.ds-btn--layout-icon {
+  width:         44px;
+  height:        44px;
+  min-height:    44px;
+  border-radius: 50%;
+  padding:       0;
+  box-shadow:    var(--ds-shadow-01);
+}
+
+/* Icon inside btn */
+.ds-btn svg { flex-shrink: 0; }
+.ds-btn__label { flex: 1; }
+
+/* ── Legacy .btn aliases (backward compat) ── */
+.btn { composes: ds-btn; }
+.btn--primary   { composes: ds-btn--green; }
+.btn--secondary { composes: ds-btn--black; }
+.btn--disabled  { composes: ds-btn--gray;  }
+.btn--pressed   { composes: ds-btn--pressed; }
+
+/* ============================================================
+   QUANTITY SELECTOR  (ds-qty)
+   ============================================================ */
+
+.ds-qty {
+  display:       inline-flex;
+  align-items:   center;
+  gap:           var(--ds-space-1);
+  background:    var(--qty-bg, var(--ds-color-gray-200));
+  border-radius: var(--ds-radius-sm);
+  padding:       var(--ds-space-1);
+  min-width:     49px;
+  min-height:    49px;
+  justify-content: center;
+}
+
+.ds-qty__btn {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           20px;
+  height:          20px;
+  border:          none;
+  border-radius:   var(--ds-radius-sm);
+  background:      transparent;
+  cursor:          pointer;
+  color:           var(--ds-color-black);
+  padding:         0;
+}
+
+.ds-qty__btn:hover { background: rgba(0,0,0,0.08); }
+
+.ds-qty__value {
+  min-width:   20px;
+  text-align:  center;
+  font-size:   var(--ds-font-size-body-md);
+  font-weight: var(--ds-font-weight-semibold);
+}
+
+/* ============================================================
+   TABS MENU  (ds-tabs-menu)
+   ============================================================ */
+
+.ds-tabs-menu {
+  position:        relative;
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             var(--ds-space-2);
+  width:           300px;
+  height:          80px;
+  padding:         var(--ds-space-6) 40px;
+  border:          none;
+  border-radius:   var(--ds-radius-xl);
+  background:      var(--ds-color-black);
+  color:           var(--ds-color-white);
+  font-family:     var(--ds-font-family);
+  font-size:       var(--ds-font-size-body-md);
+  font-weight:     var(--ds-font-weight-semibold);
+  letter-spacing:  0;
+  cursor:          pointer;
+  transition:      box-shadow 120ms ease;
+  overflow:        visible;
+}
+
+/* Figma pressed: 8px black 80% opacity outward stroke ring */
+.ds-tabs-menu--pressed { box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.8); }
+
+/* Figma disabled mode: gray-100 bg */
+.ds-tabs-menu--disabled {
+  background: var(--ds-color-gray-100);
+  color:      var(--ds-color-gray-400);
+  cursor:     default;
+}
+.ds-tabs-menu--pressed.ds-tabs-menu--disabled {
+  box-shadow: 0 0 0 8px var(--ds-color-surface), var(--ds-shadow-03-big);
+}
+
+.ds-tabs-menu__icon {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  width:           24px;
+  height:          24px;
+  flex-shrink:     0;
+}
+
+.ds-tabs-menu__label { font-size: var(--ds-font-size-body-md); }
+
+/* ============================================================
+   FILTER CHIP  (ds-filter-chip)
+   ============================================================ */
+
+.ds-filter-chip {
+  position:      relative;
+  display:       inline-flex;
+  align-items:   center;
+  gap:           var(--ds-space-1);
+  padding:       var(--ds-space-3) var(--ds-space-4);
+  height:        44px;
+  border:        none;
+  border-radius: var(--ds-radius-xl);
+  font-family:   var(--ds-font-family);
+  font-size:     var(--ds-font-size-body-md);
+  font-weight:   var(--ds-font-weight-regular);
+  cursor:        pointer;
+  transition:    background 100ms ease;
+  overflow:      visible;
+}
+
+.ds-filter-chip--active   { background: var(--ds-color-black); color: var(--ds-color-white); }
+.ds-filter-chip--disabled { background: var(--ds-color-gray-200); color: var(--ds-color-gray-300); cursor: default; }
+
+.ds-filter-chip__label { white-space: nowrap; }
+
+/* ── Filter Bar ── */
+.ds-filter-bar {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--ds-space-2);
+  padding:       var(--ds-space-4);
+  background:    var(--ds-color-white);
+  border-radius: 9999px;     /* Figma: circular pill shape */
+}
+
+/* ============================================================
+   NAVIGATION CONTROLS  (ds-nav-ctrl)
+   ============================================================ */
+
+.ds-nav-ctrl {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           65px;
+  height:          59px;
+  border:          none;
+  border-radius:   var(--ds-radius-xl);
+  background:      var(--ds-color-white);
+  box-shadow:      var(--ds-shadow-03-big);
+  cursor:          pointer;
+  transition:      box-shadow 120ms ease, background 120ms ease;
+}
+
+/* Figma pressed: stays white, 8px #F3F3F3 outward stroke (NOT black bg) */
+.ds-nav-ctrl--pressed,
+.ds-nav-ctrl:not(:disabled):active {
+  background:      var(--ds-color-white);
+  box-shadow:      0 0 0 8px var(--ds-color-surface), var(--ds-shadow-03-big);
+}
+
+/* ============================================================
+   FILTER OPTIONS  (ds-filter-opt)
+   ============================================================ */
+
+.ds-filter-opt {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           65px;
+  height:          59px;
+  border:          none;
+  border-radius:   var(--ds-radius-xl);
+  background:      var(--ds-color-white);
+  box-shadow:      var(--ds-shadow-03-big);
+  cursor:          pointer;
+  transition:      box-shadow 120ms ease, background 120ms ease;
+}
+
+.ds-filter-opt--close { background: var(--ds-color-black); }
+/* Figma pressed normal: 8px #F3F3F3 ring. Pressed close: 8px black 80% ring (dark bg) */
+.ds-filter-opt--pressed,
+.ds-filter-opt:not(:disabled):active { box-shadow: 0 0 0 8px var(--ds-color-surface), var(--ds-shadow-03-big); }
+.ds-filter-opt--pressed.ds-filter-opt--close,
+.ds-filter-opt--close:not(:disabled):active { box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.8), var(--ds-shadow-03-big); }
+
+/* ============================================================
+   TOGGLE MENU  (ds-toggle-menu)
+   ============================================================ */
+
+.ds-toggle-menu {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           65px;
+  height:          59px;
+  border:          none;
+  border-radius:   var(--ds-radius-xl);
+  background:      var(--ds-color-white);
+  box-shadow:      var(--ds-shadow-03-big);
+  cursor:          pointer;
+  transition:      box-shadow 120ms ease, background 120ms ease;
+}
+
+.ds-toggle-menu--close {
+  background:      var(--ds-color-black);
+}
+
+/* Figma pressed open: white bg, 8px #F3F3F3 stroke */
+.ds-toggle-menu--pressed.ds-toggle-menu--open,
+.ds-toggle-menu--open:not(:disabled):active {
+  box-shadow: 0 0 0 8px var(--ds-color-surface), var(--ds-shadow-03-big);
+}
+/* Figma pressed close: black bg, 8px black 80% stroke */
+.ds-toggle-menu--pressed.ds-toggle-menu--close,
+.ds-toggle-menu--close:not(:disabled):active {
+  box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.8), var(--ds-shadow-03-big);
+}
+
+/* ============================================================
+   TOGGLE CARDS  (ds-toggle-cards)
+   ============================================================ */
+
+.ds-toggle-cards {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  border:          none;
+  border-radius:   var(--ds-radius-lg);       /* 16px — Figma: corner-radius-16 */
+  box-shadow:      var(--ds-shadow-03-big);
+  background:      var(--ds-color-black);
+  cursor:          pointer;
+  transition:      background 100ms ease;
+  width:           60px;
+}
+
+.ds-toggle-cards--small { height: 50px; }
+.ds-toggle-cards--big   { height: 88px; }
+.ds-toggle-cards--disabled { background: var(--ds-color-gray-200); cursor: default; }
+/* Figma pressed: stays black, 8px black 80% opacity outward stroke ring */
+.ds-toggle-cards--pressed  { box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.8), var(--ds-shadow-03-big); }
+
+/* ============================================================
+   SUMMARY CARD  (ds-summary-card)
+   ============================================================ */
+
+.ds-summary-card {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  width:           362px;
+  padding:         2px var(--ds-space-3) 2px var(--ds-space-5);
+  border-radius:   var(--ds-radius-lg);
+  background:      var(--ds-color-white);
+  box-shadow:      var(--ds-shadow-01);
+  cursor:          default;
+}
+
+/* Sección izquierda — info block (w=116px en Figma) */
+.ds-summary-card__info {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--ds-space-2);
+  width:          116px;
+}
+
+/* Company + code apilados verticalmente */
+.ds-summary-card__company-block {
+  display:        flex;
+  flex-direction: column;
+  width:          80px;
+}
+
+.ds-summary-card__company {
+  font-family: var(--ds-font-family);
+  font-size:   var(--ds-font-size-body-md);
+  font-weight: var(--ds-font-weight-semibold);
+  line-height: var(--ds-line-height-body-md);
+  color:       var(--ds-color-gray-500);
+}
+
+/* Subtitle/semibold 24px — el "C.01" grande del Figma */
+.ds-summary-card__code {
+  font-family:     var(--ds-font-family);
+  font-size:       var(--ds-font-size-subtitle-lg);
+  font-weight:     var(--ds-font-weight-semibold);
+  line-height:     var(--ds-line-height-subtitle-lg);
+  letter-spacing:  var(--ds-letter-spacing-wide);
+  color:           var(--ds-color-gray-500);
+}
+
+/* Order number — "BS000095" */
+.ds-summary-card__order {
+  font-family: var(--ds-font-family);
+  font-size:   var(--ds-font-size-body-md);
+  font-weight: var(--ds-font-weight-semibold);
+  line-height: var(--ds-line-height-body-md);
+  color:       var(--ds-color-black);
+}
+
+/* Timestamp row — ícono reloj + texto */
+.ds-summary-card__timestamp {
+  display:     flex;
+  align-items: center;
+  gap:         3px;
+}
+
+.ds-summary-card__time {
+  font-family: var(--ds-font-family);
+  font-size:   var(--ds-font-size-body-sm);
+  font-weight: var(--ds-font-weight-regular);
+  line-height: var(--ds-line-height-body-sm);
+  color:       var(--ds-color-gray-500);
+  white-space: nowrap;
+}
+
+/* Sección derecha — status icon + toggle button */
+.ds-summary-card__actions {
+  display:     flex;
+  align-items: center;
+  gap:         var(--ds-space-3);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   MATERIAL LIST  (ds-material-list)
+   ============================================================ */
+
+.ds-material-list {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             var(--ds-space-5);
+  width:           353px;
+  padding:         var(--ds-space-2) var(--ds-space-5);
+  border-radius:   var(--ds-radius-lg);
+  background:      var(--ds-color-white);
+  box-shadow:      var(--ds-shadow-01);
+}
+
+.ds-material-list__desc {
+  flex:        1;
+  margin:      0;
+  font-size:   var(--ds-font-size-body-md);
+  font-weight: var(--ds-font-weight-regular);
+  color:       var(--ds-color-black);
+  line-height: var(--ds-line-height-body-md);
+}
+
+/* ============================================================
+   DETAIL CARD  (ds-detail-card)
+   ============================================================ */
+
+.ds-detail-card {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--ds-space-3);
+  width:          353px;
+  border-radius:  var(--ds-radius-lg);
+  background:     var(--ds-color-white);
+  box-shadow:     var(--ds-shadow-02-soft);
+  overflow:       hidden;
+  padding:        var(--ds-space-3) 0;
+}
+
+.ds-detail-card .ds-summary-card {
+  width:         100%;
+  box-shadow:    none;
+  border-radius: 0;
+}
+
+.ds-detail-card__materials {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--ds-space-2);
+  width:          100%;
+}
+
+.ds-detail-card__materials .ds-material-list {
+  width:      100%;
+  box-shadow: none;
+  border:     none;
+}
+
+/* ── Legacy card ── */
+.ds-card {
+  width:         360px;
+  border-radius: var(--ds-radius-md);
+  padding:       var(--ds-space-4);
+  background:    var(--ds-color-white);
+  box-shadow:    var(--ds-shadow-01);
+}
+.ds-card--outlined { border: 1px solid var(--ds-color-gray-300); }
+.ds-card--filled   { background: var(--ds-color-gray-100); }
+.ds-card__title    { margin: 0; font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold); }
+.ds-card__description { margin: var(--ds-space-2) 0 0; color: var(--ds-color-gray-500); }
+
+/* ============================================================
+   FORM FIELD  (ds-form-field)
+   ============================================================ */
+
+.ds-form-field {
+  display:       flex;
+  flex-direction: column;
+  gap:            var(--ds-space-1);
+  width:          370px;
+}
+
+.ds-form-field__label {
+  font-size:   var(--ds-font-size-body-md);
+  font-weight: var(--ds-font-weight-regular);
+  line-height: var(--ds-line-height-body-md);
+  color:       var(--ds-color-black);
+}
+
+/* Figma standard: label 14px/20lh (otros estados 16px/24lh) */
+.ds-form-field--standard .ds-form-field__label {
+  font-size:   var(--ds-font-size-label);
+  line-height: var(--ds-line-height-label);
+}
+
+.ds-form-field__input-wrap {
+  position:   relative;
+  display:    flex;
+  align-items: center;
+}
+
+.ds-form-field__input {
+  width:         100%;
+  height:        59px;
+  border:        none;
+  border-radius: var(--ds-radius-2xl);
+  padding:       var(--ds-space-4) var(--ds-space-5);
+  font-family:   var(--ds-font-family);
+  font-size:     var(--ds-font-size-label);   /* Figma: font-size-14 = 14px */
+  line-height:   var(--ds-line-height-label); /* Figma: line-height-20 = 20px */
+  color:         var(--ds-color-black);
+  background:    var(--ds-color-white);
+  box-shadow:    var(--ds-shadow-01);
+  outline:       none;
+  transition:    border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.ds-form-field__input::placeholder { color: var(--ds-color-gray-300); }
+
+.ds-form-field--active .ds-form-field__input {
+  border:     2px solid var(--ds-color-black);
+  box-shadow: none;
+}
+
+.ds-form-field--x .ds-form-field__input {
+  border:     2px solid var(--ds-color-green-100);
+  box-shadow: none;
+}
+
+.ds-form-field--advertencia .ds-form-field__input {
+  border:     2px solid var(--ds-color-red-100);
+  box-shadow: none;
+}
+
+.ds-form-field--disabled .ds-form-field__label {
+  color: var(--ds-color-gray-300);
+}
+.ds-form-field--disabled .ds-form-field__input {
+  background:  var(--ds-color-gray-100);
+  color:       rgba(170, 175, 182, 0.5); /* Figma: gray-300 @ 50% */
+  border:      none;
+  box-shadow:  none;
+  cursor:      not-allowed;
+}
+.ds-form-field--disabled .ds-form-field__input::placeholder {
+  color: rgba(170, 175, 182, 0.5); /* Figma: gray-300 @ 50% */
+}
+
+.ds-form-field__clear,
+.ds-form-field__icon {
+  position:        absolute;
+  right:           var(--ds-space-4);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  border:          none;
+  background:      transparent;
+  cursor:          pointer;
+  color:           var(--ds-color-gray-400);
+  padding:         0;
+}
+
+.ds-form-field__icon--warn { color: var(--ds-color-red-100); }
+
+.ds-form-field__helper {
+  display:     inline-flex;
+  align-items: center;
+  gap:         var(--ds-space-1);
+  font-size:   var(--ds-font-size-body-sm);
+  color:       var(--ds-color-gray-300);
+  margin-top:  var(--ds-space-1);
+}
+
+.ds-form-field__helper--warn { color: var(--ds-color-red-200); }
+.ds-form-field__helper-icon  { color: var(--ds-color-gray-300); flex-shrink: 0; }
+.ds-form-field__helper-icon--warn { color: var(--ds-color-red-200); }
+
+/* ============================================================
+   OPTIONS EXTRA  (ds-options-extra)
+   ============================================================ */
+
+.ds-options-extra {
+  display:     inline-flex;
+  align-items: center;
+  gap:         var(--ds-space-2);
+  cursor:      pointer;
+  user-select: none;
+}
+
+/* Figma: círculo 30x30, border 4px black, radius 50% */
+.ds-options-extra__box {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           30px;
+  height:          30px;
+  border:          4px solid var(--ds-color-black);
+  border-radius:   50%;
+  flex-shrink:     0;
+  background:      var(--ds-color-white);
+  position:        relative;
+  transition:      background 120ms ease, border-color 120ms ease, border-width 120ms ease;
+}
+
+.ds-options-extra__box--checked {
+  border-width: 8px;
+  background:   var(--ds-color-white);
+}
+
+.ds-options-extra__box--checked svg {
+  fill: var(--ds-color-black);
+}
+
+.ds-options-extra--disabled .ds-options-extra__box {
+  background:   var(--ds-color-gray-100);
+  border-color: var(--ds-color-gray-200);
+  cursor:       not-allowed;
+}
+
+/* remove usa el mismo estilo que --checked (negro sólido), manejado por ds-options-extra__box--checked */
+.ds-options-extra__label {
+  font-size: var(--ds-font-size-body-md);
+  color:     var(--ds-color-black);
+}
+
+.ds-options-extra--disabled .ds-options-extra__label { color: var(--ds-color-black); }
+
+/* ============================================================
+   CHECKBOX  (ds-checkbox)
+   ============================================================ */
+
+.ds-checkbox {
+  display:     inline-flex;
+  align-items: center;
+  gap:         var(--ds-space-2);
+  cursor:      pointer;
+  user-select: none;
+}
+
+.ds-checkbox__box {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  flex-shrink:     0;
+  color:           var(--ds-color-gray-300);
+}
+
+.ds-checkbox:hover:not(.ds-checkbox--disabled) .ds-checkbox__box,
+.ds-checkbox--hover .ds-checkbox__box {
+  color: var(--ds-color-black);
+}
+
+.ds-checkbox--checked .ds-checkbox__box {
+  color: var(--ds-color-black);
+}
+
+.ds-checkbox--disabled {
+  cursor: not-allowed;
+}
+
+.ds-checkbox--disabled .ds-checkbox__box {
+  color: var(--ds-color-gray-200);
+}
+
+.ds-checkbox__label {
+  font-size: var(--ds-font-size-body-md);
+  color:     var(--ds-color-black);
+}
+
+.ds-checkbox--disabled .ds-checkbox__label { color: var(--ds-color-gray-200); }
+
+/* ============================================================
+   TAG  (ds-tag)y como hago para que
+   ============================================================ */
+
+.ds-tag {
+  display:       inline-flex;
+  align-items:   center;
+  justify-content: center;
+  gap:           var(--ds-space-1);
+  height:        48px;
+  min-width:     80px;
+  padding:       0 20px;
+  border:        none;
+  border-radius: 40px;
+  font-family:   var(--ds-font-family);
+  font-size:     var(--ds-font-size-body-md);
+  font-weight:   var(--ds-font-weight-semibold);
+  cursor:        pointer;
+  transition:    background 100ms ease;
+}
+
+.ds-tag--active   { background: var(--ds-color-black);    color: var(--ds-color-white);   border: none; font-weight: var(--ds-font-weight-regular); }
+.ds-tag--standard { background: transparent;               color: var(--ds-color-gray-300); border: 2px solid var(--ds-color-gray-200); }
+.ds-tag--disabled { background: var(--ds-color-gray-200); color: var(--ds-color-gray-300); border: none; cursor: not-allowed; pointer-events: none; }
+
+.ds-tag--layout-label { background: transparent; border: none; color: var(--ds-color-black); }
+
+/* ============================================================
+   PROGRESS BAR  (ds-progress)
+   ============================================================ */
+
+/* Figma progressBar: vertical layout 368x66 — title on top, track, description below */
+.ds-progress {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--ds-space-2);
+  width:          368px;
+}
+
+/* Figma: "0% completado" — 16px/24px regular, black */
+.ds-progress__label {
+  font-family: var(--ds-font-family);
+  font-size:   var(--ds-font-size-body-md);
+  font-weight: var(--ds-font-weight-regular);
+  line-height: var(--ds-line-height-body-md);
+  color:       var(--ds-color-black);
+  white-space: nowrap;
+}
+
+/* Figma track: 368x14, r=20, white bg, inner shadow */
+.ds-progress__track {
+  width:         100%;
+  height:        14px;
+  background:    var(--ds-color-white);
+  border-radius: 20px;
+  overflow:      hidden;
+  box-shadow:    0 4px 8px rgba(170, 175, 182, 0.25);
+}
+
+/* Figma fill: r=20, black */
+.ds-progress__fill {
+  height:        100%;
+  background:    var(--ds-color-black);
+  border-radius: 20px;
+  min-width:     14px;
+  transition:    width 300ms ease;
+}
+
+/* Figma description: "Faltan 4 materiales" — body-sm, gray-300, alineado a la derecha bajo la barra */
+.ds-progress__description {
+  font-family: var(--ds-font-family);
+  font-size:   var(--ds-font-size-body-sm);
+  font-weight: var(--ds-font-weight-regular);
+  line-height: var(--ds-line-height-body-sm);
+  color:       var(--ds-color-gray-300);
+  text-align:  right;
+  align-self:  flex-end;
+}
+
+/* Legacy alias */
+.ds-progress__pct {
+  font-size:   var(--ds-font-size-body-sm);
+  font-weight: var(--ds-font-weight-semibold);
+  color:       var(--ds-color-black);
+  min-width:   36px;
+  text-align:  right;
+}
+
+/* ============================================================
+   OPTION LABEL  (ds-option-label)
+   ============================================================ */
+
+.ds-option-label {
+  display:     inline-flex;
+  align-items: center;
+  gap:         var(--ds-space-2);
+  border:      none;
+  background:  transparent;
+  font-family: var(--ds-font-family);
+  font-size:   var(--ds-font-size-body-md);
+  font-weight: var(--ds-font-weight-regular);
+  cursor:      pointer;
+  color:       var(--ds-color-black);
+  padding:     var(--ds-space-2) var(--ds-space-3);
+}
+
+/* Figma standard: 30x30 ellipse, 4px gray-200 border, white fill */
+.ds-option-label__dot {
+  display:       block;
+  width:         30px;
+  height:        30px;
+  border-radius: 50%;
+  flex-shrink:   0;
+  border:        4px solid var(--ds-color-gray-200);
+  background:    var(--ds-color-white);
+  transition:    background 120ms ease, border-color 120ms ease;
+}
+
+/* Figma active/selected: círculo sólido negro */
+.ds-option-label--active .ds-option-label__dot {
+  background:   var(--ds-color-black-100);
+  border-color: var(--ds-color-black);
+}
+
+/* Figma disabled: gray-100 fill, gray-200 border, gray-300 text */
+.ds-option-label--disabled { color: var(--ds-color-gray-300); cursor: not-allowed; }
+.ds-option-label--disabled .ds-option-label__dot {
+  border-color: var(--ds-color-gray-200);
+  background:   var(--ds-color-gray-100);
+}
+
+/* ============================================================
+   LEGACY NAV  (ds-nav)
+   ============================================================ */
+
+.ds-nav { display: flex; gap: var(--ds-space-2); }
+.ds-nav--sidebar  { flex-direction: column; width: 240px; }
+.ds-nav--topbar   { flex-direction: row; }
+.ds-nav__item     { display: flex; align-items: center; gap: var(--ds-space-2); text-decoration: none; color: var(--ds-color-gray-500); padding: 10px 12px; border-radius: var(--ds-radius-md); }
+.ds-nav__item--active { background: var(--ds-color-green-100); color: var(--ds-color-black); font-weight: var(--ds-font-weight-semibold); }
+
+/* ============================================================
+   ICON  (ds-icon)
+   ============================================================ */
+
+.ds-icon { display: inline-block; flex-shrink: 0; }
+

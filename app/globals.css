@@ -1,0 +1,234 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-brand:        #ADD010;
+  --color-brand-100:    #ADD010;
+  --color-brand-200:    #88A024;
+  --color-brand-light:  #D4F04A;
+  --color-brand-dark:   #6a8019;
+
+  --color-ds-gray-100:  #EBEBEB;
+  --color-ds-gray-200:  #D9D9D9;
+  --color-ds-gray-300:  #AAAFB6;
+  --color-ds-gray-400:  #747B86;
+  --color-ds-gray-500:  #5D636C;
+
+  --color-ds-red:       #C96C6C;
+  --color-ds-red-100:   #C96C6C;
+  --color-ds-red-200:   #BB4A4A;
+
+  --color-ds-yellow:    #F0C802;
+  --color-ds-bg:        #F3F3F3;
+
+  /* Font family */
+  --font-family-sans: 'Roboto', system-ui, sans-serif;
+
+  /* Font sizes */
+  --font-size-body-sm: 12px;
+  --line-height-body-sm: 16px;
+  --font-size-body:    16px;
+  --line-height-body:  24px;
+  --font-size-sub-sm:  20px;
+  --line-height-sub-sm: 24px;
+  --font-size-sub:     24px;
+  --line-height-sub:   24px;
+  --font-size-heading: 32px;
+  --line-height-heading: 40px;
+
+  /* Border radius */
+  --radius-ds-sm: 4px;
+  --radius-ds:    8px;
+  --radius-ds-lg: 16px;
+  --radius-ds-xl: 32px;
+
+  /* Shadows */
+  --shadow-ds-01: 0px 4px 8px 0px rgba(170, 175, 182, 0.25);
+  --shadow-ds-02: 0px 6px 0px 0px rgba(0, 0, 0, 0.16);
+  --shadow-ds-03: 0px 6px 0px 0px rgba(0, 0, 0, 0.16), 0px 2px 4px 0px rgba(0, 0, 0, 0.16);
+}
+
+/* ── Adelante Design System tokens (mirror de design-system.css) ── */
+:root {
+  --ds-color-green-100: #add010;
+  --ds-color-green-200: #88a024;
+  --ds-color-red-100:   #c96c6c;
+  --ds-color-red-200:   #bb4a4a;
+  --ds-color-gray-500:  #5d636c;
+  --ds-color-gray-400:  #747b86;
+  --ds-color-gray-300:  #aaafb6;
+  --ds-color-gray-200:  #d9d9d9;
+  --ds-color-gray-100:  #ebebeb;
+  --ds-color-black:     #000000;
+  --ds-color-black-100: rgba(0,0,0,0.8);
+  --ds-color-white:     #ffffff;
+  --ds-color-surface:   #f3f3f3;
+  --ds-color-yellow:    #f0c802;
+
+  --ds-font-family:          "Roboto", "Segoe UI", sans-serif;
+  --ds-font-size-body-sm:    12px;
+  --ds-font-size-label:      14px;
+  --ds-font-size-body-md:    16px;
+  --ds-font-size-subtitle:   20px;
+  --ds-font-size-subtitle-lg: 24px;
+  --ds-font-size-heading:    32px;
+  --ds-line-height-body-sm:  16px;
+  --ds-line-height-label:    20px;
+  --ds-line-height-body-md:  24px;
+  --ds-line-height-subtitle: 24px;
+  --ds-line-height-heading:  40px;
+  --ds-letter-spacing-default: 0;
+  --ds-letter-spacing-tight: 0.25px;
+  --ds-letter-spacing-wide:  0.4px;
+  --ds-font-weight-regular:  400;
+  --ds-font-weight-semibold: 600;
+
+  --ds-space-1:  4px;
+  --ds-space-2:  8px;
+  --ds-space-3:  12px;
+  --ds-space-4:  16px;
+  --ds-space-5:  20px;
+  --ds-space-6:  24px;
+  --ds-space-10: 40px;
+
+  --ds-radius-sm:  4px;
+  --ds-radius-md:  8px;
+  --ds-radius-lg:  16px;
+  --ds-radius-xl:  32px;
+  --ds-radius-2xl: 32px;
+
+  --ds-shadow-01:      0 4px 8px rgba(170,175,182,0.25);
+  --ds-shadow-02-soft: 0 0 6px rgba(0,0,0,0.16);
+  --ds-shadow-03-big:  0 2px 4px rgba(0,0,0,0.16), 0 0 6px rgba(0,0,0,0.16);
+}
+
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-family-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F3F3F3;
+  color: #000000;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D9D9D9; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #AAAFB6; }
+
+/* Animations */
+@keyframes slide-in-from-right-5 {
+  from { transform: translateX(16px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.animate-in { animation-fill-mode: both; }
+.slide-in-from-right-5 { animation-name: slide-in-from-right-5; }
+.duration-300 { animation-duration: 300ms; }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+
+/* Skeleton: shimmer sutil usando tokens ds-gray. Reemplaza los animate-pulse
+   ad-hoc por el componente <Skeleton>. */
+@keyframes ds-shimmer {
+  0%   { background-position: -180% 0; }
+  100% { background-position: 180% 0; }
+}
+.ds-skeleton {
+  background-color: var(--ds-color-gray-100, #EDEEF0);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.65) 50%,
+    transparent 100%
+  );
+  background-size: 180% 100%;
+  background-repeat: no-repeat;
+  animation: ds-shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-skeleton { animation: none; }
+}
+
+/* ── App-level overrides para componentes del Design System ── */
+/* Los componentes del DS tienen anchos fijos (Figma). En layouts web
+   los queremos fluidos. */
+.ds-form-field { width: 100%; }
+.ds-search-shell { width: 100%; }
+.ds-search--label,
+.ds-search--normal,
+.ds-search--expanded { min-width: 0; }
+
+/* ── Sidebar (Adelante DS · dark shell + nav pills) ── */
+.app-sidebar {
+  background: #2a2a2a;
+}
+.app-sidebar__footer { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.app-sidebar__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  transition: color 120ms ease, background 120ms ease;
+}
+.app-sidebar__toggle:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+
+.app-nav__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.app-nav__item:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.app-nav__item--active {
+  background: var(--ds-color-brand, #ADD010);
+  color: var(--ds-color-black, #000);
+}
+.app-nav__item--active:hover {
+  background: var(--ds-color-brand, #ADD010);
+  color: var(--ds-color-black, #000);
+}
+.app-nav__item--collapsed { justify-content: center; padding: 0; }
+.app-nav__item--logout {
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.05);
+}
+.app-nav__item--logout:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fff;
+}
+.app-nav__icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex-shrink: 0; }
+.app-nav__label { overflow: hidden; }
+
+/* Rol pill (fiel a screens/Usuarios .usr-rol-pill del DS) */
+.ds-rol-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--ds-color-white);
+  border: 1px solid var(--ds-color-gray-200);
+  color: var(--ds-color-gray-400);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
