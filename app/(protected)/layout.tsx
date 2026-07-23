@@ -76,15 +76,17 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        {/* Page content — con transiciones por ruta */}
+        {/* Page content — transición SOLO de opacidad (sin translate): animar transform
+            hace que el navegador rasterice y el texto se vea borroso/"pixeleado" durante
+            el cambio de ruta. Un fade corto con tween mantiene el texto nítido. */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.main
             key={pathname}
             className="flex-1 overflow-auto"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={springs.expanding}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
           >
             {children}
           </motion.main>
