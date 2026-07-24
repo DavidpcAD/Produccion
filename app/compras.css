@@ -85,7 +85,7 @@
 .oc-scope h1, .oc-scope h2, .oc-scope h3, .oc-scope h4, .oc-scope p { margin: 0; }
 
 /* ---- Typography helpers ---- */
-.oc-scope .ds-heading { font-size: var(--ds-font-size-heading); line-height: var(--ds-line-height-heading); font-weight: var(--ds-font-weight-semibold); overflow-wrap: anywhere; }
+.oc-scope .ds-heading { font-size: var(--ds-font-size-heading); line-height: var(--ds-line-height-heading); font-weight: 700; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .oc-scope .ds-heading { font-size: clamp(24px, 7vw, var(--ds-font-size-heading)); } }
 .oc-scope .ds-subtitle-lg { font-size: var(--ds-font-size-subtitle-lg); line-height: var(--ds-line-height-subtitle); font-weight: var(--ds-font-weight-semibold); }
 .oc-scope .ds-subtitle { font-size: var(--ds-font-size-subtitle); line-height: var(--ds-line-height-subtitle); font-weight: var(--ds-font-weight-semibold); }
@@ -606,8 +606,10 @@
 .oc-scope .topbar__user { display: flex; align-items: center; gap: var(--ds-space-3); }
 .oc-scope .topbar__avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--ds-color-gray-200); display: grid; place-items: center; font-weight: 600; color: var(--ds-color-gray-500); }
 
-.oc-scope .page { width: 100%; max-width: 1480px; margin: 0 auto; padding: var(--ds-space-10) var(--ds-space-6) 80px; flex: 1; }
-.oc-scope .page--wide { max-width: 1480px; }
+/* Contenedor alineado al resto del app (max-w-[1600px] + p-6). El 80px inferior
+   deja aire para las barras de acción fijas de algunas pantallas de compras. */
+.oc-scope .page { width: 100%; max-width: 1600px; margin: 0 auto; padding: var(--ds-space-6) var(--ds-space-6) 80px; flex: 1; }
+.oc-scope .page--wide { max-width: 1600px; }
 .oc-scope .page__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ds-space-4); margin-bottom: var(--ds-space-6); flex-wrap: wrap; }
 .oc-scope .page__title { display: flex; flex-direction: column; gap: 4px; }
 
