@@ -34,6 +34,13 @@ export default function PresupuestoPage() {
 
   // Montos por partida (vista General). Clave = idPartida.
   const [montoPartida, setMontoPartida] = useState<Record<number, string>>({});
+  // Monto por subpartida (vista Detallado). Clave = idSubPartida.
+  const [montoSub, setMontoSub] = useState<Record<number, string>>({});
+  // Horas + cantidad por subpartida (vista Horas y cantidades).
+  const [horasSub, setHorasSub] = useState<Record<number, string>>({});
+  const [cantSub, setCantSub] = useState<Record<number, string>>({});
+
+  const subsDe = useCallback((idPartida: number) => subpartidas.filter(s => s.idPartida === idPartida), [subpartidas]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,10 +64,22 @@ export default function PresupuestoPage() {
 
   async function subir() {
     if (!obraId) { toast('Elegí una obra primero', 'warning'); return; }
-    const lineas = Object.entries(montoPartida)
-      .map(([idPartida, monto]) => ({ idPartida: Number(idPartida), monto: Number(monto) || 0 }))
-      .filter(l => l.monto > 0);
-    if (lineas.length === 0) { toast('Ingresá al menos un monto', 'warning'); return; }
+    let lineas: Record<string, number>[];
+    if (tab === 'general') {
+      lineas = Object.entries(montoPartida)
+        .map(([idPartida, monto]) => ({ idPartida: Number(idPartida), monto: Number(monto) || 0 }))
+        .filter(l => l.monto > 0);
+    } else if (tab === 'detallado') {
+      lineas = Object.entries(montoSub)
+        .map(([idSubPartida, monto]) => ({ idSubPartida: Number(idSubPartida), monto: Number(monto) || 0 }))
+        .filter(l => l.monto > 0);
+    } else {
+      const ids = new Set([...Object.keys(horasSub), ...Object.keys(cantSub)].map(Number));
+      lineas = [...ids]
+        .map(id => ({ idSubPartida: id, horas: Number(horasSub[id]) || 0, cantidad: Number(cantSub[id]) || 0 }))
+        .filter(l => l.horas > 0 || l.cantidad > 0);
+    }
+    if (lineas.length === 0) { toast('Ingresá al menos un valor', 'warning'); return; }
     setSubiendo(true);
     try {
       const res = await fetch('/api/presupuesto', {
@@ -152,9 +171,90 @@ export default function PresupuestoPage() {
             <span className="text-black font-bold text-lg">{crc.format(totalGeneral)}</span>
           </div>
         </div>
+      ) : tab === 'detallado' ? (
+        <div className="space-y-5">
+          {grupos.map(({ etapa, partidas: parts }) => (
+            <div key={etapa.idEtapa} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-ds bg-black text-white text-xs font-bold font-mono">{etapa.codigo}</span>
+                <h2 className="font-bold text-black text-sm uppercase tracking-wide">{etapa.nombre}</h2>
+              </div>
+              {parts.map(p => {
+                const subs = subsDe(p.idPartida);
+                if (subs.length === 0) return null;
+                return (
+                  <div key={p.idPartida} className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+                    <div className="px-4 py-2 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-ds-gray-500">{p.codigo}</span>
+                      <span className="font-bold text-black text-sm truncate">{p.nombre}</span>
+                    </div>
+                    <div className="divide-y divide-ds-gray-100">
+                      {subs.map(s => (
+                        <div key={s.idSubPartida} className="px-4 py-2 flex items-center gap-3">
+                          <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 w-16">{s.codigo}</span>
+                          <span className="text-sm text-black truncate flex-1">{s.nombre}</span>
+                          <div className="w-40 shrink-0">
+                            <Input type="number" min={0} placeholder="₡ 0"
+                              value={montoSub[s.idSubPartida] ?? ''}
+                              onChange={e => setMontoSub(m => ({ ...m, [s.idSubPartida]: e.target.value }))} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+          <div className="flex items-center justify-end gap-3 bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 px-5 py-4 sticky bottom-3">
+            <span className="text-ds-gray-400 text-body-sm">Total presupuesto</span>
+            <span className="text-black font-bold text-lg">{crc.format(Object.values(montoSub).reduce((s, v) => s + (Number(v) || 0), 0))}</span>
+          </div>
+        </div>
       ) : (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
-          Vista <strong className="text-black">{tab === 'detallado' ? 'Detallado' : 'Horas y cantidades'}</strong> — en construcción.
+        <div className="space-y-5">
+          {grupos.map(({ etapa, partidas: parts }) => (
+            <div key={etapa.idEtapa} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-ds bg-black text-white text-xs font-bold font-mono">{etapa.codigo}</span>
+                <h2 className="font-bold text-black text-sm uppercase tracking-wide">{etapa.nombre}</h2>
+              </div>
+              {parts.map(p => {
+                const subs = subsDe(p.idPartida);
+                if (subs.length === 0) return null;
+                return (
+                  <div key={p.idPartida} className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+                    <div className="px-4 py-2 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-ds-gray-500">{p.codigo}</span>
+                      <span className="font-bold text-black text-sm truncate">{p.nombre}</span>
+                    </div>
+                    <div className="divide-y divide-ds-gray-100">
+                      {subs.map(s => (
+                        <div key={s.idSubPartida} className="px-4 py-2 flex items-center gap-3">
+                          <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 w-16">{s.codigo}</span>
+                          <span className="text-sm text-black truncate flex-1 min-w-0">{s.nombre}</span>
+                          <div className="w-28 shrink-0">
+                            <Input type="number" min={0} placeholder="Horas"
+                              value={horasSub[s.idSubPartida] ?? ''}
+                              onChange={e => setHorasSub(m => ({ ...m, [s.idSubPartida]: e.target.value }))} />
+                          </div>
+                          <div className="w-28 shrink-0">
+                            <Input type="number" min={0} placeholder="Cant."
+                              value={cantSub[s.idSubPartida] ?? ''}
+                              onChange={e => setCantSub(m => ({ ...m, [s.idSubPartida]: e.target.value }))} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+          <div className="flex items-center justify-end gap-4 bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 px-5 py-4 sticky bottom-3 text-body-sm">
+            <span className="text-ds-gray-400">Total horas <strong className="text-black">{Object.values(horasSub).reduce((s, v) => s + (Number(v) || 0), 0).toLocaleString('es-CR')}</strong></span>
+            <span className="text-ds-gray-400">Total cantidades <strong className="text-black">{Object.values(cantSub).reduce((s, v) => s + (Number(v) || 0), 0).toLocaleString('es-CR')}</strong></span>
+          </div>
         </div>
       )}
     </div>
