@@ -18,6 +18,19 @@ const TIPO_LABEL: Record<string, string> = { Sales: 'Venta', Cost: 'Costo direct
 // Solo estos 3 se suben a BC (Producción es base de avance, va aparte — no se muestra).
 const TIPO_SUBIBLES = ['Sales', 'Cost', 'Indirect Cost'];
 
+// Encabezado de paso: badge numerado + título, para guiar el flujo (1 → 2 → 3).
+function StepHeader({ n, title, hint }: { n: number; title: string; hint?: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="w-7 h-7 rounded-full bg-black text-white text-sm font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
+      <div className="min-w-0">
+        <h2 className="font-bold text-black leading-tight">{title}</h2>
+        {hint && <p className="text-ds-gray-400 text-xs mt-0.5">{hint}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function PresupuestoPage() {
   const session = useSession();
   const { toast } = useToast();
@@ -155,8 +168,9 @@ export default function PresupuestoPage() {
         <p className="text-ds-gray-400 text-body-sm">Cargá los Excel de la obra (Plantilla y Descompuesto) y subílos a Business Central.</p>
       </div>
 
-      {/* 1) Obra + archivos */}
+      {/* Paso 1 — Obra + archivos */}
       <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
+        <StepHeader n={1} title="Elegí la obra y cargá los Excel" hint="Podés cargar solo General, solo Descompuesto, o los dos." />
         <div className="sm:max-w-md">
           <Combobox
             label="Obra" required value={obraId} onChange={setObraId} placeholder="Seleccionar obra"
@@ -166,37 +180,24 @@ export default function PresupuestoPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="block">
-            <span className="text-body-sm font-semibold text-black">Plantilla (Venta / Costo / Indirectos)</span>
-            <input ref={plantillaFile} type="file" accept=".xlsx,.xls" className="mt-1 block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
+            <span className="text-body-sm font-semibold text-black">Plantilla general</span>
+            <span className="block text-ds-gray-400 text-xs mb-1">Venta, Costo e Indirectos — esto arma la versión en BC.</span>
+            <input ref={plantillaFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
           </label>
           <label className="block">
-            <span className="text-body-sm font-semibold text-black">Descompuesto (materiales)</span>
-            <input ref={descFile} type="file" accept=".xlsx,.xls" className="mt-1 block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
+            <span className="text-body-sm font-semibold text-black">Descompuesto</span>
+            <span className="block text-ds-gray-400 text-xs mb-1">Materiales por tarea — se suben aparte a BC.</span>
+            <input ref={descFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
           </label>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="outline" onClick={leerArchivos} loading={leyendo} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer archivos</Button>
-          {hayDatos && (
-            <Button variant="secondary" onClick={() => setModalGuardar(true)} icon={<Icon name="check" size="sm" color="currentColor" />}>Guardar como plantilla</Button>
-          )}
-          {plantilla && (
-            <Button onClick={() => subir('general')} loading={subiendoQue === 'general'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir General a BC</Button>
-          )}
-          {descompuesto && (
-            <Button onClick={() => subir('descompuesto')} loading={subiendoQue === 'descompuesto'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir Descompuesto a BC</Button>
-          )}
-          {hayDatos && !obraId && (
-            <span className="text-ds-red text-body-sm font-medium">↑ Elegí una obra para poder subir</span>
-          )}
-        </div>
-        {resultado && <div className="rounded-ds bg-brand-soft border border-brand/40 px-4 py-3 text-sm text-black">{resultado}</div>}
+        <Button variant="outline" onClick={leerArchivos} loading={leyendo} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer archivos</Button>
       </div>
 
       {/* Plantillas guardadas (reutilizables) */}
       {plantillas.length > 0 && (
         <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-2">
-          <h2 className="font-bold text-black">Plantillas guardadas</h2>
-          <p className="text-ds-gray-400 text-xs">Cargá una plantilla guardada para editarla o subirla a la obra que elijas.</p>
+          <h2 className="font-bold text-black">O empezá desde una plantilla guardada</h2>
+          <p className="text-ds-gray-400 text-xs">En vez de cargar Excel, reutilizá una plantilla: se abre en la vista previa para editarla y subirla a la obra que elijas.</p>
           <div className="divide-y divide-ds-gray-100">
             {plantillas.map(pl => (
               <div key={pl.idPlantilla} className="py-2.5 flex items-center gap-3">
@@ -219,6 +220,7 @@ export default function PresupuestoPage() {
           : plantilla ? 'general' : 'descompuesto';
         return (
         <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
+          <StepHeader n={2} title="Revisá el presupuesto" hint="Alterná entre General y Descompuesto. Podés editar los montos antes de subir." />
           {/* Selector de vista */}
           <div className="flex items-center gap-2 flex-wrap">
             {plantilla && (
@@ -266,10 +268,15 @@ export default function PresupuestoPage() {
                               <td className="py-1.5 px-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
                               <td className="py-1.5 px-3"><span className={'text-xs px-2 py-0.5 rounded-full ' + (l.taskType === 'Total' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{l.taskType === 'Total' ? 'Capítulo' : 'Partida'}</span></td>
                               <td className="py-1.5 px-3 truncate max-w-[360px]">{l.description}</td>
-                              <td className="py-1 px-3 text-right">
-                                <input type="number" value={l.lineAmount ?? 0}
-                                  onChange={e => editarMonto(activa, i, e.target.value)}
-                                  className="w-32 text-right rounded-ds border border-ds-gray-200 px-2 py-1 text-sm focus:border-black focus:outline-none" />
+                              <td className="py-1 px-3">
+                                <div className="flex justify-end">
+                                  <div className="inline-flex items-center gap-1 rounded-ds border border-ds-gray-200 pl-2 w-40 focus-within:border-black">
+                                    <span className="text-ds-gray-400 text-xs shrink-0">₡</span>
+                                    <input type="number" step="0.01" value={Math.round((l.lineAmount ?? 0) * 100) / 100}
+                                      onChange={e => editarMonto(activa, i, e.target.value)}
+                                      className="w-full text-right px-1 py-1 text-sm bg-transparent focus:outline-none" />
+                                  </div>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -308,6 +315,28 @@ export default function PresupuestoPage() {
         </div>
         );
       })()}
+
+      {/* Paso 3 — Guardar / Subir a Business Central */}
+      {hayDatos && (
+        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
+          <StepHeader n={3} title="Guardá o subí a Business Central" hint="General (versión) y Descompuesto (materiales) se suben por separado — cada botón manda solo lo suyo." />
+          {!obraId && (
+            <div className="rounded-ds bg-brand-soft border border-brand/40 px-4 py-2.5 text-sm text-black">
+              Elegí una obra en el paso 1 para poder subir a BC.
+            </div>
+          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button variant="secondary" onClick={() => setModalGuardar(true)} icon={<Icon name="check" size="sm" color="currentColor" />}>Guardar como plantilla</Button>
+            {plantilla && (
+              <Button onClick={() => subir('general')} loading={subiendoQue === 'general'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir General a BC</Button>
+            )}
+            {descompuesto && (
+              <Button onClick={() => subir('descompuesto')} loading={subiendoQue === 'descompuesto'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir Descompuesto a BC</Button>
+            )}
+          </div>
+          {resultado && <div className="rounded-ds bg-brand-soft border border-brand/40 px-4 py-3 text-sm text-black">{resultado}</div>}
+        </div>
+      )}
 
       {/* Modal: guardar como plantilla */}
       <Modal open={modalGuardar} onClose={() => setModalGuardar(false)} title="Guardar como plantilla"
