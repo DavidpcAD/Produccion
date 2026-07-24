@@ -140,7 +140,7 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
       </div>
 
       {/* Nav */}
-      <nav className={`app-nav flex-1 px-3 py-2 space-y-1 overflow-y-auto overflow-x-hidden${collapsed ? ' app-nav--collapsed' : ''}`}>
+      <nav className={`app-nav no-scrollbar flex-1 px-3 py-2 space-y-1 overflow-y-auto overflow-x-hidden${collapsed ? ' app-nav--collapsed' : ''}`}>
         {navItems
           .filter(item => !item.minLevel || nivelAdmin >= item.minLevel)
           .map(item => (

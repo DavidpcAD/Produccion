@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   // Líneas de versión = Venta + Costo + Indirecto (+ Producción si viene).
   const lineasVersion: BulkLine[] = [];
-  for (const tipo of ['Sales', 'Cost', 'Indirect', 'Production']) {
+  for (const tipo of ['Sales', 'Cost', 'Indirect Cost']) {
     for (const l of plantilla?.porTipo?.[tipo] ?? []) lineasVersion.push(l);
   }
   const materiales = descompuesto?.lineas ?? [];
@@ -43,12 +43,15 @@ export async function POST(req: NextRequest) {
     if (lineasVersion.length > 0) {
       const r = await subirVersionPresupuesto(worksNo, lineasVersion, verBase);
       resultado.version = r.versionCode;
+      resultado.enviadas = r.enviadas;
       resultado.totales = r.totals;
+      resultado.resultadoBC = r.resultado;
     }
     if (materiales.length > 0) {
       const d = await subirDescompuesto(worksNo, materiales);
       resultado.descompuestoChunks = d.chunks;
-      resultado.materiales = materiales.length;
+      resultado.materiales = d.enviadas;
+      resultado.resultadoDescompuestoBC = d.resultado;
     }
     await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length }, ip });
     return NextResponse.json({ ok: true, ...resultado });

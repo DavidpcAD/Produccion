@@ -32,7 +32,9 @@ const PLANTILLA_ALIAS = {
   taskNo: ['codigo', 'codigo '], taskType: ['nat'], unitOfMeasure: ['ud'], description: ['resumen'],
   quantity: ['canpres'], unitAmount: ['pres'], lineAmount: ['imppres'],
 };
-const SHEET_TIPO: Record<string, BulkLine['lineType']> = { ventaad: 'Sales', costead: 'Cost', ind: 'Indirect', producad: 'Production' };
+const SHEET_TIPO: Record<string, BulkLine['lineType']> = { ventaad: 'Sales', costead: 'Cost', ind: 'Indirect Cost', producad: 'Production' };
+// "Nat" del Excel (Capítulo/Partida/...) → taskType válido en BC (Total = rollup, Posting = hoja).
+const natToTaskType = (nat: unknown): string => (norm(nat).startsWith('capitulo') ? 'Total' : 'Posting');
 
 export interface PlantillaParsed {
   porTipo: Record<string, BulkLine[]>;   // 'Sales' | 'Cost' | 'Indirect' | 'Production'
@@ -62,7 +64,7 @@ export function parsePlantilla(buf: Buffer): PlantillaParsed {
       lineas.push({
         lineNo: lineas.length + 1,
         lineType: tipo,
-        taskType: String(row[c.taskType] ?? '').trim(),
+        taskType: natToTaskType(row[c.taskType]),
         taskNo,
         description,
         unitOfMeasure: String(row[c.unitOfMeasure] ?? '').trim(),

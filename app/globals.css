@@ -232,3 +232,7 @@ body {
   line-height: 1;
   white-space: nowrap;
 }
+
+/* Oculta la barra de scroll (usado en el sidebar) sin perder el scroll. */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

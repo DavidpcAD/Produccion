@@ -92,7 +92,7 @@ export async function getWork(worksNo: string): Promise<(WorkTotals & { no: stri
 
 // Sube la versión de presupuesto (líneas venta/costo/indirecto) vía el singleton bulk,
 // y registra la versión. Devuelve la versión creada y los totales recalculados.
-export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[], verBase?: string | null): Promise<{ versionCode: string; totals: WorkTotals | null }> {
+export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[], verBase?: string | null): Promise<{ versionCode: string; resultado: string; enviadas: number; totals: WorkTotals | null }> {
   const versionCode = nextVersion(verBase);
   const lineasJSON = JSON.stringify(lineas.map((l, i) => ({
     worksNo, versionCode,
@@ -113,10 +113,11 @@ export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[
   })));
 
   const bulk = await firstRecord('workLineBulks');
-  await req(`workLineBulks(${bulk.id})`, {
+  const patchResp = await req(`workLineBulks(${bulk.id})`, {
     method: 'PATCH', headers: { 'If-Match': bulk.etag },
     body: JSON.stringify({ worksNo, lineasJSON, ejecutar: true }),
   });
+  const resultado = String((patchResp as { resultado?: unknown })?.resultado ?? '');
 
   await req('workVersions', {
     method: 'POST',
@@ -124,11 +125,11 @@ export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[
   });
 
   const work = await getWork(worksNo);
-  return { versionCode, totals: work ? { salesLineAmount: work.salesLineAmount, costLineAmount: work.costLineAmount, indirectCostLineAmount: work.indirectCostLineAmount, result: work.result } : null };
+  return { versionCode, resultado, enviadas: lineas.length, totals: work ? { salesLineAmount: work.salesLineAmount, costLineAmount: work.costLineAmount, indirectCostLineAmount: work.indirectCostLineAmount, result: work.result } : null };
 }
 
 // Sube el descompuesto (materiales) como {n,e,d} en payload1..40 (chunks de 2048).
-export async function subirDescompuesto(worksNo: string, nuevos: DecompLine[], editados: DecompLine[] = [], eliminados: { id: string }[] = []): Promise<{ chunks: number }> {
+export async function subirDescompuesto(worksNo: string, nuevos: DecompLine[], editados: DecompLine[] = [], eliminados: { id: string }[] = []): Promise<{ chunks: number; resultado: string; enviadas: number }> {
   const payload = JSON.stringify({ n: nuevos.map(n => ({ ...n, worksNo })), e: editados, d: eliminados });
   const CHUNK = 2048;
   const MAX = 40;
@@ -138,9 +139,9 @@ export async function subirDescompuesto(worksNo: string, nuevos: DecompLine[], e
   for (let i = 0; i < MAX; i++) fields[`payload${i + 1}`] = payload.slice(i * CHUNK, (i + 1) * CHUNK);
 
   const bulk = await firstRecord('workDecompBulks');
-  await req(`workDecompBulks(${bulk.id})`, {
+  const patchResp = await req(`workDecompBulks(${bulk.id})`, {
     method: 'PATCH', headers: { 'If-Match': bulk.etag },
     body: JSON.stringify(fields),
   });
-  return { chunks };
+  return { chunks, enviadas: nuevos.length, resultado: String((patchResp as { resultado?: unknown })?.resultado ?? '') };
 }

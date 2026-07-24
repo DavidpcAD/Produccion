@@ -12,7 +12,8 @@ interface PlantillaParsed { archivo: string; porTipo: Record<string, Linea[]>; t
 interface DescParsed { archivo: string; hoja: string | null; lineas: Linea[] }
 
 const crc = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 });
-const TIPO_LABEL: Record<string, string> = { Sales: 'Venta', Cost: 'Costo directo', Indirect: 'Indirectos', Production: 'Producción' };
+const TIPO_LABEL: Record<string, string> = { Sales: 'Venta', Cost: 'Costo directo', 'Indirect Cost': 'Indirectos', Production: 'Producción' };
+const TIPO_ORDER = ['Sales', 'Cost', 'Indirect Cost', 'Production'];
 
 export default function PresupuestoPage() {
   const session = useSession();
@@ -68,11 +69,14 @@ export default function PresupuestoPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast(data.error || 'No se pudo subir', 'error'); setResultado(data.error ?? null); return; }
-      const partes = [];
-      if (data.version) partes.push(`versión ${data.version}`);
+      const partes: string[] = [];
+      if (data.version) partes.push(`versión ${data.version} (${data.enviadas ?? 0} líneas enviadas)`);
       if (data.materiales) partes.push(`${data.materiales} materiales`);
-      toast(`✅ Subido a BC: ${partes.join(' · ')}`, 'success');
-      setResultado(`Subido a Business Central — ${partes.join(' · ')}` + (data.totales ? ` · Venta ${crc.format(data.totales.salesLineAmount ?? 0)}` : ''));
+      if (data.totales) partes.push(`Venta ${crc.format(data.totales.salesLineAmount ?? 0)} · Costo ${crc.format(data.totales.costLineAmount ?? 0)}`);
+      const bcMsg = [data.resultadoBC, data.resultadoDescompuestoBC].filter(Boolean).join(' · ');
+      if (bcMsg) partes.push(`BC: ${bcMsg}`);
+      toast('Enviado a Business Central', 'success');
+      setResultado(`Subido a Business Central — ${partes.join(' · ')}`);
     } finally { setSubiendo(false); }
   }
 
@@ -126,7 +130,7 @@ export default function PresupuestoPage() {
             <span className="text-ds-gray-400 text-xs font-mono">{plantilla.archivo}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {['Sales', 'Cost', 'Indirect', 'Production'].filter(t => plantilla.porTipo[t]).map(t => (
+            {TIPO_ORDER.filter(t => plantilla.porTipo[t]).map(t => (
               <div key={t} className="rounded-ds-lg border border-ds-gray-200 p-3">
                 <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
                 <p className="text-black font-bold text-lg">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
