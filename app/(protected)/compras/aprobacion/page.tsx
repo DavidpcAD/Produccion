@@ -152,6 +152,7 @@ export default function AprobacionPage() {
                   <AprobarControl
                     busy={aprobandoId === o.id}
                     approveLabel="Aprobar y lanzar"
+                    title={`${o.numero} · ${money(total, o.currencyCode)}`}
                     onApprove={() => aprobar(o)}
                     onReject={() => { setMotivo(""); setRechObj({ id: o.id, numero: o.numero }); }}
                   />
