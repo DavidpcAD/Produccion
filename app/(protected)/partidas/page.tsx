@@ -34,6 +34,7 @@ export default function PartidasPage() {
   const [subpartidas, setSubpartidas] = useState<SubPartida[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [q, setQ] = useState('');
 
   // Modal subpartida (crear/editar)
   const [subOpen, setSubOpen] = useState(false);
@@ -158,6 +159,8 @@ export default function PartidasPage() {
   }
 
   const grupos = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const match = (...vals: (string | null | undefined)[]) => !term || vals.some(v => (v ?? '').toLowerCase().includes(term));
     const byPartida = new Map<number, SubPartida[]>();
     for (const s of subpartidas) {
       if (!byPartida.has(s.idPartida)) byPartida.set(s.idPartida, []);
@@ -165,9 +168,18 @@ export default function PartidasPage() {
     }
     return etapas.map(e => ({
       etapa: e,
-      partidas: partidas.filter(p => p.idEtapa === e.idEtapa).map(p => ({ partida: p, subs: byPartida.get(p.idPartida) ?? [] })),
-    }));
-  }, [etapas, partidas, subpartidas]);
+      partidas: partidas
+        .filter(p => p.idEtapa === e.idEtapa)
+        .map(p => {
+          const subs = byPartida.get(p.idPartida) ?? [];
+          const partidaMatches = match(p.codigo, p.nombre);
+          // Si la partida coincide, muestro todas sus subs; si no, solo las subs que coinciden.
+          const subsFiltradas = partidaMatches ? subs : subs.filter(s => match(s.codigo, s.nombre));
+          return { partida: p, subs: subsFiltradas, visible: partidaMatches || subsFiltradas.length > 0 };
+        })
+        .filter(p => p.visible),
+    })).filter(g => g.partidas.length > 0 || !term);
+  }, [etapas, partidas, subpartidas, q]);
 
   if (mounted && session && !isSuperAdmin) {
     return (
@@ -197,8 +209,21 @@ export default function PartidasPage() {
         )}
       </div>
 
+      {/* Buscador */}
+      {!loading && (partidas.length > 0) && (
+        <Input
+          placeholder="Buscar partida o subpartida por código o nombre…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+        />
+      )}
+
       {loading ? (
         <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full" />)}</div>
+      ) : grupos.length === 0 ? (
+        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
+          Ningún resultado para “{q}”.
+        </div>
       ) : (
         <div className="space-y-6">
           {grupos.map(({ etapa, partidas: parts }) => (
@@ -270,7 +295,7 @@ export default function PartidasPage() {
             )}
             <div className="ml-auto flex items-center gap-2">
               <Button variant="outline" onClick={() => setPartOpen(false)}>Cancelar</Button>
-              <Button loading={saving} onClick={guardarPart}>{partEditId != null ? 'Guardar' : 'Crear partida'}</Button>
+              <Button loading={saving} disabled={!partForm.idEtapa || !partForm.codigo.trim() || !partForm.nombre.trim()} onClick={guardarPart}>{partEditId != null ? 'Guardar' : 'Crear partida'}</Button>
             </div>
           </div>
         }
@@ -302,7 +327,7 @@ export default function PartidasPage() {
             )}
             <div className="ml-auto flex items-center gap-2">
               <Button variant="outline" onClick={() => setSubOpen(false)}>Cancelar</Button>
-              <Button loading={saving} onClick={guardarSub}>{subEditId != null ? 'Guardar' : 'Crear subpartida'}</Button>
+              <Button loading={saving} disabled={!subForm.idPartida || !subForm.codigo.trim() || !subForm.nombre.trim()} onClick={guardarSub}>{subEditId != null ? 'Guardar' : 'Crear subpartida'}</Button>
             </div>
           </div>
         }
