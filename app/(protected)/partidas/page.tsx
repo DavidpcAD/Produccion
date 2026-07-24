@@ -419,7 +419,7 @@ export default function PartidasPage() {
             </>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Código" placeholder="Ej. 1.1.5" value={subForm.codigo} onChange={e => setSub('codigo', e.target.value)} required maxLength={50} />
+            <Input label="Código" value={subForm.codigo} disabled hint="Automático — siguiente correlativo de la partida" />
             <Input label="Nombre" value={subForm.nombre} onChange={e => setSub('nombre', e.target.value)} required maxLength={50} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
