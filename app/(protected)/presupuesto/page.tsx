@@ -30,9 +30,10 @@ export default function PresupuestoPage() {
   const [plantilla, setPlantilla] = useState<PlantillaParsed | null>(null);
   const [descompuesto, setDescompuesto] = useState<DescParsed | null>(null);
   const [leyendo, setLeyendo] = useState(false);
-  const [subiendo, setSubiendo] = useState(false);
+  const [subiendoQue, setSubiendoQue] = useState<'general' | 'descompuesto' | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [tipoVista, setTipoVista] = useState('Sales');
+  const [vistaPreview, setVistaPreview] = useState<'general' | 'descompuesto'>('general');
   const [plantillas, setPlantillas] = useState<{ idPlantilla: number; nombre: string; tipo: string; archivo: string | null; fechaActualizacion: string }[]>([]);
   const [modalGuardar, setModalGuardar] = useState(false);
   const [nombrePlantilla, setNombrePlantilla] = useState('');
@@ -66,14 +67,17 @@ export default function PresupuestoPage() {
     } finally { setLeyendo(false); }
   }
 
-  async function subir() {
+  // General (plantilla → versión) y Descompuesto (materiales) se suben a BC por separado.
+  async function subir(que: 'general' | 'descompuesto') {
     if (!obra) { toast('Elegí la obra', 'warning'); return; }
-    if (!plantilla && !descompuesto) { toast('Cargá y leé los archivos primero', 'warning'); return; }
-    setSubiendo(true); setResultado(null);
+    if (que === 'general' && !plantilla) { toast('No hay plantilla (General) cargada', 'warning'); return; }
+    if (que === 'descompuesto' && !descompuesto) { toast('No hay Descompuesto cargado', 'warning'); return; }
+    setSubiendoQue(que); setResultado(null);
     try {
+      const payload = que === 'general' ? { plantilla } : { descompuesto };
       const res = await fetch('/api/presupuesto', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ worksNo: obra.numeroObra, plantilla, descompuesto }),
+        body: JSON.stringify({ worksNo: obra.numeroObra, ...payload }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast(data.error || 'No se pudo subir', 'error'); setResultado(data.error ?? null); return; }
@@ -83,9 +87,10 @@ export default function PresupuestoPage() {
       if (data.totales) partes.push(`Venta ${crc.format(data.totales.salesLineAmount ?? 0)} · Costo ${crc.format(data.totales.costLineAmount ?? 0)}`);
       const bcMsg = [data.resultadoBC, data.resultadoDescompuestoBC].filter(Boolean).join(' · ');
       if (bcMsg) partes.push(`BC: ${bcMsg}`);
-      toast('Enviado a Business Central', 'success');
-      setResultado(`Subido a Business Central — ${partes.join(' · ')}`);
-    } finally { setSubiendo(false); }
+      const etiqueta = que === 'general' ? 'General' : 'Descompuesto';
+      toast(`${etiqueta} enviado a Business Central`, 'success');
+      setResultado(`${etiqueta} subido a Business Central — ${partes.join(' · ')}`);
+    } finally { setSubiendoQue(null); }
   }
 
   // Biblioteca de plantillas guardadas (reutilizables entre obras).
@@ -174,8 +179,11 @@ export default function PresupuestoPage() {
           {hayDatos && (
             <Button variant="secondary" onClick={() => setModalGuardar(true)} icon={<Icon name="check" size="sm" color="currentColor" />}>Guardar como plantilla</Button>
           )}
-          {hayDatos && (
-            <Button onClick={subir} loading={subiendo} disabled={!obraId} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir a Business Central</Button>
+          {plantilla && (
+            <Button onClick={() => subir('general')} loading={subiendoQue === 'general'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir General a BC</Button>
+          )}
+          {descompuesto && (
+            <Button onClick={() => subir('descompuesto')} loading={subiendoQue === 'descompuesto'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir Descompuesto a BC</Button>
           )}
           {hayDatos && !obraId && (
             <span className="text-ds-red text-body-sm font-medium">↑ Elegí una obra para poder subir</span>
@@ -203,82 +211,103 @@ export default function PresupuestoPage() {
         </div>
       )}
 
-      {/* 2) Preview */}
-      {plantilla && (
+      {/* 2) Preview — tabs para alternar entre General (plantilla) y Descompuesto sin scrollear */}
+      {(plantilla || descompuesto) && (() => {
+        const vistaActiva: 'general' | 'descompuesto' =
+          vistaPreview === 'descompuesto' && descompuesto ? 'descompuesto'
+          : vistaPreview === 'general' && plantilla ? 'general'
+          : plantilla ? 'general' : 'descompuesto';
+        return (
         <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
+          {/* Selector de vista */}
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="font-bold text-black">Plantilla</h2>
-            <span className="text-ds-gray-400 text-xs font-mono">{plantilla.archivo}</span>
-          </div>
-          <p className="text-ds-gray-400 text-xs">Solo Venta, Costo e Indirectos se suben a BC. Tocá una tarjeta para ver sus líneas.</p>
-          <div className="grid grid-cols-3 gap-3">
-            {TIPO_SUBIBLES.filter(t => plantilla.porTipo[t]).map(t => (
-              <button key={t} type="button" onClick={() => setTipoVista(t)}
-                className={'text-left rounded-ds-lg border p-3 transition ' + (tipoVista === t ? 'border-brand bg-[#F6FBEA]' : 'border-ds-gray-200 hover:bg-ds-gray-100')}>
-                <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
-                <p className="text-black font-bold text-lg">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
+            {plantilla && (
+              <button type="button" onClick={() => setVistaPreview('general')}
+                className={'text-sm font-semibold px-4 py-2 rounded-ds-lg transition ' + (vistaActiva === 'general' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500 hover:bg-ds-gray-200')}>
+                General
               </button>
-            ))}
+            )}
+            {descompuesto && (
+              <button type="button" onClick={() => setVistaPreview('descompuesto')}
+                className={'text-sm font-semibold px-4 py-2 rounded-ds-lg transition ' + (vistaActiva === 'descompuesto' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500 hover:bg-ds-gray-200')}>
+                Descompuesto <span className="opacity-70 font-normal">({descompuesto.lineas.length})</span>
+              </button>
+            )}
+            <span className="ml-auto text-ds-gray-400 text-xs font-mono truncate max-w-[240px]">{vistaActiva === 'general' ? plantilla?.archivo : descompuesto?.archivo}</span>
           </div>
-          {/* Vista previa de líneas del tipo seleccionado */}
-          {(() => {
-            const activa = (TIPO_SUBIBLES.includes(tipoVista) && plantilla.porTipo[tipoVista]) ? tipoVista : TIPO_SUBIBLES.find(t => plantilla.porTipo[t]) ?? '';
-            const lineas = plantilla.porTipo[activa] ?? [];
-            return (
-              <div>
-                <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-black">{TIPO_LABEL[activa] ?? activa}</strong> ({lineas.length} líneas)</p>
-                <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-100 rounded-ds">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-ds-gray-100 text-left text-ds-gray-500 text-xs">
-                      <tr><th className="py-1.5 px-3">Código</th><th className="py-1.5 px-3">Nivel</th><th className="py-1.5 px-3">Descripción</th><th className="py-1.5 px-3 text-right">Monto</th></tr>
-                    </thead>
-                    <tbody>
-                      {lineas.map((l, i) => (
-                        <tr key={i} className="border-b border-ds-gray-100">
-                          <td className="py-1.5 px-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
-                          <td className="py-1.5 px-3"><span className={'text-xs px-2 py-0.5 rounded-full ' + (l.taskType === 'Total' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{l.taskType === 'Total' ? 'Capítulo' : 'Partida'}</span></td>
-                          <td className="py-1.5 px-3 truncate max-w-[360px]">{l.description}</td>
-                          <td className="py-1 px-3 text-right">
-                            <input type="number" value={l.lineAmount ?? 0}
-                              onChange={e => editarMonto(activa, i, e.target.value)}
-                              className="w-32 text-right rounded-ds border border-ds-gray-200 px-2 py-1 text-sm focus:border-black focus:outline-none" />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
 
-      {descompuesto && (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="font-bold text-black">Descompuesto (materiales)</h2>
-            <span className="text-ds-gray-400 text-xs font-mono">{descompuesto.archivo}</span>
-            <span className="ml-auto text-ds-gray-500 text-body-sm"><strong className="text-black">{descompuesto.lineas.length}</strong> materiales</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-left text-ds-gray-400 text-xs border-b border-ds-gray-200"><th className="py-1.5 pr-3">Tarea</th><th className="py-1.5 pr-3">Material</th><th className="py-1.5 pr-3">Descripción</th><th className="py-1.5 text-right">Costo unit.</th></tr></thead>
-              <tbody>
-                {descompuesto.lineas.slice(0, 12).map((l, i) => (
-                  <tr key={i} className="border-b border-ds-gray-100">
-                    <td className="py-1.5 pr-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
-                    <td className="py-1.5 pr-3 font-mono text-xs">{l.no}</td>
-                    <td className="py-1.5 pr-3 truncate max-w-[280px]">{l.description}</td>
-                    <td className="py-1.5 text-right">{crc.format(l.unitCost ?? 0)}</td>
-                  </tr>
+          {/* Vista General (plantilla: Venta / Costo / Indirectos) */}
+          {vistaActiva === 'general' && plantilla && (
+            <>
+              <p className="text-ds-gray-400 text-xs">Solo Venta, Costo e Indirectos se suben a BC. Tocá una tarjeta para ver sus líneas.</p>
+              <div className="grid grid-cols-3 gap-3">
+                {TIPO_SUBIBLES.filter(t => plantilla.porTipo[t]).map(t => (
+                  <button key={t} type="button" onClick={() => setTipoVista(t)}
+                    className={'text-left rounded-ds-lg border p-3 transition ' + (tipoVista === t ? 'border-brand bg-[#F6FBEA]' : 'border-ds-gray-200 hover:bg-ds-gray-100')}>
+                    <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
+                    <p className="text-black font-bold text-lg">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
+                  </button>
                 ))}
-              </tbody>
-            </table>
-            {descompuesto.lineas.length > 12 && <p className="text-ds-gray-400 text-xs mt-2">… y {descompuesto.lineas.length - 12} materiales más.</p>}
-          </div>
+              </div>
+              {(() => {
+                const activa = (TIPO_SUBIBLES.includes(tipoVista) && plantilla.porTipo[tipoVista]) ? tipoVista : TIPO_SUBIBLES.find(t => plantilla.porTipo[t]) ?? '';
+                const lineas = plantilla.porTipo[activa] ?? [];
+                return (
+                  <div>
+                    <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-black">{TIPO_LABEL[activa] ?? activa}</strong> ({lineas.length} líneas)</p>
+                    <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-100 rounded-ds">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-ds-gray-100 text-left text-ds-gray-500 text-xs">
+                          <tr><th className="py-1.5 px-3">Código</th><th className="py-1.5 px-3">Nivel</th><th className="py-1.5 px-3">Descripción</th><th className="py-1.5 px-3 text-right">Monto</th></tr>
+                        </thead>
+                        <tbody>
+                          {lineas.map((l, i) => (
+                            <tr key={i} className="border-b border-ds-gray-100">
+                              <td className="py-1.5 px-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
+                              <td className="py-1.5 px-3"><span className={'text-xs px-2 py-0.5 rounded-full ' + (l.taskType === 'Total' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{l.taskType === 'Total' ? 'Capítulo' : 'Partida'}</span></td>
+                              <td className="py-1.5 px-3 truncate max-w-[360px]">{l.description}</td>
+                              <td className="py-1 px-3 text-right">
+                                <input type="number" value={l.lineAmount ?? 0}
+                                  onChange={e => editarMonto(activa, i, e.target.value)}
+                                  className="w-32 text-right rounded-ds border border-ds-gray-200 px-2 py-1 text-sm focus:border-black focus:outline-none" />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
+          )}
+
+          {/* Vista Descompuesto (materiales) */}
+          {vistaActiva === 'descompuesto' && descompuesto && (
+            <div>
+              <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-black">Descompuesto</strong> ({descompuesto.lineas.length} materiales)</p>
+              <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-100 rounded-ds">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-ds-gray-100 text-left text-ds-gray-500 text-xs">
+                    <tr><th className="py-1.5 px-3">Tarea</th><th className="py-1.5 px-3">Material</th><th className="py-1.5 px-3">Descripción</th><th className="py-1.5 px-3 text-right">Costo unit.</th></tr>
+                  </thead>
+                  <tbody>
+                    {descompuesto.lineas.map((l, i) => (
+                      <tr key={i} className="border-b border-ds-gray-100">
+                        <td className="py-1.5 px-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
+                        <td className="py-1.5 px-3 font-mono text-xs">{l.no}</td>
+                        <td className="py-1.5 px-3 truncate max-w-[280px]">{l.description}</td>
+                        <td className="py-1.5 px-3 text-right">{crc.format(l.unitCost ?? 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Modal: guardar como plantilla */}
       <Modal open={modalGuardar} onClose={() => setModalGuardar(false)} title="Guardar como plantilla"
