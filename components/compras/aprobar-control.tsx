@@ -83,11 +83,11 @@ export function AprobarControl({ onApprove, onReject, approveLabel = 'Aprobar', 
   return (
     <>
       {/* Escritorio: botones */}
-      <div className="hidden sm:flex items-center justify-end gap-2">
+      <div className="hidden sm:flex items-center justify-end gap-3">
         {twoWay && (
-          <Button variant="danger" onClick={onReject} disabled={busy} icon={<Icon name="close" size="sm" color="currentColor" />}>{rejectLabel}</Button>
+          <Button variant="outline" size="sm" onClick={onReject} disabled={busy} className="whitespace-nowrap">{rejectLabel}</Button>
         )}
-        <Button onClick={onApprove} loading={busy} icon={<Icon name="check" size="sm" color="currentColor" />}>{approveLabel}</Button>
+        <Button size="sm" onClick={onApprove} loading={busy} icon={<Icon name="check" size="sm" color="currentColor" />} className="whitespace-nowrap">{approveLabel}</Button>
       </div>
 
       {/* Celular / tablet */}

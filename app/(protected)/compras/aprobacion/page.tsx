@@ -148,7 +148,7 @@ export default function AprobacionPage() {
 
                 {/* Aprobar/Rechazar SIEMPRE al fondo de la tarjeta: al expandir queda
                     debajo de las líneas (mejor en celular y en PC). */}
-                <div className="mt-3" style={{ maxWidth: 460, marginLeft: "auto" }}>
+                <div className="mt-4">
                   <AprobarControl
                     busy={aprobandoId === o.id}
                     approveLabel="Aprobar y lanzar"
