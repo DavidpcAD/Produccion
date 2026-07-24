@@ -633,13 +633,13 @@
 
 /* summary tiles */
 .oc-scope .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--ds-space-4); }
-.oc-scope .tile { background: #fff; border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-01); padding: var(--ds-space-5); display: flex; flex-direction: column; gap: 6px; }
+.oc-scope .tile { background: #fff; border-radius: var(--ds-radius-lg); border: 1px solid var(--ds-color-gray-200); box-shadow: var(--ds-shadow-01); padding: var(--ds-space-5); display: flex; flex-direction: column; gap: 6px; }
 .oc-scope .tile__value { font-size: var(--ds-font-size-heading); line-height: 1.1; font-weight: var(--ds-font-weight-semibold); }
 .oc-scope .tile__label { color: var(--ds-color-gray-400); font-size: var(--ds-font-size-label); }
 .oc-scope .tile__accent { width: 36px; height: 4px; border-radius: 2px; background: var(--ds-color-green-100); }
 /* tile clickeable (filtro) */
-.oc-scope .tile--clickable { cursor: pointer; text-align: left; border: 1.5px solid transparent; font-family: inherit; transition: border-color .12s ease, box-shadow .12s ease; }
-.oc-scope .tile--clickable:hover { border-color: var(--ds-color-gray-200); }
+.oc-scope .tile--clickable { cursor: pointer; text-align: left; border: 1px solid var(--ds-color-gray-200); font-family: inherit; transition: border-color .12s ease, box-shadow .12s ease; }
+.oc-scope .tile--clickable:hover { border-color: var(--ds-color-gray-400); }
 .oc-scope .tile--clickable.is-active { border-color: var(--tile-accent, var(--ds-color-green-100)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tile-accent, var(--ds-color-green-100)) 22%, transparent); }
 
 /* segmented totals box */
