@@ -28,6 +28,7 @@ export default function PresupuestoPage() {
   const [descompuesto, setDescompuesto] = useState<DescParsed | null>(null);
   const [leyendo, setLeyendo] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const [tipoVista, setTipoVista] = useState('Sales');
   const [resultado, setResultado] = useState<string | null>(null);
   const plantillaFile = useRef<HTMLInputElement>(null);
   const descFile = useRef<HTMLInputElement>(null);
@@ -131,12 +132,40 @@ export default function PresupuestoPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {TIPO_ORDER.filter(t => plantilla.porTipo[t]).map(t => (
-              <div key={t} className="rounded-ds-lg border border-ds-gray-200 p-3">
+              <button key={t} type="button" onClick={() => setTipoVista(t)}
+                className={'text-left rounded-ds-lg border p-3 transition ' + (tipoVista === t ? 'border-brand bg-[#F6FBEA]' : 'border-ds-gray-200 hover:bg-ds-gray-100')}>
                 <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
                 <p className="text-black font-bold text-lg">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
-              </div>
+              </button>
             ))}
           </div>
+          {/* Vista previa de líneas del tipo seleccionado */}
+          {(() => {
+            const activa = plantilla.porTipo[tipoVista] ? tipoVista : TIPO_ORDER.find(t => plantilla.porTipo[t]) ?? '';
+            const lineas = plantilla.porTipo[activa] ?? [];
+            return (
+              <div>
+                <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-black">{TIPO_LABEL[activa] ?? activa}</strong> ({lineas.length} líneas)</p>
+                <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-100 rounded-ds">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-ds-gray-100 text-left text-ds-gray-500 text-xs">
+                      <tr><th className="py-1.5 px-3">Código</th><th className="py-1.5 px-3">Nivel</th><th className="py-1.5 px-3">Descripción</th><th className="py-1.5 px-3 text-right">Monto</th></tr>
+                    </thead>
+                    <tbody>
+                      {lineas.map((l, i) => (
+                        <tr key={i} className="border-b border-ds-gray-100">
+                          <td className="py-1.5 px-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
+                          <td className="py-1.5 px-3"><span className={'text-xs px-2 py-0.5 rounded-full ' + (l.taskType === 'Total' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{l.taskType === 'Total' ? 'Capítulo' : 'Partida'}</span></td>
+                          <td className="py-1.5 px-3 truncate max-w-[360px]">{l.description}</td>
+                          <td className="py-1.5 px-3 text-right font-medium">{crc.format(l.lineAmount ?? 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

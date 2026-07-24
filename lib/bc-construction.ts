@@ -83,6 +83,23 @@ export function nextVersion(verBase?: string | null): string {
   return `REESTUDIO${n + 1}`;
 }
 
+// Próxima versión disponible mirando TODAS las versiones existentes de la obra en BC
+// (evita el error "Work Version already exists"). Toma el mayor REESTUDIO n y suma 1.
+export async function nextVersionDisponible(worksNo: string): Promise<string> {
+  try {
+    const body = await req(`workVersions?$filter=${encodeURIComponent(`worksNo eq '${worksNo}'`)}&$top=1000`, { method: 'GET' });
+    const codes: string[] = (body?.value ?? []).map((v: { versionCode?: string }) => String(v.versionCode ?? ''));
+    let max = 0;
+    for (const c of codes) {
+      const m = /REESTUDIO\s*(\d+)/i.exec(c);
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+    return `REESTUDIO${max + 1}`;
+  } catch {
+    return 'REESTUDIO1';
+  }
+}
+
 export interface WorkTotals { salesLineAmount?: number; costLineAmount?: number; indirectCostLineAmount?: number; result?: number }
 
 export async function getWork(worksNo: string): Promise<(WorkTotals & { no: string; filterVersionCode?: string }) | null> {
@@ -92,8 +109,8 @@ export async function getWork(worksNo: string): Promise<(WorkTotals & { no: stri
 
 // Sube la versión de presupuesto (líneas venta/costo/indirecto) vía el singleton bulk,
 // y registra la versión. Devuelve la versión creada y los totales recalculados.
-export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[], verBase?: string | null): Promise<{ versionCode: string; resultado: string; enviadas: number; totals: WorkTotals | null }> {
-  const versionCode = nextVersion(verBase);
+export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[], _verBase?: string | null): Promise<{ versionCode: string; resultado: string; enviadas: number; totals: WorkTotals | null }> {
+  const versionCode = await nextVersionDisponible(worksNo);
   const lineasJSON = JSON.stringify(lineas.map((l, i) => ({
     worksNo, versionCode,
     lineNo: l.lineNo ?? (i + 1),
@@ -119,10 +136,15 @@ export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[
   });
   const resultado = String((patchResp as { resultado?: unknown })?.resultado ?? '');
 
-  await req('workVersions', {
-    method: 'POST',
-    body: JSON.stringify({ worksNo, versionCode, createDateTime: new Date().toISOString(), reStudy: true }),
-  });
+  try {
+    await req('workVersions', {
+      method: 'POST',
+      body: JSON.stringify({ worksNo, versionCode, createDateTime: new Date().toISOString(), reStudy: true }),
+    });
+  } catch (e) {
+    // Si la versión ya existía (carrera), no es fatal: las líneas ya se cargaron.
+    if (!/already exists/i.test(e instanceof Error ? e.message : '')) throw e;
+  }
 
   const work = await getWork(worksNo);
   return { versionCode, resultado, enviadas: lineas.length, totals: work ? { salesLineAmount: work.salesLineAmount, costLineAmount: work.costLineAmount, indirectCostLineAmount: work.indirectCostLineAmount, result: work.result } : null };
