@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
@@ -158,7 +159,19 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
   }
 
   if (loading || !cuadrilla) return (
-    <div className="p-6 text-ds-gray-400">Cargando...</div>
+    <div className="p-6 max-w-3xl mx-auto animate-fade-in space-y-5">
+      <div className="flex items-start gap-3">
+        <Skeleton className="h-9 w-9 shrink-0" rounded="rounded-ds" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-8 w-1/2" rounded="rounded-full" />
+          <Skeleton className="h-4 w-2/3" rounded="rounded-full" />
+        </div>
+      </div>
+      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
+        <Skeleton className="h-4 w-1/3" rounded="rounded-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    </div>
   );
 
   const activos = cuadrilla.miembros.filter(m => m.Activo);
