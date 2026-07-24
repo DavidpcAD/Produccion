@@ -1,20 +1,18 @@
 'use client';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
-import { Skeleton } from '@/components/ui/Skeleton';
 
 interface Obra { idObra: number; numeroObra: string; nombreMostrado: string }
-interface Etapa { idEtapa: number; codigo: string; nombre: string }
-interface Partida { idPartida: number; codigo: string; nombre: string; idEtapa: number | null }
-interface SubPartida { idSubPartida: number; codigo: string; nombre: string; idPartida: number; numSprint: number }
+interface Linea { taskNo: string; taskType?: string; description: string; lineAmount?: number; unitCost?: number; no?: string }
+interface PlantillaParsed { archivo: string; porTipo: Record<string, Linea[]>; totales: Record<string, number>; hojas: string[] }
+interface DescParsed { archivo: string; hoja: string | null; lineas: Linea[] }
 
-type Tab = 'general' | 'detallado' | 'horas';
 const crc = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 });
+const TIPO_LABEL: Record<string, string> = { Sales: 'Venta', Cost: 'Costo directo', Indirect: 'Indirectos', Production: 'Producción' };
 
 export default function PresupuestoPage() {
   const session = useSession();
@@ -23,237 +21,143 @@ export default function PresupuestoPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  const [tab, setTab] = useState<Tab>('general');
   const [obras, setObras] = useState<Obra[]>([]);
   const [obraId, setObraId] = useState('');
-  const [etapas, setEtapas] = useState<Etapa[]>([]);
-  const [partidas, setPartidas] = useState<Partida[]>([]);
-  const [subpartidas, setSubpartidas] = useState<SubPartida[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [plantilla, setPlantilla] = useState<PlantillaParsed | null>(null);
+  const [descompuesto, setDescompuesto] = useState<DescParsed | null>(null);
+  const [leyendo, setLeyendo] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const [resultado, setResultado] = useState<string | null>(null);
+  const plantillaFile = useRef<HTMLInputElement>(null);
+  const descFile = useRef<HTMLInputElement>(null);
 
-  // Montos por partida (vista General). Clave = idPartida.
-  const [montoPartida, setMontoPartida] = useState<Record<number, string>>({});
-  // Monto por subpartida (vista Detallado). Clave = idSubPartida.
-  const [montoSub, setMontoSub] = useState<Record<number, string>>({});
-  // Horas + cantidad por subpartida (vista Horas y cantidades).
-  const [horasSub, setHorasSub] = useState<Record<number, string>>({});
-  const [cantSub, setCantSub] = useState<Record<number, string>>({});
-
-  const subsDe = useCallback((idPartida: number) => subpartidas.filter(s => s.idPartida === idPartida), [subpartidas]);
+  const obra = obras.find(o => String(o.idObra) === obraId);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const [o, p] = await Promise.all([
-      fetch('/api/obras?porPagina=1000').then(r => (r.ok ? r.json() : null)).catch(() => null),
-      fetch('/api/partidas').then(r => (r.ok ? r.json() : null)).catch(() => null),
-    ]);
+    const o = await fetch('/api/obras?porPagina=1000').then(r => (r.ok ? r.json() : null)).catch(() => null);
     if (o) setObras(o.data ?? []);
-    if (p) { setEtapas(p.etapas ?? []); setPartidas(p.partidas ?? []); setSubpartidas(p.subpartidas ?? []); }
-    setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const grupos = useMemo(() =>
-    etapas.map(e => ({ etapa: e, partidas: partidas.filter(p => p.idEtapa === e.idEtapa) })).filter(g => g.partidas.length > 0),
-    [etapas, partidas]);
-
-  const totalGeneral = useMemo(
-    () => Object.values(montoPartida).reduce((s, v) => s + (Number(v) || 0), 0),
-    [montoPartida]);
+  async function leerArchivos() {
+    const fd = new FormData();
+    const pf = plantillaFile.current?.files?.[0];
+    const df = descFile.current?.files?.[0];
+    if (!pf && !df) { toast('Elegí al menos un archivo (Plantilla o Descompuesto)', 'warning'); return; }
+    if (pf) fd.append('plantilla', pf);
+    if (df) fd.append('descompuesto', df);
+    setLeyendo(true); setResultado(null);
+    try {
+      const res = await fetch('/api/presupuesto/parse', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(data.error || 'No se pudo leer el Excel', 'error'); return; }
+      setPlantilla(data.plantilla ?? null);
+      setDescompuesto(data.descompuesto ?? null);
+      toast('Archivos leídos. Revisá el preview antes de subir.', 'success');
+    } finally { setLeyendo(false); }
+  }
 
   async function subir() {
-    if (!obraId) { toast('Elegí una obra primero', 'warning'); return; }
-    let lineas: Record<string, number>[];
-    if (tab === 'general') {
-      lineas = Object.entries(montoPartida)
-        .map(([idPartida, monto]) => ({ idPartida: Number(idPartida), monto: Number(monto) || 0 }))
-        .filter(l => l.monto > 0);
-    } else if (tab === 'detallado') {
-      lineas = Object.entries(montoSub)
-        .map(([idSubPartida, monto]) => ({ idSubPartida: Number(idSubPartida), monto: Number(monto) || 0 }))
-        .filter(l => l.monto > 0);
-    } else {
-      const ids = new Set([...Object.keys(horasSub), ...Object.keys(cantSub)].map(Number));
-      lineas = [...ids]
-        .map(id => ({ idSubPartida: id, horas: Number(horasSub[id]) || 0, cantidad: Number(cantSub[id]) || 0 }))
-        .filter(l => l.horas > 0 || l.cantidad > 0);
-    }
-    if (lineas.length === 0) { toast('Ingresá al menos un valor', 'warning'); return; }
-    setSubiendo(true);
+    if (!obra) { toast('Elegí la obra', 'warning'); return; }
+    if (!plantilla && !descompuesto) { toast('Cargá y leé los archivos primero', 'warning'); return; }
+    setSubiendo(true); setResultado(null);
     try {
       const res = await fetch('/api/presupuesto', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idObra: Number(obraId), vista: 'general', lineas }),
+        body: JSON.stringify({ worksNo: obra.numeroObra, plantilla, descompuesto }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { toast(data.error || 'No se pudo subir el presupuesto', 'error'); return; }
-      toast(data.message || 'Presupuesto enviado', data.ok ? 'success' : 'info');
+      if (!res.ok) { toast(data.error || 'No se pudo subir', 'error'); setResultado(data.error ?? null); return; }
+      const partes = [];
+      if (data.version) partes.push(`versión ${data.version}`);
+      if (data.materiales) partes.push(`${data.materiales} materiales`);
+      toast(`✅ Subido a BC: ${partes.join(' · ')}`, 'success');
+      setResultado(`Subido a Business Central — ${partes.join(' · ')}` + (data.totales ? ` · Venta ${crc.format(data.totales.salesLineAmount ?? 0)}` : ''));
     } finally { setSubiendo(false); }
   }
 
   if (mounted && session && !puede) {
-    return (
-      <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div>
-      </div>
-    );
+    return <div className="p-6 max-w-[1400px] mx-auto"><div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div></div>;
   }
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'general', label: 'General' },
-    { id: 'detallado', label: 'Detallado' },
-    { id: 'horas', label: 'Horas y cantidades' },
-  ];
+  const tipos = plantilla ? Object.keys(plantilla.porTipo).filter(t => (plantilla.porTipo[t] ?? []).length > 0) : [];
+  const hayDatos = tipos.length > 0 || (descompuesto?.lineas.length ?? 0) > 0;
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Subir presupuesto</h1>
-          <p className="text-ds-gray-400 text-body-sm">Cargá el presupuesto de una obra y súbilo a Business Central.</p>
-        </div>
-        <Button onClick={subir} loading={subiendo} disabled={!obraId} icon={<Icon name="open" size="sm" color="currentColor" />}>
-          Subir a Business Central
-        </Button>
+    <div className="p-6 space-y-5 max-w-[1400px] mx-auto animate-fade-in">
+      <div>
+        <h1 className="text-heading font-bold text-black">Subir presupuesto</h1>
+        <p className="text-ds-gray-400 text-body-sm">Cargá los Excel de la obra (Plantilla y Descompuesto) y subílos a Business Central.</p>
       </div>
 
-      {/* Selector de obra + tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-        <div className="sm:max-w-sm w-full">
+      {/* 1) Obra + archivos */}
+      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
+        <div className="sm:max-w-md">
           <Combobox
-            label="Obra" required value={obraId} onChange={setObraId}
-            placeholder="Seleccionar obra"
+            label="Obra" required value={obraId} onChange={setObraId} placeholder="Seleccionar obra"
             options={obras.map(o => ({ value: String(o.idObra), label: o.nombreMostrado, parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombreMostrado, weight: 'light' as const }], search: `${o.numeroObra} ${o.nombreMostrado}` }))}
           />
+          {obra && <p className="text-ds-gray-400 text-xs mt-1">Obra en BC (worksNo): <span className="font-mono font-semibold text-black">{obra.numeroObra}</span></p>}
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label className="block">
+            <span className="text-body-sm font-semibold text-black">Plantilla (Venta / Costo / Indirectos)</span>
+            <input ref={plantillaFile} type="file" accept=".xlsx,.xls" className="mt-1 block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
+          </label>
+          <label className="block">
+            <span className="text-body-sm font-semibold text-black">Descompuesto (materiales)</span>
+            <input ref={descFile} type="file" accept=".xlsx,.xls" className="mt-1 block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
+          </label>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={leerArchivos} loading={leyendo} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer archivos</Button>
+          {hayDatos && (
+            <Button onClick={subir} loading={subiendo} disabled={!obraId} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir a Business Central</Button>
+          )}
+        </div>
+        {resultado && <div className="rounded-ds bg-[#F6FBEA] border border-brand/40 px-4 py-3 text-sm text-black">{resultado}</div>}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {TABS.map(t => (
-          <button key={t.id} type="button" onClick={() => setTab(t.id)}
-            className={'inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition ' +
-              (tab === t.id ? 'bg-black text-white' : 'bg-white text-ds-gray-500 border border-ds-gray-200 hover:bg-ds-gray-100')}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>
-      ) : !obraId ? (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">Elegí una obra para cargar su presupuesto.</div>
-      ) : tab === 'general' ? (
-        <div className="space-y-5">
-          {grupos.map(({ etapa, partidas: parts }) => (
-            <div key={etapa.idEtapa} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-ds bg-black text-white text-xs font-bold font-mono">{etapa.codigo}</span>
-                <h2 className="font-bold text-black text-sm uppercase tracking-wide">{etapa.nombre}</h2>
+      {/* 2) Preview */}
+      {plantilla && (
+        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-bold text-black">Plantilla</h2>
+            <span className="text-ds-gray-400 text-xs font-mono">{plantilla.archivo}</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {['Sales', 'Cost', 'Indirect', 'Production'].filter(t => plantilla.porTipo[t]).map(t => (
+              <div key={t} className="rounded-ds-lg border border-ds-gray-200 p-3">
+                <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
+                <p className="text-black font-bold text-lg">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
               </div>
-              <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 divide-y divide-ds-gray-100">
-                {parts.map(p => (
-                  <div key={p.idPartida} className="px-4 py-2.5 flex items-center gap-3">
-                    <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 w-14">{p.codigo}</span>
-                    <span className="text-sm text-black truncate flex-1">{p.nombre}</span>
-                    <div className="w-44 shrink-0">
-                      <Input type="number" min={0} placeholder="₡ 0"
-                        value={montoPartida[p.idPartida] ?? ''}
-                        onChange={e => setMontoPartida(m => ({ ...m, [p.idPartida]: e.target.value }))} />
-                    </div>
-                  </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {descompuesto && (
+        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-bold text-black">Descompuesto (materiales)</h2>
+            <span className="text-ds-gray-400 text-xs font-mono">{descompuesto.archivo}</span>
+            <span className="ml-auto text-ds-gray-500 text-body-sm"><strong className="text-black">{descompuesto.lineas.length}</strong> materiales</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-ds-gray-400 text-xs border-b border-ds-gray-200"><th className="py-1.5 pr-3">Tarea</th><th className="py-1.5 pr-3">Material</th><th className="py-1.5 pr-3">Descripción</th><th className="py-1.5 text-right">Costo unit.</th></tr></thead>
+              <tbody>
+                {descompuesto.lineas.slice(0, 12).map((l, i) => (
+                  <tr key={i} className="border-b border-ds-gray-100">
+                    <td className="py-1.5 pr-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
+                    <td className="py-1.5 pr-3 font-mono text-xs">{l.no}</td>
+                    <td className="py-1.5 pr-3 truncate max-w-[280px]">{l.description}</td>
+                    <td className="py-1.5 text-right">{crc.format(l.unitCost ?? 0)}</td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-          ))}
-          <div className="flex items-center justify-end gap-3 bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 px-5 py-4 sticky bottom-3">
-            <span className="text-ds-gray-400 text-body-sm">Total presupuesto</span>
-            <span className="text-black font-bold text-lg">{crc.format(totalGeneral)}</span>
-          </div>
-        </div>
-      ) : tab === 'detallado' ? (
-        <div className="space-y-5">
-          {grupos.map(({ etapa, partidas: parts }) => (
-            <div key={etapa.idEtapa} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-ds bg-black text-white text-xs font-bold font-mono">{etapa.codigo}</span>
-                <h2 className="font-bold text-black text-sm uppercase tracking-wide">{etapa.nombre}</h2>
-              </div>
-              {parts.map(p => {
-                const subs = subsDe(p.idPartida);
-                if (subs.length === 0) return null;
-                return (
-                  <div key={p.idPartida} className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
-                    <div className="px-4 py-2 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-ds-gray-500">{p.codigo}</span>
-                      <span className="font-bold text-black text-sm truncate">{p.nombre}</span>
-                    </div>
-                    <div className="divide-y divide-ds-gray-100">
-                      {subs.map(s => (
-                        <div key={s.idSubPartida} className="px-4 py-2 flex items-center gap-3">
-                          <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 w-16">{s.codigo}</span>
-                          <span className="text-sm text-black truncate flex-1">{s.nombre}</span>
-                          <div className="w-40 shrink-0">
-                            <Input type="number" min={0} placeholder="₡ 0"
-                              value={montoSub[s.idSubPartida] ?? ''}
-                              onChange={e => setMontoSub(m => ({ ...m, [s.idSubPartida]: e.target.value }))} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-          <div className="flex items-center justify-end gap-3 bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 px-5 py-4 sticky bottom-3">
-            <span className="text-ds-gray-400 text-body-sm">Total presupuesto</span>
-            <span className="text-black font-bold text-lg">{crc.format(Object.values(montoSub).reduce((s, v) => s + (Number(v) || 0), 0))}</span>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-5">
-          {grupos.map(({ etapa, partidas: parts }) => (
-            <div key={etapa.idEtapa} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-ds bg-black text-white text-xs font-bold font-mono">{etapa.codigo}</span>
-                <h2 className="font-bold text-black text-sm uppercase tracking-wide">{etapa.nombre}</h2>
-              </div>
-              {parts.map(p => {
-                const subs = subsDe(p.idPartida);
-                if (subs.length === 0) return null;
-                return (
-                  <div key={p.idPartida} className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
-                    <div className="px-4 py-2 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-ds-gray-500">{p.codigo}</span>
-                      <span className="font-bold text-black text-sm truncate">{p.nombre}</span>
-                    </div>
-                    <div className="divide-y divide-ds-gray-100">
-                      {subs.map(s => (
-                        <div key={s.idSubPartida} className="px-4 py-2 flex items-center gap-3">
-                          <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 w-16">{s.codigo}</span>
-                          <span className="text-sm text-black truncate flex-1 min-w-0">{s.nombre}</span>
-                          <div className="w-28 shrink-0">
-                            <Input type="number" min={0} placeholder="Horas"
-                              value={horasSub[s.idSubPartida] ?? ''}
-                              onChange={e => setHorasSub(m => ({ ...m, [s.idSubPartida]: e.target.value }))} />
-                          </div>
-                          <div className="w-28 shrink-0">
-                            <Input type="number" min={0} placeholder="Cant."
-                              value={cantSub[s.idSubPartida] ?? ''}
-                              onChange={e => setCantSub(m => ({ ...m, [s.idSubPartida]: e.target.value }))} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-          <div className="flex items-center justify-end gap-4 bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 px-5 py-4 sticky bottom-3 text-body-sm">
-            <span className="text-ds-gray-400">Total horas <strong className="text-black">{Object.values(horasSub).reduce((s, v) => s + (Number(v) || 0), 0).toLocaleString('es-CR')}</strong></span>
-            <span className="text-ds-gray-400">Total cantidades <strong className="text-black">{Object.values(cantSub).reduce((s, v) => s + (Number(v) || 0), 0).toLocaleString('es-CR')}</strong></span>
+              </tbody>
+            </table>
+            {descompuesto.lineas.length > 12 && <p className="text-ds-gray-400 text-xs mt-2">… y {descompuesto.lineas.length - 12} materiales más.</p>}
           </div>
         </div>
       )}

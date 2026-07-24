@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
-import { bcConfigured } from '@/lib/bc-client';
+import { bcConstructionConfigured, subirVersionPresupuesto, subirDescompuesto, type BulkLine, type DecompLine } from '@/lib/bc-construction';
 
-// Recibe el presupuesto de una obra para subirlo a Business Central (job planning lines).
-// Nota: el WRITE real a BC (entidad jobPlanningLines del API custom) queda pendiente de
-// confirmar el mapeo exacto; por ahora validamos, dejamos traza en auditoría y devolvemos
-// el estado honesto para no fingir un envío que no ocurrió.
+export const runtime = 'nodejs';
+
+// Sube el presupuesto de una obra a Business Central (versión + descompuesto).
+// Recibe las líneas ya parseadas del Excel (endpoint /parse) y las empuja vía el API
+// construction, replicando el flujo de Power Apps.
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 2) {
@@ -14,31 +15,46 @@ export async function POST(req: NextRequest) {
   }
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? '';
   const body = await req.json().catch(() => ({}));
-  const idObra = Number(body.idObra) || 0;
-  const vista = String(body.vista ?? 'general');
-  const lineas = Array.isArray(body.lineas) ? body.lineas : [];
 
-  if (!idObra) return NextResponse.json({ error: 'Falta la obra' }, { status: 400 });
-  if (lineas.length === 0) return NextResponse.json({ error: 'No hay líneas de presupuesto' }, { status: 400 });
+  const worksNo = String(body.worksNo ?? '').trim();
+  const verBase = body.verBase ? String(body.verBase) : null;
+  const plantilla = body.plantilla as { porTipo?: Record<string, BulkLine[]> } | undefined;
+  const descompuesto = body.descompuesto as { lineas?: DecompLine[] } | undefined;
 
-  const total = lineas.reduce((s: number, l: { monto?: number }) => s + (Number(l?.monto) || 0), 0);
+  if (!worksNo) return NextResponse.json({ error: 'Falta la obra (worksNo)' }, { status: 400 });
 
-  await logAudit({
-    idColAccion: session.idCol,
-    accion: 'SUBIR_PRESUPUESTO',
-    entidad: 'Obra',
-    idEntidad: idObra,
-    detalleNuevo: { vista, lineas: lineas.length, total },
-    ip,
-  });
-
-  if (!bcConfigured()) {
-    return NextResponse.json({ ok: false, message: 'Presupuesto recibido (guardado en bitácora). Business Central no está configurado en este entorno.' });
+  // Líneas de versión = Venta + Costo + Indirecto (+ Producción si viene).
+  const lineasVersion: BulkLine[] = [];
+  for (const tipo of ['Sales', 'Cost', 'Indirect', 'Production']) {
+    for (const l of plantilla?.porTipo?.[tipo] ?? []) lineasVersion.push(l);
   }
-  // TODO(presupuesto): escribir jobPlanningLines en BC (mapear obra→job y partida→jobTask).
-  // Pendiente de confirmar la entidad/campos del API custom de BC.
-  return NextResponse.json({
-    ok: false,
-    message: `Presupuesto recibido: ${lineas.length} línea(s), total ₡${total.toLocaleString('es-CR')}. La subida a Business Central (job planning lines) queda lista para conectar una vez confirmado el mapeo.`,
-  });
+  const materiales = descompuesto?.lineas ?? [];
+
+  if (lineasVersion.length === 0 && materiales.length === 0) {
+    return NextResponse.json({ error: 'No hay líneas para subir (cargá la Plantilla y/o el Descompuesto)' }, { status: 400 });
+  }
+
+  if (!bcConstructionConfigured()) {
+    return NextResponse.json({ error: 'Business Central no está configurado en este entorno.' }, { status: 400 });
+  }
+
+  const resultado: Record<string, unknown> = { worksNo };
+  try {
+    if (lineasVersion.length > 0) {
+      const r = await subirVersionPresupuesto(worksNo, lineasVersion, verBase);
+      resultado.version = r.versionCode;
+      resultado.totales = r.totals;
+    }
+    if (materiales.length > 0) {
+      const d = await subirDescompuesto(worksNo, materiales);
+      resultado.descompuestoChunks = d.chunks;
+      resultado.materiales = materiales.length;
+    }
+    await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length }, ip });
+    return NextResponse.json({ ok: true, ...resultado });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('/api/presupuesto POST error:', err);
+    return NextResponse.json({ error: `Error subiendo a Business Central: ${msg}`, parcial: resultado }, { status: 502 });
+  }
 }
