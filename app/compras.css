@@ -208,6 +208,10 @@
 
 /* =====================  CARD  ===================== */
 .oc-scope .ds-card {
+  /* width:auto neutraliza la regla legacy sin scope `.ds-card{width:360px}` de
+     design-system.css, que se filtraba y dejaba las tarjetas de compras angostas
+     en PC. Acá las tarjetas deben ocupar todo el ancho de su contenedor. */
+  width: auto;
   background: var(--ds-color-white);
   border-radius: var(--ds-radius-lg);
   box-shadow: var(--ds-shadow-01);
