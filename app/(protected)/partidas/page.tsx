@@ -35,6 +35,8 @@ export default function PartidasPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState('');
+  const [selPartida, setSelPartida] = useState<number | null>(null);
+  const puede = mounted && isSuperAdmin;
 
   // Modal subpartida (crear/editar)
   const [subOpen, setSubOpen] = useState(false);
@@ -144,6 +146,8 @@ export default function PartidasPage() {
       if (!res.ok) { toast(data.error || 'No se pudo guardar la partida', 'error'); return; }
       toast(editing ? 'Partida actualizada' : 'Partida creada', 'success');
       setPartOpen(false);
+      // Al crear, dejar seleccionada la nueva partida para agregarle subpartidas ahí mismo.
+      if (!editing && data?.idPartida) setSelPartida(Number(data.idPartida));
       await load();
     } finally { setSaving(false); }
   }
@@ -181,6 +185,27 @@ export default function PartidasPage() {
     })).filter(g => g.partidas.length > 0 || !term);
   }, [etapas, partidas, subpartidas, q]);
 
+  // Subpartidas agrupadas por partida (para conteos y para el detalle).
+  const subsByPartida = useMemo(() => {
+    const m = new Map<number, SubPartida[]>();
+    for (const s of subpartidas) { if (!m.has(s.idPartida)) m.set(s.idPartida, []); m.get(s.idPartida)!.push(s); }
+    return m;
+  }, [subpartidas]);
+
+  const sel = selPartida != null ? partidas.find(p => p.idPartida === selPartida) ?? null : null;
+  const selEtapa = sel ? etapas.find(e => e.idEtapa === sel.idEtapa) ?? null : null;
+  const selSubs = useMemo(() => {
+    if (selPartida == null) return [];
+    return [...(subsByPartida.get(selPartida) ?? [])].sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
+  }, [selPartida, subsByPartida]);
+
+  // Mantener una partida seleccionada: si no hay o la actual ya no existe, tomar la primera.
+  useEffect(() => {
+    if (loading) return;
+    if (selPartida != null && partidas.some(p => p.idPartida === selPartida)) return;
+    setSelPartida(partidas[0]?.idPartida ?? null);
+  }, [loading, partidas, selPartida]);
+
   if (mounted && session && !isSuperAdmin) {
     return (
       <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
@@ -201,85 +226,102 @@ export default function PartidasPage() {
             {subpartidas.length} subpartidas en {partidas.length} partidas
           </p>
         </div>
-        {mounted && isSuperAdmin && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
-            <Button onClick={() => abrirNuevaSub()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva subpartida</Button>
-          </div>
+        {puede && (
+          <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
         )}
       </div>
 
-      {/* Buscador */}
-      {!loading && (partidas.length > 0) && (
-        <Input
-          placeholder="Buscar partida o subpartida por código o nombre…"
-          value={q}
-          onChange={e => setQ(e.target.value)}
-        />
-      )}
-
       {loading ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full" />)}</div>
-      ) : grupos.length === 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-5">
+          <div className="space-y-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+          <Skeleton className="h-80 w-full" rounded="rounded-ds-lg" />
+        </div>
+      ) : partidas.length === 0 ? (
         <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
-          Ningún resultado para “{q}”.
+          No hay partidas todavía.{puede && ' Creá la primera con “Nueva partida”.'}
         </div>
       ) : (
-        <div className="space-y-6">
-          {grupos.map(({ etapa, partidas: parts }) => (
-            <div key={etapa.idEtapa} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-ds bg-black text-white text-xs font-bold font-mono">{etapa.codigo}</span>
-                <h2 className="font-bold text-black text-sm uppercase tracking-wide">{etapa.nombre}</h2>
-                {mounted && isSuperAdmin && (
-                  <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="ml-1 text-ds-gray-400 hover:text-brand" title="Nueva partida en esta etapa">
-                    <Icon name="plus" size="sm" color="currentColor" />
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {parts.map(({ partida, subs }) => (
-                  <div key={partida.idPartida} className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
-                    <div className="px-4 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-ds-gray-500">{partida.codigo}</span>
-                      <span className="font-bold text-black text-sm truncate">{partida.nombre}</span>
-                      <span className="ml-auto text-xs text-ds-gray-400">{subs.length}</span>
-                      {mounted && isSuperAdmin && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={() => abrirEditarPart(partida)} className="text-ds-gray-400 hover:text-black p-1" title="Editar partida">
-                            <Icon name="edit" size="sm" color="currentColor" />
-                          </button>
-                          <button onClick={() => abrirNuevaSub(partida.idPartida)} className="text-ds-gray-400 hover:text-brand p-1" title="Agregar subpartida">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-5 items-start">
+          {/* IZQUIERDA — lista de todas las partidas (seleccionable) */}
+          <div className="space-y-3">
+            <Input placeholder="Buscar partida o subpartida…" value={q} onChange={e => setQ(e.target.value)} />
+            <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+              {grupos.length === 0 ? (
+                <div className="p-6 text-center text-ds-gray-400 text-sm">Ningún resultado para “{q}”.</div>
+              ) : (
+                <div className="max-h-[72vh] overflow-y-auto no-scrollbar">
+                  {grupos.map(({ etapa, partidas: parts }) => (
+                    <div key={etapa.idEtapa}>
+                      <div className="flex items-center gap-2 px-3 py-2 bg-ds-gray-100 border-y border-ds-gray-200 sticky top-0 z-10">
+                        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono">{etapa.codigo}</span>
+                        <span className="font-bold text-black text-xs uppercase tracking-wide truncate flex-1">{etapa.nombre}</span>
+                        {puede && (
+                          <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-400 hover:text-brand shrink-0" title="Nueva partida en esta etapa">
                             <Icon name="plus" size="sm" color="currentColor" />
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                      {parts.map(({ partida }) => {
+                        const total = subsByPartida.get(partida.idPartida)?.length ?? 0;
+                        const active = selPartida === partida.idPartida;
+                        return (
+                          <button key={partida.idPartida} onClick={() => setSelPartida(partida.idPartida)}
+                            className={'w-full text-left px-3 py-2.5 flex items-center gap-2 border-l-2 transition ' + (active ? 'bg-brand-soft border-brand' : 'border-transparent hover:bg-ds-gray-100')}>
+                            <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{partida.codigo}</span>
+                            <span className="text-sm text-black truncate flex-1">{partida.nombre}</span>
+                            <span className="text-xs text-ds-gray-400 shrink-0">{total}</span>
+                          </button>
+                        );
+                      })}
                     </div>
-                    {subs.length === 0 ? (
-                      <div className="px-4 py-4 text-xs text-ds-gray-300">Sin subpartidas</div>
-                    ) : (
-                      <ul className="divide-y divide-ds-gray-100">
-                        {subs.map(s => (
-                          <li key={s.idSubPartida} className="px-4 py-2.5 flex items-center gap-3 group">
-                            <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{s.codigo}</span>
-                            <span className="text-sm text-black truncate flex-1">{s.nombre}</span>
-                            {s.esCritica && <Badge variant="red">Crítica</Badge>}
-                            <span className="text-xs text-ds-gray-400 shrink-0">S{s.numSprint}</span>
-                            {mounted && isSuperAdmin && (
-                              <button onClick={() => abrirEditarSub(s)} className="text-ds-gray-300 hover:text-black p-1 shrink-0 opacity-0 group-hover:opacity-100 transition" title="Editar subpartida">
-                                <Icon name="edit" size="sm" color="currentColor" />
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-                {parts.length === 0 && (<div className="text-xs text-ds-gray-300 px-1">Sin partidas en esta etapa</div>)}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
+          </div>
+
+          {/* DERECHA — detalle de la partida seleccionada */}
+          <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden min-h-[300px]">
+            {!sel ? (
+              <div className="p-12 text-center text-ds-gray-400 text-sm">Seleccioná una partida de la izquierda para ver y agregar sus subpartidas.</div>
+            ) : (
+              <>
+                <div className="px-5 py-4 border-b border-ds-gray-200 flex items-center gap-3 flex-wrap">
+                  {selEtapa && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono shrink-0">{selEtapa.codigo}</span>}
+                  <span className="font-mono text-sm font-semibold text-ds-gray-500 shrink-0">{sel.codigo}</span>
+                  <h2 className="font-bold text-black truncate flex-1 min-w-0">{sel.nombre}</h2>
+                  <span className="text-xs text-ds-gray-400 shrink-0">{selSubs.length} subpartidas</span>
+                  {puede && (
+                    <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                      <Button size="sm" variant="outline" onClick={() => abrirEditarPart(sel)} icon={<Icon name="edit" size="sm" color="currentColor" />}>Editar</Button>
+                      <Button size="sm" onClick={() => abrirNuevaSub(sel.idPartida)} icon={<Icon name="plus" size="sm" color="currentColor" />}>Agregar subpartida</Button>
+                    </div>
+                  )}
+                </div>
+                {selSubs.length === 0 ? (
+                  <div className="p-12 text-center text-ds-gray-300 text-sm">
+                    Esta partida no tiene subpartidas.{puede && ' Agregá la primera con el botón de arriba.'}
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-ds-gray-100 max-h-[62vh] overflow-y-auto no-scrollbar">
+                    {selSubs.map(s => (
+                      <li key={s.idSubPartida} className="px-5 py-3 flex items-center gap-3 group">
+                        <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{s.codigo}</span>
+                        <span className="text-sm text-black truncate flex-1">{s.nombre}</span>
+                        {s.esCritica && <Badge variant="red">Crítica</Badge>}
+                        <span className="text-xs text-ds-gray-400 shrink-0">S{s.numSprint}</span>
+                        {puede && (
+                          <button onClick={() => abrirEditarSub(s)} className="text-ds-gray-300 hover:text-black p-1 shrink-0 opacity-0 group-hover:opacity-100 transition" title="Editar subpartida">
+                            <Icon name="edit" size="sm" color="currentColor" />
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -333,26 +375,39 @@ export default function PartidasPage() {
         }
       >
         <div className="space-y-4">
-          <p className="text-body-sm text-ds-gray-500">
-            La subpartida queda amarrada a una <span className="font-semibold text-black">partida</span> existente (y a su etapa).
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Combobox
-              label="Etapa" required
-              value={subForm.idEtapa}
-              onChange={v => { setSub('idEtapa', v); setSub('idPartida', ''); }}
-              placeholder="Seleccionar etapa"
-              options={etapas.map(e => ({ value: String(e.idEtapa), label: e.nombre, parts: [{ text: e.codigo, weight: 'bold' as const }, { text: e.nombre, weight: 'light' as const }], search: e.codigo }))}
-            />
-            <Combobox
-              label="Partida" required
-              value={subForm.idPartida}
-              onChange={v => setSub('idPartida', v)}
-              placeholder={subForm.idEtapa ? 'Seleccionar partida' : 'Elegí una etapa primero'}
-              emptyText="Esta etapa no tiene partidas"
-              options={partidasDeEtapa.map(p => ({ value: String(p.idPartida), label: p.nombre, parts: [{ text: p.codigo, weight: 'bold' as const }, { text: p.nombre, weight: 'light' as const }], search: p.codigo }))}
-            />
-          </div>
+          {subForm.idPartida ? (
+            // Partida ya definida por contexto (detalle o edición): se muestra fija.
+            <div className="rounded-ds bg-ds-gray-100 px-4 py-3 text-sm">
+              <span className="text-ds-gray-500">Partida: </span>
+              {(() => {
+                const p = partidas.find(x => String(x.idPartida) === subForm.idPartida);
+                return <span className="font-semibold text-black">{p ? `${p.codigo} — ${p.nombre}` : subForm.idPartida}</span>;
+              })()}
+            </div>
+          ) : (
+            <>
+              <p className="text-body-sm text-ds-gray-500">
+                La subpartida queda amarrada a una <span className="font-semibold text-black">partida</span> existente (y a su etapa).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Combobox
+                  label="Etapa" required
+                  value={subForm.idEtapa}
+                  onChange={v => { setSub('idEtapa', v); setSub('idPartida', ''); }}
+                  placeholder="Seleccionar etapa"
+                  options={etapas.map(e => ({ value: String(e.idEtapa), label: e.nombre, parts: [{ text: e.codigo, weight: 'bold' as const }, { text: e.nombre, weight: 'light' as const }], search: e.codigo }))}
+                />
+                <Combobox
+                  label="Partida" required
+                  value={subForm.idPartida}
+                  onChange={v => setSub('idPartida', v)}
+                  placeholder={subForm.idEtapa ? 'Seleccionar partida' : 'Elegí una etapa primero'}
+                  emptyText="Esta etapa no tiene partidas"
+                  options={partidasDeEtapa.map(p => ({ value: String(p.idPartida), label: p.nombre, parts: [{ text: p.codigo, weight: 'bold' as const }, { text: p.nombre, weight: 'light' as const }], search: p.codigo }))}
+                />
+              </div>
+            </>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Código" placeholder="Ej. 1.1.5" value={subForm.codigo} onChange={e => setSub('codigo', e.target.value)} required maxLength={50} />
             <Input label="Nombre" value={subForm.nombre} onChange={e => setSub('nombre', e.target.value)} required maxLength={50} />
