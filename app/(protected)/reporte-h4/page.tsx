@@ -219,7 +219,7 @@ export default function ReporteH4Page() {
 
       {/* Banner nómina */}
       {!loading && (
-        <div className="flex items-center gap-3 rounded-ds-lg border border-brand bg-[#F6FBEA] px-5 py-4 text-body-sm text-black">
+        <div className="flex items-center gap-3 rounded-ds-lg border border-brand bg-brand-soft px-5 py-4 text-body-sm text-black">
           <span className="text-brand shrink-0"><Icon name="check" size="md" color="currentColor" /></span>
           <span><strong>{completos} trabajadores</strong> con jornada completa y sin anomalías. Listos para procesar a nómina.</span>
         </div>
@@ -256,7 +256,7 @@ export default function ReporteH4Page() {
 function Kpi({ label, value, sub, tone }: {
   label: string; value: React.ReactNode; sub?: string; tone?: 'warning' | 'critical';
 }) {
-  const valueColor = tone === 'critical' ? 'text-ds-red' : tone === 'warning' ? 'text-[#8a7400]' : 'text-black';
+  const valueColor = tone === 'critical' ? 'text-ds-red' : tone === 'warning' ? 'text-ds-yellow-ink' : 'text-black';
   return (
     <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
       <p className="text-xs font-bold tracking-wide text-ds-gray-500">{label}</p>

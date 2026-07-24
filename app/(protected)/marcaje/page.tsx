@@ -163,7 +163,7 @@ export default function MarcajePage() {
                   return (
                     <label key={c.idColaborador}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-ds border transition-colors ${
-                        c.enZona ? 'border-ds-gray-100 bg-ds-gray-100/40' : checked ? 'border-black bg-[#F6FBEA]' : 'border-ds-gray-200 hover:bg-ds-gray-100/50 cursor-pointer'}`}>
+                        c.enZona ? 'border-ds-gray-100 bg-ds-gray-100/40' : checked ? 'border-black bg-brand-soft' : 'border-ds-gray-200 hover:bg-ds-gray-100/50 cursor-pointer'}`}>
                       {c.enZona ? (
                         <span className="w-5 h-5 flex items-center justify-center shrink-0 text-brand"><Icon name="check" size="sm" color="currentColor" /></span>
                       ) : (
