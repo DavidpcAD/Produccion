@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
+import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
@@ -31,6 +33,9 @@ export default function PresupuestoPage() {
   const [subiendo, setSubiendo] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [tipoVista, setTipoVista] = useState('Sales');
+  const [plantillas, setPlantillas] = useState<{ idPlantilla: number; nombre: string; tipo: string; archivo: string | null; fechaActualizacion: string }[]>([]);
+  const [modalGuardar, setModalGuardar] = useState(false);
+  const [nombrePlantilla, setNombrePlantilla] = useState('');
   const [resultado, setResultado] = useState<string | null>(null);
   const plantillaFile = useRef<HTMLInputElement>(null);
   const descFile = useRef<HTMLInputElement>(null);
@@ -83,32 +88,42 @@ export default function PresupuestoPage() {
     } finally { setSubiendo(false); }
   }
 
-  // Cargar borrador guardado de la obra (si existe) al elegirla.
-  const cargarBorrador = useCallback(async (idObra: string) => {
-    if (!idObra) return;
-    const d = await fetch(`/api/presupuesto/borrador?idObra=${idObra}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
-    if (!d) return;
-    if (d.plantilla?.datos) setPlantilla({ archivo: d.plantilla.archivo ?? 'guardado', ...d.plantilla.datos });
-    if (d.descompuesto?.datos) setDescompuesto({ archivo: d.descompuesto.archivo ?? 'guardado', ...d.descompuesto.datos });
-    if (d.plantilla || d.descompuesto) setResultado('Cargado borrador guardado de esta obra. Podés editarlo y volver a guardar o subir.');
+  // Biblioteca de plantillas guardadas (reutilizables entre obras).
+  const cargarPlantillas = useCallback(async () => {
+    const d = await fetch('/api/presupuesto/plantillas').then(r => (r.ok ? r.json() : null)).catch(() => null);
+    if (d) setPlantillas(d.plantillas ?? []);
   }, []);
-  useEffect(() => { if (obraId) cargarBorrador(obraId); }, [obraId, cargarBorrador]);
+  useEffect(() => { cargarPlantillas(); }, [cargarPlantillas]);
 
-  // Guardar en base de datos el borrador actual (plantilla y/o descompuesto).
-  async function guardarBorrador() {
-    if (!obra) { toast('Elegí la obra', 'warning'); return; }
+  // Guardar lo cargado como plantilla(s) nombradas (general y/o descompuesto).
+  async function guardarComoPlantilla() {
+    const nombre = nombrePlantilla.trim();
+    if (!nombre) { toast('Poné un nombre a la plantilla', 'warning'); return; }
     if (!plantilla && !descompuesto) { toast('Cargá o editá algo primero', 'warning'); return; }
     setGuardando(true);
     try {
       const reqs: Promise<Response>[] = [];
-      if (plantilla) reqs.push(fetch('/api/presupuesto/borrador', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idObra: obra.idObra, worksNo: obra.numeroObra, tipo: 'plantilla', archivo: plantilla.archivo, datos: { porTipo: plantilla.porTipo, totales: plantilla.totales, hojas: plantilla.hojas } }) }));
-      if (descompuesto) reqs.push(fetch('/api/presupuesto/borrador', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idObra: obra.idObra, worksNo: obra.numeroObra, tipo: 'descompuesto', archivo: descompuesto.archivo, datos: { hoja: descompuesto.hoja, lineas: descompuesto.lineas } }) }));
+      if (plantilla) reqs.push(fetch('/api/presupuesto/plantillas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, tipo: 'general', archivo: plantilla.archivo, datos: { porTipo: plantilla.porTipo, totales: plantilla.totales, hojas: plantilla.hojas } }) }));
+      if (descompuesto) reqs.push(fetch('/api/presupuesto/plantillas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, tipo: 'descompuesto', archivo: descompuesto.archivo, datos: { hoja: descompuesto.hoja, lineas: descompuesto.lineas } }) }));
       const res = await Promise.all(reqs);
-      if (res.every(r => r.ok)) toast('Borrador guardado en la base', 'success');
-      else toast('No se pudo guardar todo el borrador', 'error');
+      if (res.every(r => r.ok)) { toast(`Plantilla "${nombre}" guardada`, 'success'); setModalGuardar(false); setNombrePlantilla(''); cargarPlantillas(); }
+      else toast('No se pudo guardar la plantilla', 'error');
     } finally { setGuardando(false); }
+  }
+
+  // Cargar una plantilla guardada al preview (editable).
+  async function usarPlantilla(id: number) {
+    const d = await fetch(`/api/presupuesto/plantillas?id=${id}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
+    if (!d) { toast('No se pudo cargar la plantilla', 'error'); return; }
+    if (d.tipo === 'general') setPlantilla({ archivo: d.archivo ?? d.nombre, ...d.datos });
+    else setDescompuesto({ archivo: d.archivo ?? d.nombre, ...d.datos });
+    toast(`Plantilla "${d.nombre}" cargada. Elegí la obra y subí.`, 'success');
+  }
+  async function borrarPlantilla(id: number) {
+    await fetch(`/api/presupuesto/plantillas?id=${id}`, { method: 'DELETE' });
+    cargarPlantillas();
   }
 
   // Editar el monto de una línea de la plantilla (queda en memoria; guardá para persistir).
@@ -156,8 +171,8 @@ export default function PresupuestoPage() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <Button variant="outline" onClick={leerArchivos} loading={leyendo} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer archivos</Button>
-          {hayDatos && obraId && (
-            <Button variant="secondary" onClick={guardarBorrador} loading={guardando} icon={<Icon name="check" size="sm" color="currentColor" />}>Guardar borrador</Button>
+          {hayDatos && (
+            <Button variant="secondary" onClick={() => setModalGuardar(true)} icon={<Icon name="check" size="sm" color="currentColor" />}>Guardar como plantilla</Button>
           )}
           {hayDatos && (
             <Button onClick={subir} loading={subiendo} disabled={!obraId} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir a Business Central</Button>
@@ -168,6 +183,25 @@ export default function PresupuestoPage() {
         </div>
         {resultado && <div className="rounded-ds bg-[#F6FBEA] border border-brand/40 px-4 py-3 text-sm text-black">{resultado}</div>}
       </div>
+
+      {/* Plantillas guardadas (reutilizables) */}
+      {plantillas.length > 0 && (
+        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-2">
+          <h2 className="font-bold text-black">Plantillas guardadas</h2>
+          <p className="text-ds-gray-400 text-xs">Cargá una plantilla guardada para editarla o subirla a la obra que elijas.</p>
+          <div className="divide-y divide-ds-gray-100">
+            {plantillas.map(pl => (
+              <div key={pl.idPlantilla} className="py-2.5 flex items-center gap-3">
+                <span className={'text-xs px-2 py-0.5 rounded-full shrink-0 ' + (pl.tipo === 'general' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{pl.tipo === 'general' ? 'General' : 'Descompuesto'}</span>
+                <span className="text-sm text-black font-medium truncate flex-1">{pl.nombre}</span>
+                <span className="text-ds-gray-400 text-xs shrink-0 hidden sm:block">{pl.archivo}</span>
+                <Button size="sm" variant="outline" onClick={() => usarPlantilla(pl.idPlantilla)}>Usar</Button>
+                <button onClick={() => borrarPlantilla(pl.idPlantilla)} className="text-ds-gray-300 hover:text-ds-red p-1" title="Borrar plantilla"><Icon name="delete" size="sm" color="currentColor" /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 2) Preview */}
       {plantilla && (
@@ -245,6 +279,15 @@ export default function PresupuestoPage() {
           </div>
         </div>
       )}
+
+      {/* Modal: guardar como plantilla */}
+      <Modal open={modalGuardar} onClose={() => setModalGuardar(false)} title="Guardar como plantilla"
+        footer={<><Button variant="outline" onClick={() => setModalGuardar(false)}>Cancelar</Button><Button loading={guardando} disabled={!nombrePlantilla.trim()} onClick={guardarComoPlantilla}>Guardar</Button></>}>
+        <div className="space-y-3">
+          <p className="text-body-sm text-ds-gray-500">Se guarda lo que tengas cargado (general y/o descompuesto) con este nombre, para reusarlo en cualquier obra.</p>
+          <Input label="Nombre de la plantilla" value={nombrePlantilla} onChange={e => setNombrePlantilla(e.target.value)} placeholder="Ej. Casa tipo A — L15" maxLength={150} />
+        </div>
+      </Modal>
     </div>
   );
 }
