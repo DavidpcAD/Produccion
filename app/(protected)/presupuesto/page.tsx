@@ -42,7 +42,7 @@ export default function PresupuestoPage() {
   const [obraId, setObraId] = useState('');
   const [plantilla, setPlantilla] = useState<PlantillaParsed | null>(null);
   const [descompuesto, setDescompuesto] = useState<DescParsed | null>(null);
-  const [leyendo, setLeyendo] = useState(false);
+  const [leyendoQue, setLeyendoQue] = useState<'plantilla' | 'descompuesto' | null>(null);
   const [subiendoQue, setSubiendoQue] = useState<'general' | 'descompuesto' | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [tipoVista, setTipoVista] = useState('Sales');
@@ -62,22 +62,26 @@ export default function PresupuestoPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  async function leerArchivos() {
+  // Lee UN archivo a la vez (General o Descompuesto) sin borrar lo otro que ya esté
+  // cargado. El endpoint /parse auto-detecta el tipo por contenido, así que aplicamos
+  // lo que devuelva sin importar en qué campo se subió.
+  async function leerUno(cual: 'plantilla' | 'descompuesto') {
+    const input = cual === 'plantilla' ? plantillaFile.current : descFile.current;
+    const file = input?.files?.[0];
+    const nombre = cual === 'plantilla' ? 'Plantilla general' : 'Descompuesto';
+    if (!file) { toast(`Elegí el archivo de ${nombre} primero`, 'warning'); return; }
     const fd = new FormData();
-    const pf = plantillaFile.current?.files?.[0];
-    const df = descFile.current?.files?.[0];
-    if (!pf && !df) { toast('Elegí al menos un archivo (Plantilla o Descompuesto)', 'warning'); return; }
-    if (pf) fd.append('plantilla', pf);
-    if (df) fd.append('descompuesto', df);
-    setLeyendo(true); setResultado(null);
+    fd.append(cual, file);
+    setLeyendoQue(cual); setResultado(null);
     try {
       const res = await fetch('/api/presupuesto/parse', { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast(data.error || 'No se pudo leer el Excel', 'error'); return; }
-      setPlantilla(data.plantilla ?? null);
-      setDescompuesto(data.descompuesto ?? null);
-      toast('Archivos leídos. Revisá el preview antes de subir.', 'success');
-    } finally { setLeyendo(false); }
+      if (data.plantilla) setPlantilla(data.plantilla);
+      if (data.descompuesto) setDescompuesto(data.descompuesto);
+      const leido = data.plantilla ? 'Plantilla general' : data.descompuesto ? 'Descompuesto' : null;
+      toast(leido ? `${leido} leído. Revisalo en el paso 2.` : 'No se reconoció el archivo como Plantilla ni Descompuesto.', leido ? 'success' : 'warning');
+    } finally { setLeyendoQue(null); }
   }
 
   // General (plantilla → versión) y Descompuesto (materiales) se suben a BC por separado.
@@ -179,18 +183,23 @@ export default function PresupuestoPage() {
           {obra && <p className="text-ds-gray-400 text-xs mt-1">Obra en BC (worksNo): <span className="font-mono font-semibold text-black">{obra.numeroObra}</span></p>}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <label className="block">
-            <span className="text-body-sm font-semibold text-black">Plantilla general</span>
-            <span className="block text-ds-gray-400 text-xs mb-1">Venta, Costo e Indirectos — esto arma la versión en BC.</span>
+          <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">
+            <div>
+              <span className="text-body-sm font-semibold text-black">Plantilla general</span>
+              <span className="block text-ds-gray-400 text-xs">Venta, Costo e Indirectos — esto arma la versión en BC.</span>
+            </div>
             <input ref={plantillaFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
-          </label>
-          <label className="block">
-            <span className="text-body-sm font-semibold text-black">Descompuesto</span>
-            <span className="block text-ds-gray-400 text-xs mb-1">Materiales por tarea — se suben aparte a BC.</span>
+            <Button variant="outline" size="sm" onClick={() => leerUno('plantilla')} loading={leyendoQue === 'plantilla'} disabled={leyendoQue !== null} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer plantilla</Button>
+          </div>
+          <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">
+            <div>
+              <span className="text-body-sm font-semibold text-black">Descompuesto</span>
+              <span className="block text-ds-gray-400 text-xs">Materiales por tarea — se suben aparte a BC.</span>
+            </div>
             <input ref={descFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
-          </label>
+            <Button variant="outline" size="sm" onClick={() => leerUno('descompuesto')} loading={leyendoQue === 'descompuesto'} disabled={leyendoQue !== null} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer descompuesto</Button>
+          </div>
         </div>
-        <Button variant="outline" onClick={leerArchivos} loading={leyendo} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer archivos</Button>
       </div>
 
       {/* Plantillas guardadas (reutilizables) */}
