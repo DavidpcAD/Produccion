@@ -70,8 +70,18 @@ export default function PartidasPage() {
   // ---- Subpartida ----
   function abrirNuevaSub(idPartida?: number) {
     const p = idPartida ? partidas.find(x => x.idPartida === idPartida) : undefined;
+    // Código sugerido = código de la partida + el siguiente correlativo según la última
+    // subpartida existente (ej. 1.1 con hasta 1.1.5 → sugiere 1.1.6). Queda editable.
+    let codigo = '';
+    if (p) {
+      const nums = subpartidas
+        .filter(s => s.idPartida === p.idPartida)
+        .map(s => { const m = s.codigo.match(/\.(\d+)\s*$/); return m ? parseInt(m[1], 10) : NaN; })
+        .filter(n => !Number.isNaN(n));
+      codigo = `${p.codigo}.${(nums.length ? Math.max(...nums) : 0) + 1}`;
+    }
     setSubEditId(null);
-    setSubForm({ ...EMPTY_SUB, idEtapa: p?.idEtapa != null ? String(p.idEtapa) : '', idPartida: idPartida ? String(idPartida) : '' });
+    setSubForm({ ...EMPTY_SUB, idEtapa: p?.idEtapa != null ? String(p.idEtapa) : '', idPartida: idPartida ? String(idPartida) : '', codigo });
     setSubOpen(true);
   }
   function abrirEditarSub(s: SubPartida) {
