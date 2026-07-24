@@ -213,7 +213,7 @@ export default function NuevoColaboradorPage() {
                 <Icon name="user" size="sm" color="currentColor" className="text-brand" />
               </div>
               <span className="text-sm font-semibold text-black">Dispositivo de marcaje</span>
-              <span className={`ml-auto px-2.5 py-1 rounded-ds text-xs font-semibold ${form.idZonaMarcaje ? 'bg-[#E8F5C8] text-[#4a6f00]' : 'bg-ds-gray-100 text-ds-gray-500'}`}>
+              <span className={`ml-auto px-2.5 py-1 rounded-ds text-xs font-semibold ${form.idZonaMarcaje ? 'bg-ds-green-soft text-ds-green-ink' : 'bg-ds-gray-100 text-ds-gray-500'}`}>
                 {form.idZonaMarcaje ? 'Se enrolará' : 'No marcará'}
               </span>
             </div>
