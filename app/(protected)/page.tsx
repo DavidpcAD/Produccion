@@ -45,17 +45,17 @@ async function getStats() {
 }
 
 const accionLabels: Record<string, { label: string; cls: string }> = {
-  CREAR_USUARIO:   { label: 'Nuevo colaborador', cls: 'bg-[#E8F5C8] text-[#4a6f00]' },
-  CREAR_ACCESO:    { label: 'Acceso creado',     cls: 'bg-[#E8F5C8] text-[#4a6f00]' },
+  CREAR_USUARIO:   { label: 'Nuevo colaborador', cls: 'bg-ds-green-soft text-ds-green-ink' },
+  CREAR_ACCESO:    { label: 'Acceso creado',     cls: 'bg-ds-green-soft text-ds-green-ink' },
   EDITAR_ACCESO:   { label: 'Acceso editado',    cls: 'bg-ds-gray-100 text-ds-gray-500' },
   EDITAR_USUARIO:  { label: 'Edición',           cls: 'bg-ds-gray-100 text-ds-gray-500' },
   ASIGNAR_ROL:     { label: 'Rol asignado',      cls: 'bg-ds-gray-100 text-ds-gray-500' },
-  REVOCAR_ROL:     { label: 'Rol revocado',      cls: 'bg-[#FDE8E8] text-[#b42318]' },
+  REVOCAR_ROL:     { label: 'Rol revocado',      cls: 'bg-ds-red-soft text-ds-red-ink' },
   EDITAR_CUADRILLA:{ label: 'Cuadrilla',         cls: 'bg-ds-gray-100 text-ds-gray-500' },
   MOVER_CUADRILLA: { label: 'Cuadrilla',         cls: 'bg-ds-gray-100 text-ds-gray-500' },
   CAMBIO_ENCARGADO:{ label: 'Cambio de encargado', cls: 'bg-ds-gray-100 text-ds-gray-500' },
-  ASIGNAR_ENCARGADO_PARTIDA: { label: 'Encargado asignado', cls: 'bg-[#E8F5C8] text-[#4a6f00]' },
-  QUITAR_ENCARGADO_PARTIDA:  { label: 'Encargado quitado',  cls: 'bg-[#FDE8E8] text-[#b42318]' },
+  ASIGNAR_ENCARGADO_PARTIDA: { label: 'Encargado asignado', cls: 'bg-ds-green-soft text-ds-green-ink' },
+  QUITAR_ENCARGADO_PARTIDA:  { label: 'Encargado quitado',  cls: 'bg-ds-red-soft text-ds-red-ink' },
 };
 
 // Cualquier acción no mapeada: convertir SNAKE_CASE en "Snake case" legible.

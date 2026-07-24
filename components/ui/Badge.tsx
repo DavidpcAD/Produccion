@@ -8,13 +8,13 @@ interface BadgeProps {
 }
 
 const variants: Record<BadgeVariant, string> = {
-  green:  'bg-transparent text-[#4a6f00] border border-brand',
+  green:  'bg-transparent text-ds-green-ink border border-brand',
   red:    'bg-transparent text-ds-red-200 border border-ds-red',
   orange: 'bg-transparent text-ds-gray-500 border border-ds-gray-200',
   blue:   'bg-white text-ds-gray-400 border border-ds-gray-200',
   purple: 'bg-white text-ds-gray-400 border border-ds-gray-200',
   gray:   'bg-white text-ds-gray-400 border border-ds-gray-200',
-  yellow: 'bg-transparent text-[#8a7400] border border-ds-yellow',
+  yellow: 'bg-transparent text-ds-yellow-ink border border-ds-yellow',
   black:  'bg-black text-white border border-black',
 };
 

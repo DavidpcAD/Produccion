@@ -189,7 +189,7 @@ export default function PresupuestoPage() {
             <span className="text-ds-red text-body-sm font-medium">↑ Elegí una obra para poder subir</span>
           )}
         </div>
-        {resultado && <div className="rounded-ds bg-[#F6FBEA] border border-brand/40 px-4 py-3 text-sm text-black">{resultado}</div>}
+        {resultado && <div className="rounded-ds bg-brand-soft border border-brand/40 px-4 py-3 text-sm text-black">{resultado}</div>}
       </div>
 
       {/* Plantillas guardadas (reutilizables) */}
@@ -243,7 +243,7 @@ export default function PresupuestoPage() {
               <div className="grid grid-cols-3 gap-3">
                 {TIPO_SUBIBLES.filter(t => plantilla.porTipo[t]).map(t => (
                   <button key={t} type="button" onClick={() => setTipoVista(t)}
-                    className={'text-left rounded-ds-lg border p-3 transition ' + (tipoVista === t ? 'border-brand bg-[#F6FBEA]' : 'border-ds-gray-200 hover:bg-ds-gray-100')}>
+                    className={'text-left rounded-ds-lg border p-3 transition ' + (tipoVista === t ? 'border-brand bg-brand-soft' : 'border-ds-gray-200 hover:bg-ds-gray-100')}>
                     <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
                     <p className="text-black font-bold text-lg">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
                   </button>

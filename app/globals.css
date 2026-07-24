@@ -21,6 +21,15 @@
   --color-ds-yellow:    #F0C802;
   --color-ds-bg:        #F3F3F3;
 
+  /* Tintes semánticos (badges suaves / superficies de estado) — tokenizados
+     para no repetir hex sueltos por las pantallas. */
+  --color-brand-soft:   #F6FBEA;  /* superficie brand muy clara (selección) */
+  --color-ds-green-soft: #E8F5C8; /* fondo badge éxito */
+  --color-ds-green-ink:  #4A6F00; /* texto verde intenso (Badge, badges éxito) */
+  --color-ds-red-soft:   #FDE8E8; /* fondo badge peligro */
+  --color-ds-red-ink:    #B42318; /* texto rojo intenso */
+  --color-ds-yellow-ink: #8A7400; /* texto ámbar intenso */
+
   /* Font family */
   --font-family-sans: 'Roboto', system-ui, sans-serif;
 
