@@ -55,7 +55,7 @@ function EstadoObra({ estado }: { estado: string | null }) {
   if (!estado) return null;
   const e = estado.toLowerCase();
   const cfg = e === 'open'
-    ? { label: 'Abierta', cls: 'bg-brand/15 text-[#4a6f00]', dot: 'bg-brand' }
+    ? { label: 'Abierta', cls: 'bg-brand/15 text-ds-green-ink', dot: 'bg-brand' }
     : e === 'blocked'
       ? { label: 'Bloqueada', cls: 'bg-ds-red/10 text-ds-red', dot: 'bg-ds-red' }
       : { label: estado, cls: 'bg-ds-gray-100 text-ds-gray-500', dot: 'bg-ds-gray-400' };
