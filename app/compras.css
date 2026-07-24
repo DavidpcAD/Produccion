@@ -214,6 +214,8 @@
   width: auto;
   background: var(--ds-color-white);
   border-radius: var(--ds-radius-lg);
+  /* border + shadow-01 para igualar a las tarjetas del resto del app. */
+  border: 1px solid var(--ds-color-gray-200);
   box-shadow: var(--ds-shadow-01);
   padding: var(--ds-space-6);
 }
