@@ -13,7 +13,8 @@ interface DescParsed { archivo: string; hoja: string | null; lineas: Linea[] }
 
 const crc = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 });
 const TIPO_LABEL: Record<string, string> = { Sales: 'Venta', Cost: 'Costo directo', 'Indirect Cost': 'Indirectos', Production: 'Producción' };
-const TIPO_ORDER = ['Sales', 'Cost', 'Indirect Cost', 'Production'];
+// Solo estos 3 se suben a BC (Producción es base de avance, va aparte — no se muestra).
+const TIPO_SUBIBLES = ['Sales', 'Cost', 'Indirect Cost'];
 
 export default function PresupuestoPage() {
   const session = useSession();
@@ -114,10 +115,13 @@ export default function PresupuestoPage() {
             <input ref={descFile} type="file" accept=".xlsx,.xls" className="mt-1 block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
           </label>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Button variant="outline" onClick={leerArchivos} loading={leyendo} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer archivos</Button>
           {hayDatos && (
             <Button onClick={subir} loading={subiendo} disabled={!obraId} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir a Business Central</Button>
+          )}
+          {hayDatos && !obraId && (
+            <span className="text-ds-red text-body-sm font-medium">↑ Elegí una obra para poder subir</span>
           )}
         </div>
         {resultado && <div className="rounded-ds bg-[#F6FBEA] border border-brand/40 px-4 py-3 text-sm text-black">{resultado}</div>}
@@ -130,8 +134,9 @@ export default function PresupuestoPage() {
             <h2 className="font-bold text-black">Plantilla</h2>
             <span className="text-ds-gray-400 text-xs font-mono">{plantilla.archivo}</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {TIPO_ORDER.filter(t => plantilla.porTipo[t]).map(t => (
+          <p className="text-ds-gray-400 text-xs">Solo Venta, Costo e Indirectos se suben a BC. Tocá una tarjeta para ver sus líneas.</p>
+          <div className="grid grid-cols-3 gap-3">
+            {TIPO_SUBIBLES.filter(t => plantilla.porTipo[t]).map(t => (
               <button key={t} type="button" onClick={() => setTipoVista(t)}
                 className={'text-left rounded-ds-lg border p-3 transition ' + (tipoVista === t ? 'border-brand bg-[#F6FBEA]' : 'border-ds-gray-200 hover:bg-ds-gray-100')}>
                 <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
@@ -141,7 +146,7 @@ export default function PresupuestoPage() {
           </div>
           {/* Vista previa de líneas del tipo seleccionado */}
           {(() => {
-            const activa = plantilla.porTipo[tipoVista] ? tipoVista : TIPO_ORDER.find(t => plantilla.porTipo[t]) ?? '';
+            const activa = (TIPO_SUBIBLES.includes(tipoVista) && plantilla.porTipo[tipoVista]) ? tipoVista : TIPO_SUBIBLES.find(t => plantilla.porTipo[t]) ?? '';
             const lineas = plantilla.porTipo[activa] ?? [];
             return (
               <div>
