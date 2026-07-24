@@ -29,6 +29,7 @@ export default function PresupuestoPage() {
   const [descompuesto, setDescompuesto] = useState<DescParsed | null>(null);
   const [leyendo, setLeyendo] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
   const [tipoVista, setTipoVista] = useState('Sales');
   const [resultado, setResultado] = useState<string | null>(null);
   const plantillaFile = useRef<HTMLInputElement>(null);
@@ -82,6 +83,44 @@ export default function PresupuestoPage() {
     } finally { setSubiendo(false); }
   }
 
+  // Cargar borrador guardado de la obra (si existe) al elegirla.
+  const cargarBorrador = useCallback(async (idObra: string) => {
+    if (!idObra) return;
+    const d = await fetch(`/api/presupuesto/borrador?idObra=${idObra}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
+    if (!d) return;
+    if (d.plantilla?.datos) setPlantilla({ archivo: d.plantilla.archivo ?? 'guardado', ...d.plantilla.datos });
+    if (d.descompuesto?.datos) setDescompuesto({ archivo: d.descompuesto.archivo ?? 'guardado', ...d.descompuesto.datos });
+    if (d.plantilla || d.descompuesto) setResultado('Cargado borrador guardado de esta obra. Podés editarlo y volver a guardar o subir.');
+  }, []);
+  useEffect(() => { if (obraId) cargarBorrador(obraId); }, [obraId, cargarBorrador]);
+
+  // Guardar en base de datos el borrador actual (plantilla y/o descompuesto).
+  async function guardarBorrador() {
+    if (!obra) { toast('Elegí la obra', 'warning'); return; }
+    if (!plantilla && !descompuesto) { toast('Cargá o editá algo primero', 'warning'); return; }
+    setGuardando(true);
+    try {
+      const reqs: Promise<Response>[] = [];
+      if (plantilla) reqs.push(fetch('/api/presupuesto/borrador', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idObra: obra.idObra, worksNo: obra.numeroObra, tipo: 'plantilla', archivo: plantilla.archivo, datos: { porTipo: plantilla.porTipo, totales: plantilla.totales, hojas: plantilla.hojas } }) }));
+      if (descompuesto) reqs.push(fetch('/api/presupuesto/borrador', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idObra: obra.idObra, worksNo: obra.numeroObra, tipo: 'descompuesto', archivo: descompuesto.archivo, datos: { hoja: descompuesto.hoja, lineas: descompuesto.lineas } }) }));
+      const res = await Promise.all(reqs);
+      if (res.every(r => r.ok)) toast('Borrador guardado en la base', 'success');
+      else toast('No se pudo guardar todo el borrador', 'error');
+    } finally { setGuardando(false); }
+  }
+
+  // Editar el monto de una línea de la plantilla (queda en memoria; guardá para persistir).
+  function editarMonto(tipo: string, idx: number, valor: string) {
+    setPlantilla(p => {
+      if (!p) return p;
+      const arr = [...(p.porTipo[tipo] ?? [])];
+      arr[idx] = { ...arr[idx], lineAmount: Number(valor) || 0 };
+      return { ...p, porTipo: { ...p.porTipo, [tipo]: arr } };
+    });
+  }
+
   if (mounted && session && !puede) {
     return <div className="p-6 max-w-[1400px] mx-auto"><div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div></div>;
   }
@@ -117,6 +156,9 @@ export default function PresupuestoPage() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <Button variant="outline" onClick={leerArchivos} loading={leyendo} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer archivos</Button>
+          {hayDatos && obraId && (
+            <Button variant="secondary" onClick={guardarBorrador} loading={guardando} icon={<Icon name="check" size="sm" color="currentColor" />}>Guardar borrador</Button>
+          )}
           {hayDatos && (
             <Button onClick={subir} loading={subiendo} disabled={!obraId} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir a Business Central</Button>
           )}
@@ -162,7 +204,11 @@ export default function PresupuestoPage() {
                           <td className="py-1.5 px-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
                           <td className="py-1.5 px-3"><span className={'text-xs px-2 py-0.5 rounded-full ' + (l.taskType === 'Total' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{l.taskType === 'Total' ? 'Capítulo' : 'Partida'}</span></td>
                           <td className="py-1.5 px-3 truncate max-w-[360px]">{l.description}</td>
-                          <td className="py-1.5 px-3 text-right font-medium">{crc.format(l.lineAmount ?? 0)}</td>
+                          <td className="py-1 px-3 text-right">
+                            <input type="number" value={l.lineAmount ?? 0}
+                              onChange={e => editarMonto(activa, i, e.target.value)}
+                              className="w-32 text-right rounded-ds border border-ds-gray-200 px-2 py-1 text-sm focus:border-black focus:outline-none" />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
