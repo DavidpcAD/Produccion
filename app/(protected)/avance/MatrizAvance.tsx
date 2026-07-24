@@ -272,7 +272,7 @@ function FiltroChip({
       type="button"
       onClick={onClick}
       className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
-        activo ? 'border-brand bg-brand/15 text-[#4a6f00]' : 'border-ds-gray-200 bg-white text-ds-gray-400'
+        activo ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-white text-ds-gray-400'
       }`}
     >
       {label}

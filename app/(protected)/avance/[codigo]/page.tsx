@@ -22,7 +22,7 @@ function estadoDe(sp: AvanceSubPartida): EstadoAvance {
 const ESTILO: Record<EstadoAvance, { stripe: string; chip: string; label: string; icon: string }> = {
   sin_iniciar: { stripe: 'bg-ds-gray-300', chip: 'bg-ds-gray-100 text-ds-gray-500', label: 'Sin iniciar', icon: 'square' },
   en_progreso: { stripe: 'bg-ds-gray-400', chip: 'bg-ds-gray-100 text-ds-gray-500', label: 'En progreso', icon: 'incompleto' },
-  completada: { stripe: 'bg-brand', chip: 'bg-brand/20 text-[#4a6f00]', label: 'Completada', icon: 'completado' },
+  completada: { stripe: 'bg-brand', chip: 'bg-brand/20 text-ds-green-ink', label: 'Completada', icon: 'completado' },
   nc: { stripe: 'bg-ds-red', chip: 'bg-ds-red/10 text-ds-red-200', label: 'No cumplió', icon: 'alert' },
 };
 
