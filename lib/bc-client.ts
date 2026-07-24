@@ -1,6 +1,6 @@
 let bcToken: { access_token: string; expires_at: number } | null = null;
 
-async function getBCToken(): Promise<string> {
+export async function getBCToken(): Promise<string> {
   if (bcToken && Date.now() < bcToken.expires_at - 60000) {
     return bcToken.access_token;
   }
