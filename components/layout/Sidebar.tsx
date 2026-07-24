@@ -23,6 +23,7 @@ const navItems: NavItemDef[] = [
   { href: '/obras',     label: 'Obras',         icon: 'place',     minLevel: 2 },
   { href: '/cuadrillas',label: 'Cuadrillas',    icon: 'cuadrillas',minLevel: 2 },
   { href: '/partidas',  label: 'Partidas',      icon: 'calculator', minLevel: 4 },
+  { href: '/presupuesto',label: 'Presupuesto',   icon: 'boleta',    minLevel: 2 },
   { href: '/avance',    label: 'Avance de obra', icon: 'completado', minLevel: 2 },
   { href: '/concreto',  label: 'Concreto',      icon: 'traslado',  minLevel: 2 },
   { href: '/compras/aprobacion', label: 'Aprobación OC', icon: 'rol',    minLevel: 2 },
