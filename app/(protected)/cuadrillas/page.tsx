@@ -392,7 +392,7 @@ export default function CuadrillasPage() {
         body: JSON.stringify({
           nombre: form.nombre,
           idEncargado: parseInt(form.idEncargado),
-          capacidad: parseInt(form.capacidad) || 25,
+          capacidad: Math.max(1, parseInt(form.capacidad) || 25),
           bloques,
         }),
       });
@@ -779,7 +779,7 @@ export default function CuadrillasPage() {
               })}
               options={proyectos.map(pr => ({ value: String(pr.idProyecto), label: pr.nombre }))}
               placeholder="Elegí uno o más proyectos" emptyText="Sin proyectos" />
-            <Input label="Capacidad máxima" type="number" value={form.capacidad}
+            <Input label="Capacidad máxima" type="number" min={1} value={form.capacidad}
               onChange={e => setForm(p => ({ ...p, capacidad: e.target.value }))} />
           </div>
 
