@@ -31,7 +31,7 @@
   --color-ds-yellow-ink: #8A7400; /* texto ámbar intenso */
 
   /* Font family */
-  --font-family-sans: 'Roboto', system-ui, sans-serif;
+  --font-family-sans: var(--font-roboto), 'Roboto', system-ui, sans-serif;
 
   /* Font sizes */
   --font-size-body-sm: 12px;
@@ -74,7 +74,7 @@
   --ds-color-surface:   #f3f3f3;
   --ds-color-yellow:    #f0c802;
 
-  --ds-font-family:          "Roboto", "Segoe UI", sans-serif;
+  --ds-font-family:          var(--font-roboto), "Roboto", "Segoe UI", sans-serif;
   --ds-font-size-body-sm:    12px;
   --ds-font-size-label:      14px;
   --ds-font-size-body-md:    16px;

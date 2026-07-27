@@ -45,6 +45,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -53,6 +54,10 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ['mssql'],
+  // Tree-shake barrels grandes (íconos, motion, tabla) → menos JS en el first load.
+  experimental: {
+    optimizePackageImports: ['@phosphor-icons/react', 'motion', '@tanstack/react-table'],
+  },
   async headers() {
     return [
       {

@@ -2,8 +2,8 @@
    Adelante Design System — Global Tokens + Component Styles
    ============================================================ */
 
-@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;600&display=swap");
-
+/* La fuente Roboto se auto-hospeda vía next/font (app/layout.tsx) y se expone como
+   var(--font-roboto). Se eliminó el @import de Google Fonts (era render-blocking). */
 :root {
   /* ── Colors ── */
   --ds-color-green-100: #add010;
@@ -22,7 +22,7 @@
   --ds-color-yellow:    #f0c802;
 
   /* ── Typography ── */
-  --ds-font-family:          "Roboto", "Segoe UI", sans-serif;
+  --ds-font-family:          var(--font-roboto), "Roboto", "Segoe UI", sans-serif;
   --ds-font-size-body-sm:    12px;
   --ds-font-size-label:      14px;   /* Figma: font size/font size 14 */
   --ds-font-size-body-md:    16px;

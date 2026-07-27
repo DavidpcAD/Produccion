@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import * as XLSX from "xlsx";
+// xlsx se carga bajo demanda (dynamic import) dentro de los handlers de importar/
+// exportar, para no meter ~600 KB en el first-load de las páginas de ingeniería.
+async function loadXLSX(): Promise<typeof import("xlsx")> {
+  const m = await import("xlsx");
+  return ((m as unknown as { default?: typeof import("xlsx") }).default ?? m) as typeof import("xlsx");
+}
 import { Button, Card, Field, Select, Textarea, useToast } from "@/components/compras/ui";
 import { IconTrash, IconPlus } from "@/components/compras/icons";
 import { Combobox } from "@/components/compras/combobox";
@@ -336,6 +341,7 @@ export function SolicitudForm({
 
   async function importarExcel(file: File) {
     try {
+      const XLSX = await loadXLSX();
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -378,7 +384,8 @@ export function SolicitudForm({
   // importador entiende (Código / Obra / Cantidad) — precargada con las líneas
   // actuales si las hay — más una hoja "Catálogo BC" para buscar códigos. Se edita
   // en local (agregar filas) y se vuelve a subir con "Importar Excel".
-  function descargarExcel() {
+  async function descargarExcel() {
+    const XLSX = await loadXLSX();
     const filas = lineas.length
       ? lineas.map((l) => {
           const a = catArticulos.find((x) => x.id === l.articuloId);
