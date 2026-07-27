@@ -79,9 +79,19 @@ export default function ObrasPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ pagina: '1', porPagina: '5000' });
-    const data = await fetch(`/api/obras?${params}`).then(r => r.json()).catch(() => ({ data: [] }));
-    setObras(data.data ?? []);
-    setLoading(false);
+    try {
+      const r = await fetch(`/api/obras?${params}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      setObras(data.data ?? []);
+    } catch {
+      // Distinguir "falló la carga" de "no hay obras": avisar en vez de mostrar vacío.
+      toast('No se pudieron cargar las obras. Revisá tu conexión y reintentá.', 'error');
+    } finally {
+      setLoading(false);
+    }
+    // toast es estable (contexto); no se incluye en deps para no re-crear load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { load(); }, [load]);

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useToast } from '@/components/ui/Toast';
 import { MatrizAvance } from './MatrizAvance';
 import { VENTA_META } from '@/lib/avance/venta';
 import type { EstadoVenta, ObraAvance, Proyecto } from '@/lib/avance/types';
@@ -16,6 +17,7 @@ type Vista = 'lista' | 'matriz';
  */
 export default function AvancePage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [proyectoSel, setProyectoSel] = useState<string | null>(null);
   const [obras, setObras] = useState<ObraAvance[]>([]);
@@ -41,12 +43,12 @@ export default function AvancePage() {
     const params = new URLSearchParams();
     if (proyectoActivo) params.set('proyecto', proyectoActivo);
     fetch(`/api/avance/obras?${params}`)
-      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((d) => {
         if (!cancel) setObras(d.data ?? []);
       })
       .catch(() => {
-        if (!cancel) setObras([]);
+        if (!cancel) { setObras([]); toast('No se pudieron cargar las obras. Reintentá.', 'error'); }
       })
       .finally(() => {
         if (!cancel) setLoadingObras(false);
