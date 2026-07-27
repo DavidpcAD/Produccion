@@ -97,7 +97,7 @@ export default function PresupuestoPage() {
         body: JSON.stringify({ worksNo: obra.numeroObra, ...payload }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { toast(data.error || 'No se pudo subir', 'error'); setResultado(data.error ?? null); return; }
+      if (!res.ok) { toast(data.error || 'No se pudo subir', 'error'); setResultado(null); return; }
       const partes: string[] = [];
       if (data.version) partes.push(`versión ${data.version} (${data.enviadas ?? 0} líneas enviadas)`);
       if (data.materiales) partes.push(`${data.materiales} materiales`);
