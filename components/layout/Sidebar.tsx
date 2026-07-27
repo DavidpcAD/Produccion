@@ -29,9 +29,7 @@ const navItems: NavItemDef[] = [
   { href: '/compras/aprobacion', label: 'Aprobación OC', icon: 'rol',    minLevel: 2 },
   { href: '/utilidades',label: 'Utilidades',    icon: 'calculator', minLevel: 2 },
   { href: '/reporte-h4',label: 'Reporte H4',    icon: 'reloj',     minLevel: 2 },
-  // 'Roles' se administra ahora en Recursos Humanos (rh.adelante.cr). Se quitó de acá.
-  { href: '/apps',      label: 'Apps',          icon: 'list',      minLevel: 4 },
-  { href: '/auditoria', label: 'Auditoría',     icon: 'boleta',    minLevel: 2 },
+  // Roles, Apps y Auditoría se administran ahora en Recursos Humanos (rh.adelante.cr).
 ];
 
 /** Item de navegación con la interacción del DS (halo + haptic + press). */
