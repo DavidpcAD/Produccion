@@ -1,113 +1,110 @@
 import { getSession } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
+import { getCierreDia } from '@/lib/reporte-h4/queries';
+import { abreviarCRC } from '@/lib/utilidades/format';
 import Link from 'next/link';
-import { Icon } from '@/components/ds/Icon/Icon';
+import { Icon, type IconName } from '@/components/ds/Icon/Icon';
 
-async function getStats() {
-  const q = async <T,>(query: string, fallback: T): Promise<T> => {
-    try {
-      const db = await getDb();
-      const r = await db.request().query(query);
-      return r.recordset as T;
-    } catch {
-      return fallback;
-    }
-  };
-
-  const [col, usuarios, pendMarcaje, cuad, actividad] = await Promise.all([
-    q<Array<{ total: number; activos: number }>>(
-      `SELECT COUNT(*) AS total, SUM(CASE WHEN esActivo=1 THEN 1 ELSE 0 END) AS activos FROM dbo.Colaborador`,
-      [{ total: 0, activos: 0 }],
-    ),
-    q<Array<{ total: number }>>(`SELECT COUNT(*) AS total FROM dbo.Usuario`, [{ total: 0 }]),
-    q<Array<{ total: number }>>(
-      `SELECT COUNT(*) AS total FROM dbo.Colaborador WHERE esActivo=1 AND ISNULL(marcajeEstado,'Pendiente')='Pendiente'`,
-      [{ total: 0 }],
-    ),
-    q<Array<{ total: number }>>(`SELECT COUNT(*) AS total FROM dbo.Cuadrilla WHERE Activo=1`, [{ total: 0 }]),
-    // UsuarioAuditLog no existe aún en el modelo nuevo -> lista vacía si falla
-    q<Array<Record<string, unknown>>>(
-      `SELECT TOP 6 ua.Accion, ua.FechaAccion, ua.Entidad, c.calcNombreCompleto AS Actor
-       FROM dbo.UsuarioAuditLog ua
-       JOIN dbo.Colaborador c ON c.idColaborador = ua.IDColAccion
-       ORDER BY ua.FechaAccion DESC`,
-      [],
-    ),
-  ]);
-
-  return {
-    colaboradores: col[0] ?? { total: 0, activos: 0 },
-    conAcceso: usuarios[0]?.total ?? 0,
-    pendientesMarcaje: pendMarcaje[0]?.total ?? 0,
-    cuadrillas: cuad[0]?.total ?? 0,
-    actividad,
-  };
+// Cada métrica corre aislada: si su DB/consulta falla, cae al fallback y el resto
+// del dashboard igual carga (no rompe la pantalla).
+async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try { return await fn(); } catch { return fallback; }
 }
 
-const accionLabels: Record<string, { label: string; cls: string }> = {
-  CREAR_USUARIO:   { label: 'Nuevo colaborador', cls: 'bg-ds-green-soft text-ds-green-ink' },
-  CREAR_ACCESO:    { label: 'Acceso creado',     cls: 'bg-ds-green-soft text-ds-green-ink' },
-  EDITAR_ACCESO:   { label: 'Acceso editado',    cls: 'bg-ds-gray-100 text-ds-gray-500' },
-  EDITAR_USUARIO:  { label: 'Edición',           cls: 'bg-ds-gray-100 text-ds-gray-500' },
-  ASIGNAR_ROL:     { label: 'Rol asignado',      cls: 'bg-ds-gray-100 text-ds-gray-500' },
-  REVOCAR_ROL:     { label: 'Rol revocado',      cls: 'bg-ds-red-soft text-ds-red-ink' },
-  EDITAR_CUADRILLA:{ label: 'Cuadrilla',         cls: 'bg-ds-gray-100 text-ds-gray-500' },
-  MOVER_CUADRILLA: { label: 'Cuadrilla',         cls: 'bg-ds-gray-100 text-ds-gray-500' },
-  CAMBIO_ENCARGADO:{ label: 'Cambio de encargado', cls: 'bg-ds-gray-100 text-ds-gray-500' },
-  ASIGNAR_ENCARGADO_PARTIDA: { label: 'Encargado asignado', cls: 'bg-ds-green-soft text-ds-green-ink' },
-  QUITAR_ENCARGADO_PARTIDA:  { label: 'Encargado quitado',  cls: 'bg-ds-red-soft text-ds-red-ink' },
-};
+async function getStats() {
+  const now = new Date();
+  const ym = now.getFullYear() * 100 + (now.getMonth() + 1);
 
-// Cualquier acción no mapeada: convertir SNAKE_CASE en "Snake case" legible.
-function accionLegible(code: string): string {
-  return code.charAt(0).toUpperCase() + code.slice(1).toLowerCase().replace(/_/g, ' ');
+  const [cuadrillas, obras, obrasList, h4, utilidadNeta] = await Promise.all([
+    // Cuadrillas activas (AdelanteSBX)
+    safe(async () => {
+      const db = await getDb();
+      const r = await db.request().query<{ total: number }>(`SELECT COUNT(*) AS total FROM dbo.Cuadrilla WHERE Activo=1`);
+      return r.recordset[0]?.total ?? 0;
+    }, 0),
+    // Obras por estado operativo (AdelanteDB)
+    safe(async () => {
+      const db = await getAdelanteDb();
+      const r = await db.request().query<{ enEjecucion: number; enEspera: number }>(`
+        SELECT
+          SUM(CASE WHEN estado = 'en_ejecucion' THEN 1 ELSE 0 END) AS enEjecucion,
+          SUM(CASE WHEN estado = 'en_espera'    THEN 1 ELSE 0 END) AS enEspera
+        FROM obc.obra_estado`);
+      return { enEjecucion: r.recordset[0]?.enEjecucion ?? 0, enEspera: r.recordset[0]?.enEspera ?? 0 };
+    }, { enEjecucion: 0, enEspera: 0 }),
+    // Lista corta de obras en ejecución (AdelanteDB)
+    safe(async () => {
+      const db = await getAdelanteDb();
+      const r = await db.request().query<{ codigo: string; sprint: number }>(`
+        SELECT TOP 8 obra_codigo AS codigo, sprint_actual AS sprint
+        FROM obc.obra_estado WHERE estado = 'en_ejecucion' ORDER BY obra_codigo`);
+      return r.recordset;
+    }, [] as Array<{ codigo: string; sprint: number }>),
+    // Reporte H4 — jornada de hoy (AdelanteSBX)
+    safe(async () => {
+      const c = await getCierreDia();
+      return { anomalias: c.anomalias.length, sinMarcaje: c.kpis.sinMarcaje };
+    }, { anomalias: 0, sinMarcaje: 0 }),
+    // Utilidad neta del mes en curso (AdelanteDB)
+    safe(async () => {
+      const db = await getAdelanteDb();
+      const r = await db.request().input('ym', sql.Int, ym).query<{ neta: number }>(
+        `SELECT SUM(utilidad_neta) AS neta FROM uti.v_resumen_mensual WHERE (anio * 100 + mes) = @ym`);
+      return r.recordset[0]?.neta ?? 0;
+    }, 0),
+  ]);
+
+  return { cuadrillas, obras, obrasList, h4, utilidadNeta };
 }
 
 export default async function DashboardPage() {
   const session = await getSession();
   const stats = await getStats();
 
-  // Cada card lleva a su destino (o filtro) propio y su ícono lo representa.
-  // El texto gris de las 4 es una descripción de la métrica (mismo patrón).
-  const cards = [
+  // Tarjetas del dashboard de PRODUCCIÓN: obra, jornada (H4) y utilidades.
+  // El personal se administra en Recursos Humanos; acá solo Cuadrillas (donde se
+  // asignan colaboradores a la obra).
+  const cards: { label: string; value: string | number; sub: string; icon: IconName; href: string; accent: string }[] = [
     {
-      label: 'Colaboradores activos',
-      value: stats.colaboradores.activos,
-      sub: 'personal activo de la empresa',
-      icon: 'user',
-      href: '/usuarios',
+      label: 'Obras en ejecución',
+      value: stats.obras.enEjecucion,
+      sub: `${stats.obras.enEspera} en espera`,
+      icon: 'place',
+      href: '/avance',
       accent: 'bg-brand',
     },
     {
-      label: 'Con acceso a apps',
-      value: stats.conAcceso,
-      sub: 'usuarios con login',
-      icon: 'check',
-      href: '/usuarios?soloUsuarios=1',
-      accent: 'bg-black',
+      label: 'Anomalías H4 (hoy)',
+      value: stats.h4.anomalias,
+      sub: `${stats.h4.sinMarcaje} sin marcaje hoy`,
+      icon: 'reloj',
+      href: '/reporte-h4',
+      accent: stats.h4.anomalias > 0 ? 'bg-ds-red' : 'bg-ds-gray-500',
     },
     {
-      label: 'Pendientes de marcaje',
-      value: stats.pendientesMarcaje,
-      sub: 'sin enrolar en el reloj',
-      icon: 'reloj',
-      href: '/marcaje',
-      accent: stats.pendientesMarcaje > 0 ? 'bg-ds-red' : 'bg-ds-gray-500',
+      label: 'Utilidad del mes',
+      value: abreviarCRC(stats.utilidadNeta),
+      sub: 'utilidad neta acumulada del mes',
+      icon: 'boleta',
+      href: '/utilidades',
+      accent: 'bg-black',
     },
     {
       label: 'Cuadrillas activas',
       value: stats.cuadrillas,
-      sub: 'en campo',
+      sub: 'en campo · acá se asignan colaboradores',
       icon: 'cuadrillas',
       href: '/cuadrillas',
       accent: 'bg-ds-gray-500',
     },
   ];
 
-  const quickActions = [
-    { href: '/usuarios/nuevo', label: 'Crear colaborador',     icon: 'user',       minLevel: 2 },
-    { href: '/roles',          label: 'Gestionar roles',       icon: 'rol',        minLevel: 4 },
-    { href: '/cuadrillas',     label: 'Gestionar cuadrillas',  icon: 'cuadrillas', minLevel: 2 },
+  const quickActions: { href: string; label: string; icon: IconName; minLevel: number }[] = [
+    { href: '/reporte-h4', label: 'Cerrar día (Reporte H4)', icon: 'reloj',      minLevel: 2 },
+    { href: '/avance',     label: 'Ver avance de obra',      icon: 'completado', minLevel: 2 },
+    { href: '/utilidades', label: 'Ver utilidades',          icon: 'boleta',     minLevel: 2 },
+    { href: '/cuadrillas', label: 'Gestionar cuadrillas',    icon: 'cuadrillas', minLevel: 2 },
   ];
 
   return (
@@ -117,7 +114,7 @@ export default async function DashboardPage() {
         <h1 className="text-3xl sm:text-4xl font-bold text-black tracking-tight">
           Hola, {session?.nombre.split(' ')[0]}
         </h1>
-        <p className="text-ds-gray-400 mt-1.5 text-body">Control de personal, accesos y marcaje de Adelante.</p>
+        <p className="text-ds-gray-400 mt-1.5 text-body">Resumen de producción: obra, jornada (H4) y utilidades.</p>
       </div>
 
       {/* Stat cards */}
@@ -139,9 +136,9 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Quick actions + Recent activity */}
+      {/* Acciones rápidas + Obras en ejecución */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick actions */}
+        {/* Acciones rápidas */}
         <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
           <h2 className="font-bold text-black mb-4 text-sub-sm">Acciones rápidas</h2>
           <div className="space-y-1">
@@ -163,30 +160,26 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent activity */}
+        {/* Obras en ejecución */}
         <div className="lg:col-span-2 bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
-          <h2 className="font-bold text-black mb-4 text-sub-sm">Actividad reciente</h2>
-          {stats.actividad.length === 0 ? (
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="font-bold text-black text-sub-sm">Obras en ejecución</h2>
+            <Link href="/avance" className="ml-auto text-xs font-semibold text-ds-gray-400 hover:text-black transition-colors">Ver todas →</Link>
+          </div>
+          {stats.obrasList.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-ds-gray-300">
-              <Icon name="boleta" size="lg" color="currentColor" className="mb-2" />
-              <span className="text-sm">Sin actividad registrada</span>
+              <Icon name="place" size="lg" color="currentColor" className="mb-2" />
+              <span className="text-sm">No hay obras en ejecución</span>
             </div>
           ) : (
-            <div className="space-y-3">
-              {stats.actividad.map((a: Record<string, unknown>, i: number) => {
-                const cfg = accionLabels[String(a.Accion)] ?? { label: accionLegible(String(a.Accion)), cls: 'bg-ds-gray-100 text-ds-gray-500' };
-                return (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className={`px-2.5 py-1 rounded-ds text-xs font-semibold shrink-0 ${cfg.cls}`}>
-                      {cfg.label}
-                    </span>
-                    <span className="text-sm font-semibold text-black flex-1 min-w-0 truncate">{String(a.Actor)}</span>
-                    <span className="text-xs text-ds-gray-300 shrink-0">
-                      {new Date(String(a.FechaAccion)).toLocaleString('es-CR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Costa_Rica' })}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="space-y-2.5">
+              {stats.obrasList.map((o) => (
+                <Link key={o.codigo} href="/avance" className="flex items-center gap-3 px-2 -mx-2 py-1.5 rounded-ds hover:bg-ds-gray-100 transition-colors">
+                  <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.codigo}</span>
+                  <span className="flex-1" />
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-ds-gray-100 text-ds-gray-500 shrink-0">Sprint {o.sprint}</span>
+                </Link>
+              ))}
             </div>
           )}
         </div>
