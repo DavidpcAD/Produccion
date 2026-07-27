@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { MatrizAvance } from './MatrizAvance';
 import { VENTA_META } from '@/lib/avance/venta';
@@ -118,17 +119,14 @@ export default function AvancePage() {
 
       {vista === 'lista' && (
         <div className="space-y-4">
-          {/* Buscador */}
-          <div className="relative max-w-md">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ds-gray-400">
-              <Icon name="search" size="sm" color="currentColor" />
-            </span>
-            <input
+          {/* Buscador — Input del DS (mismo look que cuadrillas/usuarios) */}
+          <div className="max-w-md">
+            <Input
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar casa: código o tipo…"
-              className="h-10 w-full rounded-ds border border-ds-gray-200 pl-9 pr-3 text-sm text-black focus:border-black focus:outline-none"
+              leftIcon={<Icon name="search" size="sm" color="currentColor" />}
             />
           </div>
 
@@ -242,7 +240,7 @@ function ProyectoChip({ label, activo, onClick }: { label: string; activo: boole
       type="button"
       onClick={onClick}
       className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-        activo ? 'border-black bg-black text-white' : 'border-ds-gray-200 bg-white text-ds-gray-400'
+        activo ? 'border-black bg-black text-white' : 'border-ds-gray-200 bg-white text-ds-gray-400 hover:border-ds-gray-400 hover:text-black'
       }`}
     >
       {label}
@@ -266,7 +264,7 @@ function FiltroChip({
       type="button"
       onClick={onClick}
       className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
-        activo ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-white text-ds-gray-400'
+        activo ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-white text-ds-gray-400 hover:border-ds-gray-400 hover:text-black'
       }`}
     >
       {label}
