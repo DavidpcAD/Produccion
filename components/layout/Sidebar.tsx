@@ -18,7 +18,8 @@ interface NavItemDef {
 
 const navItems: NavItemDef[] = [
   { href: '/',          label: 'Dashboard',     icon: 'home',      minLevel: 1 },
-  { href: '/usuarios',  label: 'Colaboradores', icon: 'user',      minLevel: 1 },
+  // Colaboradores se administran ahora en Recursos Humanos (rh.adelante.cr).
+  // En Producción se asignan a la obra desde Cuadrillas.
   { href: '/proyectos', label: 'Proyectos',     icon: 'folder',    minLevel: 2 },
   { href: '/obras',     label: 'Obras',         icon: 'place',     minLevel: 2 },
   { href: '/cuadrillas',label: 'Cuadrillas',    icon: 'cuadrillas',minLevel: 2 },
