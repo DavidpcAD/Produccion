@@ -26,15 +26,22 @@ const config: sql.config = {
 };
 
 let pool: sql.ConnectionPool | null = null;
+// Promesa de conexión en curso: si varias requests llegan en frío a la vez,
+// comparten la MISMA conexión en vez de abrir un pool cada una (importante con
+// la DB serverless que tarda en despertar).
+let poolPromise: Promise<sql.ConnectionPool> | null = null;
 
 export async function getDb(): Promise<sql.ConnectionPool> {
   if (pool && pool.connected) return pool;
+  if (poolPromise) return poolPromise;
   if (pool && !pool.connected) {
     try { await pool.close(); } catch { /* ignorar */ }
     pool = null;
   }
-  pool = await sql.connect(config);
-  return pool;
+  poolPromise = sql.connect(config)
+    .then((p) => { pool = p; poolPromise = null; return p; })
+    .catch((err) => { poolPromise = null; throw err; });
+  return poolPromise;
 }
 
 export { sql };
