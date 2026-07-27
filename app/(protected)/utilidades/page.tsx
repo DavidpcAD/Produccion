@@ -4,7 +4,6 @@ import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { Combobox } from '@/components/ui/Combobox';
 import { DataTable } from '@/components/ui/DataTable';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { TabsMenu } from '@/components/ds/TabsMenu/TabsMenu';
 import { ComentariosPanel } from './ComentariosPanel';
 import { formatCRC, abreviarCRC, formatPct, extraerBloque, etiquetaMes, MESES } from '@/lib/utilidades/format';
 
@@ -218,18 +217,20 @@ export default function UtilidadesPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2">
-        <TabsMenu
-          label="Resumen mensual"
-          state={tab === 'resumen' ? 'pressed' : 'standard'}
-          onClick={() => setTab('resumen')}
-        />
-        <TabsMenu
-          label="Utilidad por lote"
-          state={tab === 'lotes' ? 'pressed' : 'standard'}
-          onClick={() => setTab('lotes')}
-        />
+      {/* Tabs — toggle pill compacto (consistente con el resto del app) */}
+      <div className="inline-flex gap-1 p-1 bg-ds-gray-100 rounded-full">
+        {([['resumen', 'Resumen mensual'], ['lotes', 'Utilidad por lote']] as const).map(([k, lbl]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setTab(k)}
+            className={`px-5 h-10 rounded-full text-sm font-semibold transition-all ${
+              tab === k ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-black'
+            }`}
+          >
+            {lbl}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -244,7 +245,7 @@ export default function UtilidadesPage() {
           {/* Ingresos del período */}
           <section className="space-y-2">
             <p className="text-xs font-medium uppercase tracking-wider text-ds-gray-400">Ingresos del período</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
               <KpiCard titulo="Ingreso Bruto" monto={resumen?.ecuacionPrincipal.ingreso_bruto ?? 0} />
               <KpiCard titulo="Ingreso Neto AD" monto={resumen?.ecuacionPrincipal.ingreso_neto_ad ?? 0} destacado />
             </div>
