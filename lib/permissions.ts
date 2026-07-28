@@ -59,6 +59,9 @@ export function requireMinLevel(session: JWTPayload | null, level: number): bool
 
 export function getRouteLevel(pathname: string): number {
   if (pathname.startsWith('/login')) return 0;
+  // Órdenes de Compra (Ingeniería / Proveeduría / Aprobación): por ahora SOLO superadmin,
+  // hasta definir los roles reales (Ingeniería / Gerencia / etc.). Cubre páginas y API.
+  if (pathname.startsWith('/compras') || pathname.startsWith('/api/compras')) return 4;
   if (pathname.startsWith('/apps')) return 4;
   if (pathname.startsWith('/roles')) return 4;
   if (pathname.startsWith('/cuentas')) return 4;

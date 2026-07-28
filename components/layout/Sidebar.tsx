@@ -27,8 +27,8 @@ const navItems: NavItemDef[] = [
   { href: '/presupuesto',label: 'Presupuesto',   icon: 'boleta',    minLevel: 2 },
   { href: '/avance',    label: 'Avance de obra', icon: 'completado', minLevel: 2 },
   { href: '/concreto',  label: 'Concreto',      icon: 'traslado',  minLevel: 2 },
-  { href: '/compras/ingenieria/dashboard', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 2 },
-  { href: '/compras/aprobacion', label: 'Aprobación OC', icon: 'rol',    minLevel: 2 },
+  { href: '/compras/ingenieria/dashboard', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4 },
+  { href: '/compras/aprobacion', label: 'Aprobación OC', icon: 'rol',    minLevel: 4 },
   { href: '/utilidades',label: 'Utilidades',    icon: 'calculator', minLevel: 2 },
   { href: '/reporte-h4',label: 'Reporte H4',    icon: 'reloj',     minLevel: 2 },
   // Roles, Apps y Auditoría se administran ahora en Recursos Humanos (rh.adelante.cr).
