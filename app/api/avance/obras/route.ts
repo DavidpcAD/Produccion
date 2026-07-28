@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { refrescarEstadoVenta } from '@/lib/avance/venta';
+import { REPORTE_CACHE } from '@/lib/cache-headers';
 import type { ObraAvance } from '@/lib/avance/types';
 
 /**
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
       proyecto_codigo: proyectoDe(o.codigo),
     }));
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, { headers: REPORTE_CACHE });
   } catch (err) {
     console.error('/api/avance/obras error:', err);
     return NextResponse.json(

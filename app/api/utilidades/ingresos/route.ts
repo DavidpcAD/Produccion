@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { resolverRango, parseCsv, contarMeses, restarMeses } from '@/lib/utilidades/periodo';
+import { REPORTE_CACHE } from '@/lib/cache-headers';
 
 // GET /api/utilidades/ingresos?anio=&mes=  (o desde/hasta)&lotes=
 //
@@ -140,7 +141,7 @@ export async function GET(req: NextRequest) {
       kpisAnterior,
       porLote: porLoteRes.recordset,
       evolucionComparada: evRes.recordset,
-    });
+    }, { headers: REPORTE_CACHE });
   } catch (e) {
     console.error('Error en GET /api/utilidades/ingresos:', e);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

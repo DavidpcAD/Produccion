@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
+import { REPORTE_CACHE } from '@/lib/cache-headers';
 import type { Proyecto } from '@/lib/avance/types';
 
 /**
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await db.request().query<Proyecto>(query);
-    return NextResponse.json({ data: result.recordset });
+    return NextResponse.json({ data: result.recordset }, { headers: REPORTE_CACHE });
   } catch (err) {
     console.error('/api/avance/proyectos error:', err);
     return NextResponse.json(

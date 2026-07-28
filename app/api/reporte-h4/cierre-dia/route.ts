@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getCierreDia } from '@/lib/reporte-h4/queries';
+import { REPORTE_CACHE } from '@/lib/cache-headers';
 
 export const runtime = 'nodejs';
 
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const data = await getCierreDia(fecha);
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: REPORTE_CACHE });
   } catch (e) {
     console.error('[reporte-h4/cierre-dia]', e);
     return NextResponse.json({ error: 'No se pudo consultar el cierre del día' }, { status: 500 });
