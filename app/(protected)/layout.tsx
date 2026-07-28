@@ -6,7 +6,6 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { useSession } from '@/hooks/useSession';
 import { getInitials } from '@/lib/permissions';
-import { springs } from '@/lib/springs';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { AdelanteMark } from '@/components/ds/AdelanteMark/AdelanteMark';
 
@@ -34,7 +33,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         onMouseLeave={() => setNavExpanded(false)}
         initial={false}
         animate={{ width: navExpanded ? 264 : 76 }}
-        transition={springs.expanding}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
       >
         <Sidebar nivelAdmin={nivelAdmin} collapsed={!navExpanded} />
       </motion.div>

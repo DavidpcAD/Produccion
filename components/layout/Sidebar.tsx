@@ -86,7 +86,7 @@ function NavItem({
             initial={{ opacity: 0, width: 0 }}
             animate={{ opacity: 1, width: 'auto' }}
             exit={{ opacity: 0, width: 0 }}
-            transition={springs.settling}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
           >
             {item.label}
           </motion.span>
@@ -141,7 +141,7 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
-              transition={springs.settling}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
             >
               <p className="text-white font-bold text-sm leading-tight whitespace-nowrap">Adelante</p>
               <p className="text-white/40 text-xs whitespace-nowrap">Desarrollos</p>
@@ -220,7 +220,7 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: 'auto' }}
                   exit={{ opacity: 0, width: 0 }}
-                  transition={springs.settling}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
                 >
                   Salir
                 </motion.span>
