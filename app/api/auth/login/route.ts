@@ -27,8 +27,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cédula y contraseña requeridas' }, { status: 400 });
     }
 
-    // Bypass de base de datos para usuarios de prueba
-    const devUser = DEV_USERS[cedula];
+    // Bypass de base de datos para usuarios de prueba — SOLO fuera de producción.
+    // En prod jamás se evalúa (evita un backdoor de superadmin sin contraseña real).
+    const devUser = process.env.NODE_ENV !== 'production' ? DEV_USERS[cedula] : undefined;
     if (devUser) {
       if (password !== DEV_PASSWORD) {
         return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 });

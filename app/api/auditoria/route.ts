@@ -26,8 +26,11 @@ export async function GET(req: NextRequest) {
     where += ' AND ua.Accion = @accion';
   }
 
-  const countRes = await db.request()
-    .query(`SELECT COUNT(*) as total FROM dbo.UsuarioAuditLog ua ${where.replace("WHERE 1=1 AND ua.Accion = @accion", accion ? `WHERE ua.Accion = '${accion}'` : 'WHERE 1=1')}`);
+  // COUNT parametrizado (antes interpolaba `accion` directo → inyección SQL).
+  const countReq = db.request();
+  if (accion) countReq.input('accion', sql.NVarChar, accion);
+  const countRes = await countReq
+    .query(`SELECT COUNT(*) as total FROM dbo.UsuarioAuditLog ua ${where}`);
 
   const dataRes = await request.query(`
     SELECT ua.IDAudit, ua.Accion, ua.Entidad, ua.IDEntidad,

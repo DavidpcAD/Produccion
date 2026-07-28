@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 });
     }
 
-    // Bypass OTP para usuarios de prueba
-    const devUser = DEV_USERS[idCol as number];
+    // Bypass OTP para usuarios de prueba — SOLO fuera de producción.
+    const devUser = process.env.NODE_ENV !== 'production' ? DEV_USERS[idCol as number] : undefined;
     if (devUser) {
       if (code !== DEV_OTP) {
         return NextResponse.json({ error: 'Código incorrecto o expirado' }, { status: 401 });
