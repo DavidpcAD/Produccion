@@ -58,9 +58,10 @@ const ROLE_META: Record<Role, { label: string; persona: string; home: string; na
   aprobacion: {
     label: "Aprobación", persona: "Luis Roberto", home: "/compras/aprobacion", color: "var(--ds-color-green-200)",
     nav: [
+      // A Aprobación nadie le devuelve: el flujo de devoluciones es
+      // Aprobación → Proveeduría → Ingeniería, así que no lleva pestaña "Devoluciones".
       { href: "/compras/aprobacion", label: "Por aprobar", icon: IconCheck },
       { href: "/compras/aprobacion/todas", label: "Todas las órdenes", icon: IconReceipt },
-      { href: "/compras/aprobacion/devoluciones", label: "Devoluciones", icon: IconWarning },
     ],
   },
   facturacion: {
@@ -112,7 +113,9 @@ export function AppShell({ role, children }: { role: Role; children: React.React
   }
 
   const meta = ROLE_META[role];
-  const hasNav = meta.nav.length > 1;
+  // Ingeniería muestra su navegación como submenú en el sidebar de la base
+  // (Órdenes de Compra), así que acá no repetimos los tabs de arriba.
+  const hasNav = meta.nav.length > 1 && role !== 'ingenieria';
   // Cuál item del nav está activo (match más largo por href/alt).
   const activeHref = meta.nav
     .map((n) => {

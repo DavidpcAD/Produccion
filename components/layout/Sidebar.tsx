@@ -14,6 +14,10 @@ interface NavItemDef {
   label: string;
   icon: IconName;
   minLevel?: number;
+  // Sección con submenú: al estar dentro de `section`, se despliegan `children`.
+  section?: string;
+  exact?: boolean;
+  children?: { href: string; label: string; exact?: boolean }[];
 }
 
 const navItems: NavItemDef[] = [
@@ -27,7 +31,20 @@ const navItems: NavItemDef[] = [
   { href: '/presupuesto',label: 'Presupuesto',   icon: 'boleta',    minLevel: 2 },
   { href: '/avance',    label: 'Avance de obra', icon: 'completado', minLevel: 2 },
   { href: '/concreto',  label: 'Concreto',      icon: 'traslado',  minLevel: 2 },
-  { href: '/compras/ingenieria/dashboard', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4 },
+  {
+    href: '/compras/ingenieria/dashboard', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4,
+    section: '/compras/ingenieria',
+    children: [
+      { href: '/compras/ingenieria/dashboard', label: 'Dashboard' },
+      { href: '/compras/ingenieria', label: 'Mis solicitudes', exact: true },
+      { href: '/compras/ingenieria/devoluciones', label: 'Devoluciones' },
+      { href: '/compras/ingenieria/matriz', label: 'Matriz' },
+      { href: '/compras/ingenieria/seguimiento', label: 'Seguimiento' },
+      { href: '/compras/ingenieria/clasificaciones', label: 'Clasificaciones' },
+      { href: '/compras/ingenieria/plantillas', label: 'Plantillas' },
+      { href: '/compras/ingenieria/inventarios', label: 'Inventarios' },
+    ],
+  },
   { href: '/compras/aprobacion', label: 'Aprobación OC', icon: 'rol',    minLevel: 4 },
   { href: '/utilidades',label: 'Utilidades',    icon: 'calculator', minLevel: 2 },
   { href: '/reporte-h4',label: 'Reporte H4',    icon: 'reloj',     minLevel: 2 },
@@ -143,15 +160,43 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
       <nav className={`app-nav no-scrollbar flex-1 px-3 py-2 space-y-1 overflow-y-auto overflow-x-hidden${collapsed ? ' app-nav--collapsed' : ''}`}>
         {navItems
           .filter(item => !item.minLevel || nivelAdmin >= item.minLevel)
-          .map(item => (
-            <NavItem
-              key={item.href}
-              item={item}
-              active={isActive(item.href)}
-              collapsed={collapsed}
-              onNavigate={onClose}
-            />
-          ))}
+          .map(item => {
+            const sectionActive = item.section ? pathname.startsWith(item.section) : isActive(item.href);
+            return (
+              <div key={item.href}>
+                <NavItem
+                  item={item}
+                  active={sectionActive}
+                  collapsed={collapsed}
+                  onNavigate={onClose}
+                />
+                {/* Submenú: al estar dentro de la sección (y con el sidebar expandido)
+                    se muestran los subitems, como una subcolumna. */}
+                {item.children && sectionActive && !collapsed && (
+                  <div className="mt-0.5 mb-1 ml-5 pl-3 border-l border-white/10 space-y-0.5">
+                    {item.children.map(child => {
+                      const childActive = child.exact
+                        ? pathname === child.href
+                        : (pathname === child.href || pathname.startsWith(child.href + '/'));
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={onClose}
+                          aria-current={childActive ? 'page' : undefined}
+                          className={`block px-3 py-1.5 rounded-ds text-sm transition-colors ${
+                            childActive ? 'text-brand font-semibold' : 'text-white/60 hover:text-white'
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
       </nav>
 
       {/* Logout */}
