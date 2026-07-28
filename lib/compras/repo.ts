@@ -264,6 +264,9 @@ export async function getOrden(id: number): Promise<Orden | null> {
 function mapOrden(o: any, lineas: any[]): Orden {
   return {
     id: String(o.idOrdenCompra), numero: o.ordenNo ?? "", proveedorId: o.proveedorNo ?? "",
+    // proveedorNo/Nombre son los que usa el flujo de lanzar a BC y la vista de aprobación.
+    // Sin esto quedaban undefined -> "sin proveedor" -> la orden se lanzaba local, nunca a BC.
+    proveedorNo: o.proveedorNo ?? undefined, proveedorNombre: o.proveedorNombre ?? undefined,
     fecha: (o.fechaEmision?.toISOString?.() ?? o.fechaCreacion?.toISOString?.() ?? "").slice(0, 10),
     currencyCode: o.currencyCode ?? "",
     estado: (codigoDeId(o.idEstado) ?? "abierto") as Orden["estado"],

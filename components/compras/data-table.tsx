@@ -37,7 +37,7 @@ const isDateCol = (c: { meta?: unknown }) => !!(c.meta as { date?: boolean } | u
 
 // Motor de tabla reutilizable (TanStack, headless) con el design system de la app.
 // Vista Tabla o Grid, ordenar, filtro por columna, búsqueda global, mostrar/ocultar
-// y reordenar columnas, paginación, y VISTAS guardadas por usuario en SQL (/api/vistas).
+// y reordenar columnas, paginación, y VISTAS guardadas por usuario en SQL (/api/compras/vistas).
 // Cada columna debe tener `id`; opcional meta.label (nombre legible) y meta.num (derecha).
 
 type ColMeta = { label?: string; num?: boolean; date?: boolean };
@@ -111,7 +111,7 @@ export function DataTable<T>({
   async function cargarVistas() {
     if (!usuario) return;
     try {
-      const r = await fetch(`/api/vistas?usuario=${encodeURIComponent(usuario)}&tabla=${encodeURIComponent(tablaKey)}`);
+      const r = await fetch(`/api/compras/vistas?usuario=${encodeURIComponent(usuario)}&tabla=${encodeURIComponent(tablaKey)}`);
       const d = await r.json(); if (r.ok) setVistas(d.vistas ?? []);
     } catch { /* sin BD */ }
   }
@@ -139,7 +139,7 @@ export function DataTable<T>({
     } catch { alert("No se pudo guardar la vista."); }
   }
   async function borrarVista(v: Vista) {
-    try { await fetch(`/api/vistas/${v.id}?usuario=${encodeURIComponent(usuario ?? "")}`, { method: "DELETE" }); await cargarVistas(); } catch { /* noop */ }
+    try { await fetch(`/api/compras/vistas/${v.id}?usuario=${encodeURIComponent(usuario ?? "")}`, { method: "DELETE" }); await cargarVistas(); } catch { /* noop */ }
     finally { setVistaABorrar(null); }
   }
   function resetVista() {
