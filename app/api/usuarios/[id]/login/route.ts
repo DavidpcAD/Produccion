@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (/duplicate|UNIQUE/i.test(msg)) {
       return NextResponse.json({ error: 'Ese usuario ya existe' }, { status: 409 });
     }
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: 'No se pudo completar la operación. Intentá de nuevo.' }, { status: 500 });
   }
 }
 
@@ -157,7 +157,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (/duplicate|UNIQUE/i.test(msg)) {
       return NextResponse.json({ error: 'Ese usuario ya existe' }, { status: 409 });
     }
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: 'No se pudo completar la operación. Intentá de nuevo.' }, { status: 500 });
   }
 }
 
@@ -209,6 +209,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try { await tx.rollback(); } catch { /* ya revertida */ }
     const msg = err instanceof Error ? err.message : String(err);
     console.error('/api/usuarios/[id]/login DELETE error:', err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: 'No se pudo completar la operación. Intentá de nuevo.' }, { status: 500 });
   }
 }

@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (/duplicate|UNIQUE/i.test(msg)) {
       return NextResponse.json({ error: 'Ese usuario ya existe' }, { status: 409 });
     }
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: 'No se pudo completar la operación. Intentá de nuevo.' }, { status: 500 });
   }
 }
 
@@ -73,6 +73,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
         { status: 409 },
       );
     }
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: 'No se pudo completar la operación. Intentá de nuevo.' }, { status: 500 });
   }
 }
