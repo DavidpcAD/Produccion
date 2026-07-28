@@ -23,26 +23,26 @@ export const api = {
 
   createPedido: (body: unknown): Promise<{ idPedidoCompra: number }> =>
     fetch("/api/compras/pedidos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
-  getPedido: (id: string): Promise<Pedido> => fetch(`/api/pedidos/${id}`).then(jsonOrThrow),
+  getPedido: (id: string): Promise<Pedido> => fetch(`/api/compras/pedidos/${id}`).then(jsonOrThrow),
   patchPedidoEstado: (id: string, body: unknown) =>
-    fetch(`/api/pedidos/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+    fetch(`/api/compras/pedidos/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
   putPedido: (id: string, body: unknown) =>
-    fetch(`/api/pedidos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+    fetch(`/api/compras/pedidos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
   deletePedido: (id: string, body: unknown) =>
-    fetch(`/api/pedidos/${id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+    fetch(`/api/compras/pedidos/${id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
 
   createOrden: (body: unknown): Promise<{ idOrdenCompra: number }> =>
     fetch("/api/compras/ordenes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
-  getOrden: (id: string): Promise<Orden> => fetch(`/api/ordenes/${id}`).then(jsonOrThrow),
+  getOrden: (id: string): Promise<Orden> => fetch(`/api/compras/ordenes/${id}`).then(jsonOrThrow),
   patchOrdenEstado: (id: string, body: unknown) =>
-    fetch(`/api/ordenes/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+    fetch(`/api/compras/ordenes/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
 
   createRecepcion: (body: unknown): Promise<{ idRecepcionCompra: number }> =>
     fetch("/api/compras/recepciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
 
   // MODO 2: registrar la factura de una recepción que estaba en revisión.
   setRecepcionFactura: (id: string, body: unknown): Promise<{ ok: true }> =>
-    fetch(`/api/recepciones/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+    fetch(`/api/compras/recepciones/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
 
   // Notas de crédito (líneas de factura con problema, para emitir NC).
   createNotasCredito: (body: unknown): Promise<{ ok: true }> =>
