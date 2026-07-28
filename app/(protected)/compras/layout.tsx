@@ -6,6 +6,11 @@ import '@/app/compras.css';
 import { StoreProvider } from '@/lib/compras/store';
 import { ToastProvider } from '@/components/compras/ui';
 
+// Este layout decide modo SQL (USE_API) leyendo la env var del App Service EN RUNTIME.
+// Sin esto, Next lo renderiza estático en el build (donde USE_API no existe) y el valor
+// queda "horneado" en false → cambiar la env en Azure no haría efecto.
+export const dynamic = 'force-dynamic';
+
 export default function ComprasLayout({ children }: { children: React.ReactNode }) {
   const useApi = process.env.USE_API === '1' || process.env.NEXT_PUBLIC_USE_API === '1';
   return (
