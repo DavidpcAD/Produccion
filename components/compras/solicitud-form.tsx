@@ -173,7 +173,7 @@ export function SolicitudForm({
     if (!code) return Promise.resolve({ variantes: [], disponible: true });
     const cached = varPromises.current.get(code);
     if (cached) return cached;
-    const p = fetch(`/api/bc/variants?item=${encodeURIComponent(code)}`)
+    const p = fetch(`/api/compras/bc/variants?item=${encodeURIComponent(code)}`)
       .then((r) => (r.ok ? r.json() : { variantes: [], disponible: false }))
       .then((d) => ({ variantes: (d.variantes ?? []) as Variante[], disponible: d.disponible !== false }))
       .catch(() => ({ variantes: [] as Variante[], disponible: false }));
@@ -279,7 +279,7 @@ export function SolicitudForm({
     setQaArticuloId(a.id); setQaQuery(`${a.code} — ${a.descripcion}`); setQaOpen(false);
     setQaVariantes([]); setQaVariante(""); setQaVariantesError(false);
     // buscar variantes del item (si la API/permiso lo permite)
-    fetch(`/api/bc/variants?item=${encodeURIComponent(a.code)}`)
+    fetch(`/api/compras/bc/variants?item=${encodeURIComponent(a.code)}`)
       .then((r) => (r.ok ? r.json() : { variantes: [], disponible: false }))
       .then((d) => { setQaVariantes(d.variantes ?? []); setQaVariantesError(d.disponible === false); })
       .catch(() => { setQaVariantes([]); setQaVariantesError(true); });
@@ -542,7 +542,7 @@ export function SolicitudForm({
     let vivo = true;
     Promise.all(faltan.map(async (c) => {
       try {
-        const r = await fetch(`/api/bc/existencias?itemNo=${encodeURIComponent(c)}`);
+        const r = await fetch(`/api/compras/bc/existencias?itemNo=${encodeURIComponent(c)}`);
         const d = await r.json().catch(() => ({}));
         const tot = r.ok && Array.isArray(d.existencias) ? d.existencias.reduce((a: number, e: any) => a + (Number(e.cantidad) || 0), 0) : null;
         return [c, tot] as const;

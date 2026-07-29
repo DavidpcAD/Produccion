@@ -35,7 +35,7 @@ export function OrdenDetalle({
   useEffect(() => {
     if (!orden.bcNumber) { setBcTot(null); return; }
     let vivo = true;
-    fetch(`/api/bc/orden-totales?orderNo=${encodeURIComponent(orden.bcNumber)}`)
+    fetch(`/api/compras/bc/orden-totales?orderNo=${encodeURIComponent(orden.bcNumber)}`)
       .then((r) => (r.ok ? r.json() : { totales: null }))
       .then((d) => { if (vivo && d?.totales) setBcTot(d.totales); })
       .catch(() => { /* sin BC: se muestran los totales locales */ });

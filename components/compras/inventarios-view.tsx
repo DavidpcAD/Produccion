@@ -79,7 +79,7 @@ export function InventariosView({ tablaKey = "inventarios" }: { tablaKey?: strin
         while (vivo && i < locs.length) {
           const loc = locs[i++];
           try {
-            const r = await fetch(`/api/bc/existencias?locationCode=${encodeURIComponent(loc)}`);
+            const r = await fetch(`/api/compras/bc/existencias?locationCode=${encodeURIComponent(loc)}`);
             const d = await r.json().catch(() => ({}));
             if (!r.ok) continue;
             okAlguno = true;
