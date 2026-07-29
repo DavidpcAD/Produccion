@@ -8,6 +8,7 @@ import { Icon, IconName } from '@/components/ds/Icon/Icon';
 import { AdelanteMark } from '@/components/ds/AdelanteMark/AdelanteMark';
 import { haptic } from '@/components/ds/haptic';
 import { springs } from '@/lib/springs';
+import { useConfirm } from '@/components/ui/Confirm';
 
 interface NavItemDef {
   href: string;
@@ -162,6 +163,19 @@ interface SidebarProps {
 
 export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps) {
   const pathname = usePathname();
+  const confirm = useConfirm();
+  const logoutRef = useRef<HTMLFormElement>(null);
+
+  // Salir con confirmación (diálogo del DS) antes del POST de logout.
+  const pedirSalir = async () => {
+    const ok = await confirm({
+      title: 'Cerrar sesión',
+      message: '¿Seguro que querés cerrar la sesión?',
+      confirmLabel: 'Cerrar sesión',
+      danger: true,
+    });
+    if (ok) logoutRef.current?.requestSubmit();
+  };
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -196,7 +210,7 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
         </AnimatePresence>
 
         {onClose && (
-          <button onClick={onClose} className="app-sidebar__toggle lg:hidden shrink-0 ml-auto" aria-label="Cerrar menú">
+          <button onClick={onClose} className="app-sidebar__toggle shrink-0 ml-auto" aria-label="Cerrar menú">
             <Icon name="close" size="sm" color="currentColor" />
           </button>
         )}
@@ -247,33 +261,33 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
 
       {/* Logout */}
       <div className="app-sidebar__footer px-3 py-4 shrink-0 space-y-1">
-        <form action="/api/auth/logout" method="POST">
-          <motion.button
-            type="submit"
-            title="Cerrar sesión"
-            aria-label="Cerrar sesión"
-            className={`app-nav__item app-nav__item--logout w-full${collapsed ? ' app-nav__item--collapsed' : ''}`}
-            whileTap={{ scale: 0.97 }}
-            transition={springs.snappy}
-          >
-            <span className="app-nav__icon">
-              <SignOut size={20} weight="bold" />
-            </span>
-            <AnimatePresence initial={false}>
-              {!collapsed && (
-                <motion.span
-                  className="app-nav__label"
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.18, ease: 'easeOut' }}
-                >
-                  Salir
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
-        </form>
+        <form ref={logoutRef} action="/api/auth/logout" method="POST" className="hidden" />
+        <motion.button
+          type="button"
+          onClick={pedirSalir}
+          title="Cerrar sesión"
+          aria-label="Cerrar sesión"
+          className={`app-nav__item app-nav__item--logout w-full${collapsed ? ' app-nav__item--collapsed' : ''}`}
+          whileTap={{ scale: 0.97 }}
+          transition={springs.snappy}
+        >
+          <span className="app-nav__icon">
+            <SignOut size={20} weight="bold" />
+          </span>
+          <AnimatePresence initial={false}>
+            {!collapsed && (
+              <motion.span
+                className="app-nav__label"
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto' }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+              >
+                Salir
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.button>
       </div>
     </div>
   );

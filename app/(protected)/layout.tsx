@@ -11,7 +11,9 @@ import { AdelanteMark } from '@/components/ds/AdelanteMark/AdelanteMark';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [navExpanded, setNavExpanded] = useState(false);
+  // Sidebar por hamburger: fija/expande (empuja el contenido) o se oculta y el
+  // contenido usa todo el ancho. El botón flotante (FAB) lo vuelve a abrir.
+  const [navOpen, setNavOpen] = useState(true);
   const session = useSession();
   const pathname = usePathname();
 
@@ -23,39 +25,51 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     nivelAdmin === 3 ? 'Admin TI' :
     nivelAdmin === 2 ? 'Jefe de Área' : 'Usuario';
 
+  const abrirMenu = () => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+      setNavOpen(true);
+    } else {
+      setMobileOpen(true);
+    }
+  };
+
   return (
     <div className="flex h-full min-h-screen bg-ds-bg">
-      {/* Desktop sidebar — riel de íconos que se expande al pasar el mouse.
-          El wrapper anima su ancho (76↔264) y EMPUJA el contenido (no lo tapa). */}
+      {/* Sidebar desktop — el hamburger la fija/expande (260px) empujando el
+          contenido, o la colapsa a 0 (oculta) para dar todo el ancho. */}
       <motion.div
         className="hidden lg:block lg:shrink-0 overflow-hidden"
-        onMouseEnter={() => setNavExpanded(true)}
-        onMouseLeave={() => setNavExpanded(false)}
         initial={false}
-        animate={{ width: navExpanded ? 264 : 76 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
+        animate={{ width: navOpen ? 260 : 0 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
       >
-        <Sidebar nivelAdmin={nivelAdmin} collapsed={!navExpanded} />
+        <div className="h-full w-[260px]">
+          <Sidebar nivelAdmin={nivelAdmin} onClose={() => setNavOpen(false)} />
+        </div>
       </motion.div>
 
-      {/* Mobile sidebar */}
+      {/* Sidebar móvil (drawer superpuesto) */}
       <MobileNav
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
         nivelAdmin={nivelAdmin}
       />
 
-      {/* Main content */}
+      {/* FAB de menú — abre el sidebar (desktop cuando está cerrado; móvil siempre).
+          Se oculta en desktop cuando el sidebar ya está abierto. */}
+      <button
+        onClick={abrirMenu}
+        aria-label="Abrir menú"
+        className={`fixed top-3 left-3 z-40 w-12 h-12 rounded-ds-lg bg-black text-brand shadow-ds-03 flex items-center justify-center active:scale-95 transition-transform ${navOpen ? 'lg:hidden' : ''}`}
+      >
+        <Icon name="menu" size="md" color="currentColor" />
+      </button>
+
+      {/* Contenido */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar (todas las resoluciones): menú en móvil + usuario a la derecha */}
         <header className="flex items-center gap-3 px-4 lg:px-6 h-14 lg:h-16 bg-white border-b border-ds-gray-200 shrink-0">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="lg:hidden p-2 rounded-full text-ds-gray-400 hover:text-black hover:bg-ds-gray-100 transition-colors"
-            aria-label="Abrir menú"
-          >
-            <Icon name="menu" size="md" color="currentColor" />
-          </button>
+          {/* Reserva el espacio del FAB a la izquierda cuando está visible. */}
+          <div className={`w-14 shrink-0 transition-all duration-200 ${navOpen ? 'lg:w-0' : 'lg:w-14'}`} />
           <div className="lg:hidden flex items-center gap-2">
             <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center text-brand">
               <AdelanteMark className="w-4 h-auto" />
@@ -65,19 +79,16 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
           {/* Chip de usuario */}
           <div className="ml-auto flex items-center gap-2.5 rounded-full bg-black text-white pl-1.5 pr-4 py-1.5 shadow-ds-01">
-            <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-black text-xs font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-black text-body-sm font-bold shrink-0">
               {iniciales}
             </div>
             <div className="leading-tight min-w-0">
-              <p className="text-sm font-semibold truncate max-w-[180px]">{nombre}</p>
+              <p className="text-body-sm font-semibold truncate max-w-[180px]">{nombre}</p>
               <p className="text-[11px] text-white/50 truncate">{nivelLabel}</p>
             </div>
           </div>
         </header>
 
-        {/* Page content — transición SOLO de opacidad (sin translate): animar transform
-            hace que el navegador rasterice y el texto se vea borroso/"pixeleado" durante
-            el cambio de ruta. Un fade corto con tween mantiene el texto nítido. */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.main
             key={pathname}
