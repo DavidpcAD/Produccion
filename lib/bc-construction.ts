@@ -160,10 +160,13 @@ export async function subirDescompuesto(worksNo: string, nuevos: DecompLine[], e
   if (chunks > MAX) throw new Error(`Descompuesto muy grande (${payload.length} chars > ${MAX * CHUNK}). Subir por lotes.`);
   for (let i = 0; i < MAX; i++) fields[`payload${i + 1}`] = payload.slice(i * CHUNK, (i + 1) * CHUNK);
 
-  const bulk = await firstRecord('workDecompBulks');
-  const patchResp = await req(`workDecompBulks(${bulk.id})`, {
-    method: 'PATCH', headers: { 'If-Match': bulk.etag },
+  // workDecompBulks es una página de tabla TEMPORAL (no un singleton persistente
+  // como workLineBulks): no hay registro base que PATCHear. Se INSERTA (POST) el
+  // payload y el trigger OnInsert lo procesa cuando ejecutar=true. (Antes hacía
+  // firstRecord+PATCH → siempre fallaba con "no hay registro base en workDecompBulks".)
+  const postResp = await req('workDecompBulks', {
+    method: 'POST',
     body: JSON.stringify(fields),
   });
-  return { chunks, enviadas: nuevos.length, resultado: String((patchResp as { resultado?: unknown })?.resultado ?? '') };
+  return { chunks, enviadas: nuevos.length, resultado: String((postResp as { resultado?: unknown })?.resultado ?? '') };
 }
