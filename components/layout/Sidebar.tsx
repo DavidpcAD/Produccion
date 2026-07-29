@@ -75,6 +75,23 @@ const navItems: NavItemDef[] = [
     ],
   },
   { href: '/compras/aprobacion', label: 'Aprobación OC', icon: 'rol',    minLevel: 4 },
+  {
+    href: '/desembolsos/dashboard', label: 'Desembolsos', icon: 'boleta', minLevel: 2,
+    section: '/desembolsos',
+    children: [
+      { href: '/desembolsos/dashboard', label: 'Dashboard' },
+      { href: '/desembolsos/matriz', label: 'Matriz' },
+      { href: '/desembolsos/movimientos', label: 'Movimientos' },
+      { href: '/desembolsos/credito-puente', label: 'Crédito Puente' },
+      { href: '/desembolsos/distribucion', label: 'Distribución' },
+      { href: '/desembolsos/esquemas', label: 'Esquemas' },
+      { href: '/desembolsos/catalogo-hitos', label: 'Catálogo de hitos' },
+      { href: '/desembolsos/formalizacion', label: 'Formalización' },
+      { href: '/desembolsos/valoracion', label: 'Valoración' },
+      { href: '/desembolsos/extras', label: 'Extras' },
+      { href: '/desembolsos/reportes', label: 'Reportes' },
+    ],
+  },
   { href: '/utilidades',label: 'Utilidades',    icon: 'calculator', minLevel: 2 },
   { href: '/reporte-h4',label: 'Reporte H4',    icon: 'reloj',     minLevel: 2 },
   // Roles, Apps y Auditoría se administran ahora en Recursos Humanos (rh.adelante.cr).
