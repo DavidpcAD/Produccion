@@ -3,9 +3,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/Badge';
-import { Combobox } from '@/components/ui/Combobox';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
+import { Pills } from '../_components/Pills';
 import { ESTADO_COLADA, ESTADOS_COLADA } from '@/lib/concreto/estados';
 import type { ColadaListadoItem, EstadoColada, PlantaListadoItem } from '@/lib/concreto/tipos';
 
@@ -137,26 +137,24 @@ export default function ColadasPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Combobox
+      <div className="space-y-3">
+        <Pills
           label="Estado"
           value={estado}
           onChange={setEstado}
           options={[
-            { value: '', label: 'Todos los estados' },
+            { value: '', label: 'Todos' },
             ...ESTADOS_COLADA.map((e) => ({ value: e, label: ESTADO_COLADA[e].label })),
           ]}
-          placeholder="Todos"
         />
-        <Combobox
+        <Pills
           label="Planta"
           value={idPlanta}
           onChange={setIdPlanta}
           options={[
-            { value: '', label: 'Todas las plantas' },
-            ...plantas.map((p) => ({ value: String(p.id), label: `${p.codigo} · ${p.marca}` })),
+            { value: '', label: 'Todas' },
+            ...plantas.map((p) => ({ value: String(p.id), label: p.codigo })),
           ]}
-          placeholder="Todas"
         />
       </div>
 

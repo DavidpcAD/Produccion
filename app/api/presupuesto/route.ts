@@ -53,15 +53,22 @@ export async function POST(req: NextRequest) {
       resultado.materiales = d.enviadas;
       resultado.resultadoDescompuestoBC = d.resultado;
     }
-    // Totales/versión actuales de la obra en BC (para el panel de detalle).
-    // Necesario sobre todo cuando solo se subió el descompuesto: así el panel
-    // muestra venta/costo/indirecto/resultado y la versión vigente de la obra.
-    if (!resultado.totales) {
-      const work = await getWork(worksNo);
-      if (work) {
+    // Totales/versión + todos los importes de la obra en BC (para el panel de
+    // detalle). getWork devuelve el registro completo de BC; se necesita sobre
+    // todo cuando solo se sube el descompuesto (así el panel muestra venta/costo/
+    // indirecto/resultado y la versión vigente) y para exponer campos extra como
+    // "Importe línea previsto" / "Importe coste total descompuesto".
+    const work = await getWork(worksNo);
+    if (work) {
+      if (!resultado.totales) {
         resultado.totales = { salesLineAmount: work.salesLineAmount, costLineAmount: work.costLineAmount, indirectCostLineAmount: work.indirectCostLineAmount, result: work.result };
         resultado.versionActual = work.filterVersionCode ?? null;
       }
+      // Solo los campos numéricos (importes/cantidades) del registro de BC, para
+      // el desglose "Ver todos los importes de la obra" del panel.
+      resultado.obraCampos = Object.fromEntries(
+        Object.entries(work as unknown as Record<string, unknown>).filter(([, v]) => typeof v === 'number')
+      );
     }
     await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length }, ip });
     return NextResponse.json({ ok: true, ...resultado });

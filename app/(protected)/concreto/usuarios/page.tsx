@@ -91,18 +91,18 @@ export default function ConcretoUsuariosPage() {
 
   if (mounted && !esAdmin) {
     return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold text-black">Gestión de usuarios</h1>
-        <p className="mt-4 text-ds-gray-500">Necesitás permisos de administrador para ver esta página.</p>
+      <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
+        <h1 className="text-heading font-bold text-black">Gestión de usuarios</h1>
+        <p className="mt-4 text-ds-gray-400 text-body-sm">Necesitás permisos de administrador para ver esta página.</p>
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-6 max-w-4xl mx-auto animate-fade-in">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-black">Gestión de roles — Concreto</h1>
-        <p className="mt-1 text-sm text-ds-gray-500">
+        <h1 className="text-heading font-bold text-black">Gestión de roles — Concreto</h1>
+        <p className="mt-1 text-ds-gray-400 text-body-sm">
           Asigná o quitá roles de la app (Admin, Operador, Laboratorio, Ingeniería) a usuarios del tenant.
         </p>
       </header>

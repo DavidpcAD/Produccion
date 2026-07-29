@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Combobox } from '@/components/ui/Combobox';
 import { DatePicker } from '@/components/ui/DatePicker';
+import { Pills } from '../_components/Pills';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import type { KpisResponse, PlantaListadoItem } from '@/lib/concreto/tipos';
@@ -80,18 +80,19 @@ export default function DashboardPage() {
         <p className="text-ds-gray-400 text-body-sm">Producción del periodo seleccionado</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <DatePicker label="Desde" value={desde} onChange={setDesde} />
-        <DatePicker label="Hasta" value={hasta} onChange={setHasta} />
-        <Combobox
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+          <DatePicker label="Desde" value={desde} onChange={setDesde} />
+          <DatePicker label="Hasta" value={hasta} onChange={setHasta} />
+        </div>
+        <Pills
           label="Planta"
           value={idPlanta}
           onChange={setIdPlanta}
           options={[
-            { value: '', label: 'Todas las plantas' },
-            ...plantas.map((p) => ({ value: String(p.id), label: `${p.codigo} · ${p.marca}` })),
+            { value: '', label: 'Todas' },
+            ...plantas.map((p) => ({ value: String(p.id), label: p.codigo })),
           ]}
-          placeholder="Todas"
         />
       </div>
 

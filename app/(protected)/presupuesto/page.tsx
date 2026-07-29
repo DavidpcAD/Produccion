@@ -22,6 +22,7 @@ interface ResultadoBC {
   materiales?: number;       // materiales del descompuesto
   descompuestoChunks?: number;
   totales?: TotalesBC;
+  obraCampos?: Record<string, number>; // todos los importes numéricos del registro de BC
   resultadoBC?: string;
   resultadoDescompuestoBC?: string;
 }
@@ -37,6 +38,22 @@ function MetricBC({ label, value, accent }: { label: string; value: string; acce
     <div className="rounded-ds border border-ds-gray-100 p-2.5">
       <p className="text-ds-gray-400 text-xs">{label}</p>
       <p className={'font-bold text-sm mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red' : 'text-black')}>{value}</p>
+    </div>
+  );
+}
+
+// Estado "ya subido a BC": reemplaza el botón de subir para no re-subir por error
+// (una re-subida del mismo descompuesto genera duplicados en BC). Deja un enlace
+// discreto para volver a subir a propósito.
+function SubidoChip({ etiqueta, onRedo, redoing }: { etiqueta: string; onRedo: () => void; redoing: boolean }) {
+  return (
+    <div className="inline-flex items-center gap-2.5 rounded-ds-lg border border-brand/50 bg-brand-soft px-4 py-2.5">
+      <Icon name="check" size="sm" color="currentColor" />
+      <span className="text-sm font-semibold text-black">{etiqueta} subido a BC</span>
+      <button type="button" onClick={onRedo} disabled={redoing}
+        className="text-xs font-semibold text-ds-gray-500 underline underline-offset-2 hover:text-black disabled:opacity-50">
+        {redoing ? 'Subiendo…' : 'Volver a subir'}
+      </button>
     </div>
   );
 }
@@ -83,6 +100,19 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
             Respuesta BC: {mensajeBC}
           </div>
         )}
+        {r.obraCampos && Object.keys(r.obraCampos).length > 0 && (
+          <details className="text-xs">
+            <summary className="cursor-pointer select-none text-ds-gray-500 hover:text-black">Ver todos los importes de la obra en BC</summary>
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
+              {Object.entries(r.obraCampos).map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-3 border-b border-ds-gray-100 py-0.5">
+                  <span className="text-ds-gray-400 truncate">{k}</span>
+                  <span className="font-mono text-ds-gray-600 shrink-0">{v.toLocaleString('es-CR', { maximumFractionDigits: 2 })}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
     </div>
   );
@@ -121,10 +151,17 @@ export default function PresupuestoPage() {
   const [modalGuardar, setModalGuardar] = useState(false);
   const [nombrePlantilla, setNombrePlantilla] = useState('');
   const [resultado, setResultado] = useState<ResultadoBC | null>(null);
+  // Qué ya se subió a BC en esta obra, para reemplazar el botón por un estado
+  // "hecho" y evitar re-subidas accidentales (una re-subida del mismo descompuesto
+  // genera duplicados y BC responde "0 insertados, N errores").
+  const [subido, setSubido] = useState<{ general?: boolean; descompuesto?: boolean }>({});
   const plantillaFile = useRef<HTMLInputElement>(null);
   const descFile = useRef<HTMLInputElement>(null);
 
   const obra = obras.find(o => String(o.idObra) === obraId);
+
+  // Al cambiar de obra, lo subido/mostrado ya no aplica.
+  useEffect(() => { setSubido({}); setResultado(null); }, [obraId]);
 
   const load = useCallback(async () => {
     const o = await fetch('/api/obras?porPagina=1000').then(r => (r.ok ? r.json() : null)).catch(() => null);
@@ -142,7 +179,7 @@ export default function PresupuestoPage() {
     if (!file) { toast(`Elegí el archivo de ${nombre} primero`, 'warning'); return; }
     const fd = new FormData();
     fd.append(cual, file);
-    setLeyendoQue(cual); setResultado(null);
+    setLeyendoQue(cual); setResultado(null); setSubido({});
     try {
       const res = await fetch('/api/presupuesto/parse', { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
@@ -171,6 +208,7 @@ export default function PresupuestoPage() {
       const etiqueta = que === 'general' ? 'General' : 'Descompuesto';
       toast(`${etiqueta} enviado a Business Central`, 'success');
       setResultado({ tipo: que, worksNo: obra.numeroObra, ...data });
+      setSubido(s => ({ ...s, [que]: true }));
     } finally { setSubiendoQue(null); }
   }
 
@@ -253,7 +291,7 @@ export default function PresupuestoPage() {
               <span className="block text-ds-gray-400 text-xs">Venta, Costo e Indirectos — esto arma la versión en BC.</span>
             </div>
             <input ref={plantillaFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
-            <Button variant="outline" size="sm" onClick={() => leerUno('plantilla')} loading={leyendoQue === 'plantilla'} disabled={leyendoQue !== null} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer plantilla</Button>
+            <Button variant="outline" size="sm" onClick={() => leerUno('plantilla')} loading={leyendoQue === 'plantilla'} disabled={leyendoQue === 'plantilla'} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer plantilla</Button>
           </div>
           <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">
             <div>
@@ -261,7 +299,7 @@ export default function PresupuestoPage() {
               <span className="block text-ds-gray-400 text-xs">Materiales por tarea — se suben aparte a BC.</span>
             </div>
             <input ref={descFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
-            <Button variant="outline" size="sm" onClick={() => leerUno('descompuesto')} loading={leyendoQue === 'descompuesto'} disabled={leyendoQue !== null} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer descompuesto</Button>
+            <Button variant="outline" size="sm" onClick={() => leerUno('descompuesto')} loading={leyendoQue === 'descompuesto'} disabled={leyendoQue === 'descompuesto'} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer descompuesto</Button>
           </div>
         </div>
       </div>
@@ -400,11 +438,13 @@ export default function PresupuestoPage() {
           )}
           <div className="flex items-center gap-3 flex-wrap">
             <Button variant="secondary" onClick={() => setModalGuardar(true)} icon={<Icon name="check" size="sm" color="currentColor" />}>Guardar como plantilla</Button>
-            {plantilla && (
-              <Button onClick={() => subir('general')} loading={subiendoQue === 'general'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir General a BC</Button>
+            {plantilla && (subido.general
+              ? <SubidoChip etiqueta="General" onRedo={() => subir('general')} redoing={subiendoQue === 'general'} />
+              : <Button onClick={() => subir('general')} loading={subiendoQue === 'general'} disabled={!obraId || subiendoQue === 'general'} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir General a BC</Button>
             )}
-            {descompuesto && (
-              <Button onClick={() => subir('descompuesto')} loading={subiendoQue === 'descompuesto'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir Descompuesto a BC</Button>
+            {descompuesto && (subido.descompuesto
+              ? <SubidoChip etiqueta="Descompuesto" onRedo={() => subir('descompuesto')} redoing={subiendoQue === 'descompuesto'} />
+              : <Button onClick={() => subir('descompuesto')} loading={subiendoQue === 'descompuesto'} disabled={!obraId || subiendoQue === 'descompuesto'} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir Descompuesto a BC</Button>
             )}
           </div>
           {resultado && <DetalleBC r={resultado} />}

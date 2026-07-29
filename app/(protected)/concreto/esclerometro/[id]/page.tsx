@@ -265,17 +265,17 @@ export default function EsclerometroDetallePage({
   // --- Render --------------------------------------------------------------
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-40 w-full" rounded="rounded-ds-lg" />
+        <Skeleton className="h-64 w-full" rounded="rounded-ds-lg" />
       </div>
     );
   }
 
   if (error || !ensayo) {
     return (
-      <div className="space-y-4">
+      <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
         <Button variant="ghost" size="sm" icon={<Icon name="back" />} onClick={() => router.push('/concreto/esclerometro')}>
           Volver
         </Button>
@@ -289,7 +289,7 @@ export default function EsclerometroDetallePage({
     .sort((a, b) => a.numero_golpe - b.numero_golpe);
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
       <div className="flex items-center justify-between gap-2">
         <Button
           variant="ghost"

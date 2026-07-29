@@ -2,9 +2,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/Badge';
-import { Combobox } from '@/components/ui/Combobox';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
+import { Pills } from '../_components/Pills';
 import type { BatchDetallePlanta, PlantaListadoItem } from '@/lib/concreto/tipos';
 
 const col = createColumnHelper<BatchDetallePlanta>();
@@ -126,26 +126,24 @@ export default function BatchesPage() {
         <p className="text-ds-gray-400 text-body-sm">{batches.length} batches · datos crudos de planta</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Combobox
+      <div className="space-y-3">
+        <Pills
           label="Planta"
           value={idPlanta}
           onChange={setIdPlanta}
           options={[
-            { value: '', label: 'Todas las plantas' },
-            ...plantas.map((p) => ({ value: String(p.id), label: `${p.codigo} · ${p.marca}` })),
+            { value: '', label: 'Todas' },
+            ...plantas.map((p) => ({ value: String(p.id), label: p.codigo })),
           ]}
-          placeholder="Todas"
         />
-        <Combobox
-          label="Filtro"
+        <Pills
+          label="Mostrar"
           value={soloAnomalias}
           onChange={setSoloAnomalias}
           options={[
-            { value: '', label: 'Todos los batches' },
+            { value: '', label: 'Todos' },
             { value: '1', label: 'Solo anomalías' },
           ]}
-          placeholder="Todos"
         />
       </div>
 

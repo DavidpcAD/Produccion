@@ -151,23 +151,22 @@ export default function EsclerometroPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-black">Laboratorio — Esclerómetro</h1>
-          <p className="mt-1 text-sm text-ds-gray-400">
-            Ensayo no destructivo (martillo Schmidt). Cada ensayo registra N golpes sobre un
-            elemento estructural; el promedio descarta máximo y mínimo cuando hay 3 o más.
+          <h1 className="text-heading font-bold text-black">Esclerómetro</h1>
+          <p className="text-ds-gray-400 text-body-sm">
+            {ensayos.length} ensayos · martillo Schmidt (no destructivo)
           </p>
         </div>
-        <Button variant="primary" icon={<Icon name="plus" />} onClick={() => setModalNuevo(true)}>
+        <Button onClick={() => setModalNuevo(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
           Nuevo ensayo
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Input
-          label="Obra (works_no)"
+          label="Obra"
           value={obra}
           onChange={(e) => setObra(e.target.value)}
           placeholder="VB, 6.24, Casa…"
