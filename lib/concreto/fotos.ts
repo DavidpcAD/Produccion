@@ -57,12 +57,15 @@ async function cargarSdks(): Promise<{ blob: BlobMod; identity: IdentityMod }> {
       'Fotos no configuradas: falta FOTOS_STORAGE_ACCOUNT.',
     );
   }
-  // Specifiers en variables: así TS/el bundler NO intentan resolver estáticamente
-  // los paquetes (no instalados). Si faltan en runtime, el import falla → 501.
+  // `turbopackIgnore`/`webpackIgnore`: el bundler NO debe resolver estos paquetes
+  // en build-time (@azure/storage-blob no está instalado hasta que se active la
+  // feature). Con el ignore quedan como import de runtime; si faltan, el import
+  // falla y cae al .catch → 501. (El specifier en variable NO basta: Turbopack lo
+  // resuelve igual siguiendo la constante.)
   const pkgBlob = '@azure/storage-blob';
   const pkgIdentity = '@azure/identity';
-  const blob = await import(pkgBlob).catch(() => null);
-  const identity = await import(pkgIdentity).catch(() => null);
+  const blob = await import(/* turbopackIgnore: true */ /* webpackIgnore: true */ pkgBlob).catch(() => null);
+  const identity = await import(/* turbopackIgnore: true */ /* webpackIgnore: true */ pkgIdentity).catch(() => null);
   if (!blob || !identity) {
     throw new ErrorFotos(
       501,
