@@ -70,6 +70,10 @@ export function Combobox<T>({
   }, [open]);
 
   const menu = open && pos && createPortal(
+    // El portal vive en <body>, FUERA de .oc-scope, que es donde compras.css
+    // scopea sus estilos y define los tokens --ds-*. Sin re-envolver en .oc-scope
+    // el menú sale sin fondo/borde/sombra/max-height y desbordado. Ver layout.tsx.
+    <div className="oc-scope">
     <div
       className="combo__menu"
       style={{
@@ -103,6 +107,7 @@ export function Combobox<T>({
         ));
       })()}
       {matched.length > max && <div className="combo__more">Mostrando {max} de {matched.length} · escribí para filtrar</div>}
+    </div>
     </div>,
     document.body
   );

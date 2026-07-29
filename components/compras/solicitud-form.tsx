@@ -167,8 +167,11 @@ export function SolicitudForm({
   const [varMap, setVarMap] = useState<Record<string, { variantes: Variante[]; disponible: boolean }>>({});
   const varPromises = useRef<Map<string, Promise<{ variantes: Variante[]; disponible: boolean }>>>(new Map());
   const codeDeLinea = (l: DraftLine) => catArticulos.find((a) => a.id === l.articuloId)?.code ?? "";
-  // Stock actual en BC por material (solo pedidos a bodega/stock): código → total | null | "loading".
-  const [stockBc, setStockBc] = useState<Record<string, number | null | "loading">>({});
+  // Existencias en BC por material (solo pedidos a bodega/stock): código → filas
+  // (variante+ubicación+cantidad) | null (sin conexión) | "loading". Guardamos las
+  // filas crudas (no un total) para poder mostrar el stock POR VARIANTE de cada
+  // línea, o —si la línea no tiene variante— la cantidad en el almacén general.
+  const [stockBc, setStockBc] = useState<Record<string, { variantCode: string; locationCode: string; cantidad: number }[] | null | "loading">>({});
   function getVariantes(code: string): Promise<{ variantes: Variante[]; disponible: boolean }> {
     if (!code) return Promise.resolve({ variantes: [], disponible: true });
     const cached = varPromises.current.get(code);
@@ -544,13 +547,30 @@ export function SolicitudForm({
       try {
         const r = await fetch(`/api/compras/bc/existencias?itemNo=${encodeURIComponent(c)}`);
         const d = await r.json().catch(() => ({}));
-        const tot = r.ok && Array.isArray(d.existencias) ? d.existencias.reduce((a: number, e: any) => a + (Number(e.cantidad) || 0), 0) : null;
-        return [c, tot] as const;
+        const rows = r.ok && Array.isArray(d.existencias)
+          ? d.existencias.map((e: any) => ({ variantCode: String(e.variantCode ?? ""), locationCode: String(e.locationCode ?? ""), cantidad: Number(e.cantidad) || 0 }))
+          : null;
+        return [c, rows] as const;
       } catch { return [c, null] as const; }
     })).then((pares) => { if (vivo) setStockBc((s) => ({ ...s, ...Object.fromEntries(pares) })); });
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codigosStock]);
+
+  // Stock que se muestra en la columna "Stock BC" del pedido a bodega:
+  //   - línea CON variante  -> existencias de ESA variante (todas las ubicaciones).
+  //   - línea SIN variante   -> cantidad en el almacén general (ALM-GRAL).
+  // Antes se sumaba TODO (todas las variantes y ubicaciones), así que un material
+  // con variantes mostraba el mismo total en cada fila.
+  const ALMACEN_GENERAL = "ALM-GRAL";
+  function stockDeLinea(l: DraftLine): number | null | "loading" | undefined {
+    const ex = stockBc[codeDeLinea(l)];
+    if (ex === undefined || ex === "loading" || ex === null) return ex;
+    const rows = l.variantCode
+      ? ex.filter((e) => e.variantCode === l.variantCode)
+      : ex.filter((e) => e.locationCode.toUpperCase() === ALMACEN_GENERAL);
+    return rows.reduce((a, e) => a + e.cantidad, 0);
+  }
 
   return (
     <>
@@ -764,7 +784,7 @@ export function SolicitudForm({
                       })()}
                     </td>
                     {esStock && (() => {
-                      const st = stockBc[a?.code ?? ""];
+                      const st = stockDeLinea(l);
                       return (
                         <td className="ds-num">
                           {st === undefined || st === "loading"
