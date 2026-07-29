@@ -29,7 +29,14 @@ const navItems: NavItemDef[] = [
   { href: '/cuadrillas',label: 'Cuadrillas',    icon: 'cuadrillas',minLevel: 2 },
   { href: '/partidas',  label: 'Partidas',      icon: 'calculator', minLevel: 4 },
   { href: '/presupuesto',label: 'Presupuesto',   icon: 'boleta',    minLevel: 2 },
-  { href: '/avance',    label: 'Avance de obra', icon: 'completado', minLevel: 2 },
+  {
+    href: '/avance', label: 'Avance de obra', icon: 'completado', minLevel: 2,
+    section: '/avance',
+    children: [
+      { href: '/avance', label: 'Obras / Matriz', exact: true },
+      { href: '/avance/mano-obra', label: 'Mano de Obra' },
+    ],
+  },
   { href: '/concreto',  label: 'Concreto',      icon: 'traslado',  minLevel: 2 },
   {
     href: '/compras/ingenieria/dashboard', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4,
