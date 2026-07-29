@@ -111,7 +111,7 @@ export default async function DashboardPage() {
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto animate-fade-in">
       {/* Welcome */}
       <div>
-        <h1 className="text-3xl sm:text-4xl font-bold text-black tracking-tight">
+        <h1 className="text-heading sm:text-4xl font-bold text-black tracking-tight">
           Hola, {session?.nombre.split(' ')[0]}
         </h1>
         <p className="text-ds-gray-400 mt-1.5 text-body">Resumen de producción: obra, jornada (H4) y utilidades.</p>
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
                 </div>
                 <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 group-hover:text-black transition-colors mt-1" />
               </div>
-              <div className="text-3xl sm:text-4xl font-bold text-black mb-1">{card.value}</div>
+              <div className="text-heading sm:text-4xl font-bold text-black mb-1">{card.value}</div>
               <div className="text-sm font-semibold text-black">{card.label}</div>
               <div className="text-xs text-ds-gray-400 mt-0.5">{card.sub}</div>
             </div>

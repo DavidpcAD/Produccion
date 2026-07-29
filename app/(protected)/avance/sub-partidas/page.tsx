@@ -79,7 +79,7 @@ export default function SubPartidasPage() {
     <main className="page mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Sub-partidas</h1>
+          <h1 className="text-heading font-bold">Sub-partidas</h1>
           <p className="text-ds-gray-500">
             Catálogo núcleo de ObrasControl — unidades atómicas que conectan sprints con partidas de
             costo.
@@ -145,17 +145,17 @@ export default function SubPartidasPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-ds-gray-400">
             Total filtrado
           </p>
-          <p className="text-3xl font-bold tabular-nums">{kpis.total}</p>
+          <p className="text-heading font-bold tabular-nums">{kpis.total}</p>
         </div>
         <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01">
           <p className="text-xs font-semibold uppercase tracking-wide text-ds-gray-400">Críticas</p>
-          <p className="text-3xl font-bold tabular-nums">{kpis.criticas}</p>
+          <p className="text-heading font-bold tabular-nums">{kpis.criticas}</p>
         </div>
         <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01">
           <p className="text-xs font-semibold uppercase tracking-wide text-ds-gray-400">
             Sprints distintos
           </p>
-          <p className="text-3xl font-bold tabular-nums">{kpis.sprints}</p>
+          <p className="text-heading font-bold tabular-nums">{kpis.sprints}</p>
         </div>
       </div>
 

@@ -628,7 +628,7 @@ export default function CuadrillasPage() {
             {partidasView.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
                 <Icon name="user" size="lg" color="currentColor" className="mb-4" />
-                <p className="text-base font-semibold text-black">{q ? 'Sin resultados' : 'Sin partidas'}</p>
+                <p className="text-body font-semibold text-black">{q ? 'Sin resultados' : 'Sin partidas'}</p>
                 <p className="text-sm mt-1 text-ds-gray-400">{q ? 'Probá con otro término de búsqueda.' : 'No hay partidas activas en el catálogo.'}</p>
               </div>
             ) : partidasView.map(row => {
@@ -693,7 +693,7 @@ export default function CuadrillasPage() {
       ) : cuadrillasFiltradas.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
           <Icon name="cuadrillas" size="lg" color="currentColor" className="mb-4" />
-          <p className="text-base font-semibold text-black">{q ? 'Sin resultados' : 'Sin cuadrillas'}</p>
+          <p className="text-body font-semibold text-black">{q ? 'Sin resultados' : 'Sin cuadrillas'}</p>
           {isAdmin && !q && (
             <Button className="mt-4" onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>
               Crear primera cuadrilla

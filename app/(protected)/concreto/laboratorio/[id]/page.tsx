@@ -276,7 +276,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
                       {esAdmin && (
                         <button
                           onClick={() => borrarEnsayo(e)}
-                          className="text-ds-gray-400 hover:text-red-600 p-1"
+                          className="text-ds-gray-400 hover:text-ds-red p-1"
                           title="Borrar ensayo"
                         >
                           <Icon name="delete" size="sm" color="currentColor" />
@@ -300,7 +300,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
                           P{m.orden}: {m.resistencia_mpa.toFixed(1)} MPa ({(m.resistencia_mpa * FACTOR_MPA_A_KGCM2).toFixed(0)} kg/cm²)
                         </button>
                         {esAdmin && (
-                          <button onClick={() => borrarMedicion(m.id)} className="text-ds-gray-400 hover:text-red-600" title="Borrar probeta">
+                          <button onClick={() => borrarMedicion(m.id)} className="text-ds-gray-400 hover:text-ds-red" title="Borrar probeta">
                             <Icon name="close" size="sm" color="currentColor" />
                           </button>
                         )}

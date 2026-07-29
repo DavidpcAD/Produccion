@@ -95,7 +95,7 @@ export default function LoginPage() {
               <Icon name="folder" size="lg" color="currentColor" className="text-black" />
             </div>
             <div>
-              <p className="text-white font-bold text-base leading-tight">Adelante</p>
+              <p className="text-white font-bold text-body leading-tight">Adelante</p>
               <p className="text-white/40 text-xs">Desarrollos</p>
             </div>
           </div>
@@ -106,7 +106,7 @@ export default function LoginPage() {
             <h1 className="text-5xl font-bold text-white mb-4 leading-tight">
               <span className="text-brand">Producción</span>
             </h1>
-            <p className="text-white/50 text-lg mb-10 leading-relaxed">
+            <p className="text-white/50 text-sub-sm mb-10 leading-relaxed">
               Gestión de obra: obras, partidas, cuadrillas,<br />presupuestos, pedidos y aprobaciones.
             </p>
 

@@ -69,7 +69,7 @@ export default function ReporteM2Page() {
   return (
     <main className="page mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Reporte de m²</h1>
+        <h1 className="text-heading font-bold">Reporte de m²</h1>
         <p className="text-ds-gray-500">
           m² producidos por partida y sub-partida (semana + acumulado), con matriz por obra.
         </p>

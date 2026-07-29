@@ -57,7 +57,7 @@ export default function EsquemasPage() {
   return (
     <main className="page mx-auto w-full max-w-4xl px-4 py-6">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold">Esquemas de desembolso</h1>
+        <h1 className="text-heading font-bold">Esquemas de desembolso</h1>
         <p className="text-ds-gray-500">
           Cada banco distribuye el desembolso por hito físico de la obra. Aplican a todos los
           proyectos. Los días y el día fijo del perito alimentan las fechas proyectadas de la matriz.
@@ -228,10 +228,10 @@ function PanelEsquema({
       <aside className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-xl" onClick={(ev) => ev.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold">{banco.AbrevBanco}</h2>
+            <h2 className="text-sub font-bold">{banco.AbrevBanco}</h2>
             <p className="text-xs text-ds-gray-400">{banco.NombreBanco}</p>
           </div>
-          <button onClick={onClose} className="text-2xl leading-none text-ds-gray-400 hover:text-black">×</button>
+          <button onClick={onClose} className="text-sub leading-none text-ds-gray-400 hover:text-black">×</button>
         </div>
 
         {e && (

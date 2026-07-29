@@ -60,7 +60,7 @@ export function AvanceRapidoDialog({ sub, pending, onClose, onConfirmar }: Props
 
           <div className="text-center">
             <span className="text-4xl font-bold tabular-nums text-ds-green-ink">{pct}</span>
-            <span className="text-2xl font-semibold text-ds-green-ink">%</span>
+            <span className="text-sub font-semibold text-ds-green-ink">%</span>
           </div>
 
           <div className="grid grid-cols-5 gap-2">

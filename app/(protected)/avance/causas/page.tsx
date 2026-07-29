@@ -52,7 +52,7 @@ export default function CausasPage() {
     <main className="page mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Causas</h1>
+          <h1 className="text-heading font-bold">Causas</h1>
           <p className="text-ds-gray-500">
             Motivos de no-cumplimiento (NC) e inactividad que el personal selecciona al registrar
             avances.

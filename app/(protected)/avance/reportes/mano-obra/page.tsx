@@ -72,7 +72,7 @@ export default function ReporteManoObraPage() {
   return (
     <main className="page mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Reporte de Mano de Obra</h1>
+        <h1 className="text-heading font-bold">Reporte de Mano de Obra</h1>
         <p className="text-ds-gray-500">
           Nómina repartida por horas + subcontratos vs. m² construidos de la semana. Costo
           M.O./m², eficiencia y sobrecosto.
@@ -410,7 +410,7 @@ function Kpi({
     <div className="rounded-ds border border-ds-gray-200 bg-white p-3 shadow-ds-01">
       <p className="text-xs uppercase tracking-wider text-ds-gray-500">{label}</p>
       <p
-        className={`font-semibold tabular-nums ${small ? 'text-lg' : 'text-2xl'} ${
+        className={`font-semibold tabular-nums ${small ? 'text-sub-sm' : 'text-sub'} ${
           accent === 'lime' ? 'text-brand-dark' : accent === 'red' ? 'text-ds-red' : 'text-black'
         }`}
       >

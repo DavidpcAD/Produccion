@@ -62,7 +62,7 @@ function KpiCard({
       <p className={`text-xs uppercase tracking-wide ${destacado ? 'text-white/60' : 'text-ds-gray-400'}`}>
         {titulo}
       </p>
-      <p className={`mt-1 text-xl font-bold ${destacado ? 'text-brand' : 'text-black'}`}>{formatCRC(monto)}</p>
+      <p className={`mt-1 text-sub-sm font-bold ${destacado ? 'text-brand' : 'text-black'}`}>{formatCRC(monto)}</p>
       {delta !== undefined && delta !== null && Number.isFinite(delta) && (
         <p className={`mt-0.5 text-xs ${delta >= 0 ? 'text-ds-green-ink' : 'text-ds-red'}`}>
           {delta >= 0 ? '▲' : '▼'} {formatPct(Math.abs(delta))} vs. período anterior
@@ -305,7 +305,7 @@ export default function UtilidadesPage() {
             />
             <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01">
               <p className="text-xs uppercase tracking-wide text-ds-gray-400">% Utilidad</p>
-              <p className="mt-1 text-xl font-bold text-black">{formatPct(ingresos?.kpisActual.porcentaje ?? null)}</p>
+              <p className="mt-1 text-sub-sm font-bold text-black">{formatPct(ingresos?.kpisActual.porcentaje ?? null)}</p>
             </div>
           </section>
 

@@ -128,7 +128,7 @@ export default function DesembolsosDashboardPage() {
 
       <div className="mb-2">
         <p className="text-[10px] uppercase tracking-[0.2em] text-ds-gray-400">Gerencia · Cartera ejecutiva</p>
-        <h1 className="text-3xl font-bold">Flujo de Desembolsos</h1>
+        <h1 className="text-heading font-bold">Flujo de Desembolsos</h1>
       </div>
 
       {error && (
@@ -214,7 +214,7 @@ export default function DesembolsosDashboardPage() {
       {/* Gráfico semanal */}
       <section className="mb-6 rounded-ds-lg border border-ds-gray-200 bg-white p-5 shadow-ds-01">
         <div className="mb-4 flex items-baseline justify-between">
-          <h3 className="text-lg font-bold">
+          <h3 className="text-sub-sm font-bold">
             Ingresos por semana{modo === 'NETO_AD' ? ' · neto AD' : ''}
           </h3>
           <div className="flex gap-4 text-xs text-ds-gray-500">
@@ -320,7 +320,7 @@ function CardKPI({ label, valor, borde }: { label: string; valor: number; borde:
   return (
     <div className="rounded-ds-lg bg-white px-4 py-3 shadow-ds-01" style={{ borderLeft: `3px solid ${borde}` }}>
       <p className="text-[10px] uppercase tracking-[0.15em] text-ds-gray-400">{label}</p>
-      <p className="text-xl font-bold tabular-nums text-black">{fmtCorto(valor)}</p>
+      <p className="text-sub-sm font-bold tabular-nums text-black">{fmtCorto(valor)}</p>
     </div>
   );
 }
@@ -329,7 +329,7 @@ function CardKPIAcum({ label, sub, valor, borde }: { label: string; sub: string;
   return (
     <div className="rounded-ds-lg bg-white px-6 py-5 shadow-ds-01" style={{ borderLeft: `4px solid ${borde}` }}>
       <p className="text-[10px] uppercase tracking-[0.2em] text-ds-gray-400">{label}</p>
-      <p className="mt-1 text-3xl font-bold tabular-nums text-black">{fmtCorto(valor)}</p>
+      <p className="mt-1 text-heading font-bold tabular-nums text-black">{fmtCorto(valor)}</p>
       <p className="mt-1 text-[10px] text-ds-gray-400">{sub}</p>
     </div>
   );

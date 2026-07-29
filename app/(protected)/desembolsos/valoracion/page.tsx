@@ -70,7 +70,7 @@ export default function ValoracionPage() {
   return (
     <main className="page mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold">Valoración de lote</h1>
+        <h1 className="text-heading font-bold">Valoración de lote</h1>
         <p className="text-ds-gray-500">Valor por m² y % de financiamiento por banco, por proyecto.</p>
       </div>
 

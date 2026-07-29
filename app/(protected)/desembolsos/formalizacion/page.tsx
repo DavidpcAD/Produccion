@@ -88,7 +88,7 @@ export default function FormalizacionPage() {
   return (
     <main className="page mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold">Formalización</h1>
+        <h1 className="text-heading font-bold">Formalización</h1>
         <p className="text-ds-gray-500">Proyección de fecha de firma para casos reservados.</p>
       </div>
 

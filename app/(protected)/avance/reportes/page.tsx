@@ -62,7 +62,7 @@ export default function ReportesPage() {
   return (
     <main className="page mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Reportes de avance</h1>
+        <h1 className="text-heading font-bold">Reportes de avance</h1>
         <p className="text-ds-gray-500">
           Resumen del mes: cronograma, costo y producción económica por semana operativa.
         </p>

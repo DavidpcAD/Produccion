@@ -56,7 +56,7 @@ export default function ProyectosPage() {
       ) : proyectos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
           <Icon name="boleta" size="lg" color="currentColor" className="mb-4" />
-          <p className="text-base font-semibold text-black">Sin proyectos</p>
+          <p className="text-body font-semibold text-black">Sin proyectos</p>
           <p className="text-sm mt-1 text-ds-gray-400">Aún no hay proyectos registrados</p>
         </div>
       ) : (

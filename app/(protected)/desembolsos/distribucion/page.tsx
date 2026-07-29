@@ -40,7 +40,7 @@ export default function DistribucionPage() {
   return (
     <main className="page mx-auto w-full max-w-4xl px-4 py-6">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold">Distribución por proyecto</h1>
+        <h1 className="text-heading font-bold">Distribución por proyecto</h1>
         <p className="text-ds-gray-500">
           Reparto del precio interno del lote entre entidades. Las tarifas se versionan por fecha de
           vigencia — cada cambio crea una nueva vigencia o edita la vigente.
@@ -186,10 +186,10 @@ function PanelDistribucion({
       <aside className="h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold">{proyecto.AbreviaturaProyecto}</h2>
+            <h2 className="text-sub font-bold">{proyecto.AbreviaturaProyecto}</h2>
             <p className="text-xs text-ds-gray-400">{proyecto.NombreProyecto}</p>
           </div>
-          <button onClick={onClose} className="text-2xl leading-none text-ds-gray-400 hover:text-black">×</button>
+          <button onClick={onClose} className="text-sub leading-none text-ds-gray-400 hover:text-black">×</button>
         </div>
 
         {cfg && (

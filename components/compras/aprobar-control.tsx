@@ -129,7 +129,7 @@ export function AprobarControl({ onApprove, onReject, approveLabel = 'Aprobar', 
                 className="w-full max-w-sm rounded-ds-lg bg-white shadow-ds-03 p-5 text-center select-none"
               >
                 <p className="text-ds-gray-400 text-body-sm mb-1">Orden seleccionada</p>
-                <p className="text-black font-bold text-lg leading-tight">{title ?? 'Orden'}</p>
+                <p className="text-black font-bold text-sub-sm leading-tight">{title ?? 'Orden'}</p>
                 <p className="text-ds-gray-400 text-body-sm mt-3">Arrastrá hasta una opción y soltá (o tocá):</p>
               </motion.div>
 

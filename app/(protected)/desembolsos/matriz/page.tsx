@@ -120,7 +120,7 @@ export default function MatrizPage() {
   return (
     <main className="page mx-auto w-full max-w-7xl px-4 py-6">
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Matriz de desembolsos</h1>
+        <h1 className="text-heading font-bold">Matriz de desembolsos</h1>
         <p className="text-ds-gray-500">
           Cartera semanal banco × hito × semana. Cada hito se ubica en la semana de su fecha
           proyectada de desembolso.

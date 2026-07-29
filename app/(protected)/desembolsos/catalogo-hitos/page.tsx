@@ -31,7 +31,7 @@ export default function CatalogoHitosPage() {
     <main className="page mx-auto w-full max-w-4xl px-4 py-6">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Catálogo de hitos</h1>
+          <h1 className="text-heading font-bold">Catálogo de hitos</h1>
           <p className="text-ds-gray-500">
             Los hitos son los puntos del proceso contra los que un banco desembolsa. Cuando agregás
             uno acá queda disponible para cualquier esquema de banco.
@@ -60,7 +60,7 @@ export default function CatalogoHitosPage() {
             )}
             {!cargando && hitos.map((h) => (
               <tr key={h.IDHito} className="border-t border-ds-gray-100">
-                <td className="px-3 py-2 text-center font-mono text-lg tabular-nums">{h.OrdenEstandar}</td>
+                <td className="px-3 py-2 text-center font-mono text-sub-sm tabular-nums">{h.OrdenEstandar}</td>
                 <td className="px-3 py-2">
                   <span className="inline-flex items-center gap-2">
                     {h.ColorHEX && <span className="h-3 w-3 rounded-full" style={{ backgroundColor: h.ColorHEX }} />}
@@ -148,7 +148,7 @@ function EditarModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-ds bg-white p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold">{esNuevo ? 'Nuevo hito' : `Editar ${hito!.Codigo}`}</h2>
+        <h2 className="text-sub-sm font-bold">{esNuevo ? 'Nuevo hito' : `Editar ${hito!.Codigo}`}</h2>
         {!esNuevo && (
           <p className="mt-1 text-xs text-ds-gray-500">
             {hito!.BancosUsando} banco(s) lo usan · {hito!.RowsTotales} filas históricas

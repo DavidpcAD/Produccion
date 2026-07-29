@@ -97,7 +97,7 @@ export default function DesembolsosMovimientosPage() {
       )}
 
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Movimientos</h1>
+        <h1 className="text-heading font-bold">Movimientos</h1>
         <p className="text-ds-gray-500">
           Movimientos de la cartera y su vinculación a hitos de desembolso. Consulta (máx. 500).
         </p>

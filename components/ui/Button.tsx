@@ -30,7 +30,7 @@ const sizes: Record<Size, string> = {
   xs: 'px-4 py-2 text-xs rounded-ds',
   sm: 'px-5 py-2.5 text-sm',
   md: 'px-6 py-3 text-sm',
-  lg: 'px-7 py-3.5 text-base',
+  lg: 'px-7 py-3.5 text-body',
 };
 
 // Halo del DS (Figma): color del stroke por variante durante el press.

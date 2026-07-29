@@ -113,7 +113,7 @@ export default function ReportesDesembolsosPage() {
   return (
     <main className="page mx-auto w-full max-w-4xl px-4 py-6">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold">Reportes de desembolsos</h1>
+        <h1 className="text-heading font-bold">Reportes de desembolsos</h1>
         <p className="text-ds-gray-500">Exportá a Excel la cartera, el flujo proyectado, la liquidación de lote y los movimientos.</p>
       </div>
 
@@ -145,7 +145,7 @@ export default function ReportesDesembolsosPage() {
 function ReporteCard({ titulo, desc, loading, onClick }: { titulo: string; desc: string; loading: boolean; onClick: () => void }) {
   return (
     <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-5 shadow-ds-01">
-      <h2 className="text-lg font-semibold">{titulo}</h2>
+      <h2 className="text-sub-sm font-semibold">{titulo}</h2>
       <p className="mt-1 mb-4 text-sm text-ds-gray-500">{desc}</p>
       <Button onClick={onClick} loading={loading}>Exportar a Excel</Button>
     </div>

@@ -47,7 +47,7 @@ export default function ManoObraPage() {
   return (
     <main className="page mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Mano de Obra</h1>
+        <h1 className="text-heading font-bold">Mano de Obra</h1>
         <p className="text-ds-gray-500">
           Captura de nómina directa, horas por obra y subcontratos por semana operativa.
         </p>

@@ -63,7 +63,7 @@ export default function ReportePendientesPage() {
   return (
     <main className="page mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Pendientes arrastrados</h1>
+        <h1 className="text-heading font-bold">Pendientes arrastrados</h1>
         <p className="text-ds-gray-500">
           Sub-partidas de sprints ya pasados que las obras en construcción aún no completan.
         </p>
@@ -192,7 +192,7 @@ function Kpi({ label, value, accent }: { label: string; value: number; accent?: 
   return (
     <div className="rounded-ds border border-ds-gray-200 bg-white p-3 shadow-ds-01">
       <p className="text-xs uppercase tracking-wider text-ds-gray-500">{label}</p>
-      <p className={`text-2xl font-semibold tabular-nums ${accent === 'red' ? 'text-ds-red' : 'text-black'}`}>
+      <p className={`text-sub font-semibold tabular-nums ${accent === 'red' ? 'text-ds-red' : 'text-black'}`}>
         {value}
       </p>
     </div>

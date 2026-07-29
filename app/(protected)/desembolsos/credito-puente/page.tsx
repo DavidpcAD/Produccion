@@ -178,7 +178,7 @@ export default function CreditoPuentePage() {
     <main className="page mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Crédito Puente</h1>
+          <h1 className="text-heading font-bold">Crédito Puente</h1>
           <p className="text-ds-gray-500">
             Créditos puente con los bancos, cobertura por lotes y movimientos del crédito.
           </p>
@@ -240,7 +240,7 @@ export default function CreditoPuentePage() {
       {sel && (
         <section className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-bold">
+            <h2 className="text-sub-sm font-bold">
               {sel.Codigo ?? `Crédito #${sel.IDCreditoPuente}`} · {sel.NombreBanco}
             </h2>
             {estadoBadge(sel.Estado)}
@@ -358,7 +358,7 @@ function Kpi({ label, valor }: { label: string; valor: number }) {
   return (
     <div className="rounded-ds border border-ds-gray-200 p-4">
       <p className="text-xs text-ds-gray-500">{label}</p>
-      <p className="mt-1 text-lg font-bold">{formatCRC(valor)}</p>
+      <p className="mt-1 text-sub-sm font-bold">{formatCRC(valor)}</p>
     </div>
   );
 }

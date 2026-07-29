@@ -40,7 +40,7 @@ export default function SprintsPage() {
   return (
     <main className="page mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Sprints y semanas</h1>
+        <h1 className="text-heading font-bold">Sprints y semanas</h1>
         <p className="text-ds-gray-500">
           Gestión de semanas operativas (la que está abierta define el reporte) y del catálogo
           global de sprints.
@@ -155,7 +155,7 @@ function SeccionSemanas() {
 
   return (
     <section className="mb-8">
-      <h2 className="mb-1 text-xl font-bold">Semanas operativas</h2>
+      <h2 className="mb-1 text-sub-sm font-bold">Semanas operativas</h2>
       <p className="mb-4 text-sm text-ds-gray-500">
         Solo una semana puede estar <strong>abierta</strong> a la vez. Abrir una fija la línea base
         (foto del avance) para medir el logrado de la semana desde ahí.
@@ -255,7 +255,7 @@ function SeccionSemanas() {
                     <td className="px-3 py-2 text-center">
                       <span
                         className={`rounded-ds px-2 py-0.5 text-xs font-semibold ${
-                          esAbierta ? 'bg-green-100 text-green-700' : 'bg-ds-gray-100 text-ds-gray-500'
+                          esAbierta ? 'bg-brand/20 text-brand-dark' : 'bg-ds-gray-100 text-ds-gray-500'
                         }`}
                       >
                         {s.estado}
@@ -344,7 +344,7 @@ function SeccionSprints() {
 
   return (
     <section>
-      <h2 className="mb-1 text-xl font-bold">Catálogo de sprints</h2>
+      <h2 className="mb-1 text-sub-sm font-bold">Catálogo de sprints</h2>
       <p className="mb-4 text-sm text-ds-gray-500">
         Secuencia global de sprints. Marcá un sprint como <strong>de espera</strong> (colado/curado)
         — no debe tener sub-partidas. La asignación de sub-partidas a cada sprint se hace en

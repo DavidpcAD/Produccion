@@ -319,7 +319,7 @@ export default function EsclerometroDetallePage({
       {/* Header del ensayo */}
       <div className="rounded-ds-lg border border-ds-gray-100 bg-white p-6 shadow-ds-01">
         <div className="mb-4 flex items-center gap-3">
-          <h1 className="text-xl font-bold text-black">Ensayo #{ensayo.numero}</h1>
+          <h1 className="text-sub-sm font-bold text-black">Ensayo #{ensayo.numero}</h1>
           <span className="text-sm text-ds-gray-400">{fmtDia(ensayo.fecha)}</span>
         </div>
 
@@ -436,7 +436,7 @@ export default function EsclerometroDetallePage({
       {/* Rebotes */}
       <div className="rounded-ds-lg border border-ds-gray-100 bg-white shadow-ds-01">
         <div className="flex flex-col gap-1 border-b border-ds-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-base font-bold text-black">Rebotes ({ensayo.rebotes.length})</h2>
+          <h2 className="text-body font-bold text-black">Rebotes ({ensayo.rebotes.length})</h2>
           <div className="flex flex-col text-xs sm:items-end">
             {promedio !== null && (
               <span className="text-sm font-semibold text-black tabular-nums">

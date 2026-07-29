@@ -442,8 +442,8 @@ function ModalImportarExcel({
             )}
             {resumen.errores.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-red-600 mb-1">Errores ({resumen.errores.length})</p>
-                <ul className="max-h-32 overflow-auto space-y-0.5 text-xs text-red-500 list-disc pl-4">
+                <p className="text-xs font-semibold text-ds-red mb-1">Errores ({resumen.errores.length})</p>
+                <ul className="max-h-32 overflow-auto space-y-0.5 text-xs text-ds-red list-disc pl-4">
                   {resumen.errores.map((e, i) => (
                     <li key={i}>Fila {e.fila_excel} ({e.numero_muestra ?? '—'}): {e.mensaje}</li>
                   ))}
@@ -461,7 +461,7 @@ function Resumen({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <p className="text-xs text-ds-gray-400">{label}</p>
-      <p className="text-lg font-bold text-black tabular-nums">{value}</p>
+      <p className="text-sub-sm font-bold text-black tabular-nums">{value}</p>
     </div>
   );
 }

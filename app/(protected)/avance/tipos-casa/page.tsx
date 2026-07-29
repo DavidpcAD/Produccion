@@ -42,7 +42,7 @@ export default function TiposCasaPage() {
   return (
     <main className="page mx-auto w-full max-w-5xl px-4 py-6">
       <div className="mb-2">
-        <h1 className="text-3xl font-bold">Tipos de casa</h1>
+        <h1 className="text-heading font-bold">Tipos de casa</h1>
         <p className="text-ds-gray-500">
           Qué sprints (de la secuencia global) participan en cada tipo de casa. El peso de
           referencia por sprint = 100% / total de sprints.
@@ -87,7 +87,7 @@ export default function TiposCasaPage() {
                   <td className="px-3 py-2 text-ds-gray-500">
                     {t.descripcion ?? '—'} · {t.sprints.length} semanas
                   </td>
-                  <td className="px-3 py-2 text-center text-lg font-semibold tabular-nums">
+                  <td className="px-3 py-2 text-center text-sub-sm font-semibold tabular-nums">
                     {t.sprints.length}
                   </td>
                   <td className="px-3 py-2">{pesoRef(t.sprints.length)}</td>
@@ -174,7 +174,7 @@ function EditarModal({
         className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-ds bg-white p-6 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-xl font-bold">Sprints de {tipo.tipo_casa}</h2>
+        <h2 className="text-sub-sm font-bold">Sprints de {tipo.tipo_casa}</h2>
         <p className="mt-1 text-sm text-ds-gray-500">
           Marcá los sprints (de la secuencia global) que participan en este tipo de casa. Total:{' '}
           <strong>{total}</strong> · peso de referencia <strong>{pesoRef(total)}</strong>.

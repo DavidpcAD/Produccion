@@ -358,7 +358,7 @@ export default function PresupuestoPage() {
                   <button key={t} type="button" onClick={() => setTipoVista(t)}
                     className={'text-left rounded-ds-lg border p-3 transition ' + (tipoVista === t ? 'border-brand bg-brand-soft' : 'border-ds-gray-200 hover:bg-ds-gray-100')}>
                     <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
-                    <p className="text-black font-bold text-lg">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
+                    <p className="text-black font-bold text-sub-sm">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
                   </button>
                 ))}
               </div>

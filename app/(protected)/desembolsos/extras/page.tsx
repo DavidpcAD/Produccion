@@ -101,7 +101,7 @@ export default function ExtrasPage() {
     <main className="page mx-auto w-full max-w-6xl px-4 py-6">
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Extras y descuentos</h1>
+          <h1 className="text-heading font-bold">Extras y descuentos</h1>
           <p className="text-ds-gray-500">Ajustes al precio de venta por caso. Neto aprobado: {formatCRC(totalAprobadas)}</p>
         </div>
         <Button onClick={() => setCreando(true)}>Nueva extra</Button>

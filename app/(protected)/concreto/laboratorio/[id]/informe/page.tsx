@@ -97,7 +97,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
         <Button variant="outline" size="sm" onClick={() => router.back()} icon={<Icon name="back" size="sm" color="currentColor" />}>
           Volver
         </Button>
-        <p className="text-sm text-red-600">No se pudo cargar la muestra.</p>
+        <p className="text-sm text-ds-red">No se pudo cargar la muestra.</p>
       </div>
     );
   }
@@ -128,7 +128,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
         {/* Encabezado */}
         <header className="flex items-start justify-between border-b-2 border-black pb-4">
           <div>
-            <div className="text-lg font-bold tracking-wider">ADELANTE.</div>
+            <div className="text-sub-sm font-bold tracking-wider">ADELANTE.</div>
             <div className="text-xs text-ds-gray-400">Laboratorio de Concreto</div>
           </div>
           <div className="text-right">
@@ -138,7 +138,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
         </header>
 
         <div className="mt-5 flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">Muestra <span className="font-mono">#{data.numero_muestra}</span></h1>
+          <h1 className="text-sub-sm font-semibold">Muestra <span className="font-mono">#{data.numero_muestra}</span></h1>
         </div>
 
         {/* Datos generales */}

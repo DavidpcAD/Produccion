@@ -303,7 +303,7 @@ function Metric({ label, value, strong, danger }: { label: string; value: number
   return (
     <div className="rounded-ds bg-ds-gray-50 px-3 py-2">
       <p className="text-[11px] uppercase tracking-wide text-ds-gray-400">{label}</p>
-      <p className={`tabular-nums text-lg ${danger ? 'text-ds-red' : strong ? 'text-black font-bold' : 'text-ds-gray-600'}`}>
+      <p className={`tabular-nums text-sub-sm ${danger ? 'text-ds-red' : strong ? 'text-black font-bold' : 'text-ds-gray-600'}`}>
         {value}
       </p>
     </div>
