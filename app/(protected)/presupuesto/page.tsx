@@ -12,11 +12,81 @@ interface Obra { idObra: number; numeroObra: string; nombreMostrado: string }
 interface Linea { taskNo: string; taskType?: string; description: string; lineAmount?: number; unitCost?: number; no?: string }
 interface PlantillaParsed { archivo: string; porTipo: Record<string, Linea[]>; totales: Record<string, number>; hojas: string[] }
 interface DescParsed { archivo: string; hoja: string | null; lineas: Linea[] }
+interface TotalesBC { salesLineAmount?: number; costLineAmount?: number; indirectCostLineAmount?: number; result?: number }
+interface ResultadoBC {
+  tipo: 'general' | 'descompuesto';
+  worksNo: string;
+  version?: string;          // versión creada en esta subida (REESTUDIO+n)
+  versionActual?: string | null; // versión vigente en BC (si no se creó una)
+  enviadas?: number;         // líneas de versión enviadas
+  materiales?: number;       // materiales del descompuesto
+  descompuestoChunks?: number;
+  totales?: TotalesBC;
+  resultadoBC?: string;
+  resultadoDescompuestoBC?: string;
+}
 
 const crc = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 });
 const TIPO_LABEL: Record<string, string> = { Sales: 'Venta', Cost: 'Costo directo', 'Indirect Cost': 'Indirectos', Production: 'Producción' };
 // Solo estos 3 se suben a BC (Producción es base de avance, va aparte — no se muestra).
 const TIPO_SUBIBLES = ['Sales', 'Cost', 'Indirect Cost'];
+
+// Tarjeta de un total de la obra (venta / costo / indirecto / resultado).
+function MetricBC({ label, value, accent }: { label: string; value: string; accent?: 'pos' | 'neg' }) {
+  return (
+    <div className="rounded-ds border border-ds-gray-100 p-2.5">
+      <p className="text-ds-gray-400 text-xs">{label}</p>
+      <p className={'font-bold text-sm mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red' : 'text-black')}>{value}</p>
+    </div>
+  );
+}
+
+// Panel de detalle de la respuesta de Business Central tras subir — replica el
+// "Información obra / Resumen" de BC: código de versión, importes y resultado.
+function DetalleBC({ r }: { r: ResultadoBC }) {
+  const t = r.totales;
+  const version = r.version ?? r.versionActual ?? null;
+  const mensajeBC = [r.resultadoBC, r.resultadoDescompuestoBC].filter(Boolean).join(' · ');
+  const resultadoVal = t?.result ?? 0;
+  return (
+    <div className="rounded-ds-lg border border-brand/40 bg-white overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-brand-soft border-b border-brand/30">
+        <div className="flex items-center gap-2 min-w-0">
+          <Icon name="check" size="sm" color="currentColor" />
+          <span className="font-bold text-black text-sm truncate">{r.tipo === 'general' ? 'General' : 'Descompuesto'} subido a Business Central</span>
+        </div>
+        <span className="text-xs text-ds-gray-500 shrink-0">Obra <span className="font-mono font-semibold text-black">{r.worksNo}</span></span>
+      </div>
+      <div className="p-4 space-y-3.5">
+        {version && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-ds-gray-400 text-xs">Cód. versión</span>
+            <span className="text-sm font-bold text-black bg-ds-gray-100 rounded-full px-3 py-0.5">{version}</span>
+            {r.version && <span className="text-ds-green-ink text-xs">· versión creada en esta subida</span>}
+          </div>
+        )}
+        {t && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <MetricBC label="Importe venta" value={crc.format(t.salesLineAmount ?? 0)} />
+            <MetricBC label="Importe coste" value={crc.format(t.costLineAmount ?? 0)} />
+            <MetricBC label="Coste indirecto" value={crc.format(t.indirectCostLineAmount ?? 0)} />
+            <MetricBC label="Resultado" value={crc.format(resultadoVal)} accent={resultadoVal >= 0 ? 'pos' : 'neg'} />
+          </div>
+        )}
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ds-gray-500">
+          {r.enviadas != null && <span>Líneas de versión enviadas: <strong className="text-black">{r.enviadas}</strong></span>}
+          {r.materiales != null && <span>Materiales del descompuesto: <strong className="text-black">{r.materiales}</strong></span>}
+          {r.descompuestoChunks != null && <span>Chunks: <strong className="text-black">{r.descompuestoChunks}</strong></span>}
+        </div>
+        {mensajeBC && (
+          <div className="rounded-ds bg-ds-gray-100 px-3 py-2 text-xs font-mono text-ds-gray-600 break-words">
+            Respuesta BC: {mensajeBC}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Encabezado de paso: badge numerado + título, para guiar el flujo (1 → 2 → 3).
 function StepHeader({ n, title, hint }: { n: number; title: string; hint?: string }) {
@@ -50,7 +120,7 @@ export default function PresupuestoPage() {
   const [plantillas, setPlantillas] = useState<{ idPlantilla: number; nombre: string; tipo: string; archivo: string | null; fechaActualizacion: string }[]>([]);
   const [modalGuardar, setModalGuardar] = useState(false);
   const [nombrePlantilla, setNombrePlantilla] = useState('');
-  const [resultado, setResultado] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<ResultadoBC | null>(null);
   const plantillaFile = useRef<HTMLInputElement>(null);
   const descFile = useRef<HTMLInputElement>(null);
 
@@ -98,15 +168,9 @@ export default function PresupuestoPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast(data.error || 'No se pudo subir', 'error'); setResultado(null); return; }
-      const partes: string[] = [];
-      if (data.version) partes.push(`versión ${data.version} (${data.enviadas ?? 0} líneas enviadas)`);
-      if (data.materiales) partes.push(`${data.materiales} materiales`);
-      if (data.totales) partes.push(`Venta ${crc.format(data.totales.salesLineAmount ?? 0)} · Costo ${crc.format(data.totales.costLineAmount ?? 0)}`);
-      const bcMsg = [data.resultadoBC, data.resultadoDescompuestoBC].filter(Boolean).join(' · ');
-      if (bcMsg) partes.push(`BC: ${bcMsg}`);
       const etiqueta = que === 'general' ? 'General' : 'Descompuesto';
       toast(`${etiqueta} enviado a Business Central`, 'success');
-      setResultado(`${etiqueta} subido a Business Central — ${partes.join(' · ')}`);
+      setResultado({ tipo: que, worksNo: obra.numeroObra, ...data });
     } finally { setSubiendoQue(null); }
   }
 
@@ -343,7 +407,7 @@ export default function PresupuestoPage() {
               <Button onClick={() => subir('descompuesto')} loading={subiendoQue === 'descompuesto'} disabled={!obraId || subiendoQue !== null} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir Descompuesto a BC</Button>
             )}
           </div>
-          {resultado && <div className="rounded-ds bg-brand-soft border border-brand/40 px-4 py-3 text-sm text-black">{resultado}</div>}
+          {resultado && <DetalleBC r={resultado} />}
         </div>
       )}
 

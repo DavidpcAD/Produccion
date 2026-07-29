@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
-import { bcConstructionConfigured, subirVersionPresupuesto, subirDescompuesto, type BulkLine, type DecompLine } from '@/lib/bc-construction';
+import { bcConstructionConfigured, subirVersionPresupuesto, subirDescompuesto, getWork, type BulkLine, type DecompLine } from '@/lib/bc-construction';
 
 export const runtime = 'nodejs';
 
@@ -52,6 +52,16 @@ export async function POST(req: NextRequest) {
       resultado.descompuestoChunks = d.chunks;
       resultado.materiales = d.enviadas;
       resultado.resultadoDescompuestoBC = d.resultado;
+    }
+    // Totales/versión actuales de la obra en BC (para el panel de detalle).
+    // Necesario sobre todo cuando solo se subió el descompuesto: así el panel
+    // muestra venta/costo/indirecto/resultado y la versión vigente de la obra.
+    if (!resultado.totales) {
+      const work = await getWork(worksNo);
+      if (work) {
+        resultado.totales = { salesLineAmount: work.salesLineAmount, costLineAmount: work.costLineAmount, indirectCostLineAmount: work.indirectCostLineAmount, result: work.result };
+        resultado.versionActual = work.filterVersionCode ?? null;
+      }
     }
     await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length }, ip });
     return NextResponse.json({ ok: true, ...resultado });
