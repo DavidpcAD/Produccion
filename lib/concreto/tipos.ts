@@ -169,3 +169,93 @@ export interface EnsayoDetalle {
 export interface MuestraDetalle extends MuestraListadoItem {
   ensayos_detalle: EnsayoDetalle[];
 }
+
+// ─── Dashboard / KPIs de producción ──────────────────────────────────────
+
+export interface M3PorDia {
+  fecha: string; // YYYY-MM-DD
+  m3: number;
+  m3_por_planta: Record<string, number>;
+}
+
+export interface KpisResponse {
+  total_batches: number;
+  total_m3: number;
+  pct_con_alarma: number;
+  pct_receta_modificada: number;
+  m3_por_dia: M3PorDia[];
+}
+
+// ─── Batches (datos crudos de planta, para análisis de calidad) ───────────
+
+export interface BatchDetallePlanta {
+  id: number;
+  record_no: number;
+  fecha_inicio: string;
+  planta_nombre: string;
+  cliente_raw: string | null;
+  recipe_name_raw: string | null;
+  m3_producidos: number;
+
+  // Receta / diseño por 1 m³.
+  arido_a_nombre: string | null;
+  arido_a_dosis_kg_m3: number | null;
+  arido_b_nombre: string | null;
+  arido_b_dosis_kg_m3: number | null;
+  cemento_dosis_kg_m3: number | null;
+  agua_dosis_l_m3: number | null;
+  aditivo1_dosis_l_m3: number | null;
+  aditivo2_dosis_l_m3: number | null;
+  aditivo3_dosis_l_m3: number | null;
+
+  // Agua.
+  agua_l: number | null;
+  agua_l_teor: number | null;
+  agua_delta_l: number | null;
+  agua_delta_pct: number | null;
+  water_dosage_adj: boolean | null;
+  water_total_adj_l: number | null;
+  relacion_agua_cemento: number | null;
+
+  // Humedad de áridos.
+  arido_a_moisture_pct: number | null;
+  arido_b_moisture_pct: number | null;
+
+  // Cemento.
+  cemento_kg: number | null;
+  cemento_kg_teor: number | null;
+  cemento_delta_pct: number | null;
+
+  // Áridos.
+  arido_a_kg: number | null;
+  arido_a_kg_teor: number | null;
+  arido_a_delta_pct: number | null;
+  arido_b_kg: number | null;
+  arido_b_kg_teor: number | null;
+  arido_b_delta_pct: number | null;
+
+  // Aditivos.
+  aditivo1_l: number | null;
+  aditivo1_l_teor: number | null;
+  aditivo1_delta_pct: number | null;
+  aditivo2_l: number | null;
+  aditivo2_l_teor: number | null;
+  aditivo2_delta_pct: number | null;
+  aditivo3_l: number | null;
+  aditivo3_l_teor: number | null;
+  aditivo3_delta_pct: number | null;
+
+  // Ambiente + flags.
+  temp_ambiente_inicio: number | null;
+  temp_ambiente_fin: number | null;
+  production_rate: number | null;
+  production_rate_adj: boolean | null;
+  receta_modificada: boolean;
+  tuvo_alarma: boolean;
+  cantidad_alarmas: number;
+  operador: string | null;
+
+  // Colada a la que pertenece.
+  id_colada: number | null;
+  codigo_interno_colada: number | null;
+}

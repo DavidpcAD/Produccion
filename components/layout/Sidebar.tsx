@@ -35,9 +35,24 @@ const navItems: NavItemDef[] = [
     children: [
       { href: '/avance', label: 'Obras / Matriz', exact: true },
       { href: '/avance/mano-obra', label: 'Mano de Obra' },
+      { href: '/avance/sub-partidas', label: 'Sub-partidas' },
+      { href: '/avance/tipos-casa', label: 'Tipos de casa' },
+      { href: '/avance/causas', label: 'Causas' },
     ],
   },
-  { href: '/concreto',  label: 'Concreto',      icon: 'traslado',  minLevel: 2 },
+  {
+    href: '/concreto/dashboard', label: 'Concreto', icon: 'traslado', minLevel: 2,
+    section: '/concreto',
+    children: [
+      { href: '/concreto/dashboard', label: 'Dashboard' },
+      { href: '/concreto/coladas', label: 'Coladas' },
+      { href: '/concreto/batches', label: 'Batches' },
+      { href: '/concreto/laboratorio', label: 'Laboratorio' },
+      { href: '/concreto/esclerometro', label: 'Esclerómetro' },
+      { href: '/concreto/importaciones', label: 'Importaciones' },
+      { href: '/concreto/config', label: 'Configuración' },
+    ],
+  },
   {
     href: '/compras/ingenieria/dashboard', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4,
     section: '/compras/ingenieria',
