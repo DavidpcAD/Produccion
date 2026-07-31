@@ -156,9 +156,10 @@
 .oc-scope .ds-btn--sm.ds-btn--outline { box-shadow: none; }
 .oc-scope .ds-btn--lg { min-height: 64px; padding: var(--ds-space-5) var(--ds-space-6); font-size: var(--ds-font-size-subtitle); }
 .oc-scope .ds-btn--block, .oc-scope .ds-btn--full { width: 100%; }
-/* Icon-only (DS layout=icon): cuadrado 56px, sm=círculo 44px */
-.oc-scope .ds-btn--icon { width: 56px; height: 56px; padding: var(--ds-space-4); }
-.oc-scope .ds-btn--sm.ds-btn--icon { width: 44px; height: 44px; border-radius: 50%; padding: 0; }
+/* Icon-only: cuadrado 40px (md) / círculo 36px (sm), alineado al alto de los
+   botones de texto (40px) del ui/Button del resto del app. */
+.oc-scope .ds-btn--icon { width: 40px; height: 40px; padding: 0; }
+.oc-scope .ds-btn--sm.ds-btn--icon { width: 36px; height: 36px; border-radius: 50%; padding: 0; }
 
 /* =====================  FORM FIELD  =====================
    Alineado a react/design-system.css del Adelante DS:
