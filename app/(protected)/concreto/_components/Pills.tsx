@@ -38,7 +38,7 @@ export function Pills({
             type="button"
             onClick={() => onChange(o.value)}
             aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-sm font-semibold transition-colors ${
+            className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 ${
               active ? 'bg-black text-white shadow-ds-01' : 'bg-ds-gray-100 text-ds-gray-500 hover:text-black'
             }`}
           >
