@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/Confirm';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { ANGULOS_IMPACTO, calcularReboteUtilPromedio } from '@/lib/concreto/tipos-esclerometro';
 import type { EnsayoEsclerometroDetalle, Rebote } from '@/lib/concreto/tipos-esclerometro';
 
@@ -265,22 +266,22 @@ export default function EsclerometroDetallePage({
   // --- Render --------------------------------------------------------------
   if (loading) {
     return (
-      <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
+      <PageShell width="narrow" className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full" rounded="rounded-ds-lg" />
         <Skeleton className="h-64 w-full" rounded="rounded-ds-lg" />
-      </div>
+      </PageShell>
     );
   }
 
   if (error || !ensayo) {
     return (
-      <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
+      <PageShell width="narrow" className="space-y-4">
         <Button variant="ghost" size="sm" icon={<Icon name="back" />} onClick={() => router.push('/concreto/esclerometro')}>
           Volver
         </Button>
         <p className="text-sm text-ds-red">{error ?? 'No se encontró el ensayo.'}</p>
-      </div>
+      </PageShell>
     );
   }
 
@@ -289,32 +290,37 @@ export default function EsclerometroDetallePage({
     .sort((a, b) => a.numero_golpe - b.numero_golpe);
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<Icon name="back" />}
-          onClick={() => router.push('/concreto/esclerometro')}
-        >
-          Volver al listado
-        </Button>
-        <div className="flex gap-2">
-          {!modoEdicion && (
-            <Button variant="outline" size="sm" icon={<Icon name="edit" />} onClick={abrirEdicion}>
-              Editar
-            </Button>
-          )}
+    <PageShell width="narrow" className="space-y-4">
+      <PageHeader
+        back={
           <Button
-            variant="danger"
+            variant="ghost"
             size="sm"
-            icon={<Icon name="delete" />}
-            onClick={onEliminarEnsayo}
+            icon={<Icon name="back" />}
+            onClick={() => router.push('/concreto/esclerometro')}
           >
-            Eliminar
+            Volver al listado
           </Button>
-        </div>
-      </div>
+        }
+        title={null}
+        actions={
+          <>
+            {!modoEdicion && (
+              <Button variant="outline" size="sm" icon={<Icon name="edit" />} onClick={abrirEdicion}>
+                Editar
+              </Button>
+            )}
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<Icon name="delete" />}
+              onClick={onEliminarEnsayo}
+            >
+              Eliminar
+            </Button>
+          </>
+        }
+      />
 
       {/* Header del ensayo */}
       <div className="rounded-ds-lg border border-ds-gray-100 bg-white p-6 shadow-ds-01">
@@ -541,7 +547,7 @@ export default function EsclerometroDetallePage({
           <> · Actualizado {fmtFechaLarga(ensayo.actualizado_en)}</>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }
 

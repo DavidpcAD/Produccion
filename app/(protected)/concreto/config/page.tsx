@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { ActividadLab } from '@/lib/concreto/tipos';
 import {
   COMPARADORES_UMBRAL,
@@ -47,13 +48,11 @@ export default function ConfigConcretoPage() {
   const [tab, setTab] = useState<Tab>('actividades');
 
   return (
-    <div className="p-6 space-y-5 max-w-[1200px] mx-auto animate-fade-in">
-      <div>
-        <h1 className="text-heading font-bold text-black">Configuración</h1>
-        <p className="text-ds-gray-400 text-body-sm">
-          Actividades de laboratorio, umbrales de alerta y densidades de materiales.
-        </p>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Configuración"
+        subtitle="Actividades de laboratorio, umbrales de alerta y densidades de materiales."
+      />
 
       {/* Tabs simples con estado */}
       <div className="flex items-center gap-1 border-b border-ds-gray-200">
@@ -76,7 +75,7 @@ export default function ConfigConcretoPage() {
       {tab === 'actividades' && <TabActividades puede={puede} />}
       {tab === 'umbrales' && <TabUmbrales puede={puede} />}
       {tab === 'densidades' && <TabDensidades puede={puede} />}
-    </div>
+    </PageShell>
   );
 }
 

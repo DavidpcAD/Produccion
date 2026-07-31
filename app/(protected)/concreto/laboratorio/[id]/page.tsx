@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useConfirm } from '@/components/ui/Confirm';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { useSession } from '@/hooks/useSession';
 import type { EnsayoDetalle, MuestraDetalle } from '@/lib/concreto/tipos';
 import {
@@ -163,51 +164,59 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
 
   if (loading) {
     return (
-      <div className="p-6 max-w-[1200px] mx-auto space-y-4">
+      <PageShell width="narrow" className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full" rounded="rounded-ds-lg" />
         <Skeleton className="h-64 w-full" rounded="rounded-ds-lg" />
-      </div>
+      </PageShell>
     );
   }
 
   if (!data) {
     return (
-      <div className="p-6 max-w-[1200px] mx-auto">
+      <PageShell width="narrow">
         <Button variant="outline" onClick={() => router.push('/concreto/laboratorio')} icon={<Icon name="back" size="sm" color="currentColor" />}>
           Volver
         </Button>
         <p className="mt-6 text-ds-gray-400">Muestra no encontrada.</p>
-      </div>
+      </PageShell>
     );
   }
 
   const ensayos = [...data.ensayos_detalle].sort((a, b) => a.edad_dias - b.edad_dias);
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto space-y-5 animate-fade-in">
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button variant="outline" size="sm" onClick={() => router.push('/concreto/laboratorio')} icon={<Icon name="back" size="sm" color="currentColor" />}>
-          Volver
-        </Button>
-        <h1 className="text-heading font-bold text-black">Muestra #{data.numero_muestra}</h1>
-        <Badge variant="gray">{data.actividad_nombre}</Badge>
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <Link href={`/concreto/laboratorio/${id}/informe`} target="_blank">
-            <Button variant="outline" size="sm" icon={<Icon name="boleta" size="sm" color="currentColor" />}>
-              Ver informe
-            </Button>
-          </Link>
-          <Button variant="outline" size="sm" onClick={() => setEditarMuestra(true)} icon={<Icon name="edit" size="sm" color="currentColor" />}>
-            Editar
+    <PageShell width="narrow">
+      <PageHeader
+        back={
+          <Button variant="outline" size="sm" onClick={() => router.push('/concreto/laboratorio')} icon={<Icon name="back" size="sm" color="currentColor" />}>
+            Volver
           </Button>
-          {esAdmin && (
-            <Button variant="danger" size="sm" onClick={borrarMuestra} icon={<Icon name="delete" size="sm" color="currentColor" />}>
-              Borrar
+        }
+        title={
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-heading font-bold text-black">Muestra #{data.numero_muestra}</h1>
+            <Badge variant="gray">{data.actividad_nombre}</Badge>
+          </div>
+        }
+        actions={
+          <>
+            <Link href={`/concreto/laboratorio/${id}/informe`} target="_blank">
+              <Button variant="outline" size="sm" icon={<Icon name="boleta" size="sm" color="currentColor" />}>
+                Ver informe
+              </Button>
+            </Link>
+            <Button variant="outline" size="sm" onClick={() => setEditarMuestra(true)} icon={<Icon name="edit" size="sm" color="currentColor" />}>
+              Editar
             </Button>
-          )}
-        </div>
-      </div>
+            {esAdmin && (
+              <Button variant="danger" size="sm" onClick={borrarMuestra} icon={<Icon name="delete" size="sm" color="currentColor" />}>
+                Borrar
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Header */}
       <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
@@ -330,7 +339,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
       {medEdit && (
         <ModalEditarMedicion med={medEdit} cerrar={() => setMedEdit(null)} onGuardado={() => { setMedEdit(null); load(); }} />
       )}
-    </div>
+    </PageShell>
   );
 }
 
