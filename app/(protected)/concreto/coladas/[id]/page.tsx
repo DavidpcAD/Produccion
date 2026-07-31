@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Combobox, type ComboOption } from '@/components/ui/Combobox';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/Confirm';
 import { useSession } from '@/hooks/useSession';
@@ -207,22 +208,22 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
 
   if (loading && !data) {
     return (
-      <div className="p-6 max-w-[1400px] mx-auto space-y-4">
+      <PageShell width="full" className="max-w-[1400px]">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full" rounded="rounded-ds-lg" />
         <Skeleton className="h-64 w-full" rounded="rounded-ds-lg" />
-      </div>
+      </PageShell>
     );
   }
 
   if (!data) {
     return (
-      <div className="p-6 max-w-[1400px] mx-auto">
+      <PageShell width="full" className="max-w-[1400px]">
         <Button variant="outline" onClick={() => router.push('/concreto')} icon={<Icon name="back" size="sm" color="currentColor" />}>
           Volver
         </Button>
         <p className="mt-6 text-ds-gray-400">Colada no encontrada.</p>
-      </div>
+      </PageShell>
     );
   }
 
@@ -233,15 +234,21 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
   const batchesEditables = c.estado === 'sugerida' || c.estado === 'confirmada';
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto space-y-5 animate-fade-in">
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button variant="outline" size="sm" onClick={() => router.push('/concreto')} icon={<Icon name="back" size="sm" color="currentColor" />}>
-          Volver
-        </Button>
-        <h1 className="text-heading font-bold text-black">Colada #{c.codigo_interno}</h1>
-        <Badge variant={estadoCfg.variant} dot>{estadoCfg.label}</Badge>
-        {c.tuvo_alarma && <Badge variant="red" dot>{c.cantidad_alarmas_total} alarma(s)</Badge>}
-      </div>
+    <PageShell width="full" className="max-w-[1400px]">
+      <PageHeader
+        back={
+          <Button variant="outline" size="sm" onClick={() => router.push('/concreto')} icon={<Icon name="back" size="sm" color="currentColor" />}>
+            Volver
+          </Button>
+        }
+        title={
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-heading font-bold text-black">Colada #{c.codigo_interno}</h1>
+            <Badge variant={estadoCfg.variant} dot>{estadoCfg.label}</Badge>
+            {c.tuvo_alarma && <Badge variant="red" dot>{c.cantidad_alarmas_total} alarma(s)</Badge>}
+          </div>
+        }
+      />
 
       {c.estado === 'anulada' && c.motivo_anulacion && (
         <div className="rounded-ds-lg border border-ds-red/50 bg-ds-red/10 px-4 py-3 text-sm text-black flex items-start gap-2.5">
@@ -548,6 +555,6 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </Modal>
-    </div>
+    </PageShell>
   );
 }

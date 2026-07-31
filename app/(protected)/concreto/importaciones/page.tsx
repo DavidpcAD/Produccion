@@ -4,6 +4,7 @@ import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { useToast } from '@/components/ui/Toast';
 import type {
   EstadoImportacion,
@@ -180,13 +181,11 @@ export default function ImportacionesPage() {
   ];
 
   return (
-    <div className="p-6 space-y-6 max-w-[1400px] mx-auto animate-fade-in">
-      <div>
-        <h1 className="text-heading font-bold text-black">Importaciones</h1>
-        <p className="text-ds-gray-400 text-body-sm">
-          Ingesta del CSV de la planta Blend e historial de cargas. La planta se detecta del propio archivo.
-        </p>
-      </div>
+    <PageShell width="full" className="max-w-[1400px] space-y-6">
+      <PageHeader
+        title="Importaciones"
+        subtitle="Ingesta del CSV de la planta Blend e historial de cargas. La planta se detecta del propio archivo."
+      />
 
       {/* Zona de carga */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -295,7 +294,7 @@ export default function ImportacionesPage() {
           emptyMessage="Sin importaciones aún"
         />
       </div>
-    </div>
+    </PageShell>
   );
 }
 
