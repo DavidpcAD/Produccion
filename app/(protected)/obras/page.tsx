@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { ObraEditModal } from '@/components/obras/ObraEditModal';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 
 interface Obra {
   idObra: number;
@@ -253,14 +254,9 @@ export default function ObrasPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Obras</h1>
-          <p className="text-ds-gray-400 text-body-sm">{obras.length} obras</p>
-        </div>
-        {isAdmin && <Button onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva obra</Button>}
-      </div>
+    <PageShell>
+      <PageHeader title="Obras" subtitle={`${obras.length} obras`}
+        actions={isAdmin ? <Button onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva obra</Button> : undefined} />
 
       <DataTable
         columns={columns}
@@ -384,6 +380,6 @@ export default function ObrasPage() {
         proyectos={proyectos}
         onSaved={load}
       />
-    </div>
+    </PageShell>
   );
 }

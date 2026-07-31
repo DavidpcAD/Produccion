@@ -5,6 +5,7 @@ import { getCierreDia } from '@/lib/reporte-h4/queries';
 import { abreviarCRC } from '@/lib/utilidades/format';
 import Link from 'next/link';
 import { Icon, type IconName } from '@/components/ds/Icon/Icon';
+import { PageShell } from '@/components/layout/Page';
 
 // Cada métrica corre aislada: si su DB/consulta falla, cae al fallback y el resto
 // del dashboard igual carga (no rompe la pantalla).
@@ -108,7 +109,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto animate-fade-in">
+    <PageShell className="space-y-6">
       {/* Welcome */}
       <div>
         <h1 className="text-heading sm:text-4xl font-bold text-black tracking-tight">
@@ -184,6 +185,6 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

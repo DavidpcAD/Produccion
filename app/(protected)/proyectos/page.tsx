@@ -7,6 +7,7 @@ import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { listStagger, listItem } from '@/components/ui/Motion';
 import { motion } from 'motion/react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 
 interface Proyecto {
   IDProyecto: number;
@@ -36,13 +37,8 @@ export default function ProyectosPage() {
     e === 'Activo' || e === 'Open' ? 'green' : 'gray';
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <div>
-          <h1 className="text-heading font-bold text-black">Proyectos</h1>
-          <p className="text-ds-gray-400 text-body-sm">{proyectos.length} proyectos activos</p>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader title="Proyectos" subtitle={`${proyectos.length} proyectos activos`} />
 
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -88,6 +84,6 @@ export default function ProyectosPage() {
           ))}
         </motion.div>
       )}
-    </div>
+    </PageShell>
   );
 }
