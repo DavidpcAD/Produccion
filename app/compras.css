@@ -106,12 +106,14 @@
   gap: var(--ds-space-2);
   border: 0;
   border-radius: var(--ds-radius-lg);
-  padding: var(--ds-space-4);
-  min-height: 56px;
+  /* Alineado al ui/Button del resto del app (md ≈ 40px, 14px), no al ds-btn
+     grande de Figma (56px/16px), para consistencia con las demás pantallas. */
+  padding: var(--ds-space-3) var(--ds-space-6);
+  min-height: 40px;
   font-family: var(--ds-font-family);
-  font-size: var(--ds-font-size-body-md);
+  font-size: var(--ds-font-size-label);
   font-weight: var(--ds-font-weight-semibold);
-  line-height: var(--ds-line-height-body-md);
+  line-height: var(--ds-line-height-label);
   letter-spacing: 0;
   cursor: pointer;
   box-shadow: var(--ds-shadow-03-big);
