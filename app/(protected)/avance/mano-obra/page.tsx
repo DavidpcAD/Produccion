@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
@@ -45,13 +46,11 @@ export default function ManoObraPage() {
     `Semana ${s.numero_semana}/${s.anio} · ${s.fecha_inicio} → ${s.fecha_fin}`;
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Mano de Obra</h1>
-        <p className="text-ds-gray-500">
-          Captura de nómina directa, horas por obra y subcontratos por semana operativa.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Mano de Obra"
+        subtitle="Captura de nómina directa, horas por obra y subcontratos por semana operativa."
+      />
 
       {/* Selector de semana (compartido por los tres tabs) */}
       <div className="my-4 max-w-md">
@@ -89,7 +88,7 @@ export default function ManoObraPage() {
       ) : (
         <TabSubcontratos semanaId={semanaSel.id} />
       )}
-    </main>
+    </PageShell>
   );
 }
 

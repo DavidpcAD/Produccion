@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
@@ -76,17 +77,12 @@ export default function SubPartidasPage() {
   }, [subPartidas]);
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-heading font-bold">Sub-partidas</h1>
-          <p className="text-ds-gray-500">
-            Catálogo núcleo de ObrasControl — unidades atómicas que conectan sprints con partidas de
-            costo.
-          </p>
-        </div>
-        <Button onClick={() => setCreando(true)}>Nueva sub-partida</Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Sub-partidas"
+        subtitle="Catálogo núcleo de ObrasControl — unidades atómicas que conectan sprints con partidas de costo."
+        actions={<Button onClick={() => setCreando(true)}>Nueva sub-partida</Button>}
+      />
 
       {/* Filtros */}
       <div className="mb-5 grid grid-cols-1 gap-3 rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01 md:grid-cols-4">
@@ -256,7 +252,7 @@ export default function SubPartidasPage() {
           }}
         />
       )}
-    </main>
+    </PageShell>
   );
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Input, Select } from '@/components/ui/Input';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
@@ -70,14 +71,11 @@ export default function ReporteManoObraPage() {
   const calc = data?.calc ?? null;
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Reporte de Mano de Obra</h1>
-        <p className="text-ds-gray-500">
-          Nómina repartida por horas + subcontratos vs. m² construidos de la semana. Costo
-          M.O./m², eficiencia y sobrecosto.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Reporte de Mano de Obra"
+        subtitle="Nómina repartida por horas + subcontratos vs. m² construidos de la semana. Costo M.O./m², eficiencia y sobrecosto."
+      />
 
       <div className="my-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Select
@@ -168,7 +166,7 @@ export default function ReporteManoObraPage() {
           <Distribucion obras={calc.obras} />
         </div>
       ) : null}
-    </main>
+    </PageShell>
   );
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import type {
@@ -40,16 +41,13 @@ export default function TiposCasaPage() {
   useEffect(recargar, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <main className="page mx-auto w-full max-w-5xl px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Tipos de casa</h1>
-        <p className="text-ds-gray-500">
-          Qué sprints (de la secuencia global) participan en cada tipo de casa. El peso de
-          referencia por sprint = 100% / total de sprints.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Tipos de casa"
+        subtitle="Qué sprints (de la secuencia global) participan en cada tipo de casa. El peso de referencia por sprint = 100% / total de sprints."
+      />
 
-      <div className="mt-5 overflow-x-auto rounded-ds border border-ds-gray-200">
+      <div className="overflow-x-auto rounded-ds border border-ds-gray-200">
         <table className="w-full text-sm">
           <thead className="bg-ds-gray-100 text-left">
             <tr>
@@ -116,7 +114,7 @@ export default function TiposCasaPage() {
           }}
         />
       )}
-    </main>
+    </PageShell>
   );
 }
 

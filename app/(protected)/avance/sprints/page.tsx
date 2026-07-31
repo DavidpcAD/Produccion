@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -38,18 +39,15 @@ function sumarDias(fecha: string, dias: number): string {
  */
 export default function SprintsPage() {
   return (
-    <main className="page mx-auto w-full max-w-5xl px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Sprints y semanas</h1>
-        <p className="text-ds-gray-500">
-          Gestión de semanas operativas (la que está abierta define el reporte) y del catálogo
-          global de sprints.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Sprints y semanas"
+        subtitle="Gestión de semanas operativas (la que está abierta define el reporte) y del catálogo global de sprints."
+      />
 
       <SeccionSemanas />
       <SeccionSprints />
-    </main>
+    </PageShell>
   );
 }
 

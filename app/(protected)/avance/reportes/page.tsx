@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Select } from '@/components/ui/Input';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
@@ -60,13 +61,11 @@ export default function ReportesPage() {
     `Semana ${s.numero_semana}/${s.anio} · ${s.fecha_inicio} → ${s.fecha_fin}`;
 
   return (
-    <main className="page mx-auto w-full max-w-5xl px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Reportes de avance</h1>
-        <p className="text-ds-gray-500">
-          Resumen del mes: cronograma, costo y producción económica por semana operativa.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Reportes de avance"
+        subtitle="Resumen del mes: cronograma, costo y producción económica por semana operativa."
+      />
 
       <div className="my-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Select
@@ -104,7 +103,7 @@ export default function ReportesPage() {
           <ResumenFinanciero data={data} semanaSel={semanaId} />
         </div>
       ) : null}
-    </main>
+    </PageShell>
   );
 }
 

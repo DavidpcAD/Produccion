@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Select } from '@/components/ui/Input';
 import type { PendienteItem } from '@/lib/avance/reporte-pendientes';
 
@@ -61,13 +62,11 @@ export default function ReportePendientesPage() {
   }, [filtrados, agrupar]);
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Pendientes arrastrados</h1>
-        <p className="text-ds-gray-500">
-          Sub-partidas de sprints ya pasados que las obras en construcción aún no completan.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Pendientes arrastrados"
+        subtitle="Sub-partidas de sprints ya pasados que las obras en construcción aún no completan."
+      />
 
       {error && (
         <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">
@@ -184,7 +183,7 @@ export default function ReportePendientesPage() {
           ))}
         </div>
       )}
-    </main>
+    </PageShell>
   );
 }
 

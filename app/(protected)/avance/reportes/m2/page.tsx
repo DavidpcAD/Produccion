@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Select } from '@/components/ui/Input';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 import type { M2Partida, M2Reporte } from '@/lib/avance/reporte-m2';
@@ -67,13 +68,11 @@ export default function ReporteM2Page() {
     `Semana ${s.numero_semana}/${s.anio} · ${s.fecha_inicio} → ${s.fecha_fin}`;
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Reporte de m²</h1>
-        <p className="text-ds-gray-500">
-          m² producidos por partida y sub-partida (semana + acumulado), con matriz por obra.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Reporte de m²"
+        subtitle="m² producidos por partida y sub-partida (semana + acumulado), con matriz por obra."
+      />
 
       <div className="my-4 max-w-md">
         <Select
@@ -153,7 +152,7 @@ export default function ReporteM2Page() {
           )}
         </>
       )}
-    </main>
+    </PageShell>
   );
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Select } from '@/components/ui/Input';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 import type { HistoricoReporte } from '@/lib/avance/reporte-historico';
@@ -75,13 +76,11 @@ export default function ReporteHistoricoPage() {
   }
 
   return (
-    <main className="page mx-auto w-full max-w-[1400px] px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Histórico de avance</h1>
-        <p className="text-ds-gray-500">
-          Grilla sub-partida × obra al cierre de una semana. Las celdas resaltadas avanzaron esa semana.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Histórico de avance"
+        subtitle="Grilla sub-partida × obra al cierre de una semana. Las celdas resaltadas avanzaron esa semana."
+      />
 
       <div className="my-4 flex flex-wrap items-center gap-3">
         <div className="max-w-md flex-1">
@@ -171,6 +170,6 @@ export default function ReporteHistoricoPage() {
           </table>
         </div>
       )}
-    </main>
+    </PageShell>
   );
 }

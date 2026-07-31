@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
@@ -49,17 +50,12 @@ export default function CausasPage() {
   }
 
   return (
-    <main className="page mx-auto w-full max-w-5xl px-4 py-6">
-      <div className="mb-4 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-heading font-bold">Causas</h1>
-          <p className="text-ds-gray-500">
-            Motivos de no-cumplimiento (NC) e inactividad que el personal selecciona al registrar
-            avances.
-          </p>
-        </div>
-        <Button onClick={() => setEditar('nueva')}>+ Nueva causa</Button>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Causas"
+        subtitle="Motivos de no-cumplimiento (NC) e inactividad que el personal selecciona al registrar avances."
+        actions={<Button onClick={() => setEditar('nueva')}>+ Nueva causa</Button>}
+      />
 
       <Table<Causa>
         columns={[
@@ -148,7 +144,7 @@ export default function CausasPage() {
         danger
         loading={borrando}
       />
-    </main>
+    </PageShell>
   );
 }
 
