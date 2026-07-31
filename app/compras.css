@@ -154,7 +154,7 @@
 /* Tamaños (DS: sm = 44px, radius-xl, shadow-01) */
 .oc-scope .ds-btn--sm { min-height: 44px; padding: var(--ds-space-2) var(--ds-space-4); font-size: var(--ds-font-size-body-sm); border-radius: var(--ds-radius-xl); box-shadow: var(--ds-shadow-01); }
 .oc-scope .ds-btn--sm.ds-btn--outline { box-shadow: none; }
-.oc-scope .ds-btn--lg { min-height: 64px; padding: var(--ds-space-5) var(--ds-space-6); font-size: var(--ds-font-size-subtitle); }
+.oc-scope .ds-btn--lg { min-height: 48px; padding: var(--ds-space-3) var(--ds-space-6); font-size: var(--ds-font-size-body-md); }
 .oc-scope .ds-btn--block, .oc-scope .ds-btn--full { width: 100%; }
 /* Icon-only: cuadrado 40px (md) / círculo 36px (sm), alineado al alto de los
    botones de texto (40px) del ui/Button del resto del app. */
