@@ -64,13 +64,15 @@ export default function ManoObraPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-5 flex gap-2 border-b border-ds-gray-200">
+      <div role="tablist" aria-label="Secciones de mano de obra" className="mb-5 flex gap-2 border-b border-ds-gray-200">
         {(['nomina', 'horas', 'subcontratos'] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
+            role="tab"
+            aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition ${
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black ${
               tab === t ? 'border-black text-black' : 'border-transparent text-ds-gray-400 hover:text-black'
             }`}
           >

@@ -55,13 +55,15 @@ export default function ConfigConcretoPage() {
       />
 
       {/* Tabs simples con estado */}
-      <div className="flex items-center gap-1 border-b border-ds-gray-200">
+      <div role="tablist" aria-label="Secciones de configuración" className="flex items-center gap-1 border-b border-ds-gray-200">
         {TABS.map((t) => (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={
-              'px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition ' +
+              'px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black ' +
               (tab === t.id
                 ? 'border-brand text-black'
                 : 'border-transparent text-ds-gray-400 hover:text-black')
