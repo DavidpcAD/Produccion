@@ -25,7 +25,9 @@ export function PageShell({
   const max =
     width === 'full' ? '' : width === 'narrow' ? 'max-w-[1200px]' : 'max-w-[1600px]';
   return (
-    <div className={`p-6 space-y-5 ${max} mx-auto animate-fade-in ${className}`}>
+    // Padding responsive: 16px en móvil (alineado al topbar px-4, aprovecha el
+    // ancho en pantallas chicas) y 24px desde sm en adelante.
+    <div className={`p-4 sm:p-6 space-y-5 ${max} mx-auto animate-fade-in ${className}`}>
       {children}
     </div>
   );
