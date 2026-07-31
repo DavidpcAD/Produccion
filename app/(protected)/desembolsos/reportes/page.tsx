@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Input';
 import { DatePicker } from '@/components/ui/DatePicker';
@@ -111,13 +112,13 @@ export default function ReportesDesembolsosPage() {
   }
 
   return (
-    <main className="page mx-auto w-full max-w-4xl px-4 py-6">
-      <div className="mb-4">
-        <h1 className="text-heading font-bold">Reportes de desembolsos</h1>
-        <p className="text-ds-gray-500">Exportá a Excel la cartera, el flujo proyectado, la liquidación de lote y los movimientos.</p>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Reportes de desembolsos"
+        subtitle="Exportá a Excel la cartera, el flujo proyectado, la liquidación de lote y los movimientos."
+      />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <Select label="Proyecto" value={idProyecto} onChange={(e) => setIdProyecto(Number(e.target.value) || '')}
           options={proyectos.map((p) => ({ value: p.IDProyecto, label: p.AbreviaturaProyecto }))} placeholder="Todos" />
         <Select label="Banco" value={idBanco} onChange={(e) => setIdBanco(Number(e.target.value) || '')}
@@ -138,7 +139,7 @@ export default function ReportesDesembolsosPage() {
         <ReporteCard titulo="Movimientos" desc="Movimientos bancarios con vinculación en el rango (filtra por proyecto/banco)."
           loading={ocupado === 'movimientos'} onClick={() => run('movimientos', exportMovimientos)} />
       </div>
-    </main>
+    </PageShell>
   );
 }
 

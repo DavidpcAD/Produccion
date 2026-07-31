@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatCRC } from '@/lib/utilidades/format';
@@ -118,16 +119,13 @@ export default function MatrizPage() {
   const cp = data?.creditoPuente;
 
   return (
-    <main className="page mx-auto w-full max-w-7xl px-4 py-6">
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Matriz de desembolsos</h1>
-        <p className="text-ds-gray-500">
-          Cartera semanal banco × hito × semana. Cada hito se ubica en la semana de su fecha
-          proyectada de desembolso.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Matriz de desembolsos"
+        subtitle="Cartera semanal banco × hito × semana. Cada hito se ubica en la semana de su fecha proyectada de desembolso."
+      />
 
-      <div className="my-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="outline"
           size="sm"
@@ -244,7 +242,7 @@ export default function MatrizPage() {
           )}
         </div>
       ) : null}
-    </main>
+    </PageShell>
   );
 }
 

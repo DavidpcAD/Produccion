@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
@@ -68,13 +69,13 @@ export default function ValoracionPage() {
   ];
 
   return (
-    <main className="page mx-auto w-full max-w-5xl px-4 py-6">
-      <div className="mb-4">
-        <h1 className="text-heading font-bold">Valoración de lote</h1>
-        <p className="text-ds-gray-500">Valor por m² y % de financiamiento por banco, por proyecto.</p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Valoración de lote"
+        subtitle="Valor por m² y % de financiamiento por banco, por proyecto."
+      />
 
-      <div className="mb-4 max-w-md">
+      <div className="max-w-md">
         <Select label="Proyecto" value={idProyecto ?? ''} onChange={(e) => setIdProyecto(Number(e.target.value) || null)}
           options={proyectos.map((p) => ({ value: p.IDProyecto, label: `${p.AbreviaturaProyecto} · ${p.Nombre}` }))}
           placeholder={proyectos.length ? 'Elegí un proyecto…' : 'Cargando…'} />
@@ -87,7 +88,7 @@ export default function ValoracionPage() {
           idProyecto={idProyecto} banco={editar.banco} modo={editar.modo}
           onClose={() => setEditar(null)} onSaved={() => { setEditar(null); cargar(idProyecto); }} />
       )}
-    </main>
+    </PageShell>
   );
 }
 

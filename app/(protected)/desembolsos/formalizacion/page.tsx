@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
@@ -86,13 +87,13 @@ export default function FormalizacionPage() {
   ];
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-4">
-        <h1 className="text-heading font-bold">Formalización</h1>
-        <p className="text-ds-gray-500">Proyección de fecha de firma para casos reservados.</p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Formalización"
+        subtitle="Proyección de fecha de firma para casos reservados."
+      />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="w-72"><Input label="Buscar" placeholder="Cliente, lote, caso…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <label className="flex items-center gap-2 text-sm mb-3">
           <input type="checkbox" checked={soloSinProyectar} onChange={(e) => setSoloSinProyectar(e.target.checked)} />
@@ -110,7 +111,7 @@ export default function FormalizacionPage() {
           onSaved={() => { setEditando(null); cargar(); }}
         />
       )}
-    </main>
+    </PageShell>
   );
 }
 

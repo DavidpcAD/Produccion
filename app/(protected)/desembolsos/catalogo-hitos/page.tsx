@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -28,27 +29,22 @@ export default function CatalogoHitosPage() {
   useEffect(recargar, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <main className="page mx-auto w-full max-w-4xl px-4 py-6">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-heading font-bold">Catálogo de hitos</h1>
-          <p className="text-ds-gray-500">
-            Los hitos son los puntos del proceso contra los que un banco desembolsa. Cuando agregás
-            uno acá queda disponible para cualquier esquema de banco.
-          </p>
-        </div>
-        <Button onClick={() => setEditando('nuevo')}>+ Nuevo hito</Button>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Catálogo de hitos"
+        subtitle="Los hitos son los puntos del proceso contra los que un banco desembolsa. Cuando agregás uno acá queda disponible para cualquier esquema de banco."
+        actions={<Button onClick={() => setEditando('nuevo')}>+ Nuevo hito</Button>}
+      />
 
-      <div className="mt-4 overflow-x-auto rounded-ds border border-ds-gray-200">
+      <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
         <table className="w-full text-sm">
-          <thead className="bg-ds-gray-100 text-left">
-            <tr>
-              <th className="px-3 py-2 text-center">Orden</th>
-              <th className="px-3 py-2">Código</th>
-              <th className="px-3 py-2">Nombre</th>
-              <th className="px-3 py-2">Uso</th>
-              <th className="px-3 py-2" />
+          <thead>
+            <tr className="bg-ds-gray-100 border-b border-ds-gray-200">
+              <th className="px-4 py-3 text-center font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Orden</th>
+              <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Código</th>
+              <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Nombre</th>
+              <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Uso</th>
+              <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide" />
             </tr>
           </thead>
           <tbody>
@@ -93,7 +89,7 @@ export default function CatalogoHitosPage() {
           onGuardado={() => { setEditando(null); recargar(); }}
         />
       )}
-    </main>
+    </PageShell>
   );
 }
 

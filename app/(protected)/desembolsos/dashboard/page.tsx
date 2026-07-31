@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Input, Select } from '@/components/ui/Input';
 import { formatCRC } from '@/lib/utilidades/format';
 import type {
@@ -123,13 +124,17 @@ export default function DesembolsosDashboardPage() {
   );
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
+    <PageShell>
       <EstadoCuentaModal idCaso={casoModal} onClose={() => setCasoModal(null)} />
 
-      <div className="mb-2">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-ds-gray-400">Gerencia · Cartera ejecutiva</p>
-        <h1 className="text-heading font-bold">Flujo de Desembolsos</h1>
-      </div>
+      <PageHeader
+        title={
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-ds-gray-400">Gerencia · Cartera ejecutiva</p>
+            <h1 className="text-heading font-bold text-black">Flujo de Desembolsos</h1>
+          </div>
+        }
+      />
 
       {error && (
         <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">{error}</p>
@@ -310,7 +315,7 @@ export default function DesembolsosDashboardPage() {
           )}
         </table>
       </div>
-    </main>
+    </PageShell>
   );
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Input';
@@ -55,14 +56,11 @@ export default function EsquemasPage() {
   const sinEsquema = bancos.filter((b) => !b.EsquemaVigente);
 
   return (
-    <main className="page mx-auto w-full max-w-4xl px-4 py-6">
-      <div className="mb-4">
-        <h1 className="text-heading font-bold">Esquemas de desembolso</h1>
-        <p className="text-ds-gray-500">
-          Cada banco distribuye el desembolso por hito físico de la obra. Aplican a todos los
-          proyectos. Los días y el día fijo del perito alimentan las fechas proyectadas de la matriz.
-        </p>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Esquemas de desembolso"
+        subtitle="Cada banco distribuye el desembolso por hito físico de la obra. Aplican a todos los proyectos. Los días y el día fijo del perito alimentan las fechas proyectadas de la matriz."
+      />
 
       {cargando && <p className="text-ds-gray-400">Cargando bancos…</p>}
 
@@ -79,7 +77,7 @@ export default function EsquemasPage() {
         <PanelEsquema banco={sel} hitos={hitos} onClose={() => setSel(null)}
           onGuardado={() => { setSel(null); recargar(); }} />
       )}
-    </main>
+    </PageShell>
   );
 }
 

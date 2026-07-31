@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -38,16 +39,13 @@ export default function DistribucionPage() {
   useEffect(recargar, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <main className="page mx-auto w-full max-w-4xl px-4 py-6">
-      <div className="mb-4">
-        <h1 className="text-heading font-bold">Distribución por proyecto</h1>
-        <p className="text-ds-gray-500">
-          Reparto del precio interno del lote entre entidades. Las tarifas se versionan por fecha de
-          vigencia — cada cambio crea una nueva vigencia o edita la vigente.
-        </p>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Distribución por proyecto"
+        subtitle="Reparto del precio interno del lote entre entidades. Las tarifas se versionan por fecha de vigencia — cada cambio crea una nueva vigencia o edita la vigente."
+      />
 
-      <div className="mt-4 divide-y divide-ds-gray-100 rounded-ds border border-ds-gray-200 bg-white">
+      <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-gray-200 bg-white">
         {cargando && <p className="px-3 py-6 text-center text-ds-gray-400">Cargando proyectos…</p>}
         {!cargando && proyectos.length === 0 && (
           <p className="px-3 py-6 text-center text-ds-gray-400">Sin proyectos con ventas activas.</p>
@@ -102,7 +100,7 @@ export default function DistribucionPage() {
           onGuardado={() => { setSel(null); recargar(); }}
         />
       )}
-    </main>
+    </PageShell>
   );
 }
 

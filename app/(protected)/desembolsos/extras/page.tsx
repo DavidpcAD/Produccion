@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
@@ -98,16 +99,14 @@ export default function ExtrasPage() {
   ];
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h1 className="text-heading font-bold">Extras y descuentos</h1>
-          <p className="text-ds-gray-500">Ajustes al precio de venta por caso. Neto aprobado: {formatCRC(totalAprobadas)}</p>
-        </div>
-        <Button onClick={() => setCreando(true)}>Nueva extra</Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Extras y descuentos"
+        subtitle={`Ajustes al precio de venta por caso. Neto aprobado: ${formatCRC(totalAprobadas)}`}
+        actions={<Button onClick={() => setCreando(true)}>Nueva extra</Button>}
+      />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="w-56"><Input label="Buscar" placeholder="Descripción, cliente…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <Select label="Estado" value={fEstado} onChange={(e) => setFEstado(e.target.value as ExtraEstado | '')}
           options={[{ value: 'COTIZADA', label: 'Cotizada' }, { value: 'APROBADA', label: 'Aprobada' }, { value: 'RECHAZADA', label: 'Rechazada' }]} placeholder="Todos" />
@@ -122,7 +121,7 @@ export default function ExtrasPage() {
       {creando && <CrearExtraModal onClose={() => setCreando(false)} onSaved={() => { setCreando(false); cargar(); }} />}
       {editando && <EditarExtraModal extra={editando} onClose={() => setEditando(null)} onSaved={() => { setEditando(null); cargar(); }} />}
       {aprobando && <AprobarExtraModal extra={aprobando} onClose={() => setAprobando(null)} onSaved={() => { setAprobando(null); cargar(); }} />}
-    </main>
+    </PageShell>
   );
 }
 

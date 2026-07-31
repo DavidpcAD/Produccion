@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -82,7 +83,7 @@ export default function DesembolsosMovimientosPage() {
   const totalMonto = useMemo(() => movs.reduce((a, m) => a + m.MontoColones, 0), [movs]);
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
+    <PageShell>
       <EstadoCuentaModal idCaso={casoEstadoCuenta} onClose={() => setCasoEstadoCuenta(null)} />
       {casoDetalle != null && (
         <CasoDetalleModal
@@ -96,12 +97,10 @@ export default function DesembolsosMovimientosPage() {
         />
       )}
 
-      <div className="mb-2">
-        <h1 className="text-heading font-bold">Movimientos</h1>
-        <p className="text-ds-gray-500">
-          Movimientos de la cartera y su vinculación a hitos de desembolso. Consulta (máx. 500).
-        </p>
-      </div>
+      <PageHeader
+        title="Movimientos"
+        subtitle="Movimientos de la cartera y su vinculación a hitos de desembolso. Consulta (máx. 500)."
+      />
 
       {/* Filtros */}
       <div className="my-4 grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -198,7 +197,7 @@ export default function DesembolsosMovimientosPage() {
           </tbody>
         </table>
       </div>
-    </main>
+    </PageShell>
   );
 }
 

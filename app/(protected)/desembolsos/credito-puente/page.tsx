@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
@@ -175,19 +176,15 @@ export default function CreditoPuentePage() {
   }
 
   return (
-    <main className="page mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-heading font-bold">Crédito Puente</h1>
-          <p className="text-ds-gray-500">
-            Créditos puente con los bancos, cobertura por lotes y movimientos del crédito.
-          </p>
-        </div>
-        <Button onClick={abrirNuevo}>+ Nuevo crédito</Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Crédito Puente"
+        subtitle="Créditos puente con los bancos, cobertura por lotes y movimientos del crédito."
+        actions={<Button onClick={abrirNuevo}>+ Nuevo crédito</Button>}
+      />
 
       {/* Lista de créditos */}
-      <div className="mb-6">
+      <div>
         <Table<CreditoPuenteResumen>
           columns={[
             { key: 'Codigo', header: 'Código', render: (c) => c.Codigo ?? `#${c.IDCreditoPuente}` },
@@ -349,7 +346,7 @@ export default function CreditoPuentePage() {
           </div>
         </div>
       </Modal>
-    </main>
+    </PageShell>
   );
 }
 
