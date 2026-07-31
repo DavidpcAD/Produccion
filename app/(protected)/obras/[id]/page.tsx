@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { motion } from 'motion/react';
 import { springs } from '@/lib/springs';
 import { Badge } from '@/components/ui/Badge';
@@ -171,7 +172,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto space-y-4">
+      <div className="p-6 max-w-[1200px] mx-auto space-y-4">
         <Skeleton className="h-8 w-1/3" rounded="rounded-full" />
         <div className="bg-white rounded-ds-lg border border-ds-gray-200 p-6 space-y-3">
           <Skeleton className="h-4 w-1/2" rounded="rounded-full" />
@@ -183,10 +184,10 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
 
   if (!obra) {
     return (
-      <div className="p-6 max-w-4xl mx-auto animate-fade-in">
-        <button onClick={() => router.push('/obras')} className="flex items-center gap-2 text-ds-gray-400 hover:text-black transition-colors mb-4">
-          <Icon name="chevron-left" size="sm" color="currentColor" /> Volver a obras
-        </button>
+      <div className="p-6 max-w-[1200px] mx-auto animate-fade-in">
+        <Button variant="outline" size="sm" className="mb-4" onClick={() => router.push('/obras')} icon={<Icon name="chevron-left" size="sm" color="currentColor" />}>
+          Volver a obras
+        </Button>
         <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">
           No se encontró la obra.
         </div>
@@ -225,44 +226,41 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
   ];
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-5">
-      {/* Header card */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={springs.expanding}
-        className="rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01 p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+    <PageShell width="narrow">
+      <PageHeader
+        back={
           <button onClick={() => router.push('/obras')} aria-label="Volver a obras"
-            className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black shrink-0">
+            className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black shrink-0 mt-1">
             <Icon name="chevron-left" size="sm" color="currentColor" />
           </button>
-          <div className={`w-14 h-14 rounded-ds-lg flex items-center justify-center shrink-0 shadow-ds-02 ${estaBloqueada ? 'bg-ds-red' : 'bg-black'}`}>
-            <Icon name="place" size="md" color="currentColor" className={estaBloqueada ? 'text-white' : 'text-brand'} />
+        }
+        title={
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-heading font-bold text-black leading-none">{obra.numeroObra}</h1>
+            <EstadoObra estado={obra.estado} />
+            {obra.esBC && <Badge variant="gray">BC</Badge>}
+            {obra.esProcore && <Badge variant="gray">Procore</Badge>}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-heading font-bold text-black leading-none">{obra.numeroObra}</h1>
-              <EstadoObra estado={obra.estado} />
-              {obra.esBC && <Badge variant="gray">BC</Badge>}
-              {obra.esProcore && <Badge variant="gray">Procore</Badge>}
-            </div>
-            <p className="text-ds-gray-400 text-body-sm mt-1 truncate">
-              {obra.nombreMostrado || 'Sin nombre'}
-              {obra.proyectoNombre ? <span className="text-ds-gray-300"> · {obra.proyectoNombre}</span> : null}
-            </p>
-          </div>
-          {isAdmin && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Button variant={estaBloqueada ? 'primary' : 'danger'} loading={cambiandoEstado}
-                onClick={estaBloqueada ? desbloquear : abrirBloqueo}
-                icon={<Icon name={estaBloqueada ? 'check' : 'remove'} size="sm" color="currentColor" />}>
-                {estaBloqueada ? 'Desbloquear' : 'Bloquear'}
-              </Button>
-              <Button variant="outline" onClick={() => setEditOpen(true)} icon={<Icon name="edit" size="sm" color="currentColor" />}>
-                Editar
-              </Button>
-            </div>
-          )}
-        </div>
-      </motion.div>
+        }
+        subtitle={
+          <span className="truncate">
+            {obra.nombreMostrado || 'Sin nombre'}
+            {obra.proyectoNombre ? <span className="text-ds-gray-300"> · {obra.proyectoNombre}</span> : null}
+          </span>
+        }
+        actions={isAdmin && (
+          <>
+            <Button variant={estaBloqueada ? 'primary' : 'danger'} loading={cambiandoEstado}
+              onClick={estaBloqueada ? desbloquear : abrirBloqueo}
+              icon={<Icon name={estaBloqueada ? 'check' : 'remove'} size="sm" color="currentColor" />}>
+              {estaBloqueada ? 'Desbloquear' : 'Bloquear'}
+            </Button>
+            <Button variant="outline" onClick={() => setEditOpen(true)} icon={<Icon name="edit" size="sm" color="currentColor" />}>
+              Editar
+            </Button>
+          </>
+        )}
+      />
 
       <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start"
         initial="hidden" animate="show"
@@ -327,6 +325,6 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
           )}
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }

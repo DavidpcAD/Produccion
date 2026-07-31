@@ -12,6 +12,7 @@ import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton, SkeletonCards } from '@/components/ui/Skeleton';
 import { Stagger, StaggerItem, listStagger, listItem } from '@/components/ui/Motion';
 import { motion } from 'motion/react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 
 interface ObraLite { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null; }
 interface SubLite { idSubPartida: number; codigo: string; nombre: string; idPartida: number; partidaCodigo: string | null; partidaNombre: string | null; idProyecto?: number | null; }
@@ -576,20 +577,16 @@ export default function CuadrillasPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-heading font-bold text-black">Cuadrillas</h1>
-          <p className="text-ds-gray-400 text-body-sm">
-            {vista === 'cuadrillas' ? `${cuadrillas.length} cuadrillas activas` : `${partidasConEnc} de ${partidas.length} partida(s) con encargados`}
-          </p>
-        </div>
-        {isAdmin && vista === 'cuadrillas' && (
+    <PageShell>
+      <PageHeader
+        title="Cuadrillas"
+        subtitle={vista === 'cuadrillas' ? `${cuadrillas.length} cuadrillas activas` : `${partidasConEnc} de ${partidas.length} partida(s) con encargados`}
+        actions={isAdmin && vista === 'cuadrillas' && (
           <Button onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>
             Nueva cuadrilla
           </Button>
         )}
-      </div>
+      />
 
       {/* Toggle: Cuadrillas | Encargados por partida */}
       <div className="inline-flex gap-1 p-1 bg-ds-gray-100 rounded-full">
@@ -1076,6 +1073,6 @@ export default function CuadrillasPage() {
           );
         })()}
       </Modal>
-    </div>
+    </PageShell>
   );
 }

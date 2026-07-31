@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { Modal } from '@/components/ui/Modal';
@@ -261,18 +262,18 @@ export default function PresupuestoPage() {
   }
 
   if (mounted && session && !puede) {
-    return <div className="p-6 max-w-[1400px] mx-auto"><div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div></div>;
+    return <div className="p-6 max-w-[1200px] mx-auto"><div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div></div>;
   }
 
   const tipos = plantilla ? Object.keys(plantilla.porTipo).filter(t => (plantilla.porTipo[t] ?? []).length > 0) : [];
   const hayDatos = tipos.length > 0 || (descompuesto?.lineas.length ?? 0) > 0;
 
   return (
-    <div className="p-6 space-y-5 max-w-[1400px] mx-auto animate-fade-in">
-      <div>
-        <h1 className="text-heading font-bold text-black">Subir presupuesto</h1>
-        <p className="text-ds-gray-400 text-body-sm">Cargá los Excel de la obra (Plantilla y Descompuesto) y subílos a Business Central.</p>
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        title="Subir presupuesto"
+        subtitle="Cargá los Excel de la obra (Plantilla y Descompuesto) y subílos a Business Central."
+      />
 
       {/* Paso 1 — Obra + archivos */}
       <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
@@ -368,10 +369,15 @@ export default function PresupuestoPage() {
                 return (
                   <div>
                     <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-black">{TIPO_LABEL[activa] ?? activa}</strong> ({lineas.length} líneas)</p>
-                    <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-100 rounded-ds">
+                    <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-200 rounded-ds-lg">
                       <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-ds-gray-100 text-left text-ds-gray-500 text-xs">
-                          <tr><th className="py-1.5 px-3">Código</th><th className="py-1.5 px-3">Nivel</th><th className="py-1.5 px-3">Descripción</th><th className="py-1.5 px-3 text-right">Monto</th></tr>
+                        <thead className="sticky top-0 z-10">
+                          <tr className="bg-ds-gray-100 border-b border-ds-gray-200">
+                            <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Código</th>
+                            <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Nivel</th>
+                            <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Descripción</th>
+                            <th className="px-4 py-3 text-right font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Monto</th>
+                          </tr>
                         </thead>
                         <tbody>
                           {lineas.map((l, i) => (
@@ -404,10 +410,15 @@ export default function PresupuestoPage() {
           {vistaActiva === 'descompuesto' && descompuesto && (
             <div>
               <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-black">Descompuesto</strong> ({descompuesto.lineas.length} materiales)</p>
-              <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-100 rounded-ds">
+              <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-200 rounded-ds-lg">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-ds-gray-100 text-left text-ds-gray-500 text-xs">
-                    <tr><th className="py-1.5 px-3">Tarea</th><th className="py-1.5 px-3">Material</th><th className="py-1.5 px-3">Descripción</th><th className="py-1.5 px-3 text-right">Costo unit.</th></tr>
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-ds-gray-100 border-b border-ds-gray-200">
+                      <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Tarea</th>
+                      <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Material</th>
+                      <th className="px-4 py-3 text-left font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Descripción</th>
+                      <th className="px-4 py-3 text-right font-semibold text-ds-gray-500 text-xs uppercase tracking-wide">Costo unit.</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {descompuesto.lineas.map((l, i) => (
@@ -459,6 +470,6 @@ export default function PresupuestoPage() {
           <Input label="Nombre de la plantilla" value={nombrePlantilla} onChange={e => setNombrePlantilla(e.target.value)} placeholder="Ej. Casa tipo A — L15" maxLength={150} />
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -159,7 +160,7 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
   }
 
   if (loading || !cuadrilla) return (
-    <div className="p-6 max-w-3xl mx-auto animate-fade-in space-y-5">
+    <div className="p-6 max-w-[1200px] mx-auto animate-fade-in space-y-5">
       <div className="flex items-start gap-3">
         <Skeleton className="h-9 w-9 shrink-0" rounded="rounded-ds" />
         <div className="flex-1 space-y-2">
@@ -179,38 +180,41 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
   const barColor = pct > 80 ? 'bg-ds-red' : pct > 60 ? 'bg-ds-yellow' : 'bg-brand';
 
   return (
-    <div className="p-6 max-w-3xl mx-auto animate-fade-in space-y-5">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black mt-1 shrink-0">
-          <Icon name="chevron-left" size="md" color="currentColor" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-heading font-bold text-black">{cuadrilla.Nombre}</h1>
-          <p className="text-ds-gray-400 text-body-sm">{cuadrilla.Proyecto} · Encargado: {cuadrilla.Encargado}</p>
-          {(cuadrilla.SubPartidaCodigo || cuadrilla.TaskNoBC) && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {cuadrilla.PartidaCodigo && (
-                <Badge variant="gray">Partida: {cuadrilla.PartidaCodigo} · {cuadrilla.PartidaNombre}</Badge>
-              )}
-              <Badge variant="black">
-                Tarea BC: {cuadrilla.SubPartidaCodigo ?? cuadrilla.TaskNoBC}
-                {cuadrilla.SubPartidaNombre ? ` · ${cuadrilla.SubPartidaNombre}` : ''}
-              </Badge>
-            </div>
-          )}
-        </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2 shrink-0">
+    <PageShell width="narrow">
+      <PageHeader
+        back={
+          <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black mt-1 shrink-0">
+            <Icon name="chevron-left" size="md" color="currentColor" />
+          </button>
+        }
+        title={
+          <div className="min-w-0">
+            <h1 className="text-heading font-bold text-black">{cuadrilla.Nombre}</h1>
+            <p className="text-ds-gray-400 text-body-sm">{cuadrilla.Proyecto} · Encargado: {cuadrilla.Encargado}</p>
+            {(cuadrilla.SubPartidaCodigo || cuadrilla.TaskNoBC) && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {cuadrilla.PartidaCodigo && (
+                  <Badge variant="gray">Partida: {cuadrilla.PartidaCodigo} · {cuadrilla.PartidaNombre}</Badge>
+                )}
+                <Badge variant="black">
+                  Tarea BC: {cuadrilla.SubPartidaCodigo ?? cuadrilla.TaskNoBC}
+                  {cuadrilla.SubPartidaNombre ? ` · ${cuadrilla.SubPartidaNombre}` : ''}
+                </Badge>
+              </div>
+            )}
+          </div>
+        }
+        actions={isAdmin && (
+          <>
             <Button variant="outline" onClick={openEdit} icon={<Icon name="edit" size="sm" color="currentColor" />}>
               Editar
             </Button>
             <Button onClick={() => setModalOpen(true)} icon={<Icon name="user" size="sm" color="currentColor" />}>
               Agregar
             </Button>
-          </div>
+          </>
         )}
-      </div>
+      />
 
       {/* Capacity */}
       <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
@@ -339,6 +343,6 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
             value={edit.idSubPartida} onChange={v => setEdit(p => ({ ...p, idSubPartida: v }))} />
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -80,7 +81,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
   }
 
   if (loading || !proyecto) return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-[1200px] mx-auto">
       <Skeleton className="h-8 w-1/3 mb-4" rounded="rounded-full" />
       <div className="bg-white rounded-ds-lg border border-ds-gray-200 p-6">
         <Skeleton className="h-4 w-1/2" rounded="rounded-full" />
@@ -97,29 +98,32 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
   }, {} as Record<string, { desc: string; members: Asignacion[] }>);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto animate-fade-in space-y-5">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black mt-1 shrink-0">
-          <Icon name="chevron-left" size="sm" color="currentColor" />
-        </button>
-        <div className="flex-1 min-w-0">
+    <PageShell width="narrow">
+      <PageHeader
+        back={
+          <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black mt-1 shrink-0">
+            <Icon name="chevron-left" size="sm" color="currentColor" />
+          </button>
+        }
+        title={
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-heading font-bold text-black">{proyecto.Nombre}</h1>
             <Badge variant="gray">{proyecto.CodigoBC}</Badge>
             <Badge variant="green">{proyecto.Estado}</Badge>
           </div>
-          <p className="text-ds-gray-400 text-body-sm mt-0.5 flex items-center gap-1">
+        }
+        subtitle={
+          <span className="flex items-center gap-1">
             <Icon name="user" size="sm" color="currentColor" />
             {activos.length} personas asignadas
-          </p>
-        </div>
-        {session && session.nivelAdmin >= 2 && (
+          </span>
+        }
+        actions={session && session.nivelAdmin >= 2 && (
           <Button onClick={() => setModalOpen(true)} icon={<Icon name="user" size="sm" color="currentColor" />}>
             Asignar persona
           </Button>
         )}
-      </div>
+      />
 
       {Object.keys(byTask).length === 0 ? (
         <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-300">
@@ -188,6 +192,6 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
           <p className="text-xs text-ds-gray-400">Solo se pueden asignar colaboradores que tengan usuario de login.</p>
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }

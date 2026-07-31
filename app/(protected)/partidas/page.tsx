@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -227,19 +228,14 @@ export default function PartidasPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Partidas y subpartidas</h1>
-          <p className="text-ds-gray-400 text-body-sm">
-            {subpartidas.length} subpartidas en {partidas.length} partidas
-          </p>
-        </div>
-        {puede && (
+    <PageShell>
+      <PageHeader
+        title="Partidas y subpartidas"
+        subtitle={`${subpartidas.length} subpartidas en ${partidas.length} partidas`}
+        actions={puede && (
           <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
         )}
-      </div>
+      />
 
       {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-5">
@@ -434,6 +430,6 @@ export default function PartidasPage() {
           <Input label="Descripción (opcional)" value={subForm.descripcion} onChange={e => setSub('descripcion', e.target.value)} maxLength={50} />
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }
