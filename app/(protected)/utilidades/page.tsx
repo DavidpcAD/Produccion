@@ -6,6 +6,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ComentariosPanel } from './ComentariosPanel';
 import { formatCRC, abreviarCRC, formatPct, extraerBloque, etiquetaMes, MESES } from '@/lib/utilidades/format';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 
 // ─── Tipos de la respuesta del API ─────────────────────────────────────────
 interface Resumen {
@@ -192,30 +193,30 @@ export default function UtilidadesPage() {
   const mesesOpts = MESES.map((m, i) => ({ value: String(i + 1), label: m }));
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
+    <PageShell>
       {/* Header + selector de período */}
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Reporte de Utilidades</h1>
-          <p className="text-ds-gray-400 text-body-sm">{etiquetaMes(anio, mes)}</p>
-        </div>
-        <div className="flex items-end gap-3">
-          <Combobox
-            label="Mes"
-            value={String(mes)}
-            onChange={(v) => setMes(Number(v))}
-            options={mesesOpts}
-            placeholder="Mes"
-          />
-          <Combobox
-            label="Año"
-            value={String(anio)}
-            onChange={(v) => setAnio(Number(v))}
-            options={aniosOpts}
-            placeholder="Año"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Reporte de Utilidades"
+        subtitle={etiquetaMes(anio, mes)}
+        actions={
+          <>
+            <Combobox
+              label="Mes"
+              value={String(mes)}
+              onChange={(v) => setMes(Number(v))}
+              options={mesesOpts}
+              placeholder="Mes"
+            />
+            <Combobox
+              label="Año"
+              value={String(anio)}
+              onChange={(v) => setAnio(Number(v))}
+              options={aniosOpts}
+              placeholder="Año"
+            />
+          </>
+        }
+      />
 
       {/* Tabs — toggle pill compacto (consistente con el resto del app) */}
       <div className="inline-flex gap-1 p-1 bg-ds-gray-100 rounded-full">
@@ -341,6 +342,6 @@ export default function UtilidadesPage() {
           indirectos por obra, evolución mensual como gráfico, export PDF/Excel del reporte,
           envío del reporte (uti.envios_reporte), comentarios a nivel de celda (3ª capa),
           filtros por tipo/lote y selector de período por trimestre/año/rango. */}
-    </div>
+    </PageShell>
   );
 }

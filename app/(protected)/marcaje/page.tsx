@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 
 interface Zona { idZona: number; nombre: string; ubicacion: string | null; }
 type Estado = 'sin_dispositivos' | 'esperando_biometria' | 'redistribuyendo' | 'lista' | null;
@@ -107,14 +108,8 @@ export default function MarcajePage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div>
-        <h1 className="text-heading font-bold text-black">Marcaje</h1>
-        <p className="text-ds-gray-400 text-body-sm">
-          Agregá colaboradores al dispositivo de una zona. Al enrolarlos quedan dados de alta en todos
-          los relojes; luego deben pasar la cara/huella por cualquiera y el sistema la replica.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader title="Marcaje" subtitle="Agregá colaboradores al dispositivo de una zona. Al enrolarlos quedan dados de alta en todos los relojes; luego deben pasar la cara/huella por cualquiera y el sistema la replica." />
 
       <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -185,6 +180,6 @@ export default function MarcajePage() {
           </>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

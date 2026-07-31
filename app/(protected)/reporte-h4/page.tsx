@@ -15,6 +15,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 
 interface CierreKpis {
   diaCompleto: number;
@@ -161,29 +162,27 @@ export default function ReporteH4Page() {
   ];
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
+    <PageShell>
       {/* Encabezado */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-heading font-bold text-black">Reporte H4 · Cierre del Día</h1>
-          <p className="text-ds-gray-400 text-body-sm">
-            Resumen de la jornada y anomalías pendientes a resolver antes de cerrar el día y procesar a nómina.
-          </p>
-        </div>
-        <div className="flex items-end gap-3">
-          <div className="w-44">
-            <DatePicker label="Día" value={fecha} onChange={(v) => setFecha(v || hoyLocal())} />
-          </div>
-          <Button
-            variant="primary"
-            disabled={bloqueado}
-            onClick={cerrarDia}
-            icon={<Icon name="check" size="sm" color="currentColor" />}
-          >
-            {bloqueado ? `Cerrar Día (${nAnom})` : 'Cerrar Día'}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Reporte H4 · Cierre del Día"
+        subtitle="Resumen de la jornada y anomalías pendientes a resolver antes de cerrar el día y procesar a nómina."
+        actions={
+          <>
+            <div className="w-44">
+              <DatePicker label="Día" value={fecha} onChange={(v) => setFecha(v || hoyLocal())} />
+            </div>
+            <Button
+              variant="primary"
+              disabled={bloqueado}
+              onClick={cerrarDia}
+              icon={<Icon name="check" size="sm" color="currentColor" />}
+            >
+              {bloqueado ? `Cerrar Día (${nAnom})` : 'Cerrar Día'}
+            </Button>
+          </>
+        }
+      />
 
       {/* KPIs */}
       {loading ? (
@@ -249,7 +248,7 @@ export default function ReporteH4Page() {
           </div>
         )}
       </Modal>
-    </div>
+    </PageShell>
   );
 }
 

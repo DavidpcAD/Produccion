@@ -10,6 +10,7 @@ import { useSession } from '@/hooks/useSession';
 import { Button } from '@/components/ds/Button/Button';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { FormField } from '@/components/ds/Form/Form';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 
 interface AppRoles {
   idApp: number | null;
@@ -169,16 +170,12 @@ export default function CuentasPage() {
   ];
 
   return (
-    <div className="p-6 space-y-5 max-w-5xl mx-auto animate-fade-in">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Usuarios</h1>
-          <p className="text-ds-gray-400 text-body-sm">{cuentas.length} cuentas de login</p>
-        </div>
-        {isAdmin && (
-          <Button color="green" layout="icon-left" icon="plus" label="Nueva cuenta" onClick={openCreate} />
-        )}
-      </div>
+    <PageShell width="full" className="max-w-5xl">
+      <PageHeader
+        title="Usuarios"
+        subtitle={`${cuentas.length} cuentas de login`}
+        actions={isAdmin ? <Button color="green" layout="icon-left" icon="plus" label="Nueva cuenta" onClick={openCreate} /> : undefined}
+      />
 
       <DataTable
         columns={columns}
@@ -306,6 +303,6 @@ export default function CuentasPage() {
           )}
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }
