@@ -7,6 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Pills } from '../_components/Pills';
 import { ESTADO_COLADA, ESTADOS_COLADA } from '@/lib/concreto/estados';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { ColadaListadoItem, EstadoColada, PlantaListadoItem } from '@/lib/concreto/tipos';
 
 const col = createColumnHelper<ColadaListadoItem>();
@@ -129,13 +130,11 @@ export default function ColadasPage() {
   ];
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Coladas</h1>
-          <p className="text-ds-gray-400 text-body-sm">{coladas.length} coladas</p>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Coladas"
+        subtitle={`${coladas.length} coladas`}
+      />
 
       <div className="space-y-3">
         <Pills
@@ -167,6 +166,6 @@ export default function ColadasPage() {
         exportFilename="coladas"
         emptyMessage="Sin coladas"
       />
-    </div>
+    </PageShell>
   );
 }

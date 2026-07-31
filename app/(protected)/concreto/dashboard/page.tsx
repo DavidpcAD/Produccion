@@ -4,6 +4,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { Pills } from '../_components/Pills';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { KpisResponse, PlantaListadoItem } from '@/lib/concreto/tipos';
 
 function isoDaysAgo(n: number): string {
@@ -74,11 +75,11 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div>
-        <h1 className="text-heading font-bold text-black">Dashboard de Concreto</h1>
-        <p className="text-ds-gray-400 text-body-sm">Producción del periodo seleccionado</p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Dashboard de Concreto"
+        subtitle="Producción del periodo seleccionado"
+      />
 
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
@@ -132,6 +133,6 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

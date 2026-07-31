@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Pills } from '../_components/Pills';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { BatchDetallePlanta, PlantaListadoItem } from '@/lib/concreto/tipos';
 
 const col = createColumnHelper<BatchDetallePlanta>();
@@ -120,11 +121,11 @@ export default function BatchesPage() {
   ];
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div>
-        <h1 className="text-heading font-bold text-black">Batches</h1>
-        <p className="text-ds-gray-400 text-body-sm">{batches.length} batches · datos crudos de planta</p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Batches"
+        subtitle={`${batches.length} batches · datos crudos de planta`}
+      />
 
       <div className="space-y-3">
         <Pills
@@ -155,6 +156,6 @@ export default function BatchesPage() {
         exportFilename="batches"
         emptyMessage="Sin batches"
       />
-    </div>
+    </PageShell>
   );
 }
