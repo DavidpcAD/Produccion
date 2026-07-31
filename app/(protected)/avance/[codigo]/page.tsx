@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -170,9 +171,9 @@ export default function AvanceCapturaPage() {
   const arrastradasPendientes = (avance?.sub_partidas ?? []).filter((sp) => sp.arrastrada && !sp.completada).length;
 
   return (
-    <div className="p-6 space-y-5 max-w-[1100px] mx-auto animate-fade-in">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+    <PageShell width="full" className="max-w-[1100px]">
+      <PageHeader
+        back={
           <button
             type="button"
             onClick={() => router.push('/avance')}
@@ -180,19 +181,23 @@ export default function AvanceCapturaPage() {
           >
             <Icon name="back" size="sm" color="currentColor" /> Volver a obras
           </button>
-          <h1 className="text-heading font-bold text-black font-mono">{codigo}</h1>
-          {avance && (
-            <p className="text-ds-gray-400 text-body-sm">
+        }
+        title={<h1 className="text-heading font-bold text-black font-mono">{codigo}</h1>}
+        subtitle={
+          avance ? (
+            <>
               {avance.tipo_casa} · sprint {avance.sprint} · avance del sprint {avance.avance_sprint}%
-            </p>
-          )}
-        </div>
-        {arrastradasPendientes > 0 && (
-          <Button variant="outline" onClick={completarArrastradas} icon={<Icon name="check" size="sm" color="currentColor" />}>
-            Completar {arrastradasPendientes} arrastrada{arrastradasPendientes === 1 ? '' : 's'}
-          </Button>
-        )}
-      </div>
+            </>
+          ) : undefined
+        }
+        actions={
+          arrastradasPendientes > 0 ? (
+            <Button variant="outline" onClick={completarArrastradas} icon={<Icon name="check" size="sm" color="currentColor" />}>
+              Completar {arrastradasPendientes} arrastrada{arrastradasPendientes === 1 ? '' : 's'}
+            </Button>
+          ) : undefined
+        }
+      />
 
       {partidaFoco && (
         <div className="flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-body-sm">
@@ -339,7 +344,7 @@ export default function AvanceCapturaPage() {
           setNcDe(null);
         }}
       />
-    </div>
+    </PageShell>
   );
 }
 

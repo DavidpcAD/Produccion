@@ -5,6 +5,7 @@ import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { MatrizAvance } from './MatrizAvance';
 import { VENTA_META } from '@/lib/avance/venta';
 import type { EstadoVenta, ObraAvance, Proyecto } from '@/lib/avance/types';
@@ -87,18 +88,18 @@ export default function AvancePage() {
   }, [obrasFiltradas]);
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Avance de obra</h1>
-          <p className="text-ds-gray-400 text-body-sm">Elegí la obra donde vas a registrar avance.</p>
-        </div>
-        {/* Toggle Lista / Matriz */}
-        <div className="flex shrink-0 rounded-ds border border-ds-gray-200 bg-white p-0.5">
-          <ToggleBtn label="Vista de lista" activo={vista === 'lista'} onClick={() => setVista('lista')} icon="list" />
-          <ToggleBtn label="Vista de matriz" activo={vista === 'matriz'} onClick={() => setVista('matriz')} icon="options" />
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Avance de obra"
+        subtitle="Elegí la obra donde vas a registrar avance."
+        actions={
+          /* Toggle Lista / Matriz */
+          <div className="flex shrink-0 rounded-ds border border-ds-gray-200 bg-white p-0.5">
+            <ToggleBtn label="Vista de lista" activo={vista === 'lista'} onClick={() => setVista('lista')} icon="list" />
+            <ToggleBtn label="Vista de matriz" activo={vista === 'matriz'} onClick={() => setVista('matriz')} icon="options" />
+          </div>
+        }
+      />
 
       {/* Chips de proyecto */}
       <div className="-mx-1 overflow-x-auto px-1">
@@ -204,7 +205,7 @@ export default function AvancePage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
 

@@ -14,6 +14,7 @@ import {
   Plus,
   XCircle,
 } from '@phosphor-icons/react';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -296,9 +297,9 @@ export default function KanbanPage() {
   }, [sprints, obrasFiltradas]);
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+    <PageShell>
+      <PageHeader
+        back={
           <button
             type="button"
             onClick={() => router.push('/avance')}
@@ -306,15 +307,15 @@ export default function KanbanPage() {
           >
             <ArrowLeft size={16} weight="bold" /> Volver a obras
           </button>
-          <h1 className="text-heading font-bold text-black">Kanban de avance</h1>
-          <p className="text-body-sm text-ds-gray-400">
-            Tablero por sprint. Tocá una tarjeta para capturar avance o mover la obra.
-          </p>
-        </div>
-        <Button variant="outline" icon={<Plus size={16} weight="bold" />} onClick={() => setLoteOpen(true)}>
-          Habilitar lote
-        </Button>
-      </div>
+        }
+        title="Kanban de avance"
+        subtitle="Tablero por sprint. Tocá una tarjeta para capturar avance o mover la obra."
+        actions={
+          <Button variant="outline" icon={<Plus size={16} weight="bold" />} onClick={() => setLoteOpen(true)}>
+            Habilitar lote
+          </Button>
+        }
+      />
 
       {/* Chips de proyecto */}
       <div className="-mx-1 overflow-x-auto px-1">
@@ -488,7 +489,7 @@ export default function KanbanPage() {
         onClose={() => setLoteOpen(false)}
         onConfirmar={habilitarLote}
       />
-    </div>
+    </PageShell>
   );
 }
 
