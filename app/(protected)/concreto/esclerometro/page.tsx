@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/Modal';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { ANGULOS_IMPACTO } from '@/lib/concreto/tipos-esclerometro';
 import type {
   EnsayoEsclerometroListado,
@@ -151,18 +152,16 @@ export default function EsclerometroPage() {
   ];
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Esclerómetro</h1>
-          <p className="text-ds-gray-400 text-body-sm">
-            {ensayos.length} ensayos · martillo Schmidt (no destructivo)
-          </p>
-        </div>
-        <Button onClick={() => setModalNuevo(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
-          Nuevo ensayo
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Esclerómetro"
+        subtitle={`${ensayos.length} ensayos · martillo Schmidt (no destructivo)`}
+        actions={
+          <Button onClick={() => setModalNuevo(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
+            Nuevo ensayo
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Input
@@ -193,7 +192,7 @@ export default function EsclerometroPage() {
           router.push(`/concreto/esclerometro/${id}`);
         }}
       />
-    </div>
+    </PageShell>
   );
 }
 

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { ActividadLab, MuestraListadoItem } from '@/lib/concreto/tipos';
 import {
   CATEGORIAS_CONCRETO,
@@ -130,21 +131,21 @@ export default function LaboratorioPage() {
   ];
 
   return (
-    <div className="p-6 space-y-5 max-w-[1600px] mx-auto animate-fade-in">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-heading font-bold text-black">Laboratorio de Concreto</h1>
-          <p className="text-ds-gray-400 text-body-sm">{muestras.length} muestras</p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <Button variant="outline" onClick={() => setImportAbierto(true)} icon={<Icon name="list" size="sm" color="currentColor" />}>
-            Importar Excel
-          </Button>
-          <Button onClick={() => setCrearAbierto(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
-            Nueva muestra
-          </Button>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Laboratorio de Concreto"
+        subtitle={`${muestras.length} muestras`}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setImportAbierto(true)} icon={<Icon name="list" size="sm" color="currentColor" />}>
+              Importar Excel
+            </Button>
+            <Button onClick={() => setCrearAbierto(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
+              Nueva muestra
+            </Button>
+          </>
+        }
+      />
 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -186,7 +187,7 @@ export default function LaboratorioPage() {
       {importAbierto && (
         <ModalImportarExcel cerrar={() => setImportAbierto(false)} onImportado={() => load()} />
       )}
-    </div>
+    </PageShell>
   );
 }
 

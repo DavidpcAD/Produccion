@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { PageShell, PageHeader } from '@/components/layout/Page';
 import { useSession } from '@/hooks/useSession';
 import { ROLES_APP, type RolApp, type UsuarioConRoles } from '@/lib/concreto/tipos-deps';
 
@@ -91,21 +92,19 @@ export default function ConcretoUsuariosPage() {
 
   if (mounted && !esAdmin) {
     return (
-      <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
+      <PageShell>
         <h1 className="text-heading font-bold text-black">Gestión de usuarios</h1>
         <p className="mt-4 text-ds-gray-400 text-body-sm">Necesitás permisos de administrador para ver esta página.</p>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto animate-fade-in">
-      <header className="mb-6">
-        <h1 className="text-heading font-bold text-black">Gestión de roles — Concreto</h1>
-        <p className="mt-1 text-ds-gray-400 text-body-sm">
-          Asigná o quitá roles de la app (Admin, Operador, Laboratorio, Ingeniería) a usuarios del tenant.
-        </p>
-      </header>
+    <PageShell width="full" className="max-w-4xl">
+      <PageHeader
+        title="Gestión de roles — Concreto"
+        subtitle="Asigná o quitá roles de la app (Admin, Operador, Laboratorio, Ingeniería) a usuarios del tenant."
+      />
 
       <form
         className="flex gap-3 mb-6"
@@ -179,6 +178,6 @@ export default function ConcretoUsuariosPage() {
           );
         })}
       </ul>
-    </div>
+    </PageShell>
   );
 }
