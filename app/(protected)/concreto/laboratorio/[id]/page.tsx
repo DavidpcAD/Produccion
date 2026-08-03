@@ -35,7 +35,7 @@ function Dato({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
       <p className="text-xs font-semibold text-ds-gray-400">{label}</p>
-      <p className="text-sm font-semibold text-black">{value}</p>
+      <p className="text-sm font-semibold text-black break-words">{value}</p>
     </div>
   );
 }
