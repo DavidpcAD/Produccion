@@ -325,6 +325,10 @@
 .oc-scope .ds-select__chev { flex-shrink: 0; color: var(--ds-color-gray-400); transition: transform .15s ease; }
 .oc-scope .ds-select__trigger[aria-expanded="true"] .ds-select__chev { transform: rotate(180deg); }
 .oc-scope .ds-select__overlay { position: fixed; inset: 0; z-index: 29; }
+/* El menú del Select va inline (no en portal como el Combobox): hay que anclarlo
+   absolute bajo el trigger para que su z-index gane al overlay y se pueda hacer
+   scroll dentro (max-height + overflow-y ya vienen en .combo__menu). */
+.oc-scope .ds-select .combo__menu { position: absolute; top: calc(100% + 6px); left: 0; right: 0; }
 /* Fallback para cualquier <select> nativo que quede: flecha custom separada */
 .oc-scope .ds-form-field__select {
   appearance: none; -webkit-appearance: none; -moz-appearance: none;
