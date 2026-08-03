@@ -314,7 +314,7 @@ export default function ObrasPage() {
                 hint="Descripción principal del proyecto en BC" />
               <Input label="Descripción" value={String(form.descripcion)} onChange={e => set('descripcion', e.target.value)} />
               <label className="flex items-center gap-2 text-sm font-medium text-black cursor-pointer pt-1">
-                <input type="checkbox" checked={crearEnBC} onChange={e => setCrearEnBC(e.target.checked)} className="w-4 h-4 accent-brand" />
+                <input type="checkbox" checked={crearEnBC} onChange={e => setCrearEnBC(e.target.checked)} className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" />
                 Crear también en Business Central
               </label>
               {crearEnBC && dimOpts.AC.length === 0 && !dimLoading && (

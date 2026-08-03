@@ -422,7 +422,7 @@ export default function PartidasPage() {
             <Input label="Sprint (N°)" type="number" min={0} value={subForm.numSprint} onChange={e => setSub('numSprint', e.target.value)} />
             <div className="flex items-end pb-3">
               <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
-                <input type="checkbox" checked={subForm.esCritica} onChange={e => setSub('esCritica', e.target.checked)} className="w-4 h-4 accent-brand" />
+                <input type="checkbox" checked={subForm.esCritica} onChange={e => setSub('esCritica', e.target.checked)} className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" />
                 Es crítica
               </label>
             </div>
