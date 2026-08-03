@@ -133,7 +133,7 @@ export function AppShell({ role, children }: { role: Role; children: React.React
   // duplicar el del shell de la base. Solo una fila de tabs (sub-navegación del módulo)
   // con el estilo del Design System, y el contenido.
   return (
-    <div className="px-6 py-6 md:px-8">
+    <div className="px-4 py-6 sm:px-6 md:px-8">
       {hasNav && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {meta.nav.map((n) => {
