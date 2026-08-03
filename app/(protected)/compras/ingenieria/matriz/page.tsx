@@ -56,7 +56,7 @@ export default function MatrizPage() {
   useEffect(() => {
     if (!usuario) return;
     let vivo = true;
-    fetch(`/api/mi-etapa?username=${encodeURIComponent(usuario)}`)
+    fetch(`/api/compras/mi-etapa?username=${encodeURIComponent(usuario)}`)
       .then((r) => r.json()).then((d) => {
         if (!vivo) return;
         const ids: number[] = Array.isArray(d?.etapaIds) ? d.etapaIds : [];

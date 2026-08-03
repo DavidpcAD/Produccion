@@ -76,7 +76,7 @@ export default function PlantillasPage() {
 
   async function borrar(pl: Plantilla) {
     try {
-      const r = await fetch(`/api/plantillas/${pl.id}?usuario=${encodeURIComponent(usuario ?? "")}`, { method: "DELETE" });
+      const r = await fetch(`/api/compras/plantillas/${pl.id}?usuario=${encodeURIComponent(usuario ?? "")}`, { method: "DELETE" });
       if (!r.ok) throw new Error("No se pudo borrar");
       toast("Plantilla borrada", "success"); recargar();
     } catch (e: any) { toast(String(e?.message ?? e), "error"); }
@@ -219,7 +219,7 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, onClose, onSaved }: {
     try {
       const body = { nombre: nombre.trim(), tipo, idClasificacion: tipo === "bodega" ? null : (idClas ? Number(idClas) : null), lineas, creadoPor: usuario, usuario };
       const r = plantilla
-        ? await fetch(`/api/plantillas/${plantilla.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        ? await fetch(`/api/compras/plantillas/${plantilla.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
         : await fetch("/api/compras/plantillas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");

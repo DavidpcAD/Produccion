@@ -154,7 +154,7 @@ function ClasifModal({ wbs, inicial, onClose, onSaved }: { wbs: Wbs; inicial: Cl
     setGuardando(true);
     try {
       const payload = { nombre: nombre.trim(), partidaId: Number(partidaId) };
-      const r = await fetch(editing ? `/api/clasificaciones/${inicial!.id}` : "/api/compras/clasificaciones", {
+      const r = await fetch(editing ? `/api/compras/clasificaciones/${inicial!.id}` : "/api/compras/clasificaciones", {
         method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const d = await r.json().catch(() => ({}));
