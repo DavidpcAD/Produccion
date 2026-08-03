@@ -78,11 +78,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Chip de usuario */}
-          <div className="ml-auto flex items-center gap-2.5 rounded-full bg-black text-white pl-1.5 pr-4 py-1.5 shadow-ds-01">
+          <div className="ml-auto flex items-center gap-2.5 rounded-full bg-black text-white pl-1.5 pr-1.5 py-1.5 sm:pr-4 shadow-ds-01">
             <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-black text-body-sm font-bold shrink-0">
               {iniciales}
             </div>
-            <div className="leading-tight min-w-0">
+            <div className="leading-tight min-w-0 hidden sm:block">
               <p className="text-body-sm font-semibold truncate max-w-[180px]">{nombre}</p>
               <p className="text-[11px] text-white/50 truncate">{nivelLabel}</p>
             </div>
