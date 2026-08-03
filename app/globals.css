@@ -197,12 +197,12 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 46px;
+  height: 42px;
   padding: 0 14px;
   border-radius: 999px;
   color: rgba(255, 255, 255, 0.6);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   transition: background 120ms ease, color 120ms ease;
 }
@@ -210,6 +210,7 @@ body {
 .app-nav__item--active {
   background: var(--ds-color-brand, #ADD010);
   color: var(--ds-color-black, #000);
+  font-weight: 600;
   box-shadow: 0 4px 14px rgba(173, 208, 16, 0.28);
 }
 .app-nav__item--active:hover {
