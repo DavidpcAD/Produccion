@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Pills } from '../_components/Pills';
@@ -32,11 +33,13 @@ export default function BatchesPage() {
   const [batches, setBatches] = useState<BatchDetallePlanta[]>([]);
   const [plantas, setPlantas] = useState<PlantaListadoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [idPlanta, setIdPlanta] = useState('');
   const [soloAnomalias, setSoloAnomalias] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(false);
     const params = new URLSearchParams({ pagina: '1', por_pagina: '500' });
     if (idPlanta) params.set('id_planta', idPlanta);
     if (soloAnomalias) params.set('solo_anomalias', '1');
@@ -47,6 +50,7 @@ export default function BatchesPage() {
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Error cargando batches', 'error');
       setBatches([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -147,6 +151,13 @@ export default function BatchesPage() {
           ]}
         />
       </div>
+
+      {error && !loading && (
+        <div className="bg-white rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar los batches.</p>
+          <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
+        </div>
+      )}
 
       <DataTable
         columns={columns}
