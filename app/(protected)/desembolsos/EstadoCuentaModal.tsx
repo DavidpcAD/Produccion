@@ -227,7 +227,7 @@ function Dato({ label, valor }: { label: string; valor: string }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider text-ds-gray-400">{label}</p>
-      <p className="text-black">{valor}</p>
+      <p className="text-black break-words">{valor}</p>
     </div>
   );
 }
