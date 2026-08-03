@@ -37,12 +37,14 @@ export default function LaboratorioPage() {
   const [muestras, setMuestras] = useState<MuestraListadoItem[]>([]);
   const [actividades, setActividades] = useState<ActividadLab[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [idActividad, setIdActividad] = useState('');
   const [crearAbierto, setCrearAbierto] = useState(false);
   const [importAbierto, setImportAbierto] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(false);
     const params = new URLSearchParams({ pagina: '1', por_pagina: '500' });
     if (idActividad) params.set('id_actividad', idActividad);
     try {
@@ -52,6 +54,7 @@ export default function LaboratorioPage() {
     } catch {
       toast('Error cargando muestras', 'error');
       setMuestras([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -160,6 +163,13 @@ export default function LaboratorioPage() {
           placeholder="Todas"
         />
       </div>
+
+      {error && !loading && (
+        <div className="bg-white rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar las muestras.</p>
+          <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
+        </div>
+      )}
 
       <DataTable
         columns={columns}
