@@ -210,8 +210,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         .input('idObra', sql.BigInt, idObra)
         .query('INSERT INTO dbo.CuadrillaObra (IDCuadrilla, idObra) VALUES (@id, @idObra)');
     }
+    // Dedupe de pares (proyecto, subpartida): si el payload trae el mismo par
+    // repetido, el INSERT viola UQ_CuadrillaSubPartida. Colapsar duplicados
+    // exactos es seguro (no pierde datos distintos).
+    const vistosCS = new Set<string>();
     for (const b of bloques) {
       for (const idSub of b.idSubPartidas) {
+        const clave = `${b.idProyecto}:${idSub}`;
+        if (vistosCS.has(clave)) continue;
+        vistosCS.add(clave);
         await new sql.Request(tx)
           .input('id', sql.Int, idCuad)
           .input('idProyecto', sql.Int, b.idProyecto)
@@ -255,6 +262,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     try { await tx.rollback(); } catch { /* ya revertida */ }
+    const num = (err as { number?: number })?.number;
+    if (num === 2627 || num === 2601) {
+      console.error('/api/cuadrillas/[id] PUT unique violation:', err);
+      return NextResponse.json({ error: 'Una o más subpartidas ya están asignadas a otra cuadrilla en ese proyecto. Quitalas y volvé a intentar.' }, { status: 409 });
+    }
     const msg = err instanceof Error ? err.message : String(err);
     console.error('/api/cuadrillas/[id] PUT error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
