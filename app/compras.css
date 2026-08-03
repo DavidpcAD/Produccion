@@ -890,6 +890,7 @@
 .oc-scope .modal-overlay { position: fixed; inset: 0; background: #0006; display: grid; place-items: center; z-index: 80; padding: var(--ds-space-6); animation: fade .15s ease; }
 .oc-scope .modal { width: 100%; max-width: 560px; background: #fff; border-radius: var(--ds-radius-2xl); box-shadow: var(--ds-shadow-03-big); padding: var(--ds-space-6); max-height: 88vh; overflow: auto; }
 .oc-scope .modal--wide { max-width: 920px; }
+.oc-scope .modal--full { max-width: min(1200px, 96vw); max-height: 92vh; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
 @media (max-width: 760px) {

@@ -216,12 +216,12 @@ export function ProgressBar({
 }
 
 // ---------------------------------------------------------------- Modal
-export function Modal({ title, onClose, children, footer, wide }: {
-  title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean;
+export function Modal({ title, onClose, children, footer, wide, full }: {
+  title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; full?: boolean;
 }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className={`modal ${wide ? "modal--wide" : ""}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`modal ${full ? "modal--full" : wide ? "modal--wide" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="row row--between" style={{ marginBottom: 16 }}>
           <h3 className="ds-subtitle-lg">{title}</h3>
           <button className="modal-close" onClick={onClose} aria-label="Cerrar"><IconClose size={18} /></button>

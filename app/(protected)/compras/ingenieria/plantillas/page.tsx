@@ -228,7 +228,7 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, onClose, onSaved }: {
   }
 
   return (
-    <Modal title={plantilla ? "Editar plantilla" : "Nueva plantilla de pedido"} onClose={onClose}
+    <Modal title={plantilla ? "Editar plantilla" : "Nueva plantilla de pedido"} onClose={onClose} full
       footer={<><Button variant="outline" onClick={onClose}>Cancelar</Button><Button onClick={guardar} disabled={guardando || !nombre.trim() || (tipo === "general" && !idClas)}>{guardando ? "Guardando…" : "Guardar plantilla"}</Button></>}>
       {/* Tipo de plantilla: general (amarrada a clasificación) vs bodega (solo materiales) */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
