@@ -52,6 +52,7 @@ export default function EsclerometroPage() {
   const { toast } = useToast();
   const [ensayos, setEnsayos] = useState<EnsayoEsclerometroListado[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [obra, setObra] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
@@ -59,6 +60,7 @@ export default function EsclerometroPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(false);
     const params = new URLSearchParams({ pagina: '1', por_pagina: '100' });
     if (obra.trim()) params.set('obra_works_no', obra.trim());
     if (desde) params.set('desde', desde);
@@ -70,6 +72,7 @@ export default function EsclerometroPage() {
     } catch {
       toast('Error cargando ensayos', 'error');
       setEnsayos([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -173,6 +176,13 @@ export default function EsclerometroPage() {
         <DatePicker label="Desde" value={desde} onChange={setDesde} />
         <DatePicker label="Hasta" value={hasta} onChange={setHasta} />
       </div>
+
+      {error && !loading && (
+        <div className="bg-white rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar los ensayos.</p>
+          <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
+        </div>
+      )}
 
       <DataTable
         columns={columns}
