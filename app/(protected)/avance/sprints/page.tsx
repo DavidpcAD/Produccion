@@ -397,7 +397,7 @@ function SeccionSprints() {
                       checked={s.es_espera}
                       disabled={guardando === s.numero_global}
                       onChange={(e) => toggleEspera(s, e.target.checked)}
-                      className="h-4 w-4 accent-violet-500"
+                      className="h-4 w-4 accent-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
                     />
                   </td>
                 </tr>

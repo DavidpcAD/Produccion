@@ -248,6 +248,7 @@ function ModalCausa({
               type="checkbox"
               checked={aplicaNc}
               onChange={(e) => setAplicaNc(e.target.checked)}
+              className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             />
             Aplica a no-cumplimiento (NC)
           </label>
@@ -256,6 +257,7 @@ function ModalCausa({
               type="checkbox"
               checked={aplicaInact}
               onChange={(e) => setAplicaInact(e.target.checked)}
+              className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             />
             Aplica a inactividad de obra
           </label>
@@ -265,6 +267,7 @@ function ModalCausa({
                 type="checkbox"
                 checked={activo}
                 onChange={(e) => setActivo(e.target.checked)}
+                className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
               />
               Activa
             </label>

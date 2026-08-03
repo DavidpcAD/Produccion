@@ -494,6 +494,7 @@ function SubPartidaModal({ partidas, editandoId, onClose, onGuardado }: ModalPro
                     type="checkbox"
                     checked={form.tipos_casa.has(tc)}
                     onChange={() => toggleTipoCasa(tc)}
+                    className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
                   />
                   <span className="font-mono">{tc}</span>
                 </label>
@@ -525,6 +526,7 @@ function SubPartidaModal({ partidas, editandoId, onClose, onGuardado }: ModalPro
                 type="checkbox"
                 checked={form.es_critica}
                 onChange={(e) => setForm({ ...form, es_critica: e.target.checked })}
+                className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
               />
             </label>
             <label className="flex cursor-pointer items-center justify-between gap-3">
@@ -538,6 +540,7 @@ function SubPartidaModal({ partidas, editandoId, onClose, onGuardado }: ModalPro
                 type="checkbox"
                 checked={form.activo}
                 onChange={(e) => setForm({ ...form, activo: e.target.checked })}
+                className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
               />
             </label>
           </div>
