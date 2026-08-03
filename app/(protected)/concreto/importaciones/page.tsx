@@ -212,7 +212,7 @@ export default function ImportacionesPage() {
           />
 
           {archivo && (
-            <p className="text-sm text-black">
+            <p className="text-sm text-black text-center break-all">
               Seleccionado: <span className="font-mono">{archivo.name}</span>{' '}
               <span className="text-ds-gray-400">({Math.round(archivo.size / 1024)} KB)</span>
             </p>
