@@ -190,7 +190,7 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
           al colapsar): si se cambiara a flex-col, el texto que aún se está
           desmontando se apila bajo el logo, agranda el alto del header y empuja los
           íconos del nav hacia abajo hasta que termina la salida (el "salto" feo). */}
-      <div className={`shrink-0 px-4 py-5 flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
+      <div className={`shrink-0 px-4 py-5 flex items-center gap-3 border-b border-white/[0.06] ${collapsed ? 'justify-center' : ''}`}>
         <div className="w-9 h-9 rounded-ds-lg bg-brand flex items-center justify-center shrink-0 shadow-ds-02 text-black">
           <AdelanteMark className="w-5 h-auto" />
         </div>
@@ -204,7 +204,7 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
               transition={{ duration: 0.18, ease: 'easeOut' }}
             >
               <p className="text-white font-bold text-sm leading-tight whitespace-nowrap">Adelante</p>
-              <p className="text-white/40 text-xs whitespace-nowrap">Desarrollos</p>
+              <p className="text-white/50 text-xs whitespace-nowrap">Desarrollos</p>
             </motion.div>
           )}
         </AnimatePresence>
