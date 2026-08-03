@@ -26,7 +26,7 @@ function fmtDiaCorto(iso: string): string {
 function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="bg-white rounded-ds-lg shadow-ds-01 p-5 border border-ds-gray-200">
-      <p className="text-ds-gray-400 text-body-sm">{label}</p>
+      <p className="text-ds-gray-400 text-body-sm leading-tight min-h-[2.4em]">{label}</p>
       <p className="text-heading font-bold text-black mt-1 tabular-nums">{value}</p>
       {sub && <p className="text-ds-gray-400 text-xs mt-0.5">{sub}</p>}
     </div>
