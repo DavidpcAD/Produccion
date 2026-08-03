@@ -449,7 +449,7 @@ function TabUmbrales({ puede }: { puede: boolean }) {
               type="checkbox"
               checked={form.activo}
               onChange={(e) => setForm((p) => ({ ...p, activo: e.target.checked }))}
-              className="w-4 h-4 accent-brand"
+              className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             />
             Activo
           </label>
@@ -699,7 +699,7 @@ function TabDensidades({ puede }: { puede: boolean }) {
                 type="checkbox"
                 checked={form.activo}
                 onChange={(e) => set('activo', e.target.checked)}
-                className="w-4 h-4 accent-brand"
+                className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
               />
               Activo
             </label>

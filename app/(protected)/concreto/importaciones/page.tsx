@@ -228,7 +228,7 @@ export default function ImportacionesPage() {
           </div>
 
           <label className="flex items-center gap-2 text-xs text-ds-gray-500 cursor-pointer select-none">
-            <input type="checkbox" checked={forzar} onChange={(e) => setForzar(e.target.checked)} />
+            <input type="checkbox" checked={forzar} onChange={(e) => setForzar(e.target.checked)} className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" />
             Forzar reingesta (ignorar dedup por hash de archivo)
           </label>
         </div>
