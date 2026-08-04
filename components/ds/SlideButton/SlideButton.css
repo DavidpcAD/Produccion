@@ -1,0 +1,124 @@
+/* SlideButton — Figma node 997-3096.
+ * 282×80. Knob 80×80 (chevron-right). Track 282×80 (clip-path reveals
+ * from knob's right edge to trailing). Solo tokens var(--ds-*). */
+
+.ds-slide {
+  position: relative;
+  display: inline-block;
+}
+
+.ds-slide--disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Black track — full bounds of the component. The visible region is clipped
+ * via clip-path inset() driven by the knob's x, so the left edge of the
+ * black bar tracks the knob exactly. */
+.ds-slide__track {
+  position: absolute;
+  inset: 0;
+  background: var(--ds-color-black);
+  border-radius: var(--ds-radius-lg);
+  pointer-events: none;
+}
+
+/* Label centered horizontally over the visible track portion (we offset by
+ * the knob's width so the text sits to the RIGHT of the knob's rest position). */
+.ds-slide__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-white);
+  font-family: var(--ds-font-family);
+  font-size: var(--ds-font-size-body-md);
+  line-height: var(--ds-line-height-body-md);
+  font-weight: var(--ds-font-weight-semibold);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Confirm overlay — covers the component on success. */
+.ds-slide__confirm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-2);
+  background: var(--ds-color-green-100);
+  color: var(--ds-color-black);
+  font-family: var(--ds-font-family);
+  font-size: var(--ds-font-size-body-md);
+  line-height: var(--ds-line-height-body-md);
+  font-weight: var(--ds-font-weight-semibold);
+  border-radius: var(--ds-radius-lg);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Knob — 80×80 squircle with right-chevron. Translates via motion `x`. */
+.ds-slide__knob {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  border: 0;
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-color-green-100);
+  color: var(--ds-color-black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  box-shadow: var(--ds-shadow-03-big);
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  font-family: inherit;
+}
+
+.ds-slide__knob[data-dragging="true"] {
+  cursor: grabbing;
+}
+
+.ds-slide__knob:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Halo — outer stroke ring in green-200, fades in on press.
+ * Drawn OUTSIDE the knob's bounds via negative inset, no layout shift. */
+.ds-slide__halo {
+  position: absolute;
+  inset: -4px;
+  border: 8px solid var(--ds-color-green-200);
+  border-radius: calc(var(--ds-radius-lg) + 4px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease-out 120ms;
+  will-change: opacity;
+  transform: translateZ(0);
+}
+
+.ds-slide__knob:active .ds-slide__halo,
+.ds-slide__knob[data-dragging="true"] .ds-slide__halo {
+  opacity: 1;
+  transition: opacity 80ms ease-out 0ms;
+}
+
+/* mode: eliminar — overlay de confirmación en rojo */
+.ds-slide--eliminar .ds-slide__confirm { background: var(--ds-color-red-100); }
+
+/* mode: eliminar — knob rojo, halo rojo claro */
+.ds-slide--eliminar .ds-slide__knob                          { background: var(--ds-color-red-100); }
+.ds-slide--eliminar .ds-slide__knob:active,
+.ds-slide--eliminar .ds-slide__knob[data-dragging="true"]    { background: var(--ds-color-red-200); }
+.ds-slide--eliminar .ds-slide__halo                          { border-color: var(--ds-color-red-100); }
+.ds-slide--pressed.ds-slide--eliminar .ds-slide__knob        { background: var(--ds-color-red-200); }
+
+/* state: pressed — halo visible sin interacción (Storybook) */
+.ds-slide--pressed .ds-slide__halo   { opacity: 1; transition: none; }

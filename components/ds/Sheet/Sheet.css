@@ -1,0 +1,123 @@
+/* ============================================================
+   Sheet (ds-sheet) — FAB → bottom-sheet morph + drag-to-dismiss
+   + scroll-to-fullscreen. Behavior contract: ~/Desktop/SHEET_MORPH.md
+   ============================================================ */
+
+/* Scrim — sits above page content, below the sheet. */
+.ds-sheet__scrim {
+  position:   fixed;
+  inset:      0;
+  z-index:    40;
+  cursor:     default;
+  background: var(--ds-color-black-100);
+  border:     none;
+  padding:    0;
+}
+
+/* The morphing surface. Position + size driven by motion variants. */
+.ds-sheet {
+  position:   fixed;
+  z-index:    50;
+  overflow:   hidden;
+  box-shadow: var(--ds-shadow-03-big);
+  margin:     0 auto;
+}
+
+/* Inner content wrapper when open — fills the surface, flex column. */
+.ds-sheet__content {
+  display:        flex;
+  flex-direction: column;
+  width:          100%;
+  height:         100%;
+}
+
+/* Drag-handle close button — chevron-down icon centered at top. */
+.ds-sheet__handle {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  flex-shrink:     0;
+  padding-top:     var(--ds-space-3);
+  padding-bottom:  4px;
+}
+
+.ds-sheet__handle-btn {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  width:           56px;
+  height:          28px;
+  border:          none;
+  background:      transparent;
+  cursor:          pointer;
+  border-radius:   20px;
+}
+
+/* Scrollable body — the only scroll surface inside the sheet. */
+.ds-sheet__body {
+  flex:       1;
+  overflow-y: auto;
+  padding:    0 var(--ds-space-6) var(--ds-space-6);
+}
+
+/* Title row (built by SheetHeader slot when icon/title props are given). */
+.ds-sheet__title-row {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             var(--ds-space-3);
+  padding:         var(--ds-space-2) 0 var(--ds-space-6);
+}
+
+.ds-sheet__avatar {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  width:           48px;
+  height:          48px;
+  border-radius:   50%;
+  background:      var(--ds-color-gray-100);
+  color:           var(--ds-color-gray-500);
+}
+
+.ds-sheet__title {
+  margin:         0;
+  font-size:      var(--ds-font-size-subtitle-lg);
+  font-weight:    var(--ds-font-weight-semibold);
+  letter-spacing: var(--ds-letter-spacing-wide);
+  text-transform: uppercase;
+  color:          var(--ds-color-black);
+}
+
+/* Body pane (SheetBody slot) — children stacked vertically. */
+.ds-sheet__pane {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--ds-space-4);
+}
+
+/* Footer — pinned at the bottom of the sheet, OUTSIDE the scroll body.
+   Keeps action CTAs (SlideArm, primary button) visible regardless of
+   how long the form scrolls. */
+.ds-sheet__footer {
+  flex-shrink: 0;
+  padding:     var(--ds-space-3) var(--ds-space-6) var(--ds-space-6);
+  background:  var(--ds-color-white);
+  border-top:  1px solid var(--ds-color-gray-100);
+  box-shadow:  0 -8px 16px rgba(0, 0, 0, 0.04);
+}
+
+/* FAB surface when closed — fills the small morph rect. The
+   background color is set inline by the Sheet motion variants (not
+   in CSS) so consumers can override it via the `fab.background` prop. */
+.ds-sheet__fab {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           100%;
+  height:          100%;
+  border:          none;
+  background:      transparent;
+  color:           currentColor;
+  cursor:          pointer;
+}

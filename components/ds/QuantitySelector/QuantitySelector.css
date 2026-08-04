@@ -1,0 +1,180 @@
+/* QuantitySelector — mirror del Figma quantitySelector. Solo tokens var(--ds-*).
+ *
+ * Estructura: 3 capas posicionadas absolute dentro del wrapper:
+ *   __outer = disco gray-200 (background "vacío")
+ *   __ring  = border colorido por variant — overlay sobre el outer (clip para half-ring)
+ *   __inner = círculo negro centrado, contiene el número
+ */
+
+.ds-qty-selector {
+  position: relative;
+  flex-shrink: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.ds-qty-selector {
+  cursor: pointer;
+}
+
+.ds-qty-selector:focus-visible {
+  outline: 2px solid var(--ds-color-yellow);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* ============================================================
+ * Sizes — mirror del Figma 49x49 (sm). md/lg escalan proporcionalmente.
+ * ============================================================ */
+
+.ds-qty-selector--sm { width: 49px; height: 49px; }
+.ds-qty-selector--md { width: 64px; height: 64px; }
+.ds-qty-selector--lg { width: 96px; height: 96px; }
+
+/* ============================================================
+ * Layer 1 — Outer disk (gray-200 background)
+ * ============================================================ */
+
+.ds-qty-selector__outer {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--ds-color-gray-200);
+  /* Drop shadow base — box-shadow en el __outer (que ya es border-radius: 50%)
+     en lugar de `filter: drop-shadow` en el wrapper, porque WebKit a veces
+     proyecta la sombra cuadrada en lugar de seguir el alpha circular. */
+  box-shadow:
+    0 0 3px rgba(0, 0, 0, 0.16),
+    0 2px 2px rgba(0, 0, 0, 0.16);
+}
+
+/* ============================================================
+ * Layer 2 — Ring overlay (colored border per variant)
+ * ============================================================ */
+
+/* Ring fills el espacio completo entre outer (49) y inner (35) = 7px de anillo
+   en sm, escala proporcional en md/lg. box-sizing: border-box para que el border
+   no expanda el tamaño del elemento. */
+.ds-qty-selector__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 7px solid transparent;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.ds-qty-selector--md .ds-qty-selector__ring {
+  border-width: 9px;
+}
+
+.ds-qty-selector--lg .ds-qty-selector__ring {
+  border-width: 13px;
+}
+
+/* CSS var --pill-color por variant — usado por el ring interior y el outer halo del pressed.
+   Pendiente no tiene color "intrínseco" (cae a gray-300 para que el halo de pressed sea visible). */
+.ds-qty-selector--pendiente { --pill-color: var(--ds-color-gray-300); }
+.ds-qty-selector--incompleto { --pill-color: var(--ds-color-yellow); }
+.ds-qty-selector--completo { --pill-color: var(--ds-color-green-100); }
+.ds-qty-selector--sin-stock { --pill-color: var(--ds-color-red-100); }
+
+/* Variant: pendiente → sin anillo (transparente, default) */
+
+/* Variant: incompleto → anillo amarillo, mitad derecha (clip-path).
+   Replica el SVG ellipse39 del Figma posicionado en x>=50%. */
+.ds-qty-selector--incompleto .ds-qty-selector__ring {
+  border-color: var(--pill-color);
+  clip-path: inset(0 0 0 50%);
+}
+
+/* Variant: completo → anillo verde completo */
+.ds-qty-selector--completo .ds-qty-selector__ring {
+  border-color: var(--pill-color);
+}
+
+/* Variant: sin-stock → anillo rojo completo */
+.ds-qty-selector--sin-stock .ds-qty-selector__ring {
+  border-color: var(--pill-color);
+}
+
+/* ============================================================
+ * Layer 3 — Inner black circle con el número
+ * ============================================================ */
+
+/* Inner se alinea exacto con el inside-edge del ring (inset = grosor del anillo).
+   sm: 7px → inner 35x35; md: 9px → inner 46x46; lg: 13px → inner 70x70.
+   Transition para que el grow del pressed sea suave. */
+.ds-qty-selector__inner {
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
+  background: var(--ds-color-black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  transition: inset 120ms ease;
+}
+
+.ds-qty-selector--md .ds-qty-selector__inner {
+  inset: 9px;
+}
+
+.ds-qty-selector--lg .ds-qty-selector__inner {
+  inset: 13px;
+}
+
+/* ============================================================
+ * Value — número centrado en el inner negro
+ * ============================================================ */
+
+.ds-qty-selector__value {
+  position: relative;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: var(--ds-font-weight-semibold);
+  letter-spacing: 0.4px;
+  color: var(--ds-color-white);
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-qty-selector--md .ds-qty-selector__value {
+  font-size: 22px;
+  letter-spacing: var(--ds-letter-spacing-wide);
+}
+
+.ds-qty-selector--lg .ds-qty-selector__value {
+  font-size: 32px;
+  letter-spacing: var(--ds-letter-spacing-wide);
+}
+
+/* ============================================================
+ * Pressed mode — mirror del Figma:
+ *   El círculo INTERIOR negro crece (sm: 35→37, md: 46→48, lg: 70→72)
+ *   reduciendo el inset 1px de cada lado. El ring de color queda detrás.
+ *   El drop-shadow base ya está en `.ds-qty-selector` (aplica a standard también).
+ * Se aplica explícitamente con prop mode="pressed", o automáticamente al
+ * :active cuando es interactivo (button.ds-qty-selector).
+ * ============================================================ */
+
+.ds-qty-selector--pressed .ds-qty-selector__inner,
+button.ds-qty-selector:not(:disabled):active .ds-qty-selector__inner {
+  inset: 6px;
+}
+
+.ds-qty-selector--md.ds-qty-selector--pressed .ds-qty-selector__inner,
+button.ds-qty-selector.ds-qty-selector--md:not(:disabled):active .ds-qty-selector__inner {
+  inset: 8px;
+}
+
+.ds-qty-selector--lg.ds-qty-selector--pressed .ds-qty-selector__inner,
+button.ds-qty-selector.ds-qty-selector--lg:not(:disabled):active .ds-qty-selector__inner {
+  inset: 12px;
+}
+
