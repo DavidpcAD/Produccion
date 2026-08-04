@@ -15,8 +15,8 @@ import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 export type { SemanaOperativa };
 
 /**
- * Sprint del catálogo global (obc.sprints_catalogo) con el nº de sub-partidas
- * críticas que participan en él (obc.sub_partidas activas).
+ * Sprint del catálogo global (pro_obc.sprints_catalogo) con el nº de sub-partidas
+ * críticas que participan en él (pro_obc.sub_partidas activas).
  */
 export interface SprintCatalogoDetalle {
   id: number;
@@ -31,7 +31,7 @@ export interface SprintCatalogoDetalle {
 }
 
 /**
- * Semana operativa con estado/config (obc.semanas_operativas). Extiende la
+ * Semana operativa con estado/config (pro_obc.semanas_operativas). Extiende la
  * SemanaOperativa base (usada por Mano de Obra) con los campos de gestión.
  */
 export interface SemanaOperativaDetalle extends SemanaOperativa {

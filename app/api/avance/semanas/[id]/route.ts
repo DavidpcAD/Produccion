@@ -52,7 +52,7 @@ export async function PATCH(
     }
 
     const r = await req2.query<SemanaOperativaDetalle>(`
-      UPDATE obc.semanas_operativas SET ${sets.join(', ')}
+      UPDATE pro_obc.semanas_operativas SET ${sets.join(', ')}
       OUTPUT INSERTED.id, INSERTED.anio, INSERTED.numero_semana,
              CONVERT(varchar(10), INSERTED.fecha_inicio, 23) AS fecha_inicio,
              CONVERT(varchar(10), INSERTED.fecha_fin, 23) AS fecha_fin,

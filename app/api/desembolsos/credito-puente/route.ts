@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  *   GET  /api/desembolsos/credito-puente?idBan=&estado=  → lista + catálogo de bancos
  *   POST /api/desembolsos/credito-puente                 → crea uno (devuelve id)
  *
- * Lectura: vista `app.vw_credito_puente_resumen` (idéntica al fuente).
+ * Lectura: vista `pro_app.vw_credito_puente_resumen` (idéntica al fuente).
  * Escritura: INSERT directo (la base de Producción no tiene el SP
  * `sp_actualizar_credito_puente`).
  */
@@ -53,14 +53,14 @@ export async function GET(req: NextRequest) {
 
     const r = await request.query<Record<string, unknown>>(`
       SELECT *
-      FROM [app].vw_credito_puente_resumen
+      FROM [pro_app].vw_credito_puente_resumen
       WHERE ${conds.join(' AND ')}
       ORDER BY FechaCreacion DESC, IDCreditoPuente DESC
     `);
 
     const bancosRes = await db.request().query<BancoOpcion>(`
       SELECT IDBan, Abreviatura, NombreEntidad, ColorHEXBan
-      FROM dbo.Bancos
+      FROM pro_ventas.Bancos
       WHERE Activo = 1
       ORDER BY Abreviatura
     `);
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       .input('Notas', sql.NVarChar(sql.MAX), notas)
       .input('Usuario', sql.NVarChar(400), usuario)
       .query<{ IDCreditoPuente: number }>(`
-        INSERT INTO [app].credito_puente
+        INSERT INTO [pro_app].credito_puente
           (IDBan, Codigo, MontoTotal_CRC, GastosFormalizacion_CRC, TasaAnual,
            FechaAprobacion, FechaVencimiento, Estado, Notas, CreadoPor, FechaCreacion)
         OUTPUT INSERTED.IDCreditoPuente

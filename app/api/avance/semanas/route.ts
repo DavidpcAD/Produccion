@@ -5,7 +5,7 @@ import type { SemanaOperativaDetalle } from '@/lib/avance/sprints';
 
 export const dynamic = 'force-dynamic';
 
-/** Columnas devueltas de obc.semanas_operativas (fechas como YYYY-MM-DD). */
+/** Columnas devueltas de pro_obc.semanas_operativas (fechas como YYYY-MM-DD). */
 const SELECT_SEMANA = `
   id, anio, numero_semana,
   CONVERT(varchar(10), fecha_inicio, 23) AS fecha_inicio,
@@ -13,7 +13,7 @@ const SELECT_SEMANA = `
   estado, descripcion, dias_efectivos
 `;
 
-/** GET /api/avance/semanas → semanas operativas (obc.semanas_operativas), recientes primero. */
+/** GET /api/avance/semanas → semanas operativas (pro_obc.semanas_operativas), recientes primero. */
 export async function GET() {
   const session = await getSession();
   if (!session || session.nivelAdmin < 1) {
@@ -23,7 +23,7 @@ export async function GET() {
     const db = await getAdelanteDb();
     const r = await db.request().query<SemanaOperativaDetalle>(`
       SELECT ${SELECT_SEMANA}
-      FROM obc.semanas_operativas
+      FROM pro_obc.semanas_operativas
       ORDER BY fecha_inicio DESC, id DESC
     `);
     return NextResponse.json({ semanas: r.recordset });
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const abierta = await db
       .request()
       .query<{ id: number }>(
-        "SELECT TOP 1 id FROM obc.semanas_operativas WHERE estado = 'abierta'",
+        "SELECT TOP 1 id FROM pro_obc.semanas_operativas WHERE estado = 'abierta'",
       );
     if (abierta.recordset.length > 0) {
       return NextResponse.json(
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       .input('dias', sql.SmallInt, diasEfectivos)
       .input('desc', sql.NVarChar(sql.MAX), descripcion)
       .query<SemanaOperativaDetalle>(`
-        INSERT INTO obc.semanas_operativas
+        INSERT INTO pro_obc.semanas_operativas
           (anio, numero_semana, fecha_inicio, fecha_fin, estado, dias_efectivos, descripcion)
         OUTPUT INSERTED.id, INSERTED.anio, INSERTED.numero_semana,
                CONVERT(varchar(10), INSERTED.fecha_inicio, 23) AS fecha_inicio,
@@ -117,10 +117,10 @@ export async function POST(req: NextRequest) {
       .request()
       .input('sem', sql.BigInt, Number(nueva.id))
       .query(`
-        MERGE obc.plan_semanal AS dst
+        MERGE pro_obc.plan_semanal AS dst
         USING (
           SELECT @sem AS semana_operativa_id, e.obra_codigo, e.sprint_actual AS sprint_objetivo
-          FROM obc.obra_estado e
+          FROM pro_obc.obra_estado e
           WHERE e.estado IN ('en_ejecucion', 'en_espera') AND e.tipo_casa IS NOT NULL
         ) AS src
           ON dst.semana_operativa_id = src.semana_operativa_id
@@ -130,10 +130,10 @@ export async function POST(req: NextRequest) {
         WHEN NOT MATCHED THEN INSERT (semana_operativa_id, obra_codigo, sprint_objetivo)
           VALUES (src.semana_operativa_id, src.obra_codigo, src.sprint_objetivo);
 
-        DELETE FROM obc.avance_base_semanal WHERE semana_operativa_id = @sem;
-        INSERT INTO obc.avance_base_semanal (semana_operativa_id, obra_codigo, sub_partida_id, pct_completado)
+        DELETE FROM pro_obc.avance_base_semanal WHERE semana_operativa_id = @sem;
+        INSERT INTO pro_obc.avance_base_semanal (semana_operativa_id, obra_codigo, sub_partida_id, pct_completado)
         SELECT @sem, a.obra_codigo, a.sub_partida_id, ISNULL(a.pct_completado, 0)
-        FROM obc.avance_sub_partidas a;
+        FROM pro_obc.avance_sub_partidas a;
       `);
 
     return NextResponse.json({ ok: true, semana: nueva });

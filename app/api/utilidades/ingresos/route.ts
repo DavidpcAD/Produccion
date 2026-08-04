@@ -11,7 +11,7 @@ import { REPORTE_CACHE } from '@/lib/cache-headers';
 // de los últimos 24 meses. Portado de la Azure Function `utilidades-ingresos`.
 //
 // Depende de las vistas del schema `uti`:
-//   uti.v_ingresos_utilidad_por_lote, uti.v_porcentaje_utilidad_mensual.
+//   pro_uti.v_ingresos_utilidad_por_lote, pro_uti.v_porcentaje_utilidad_mensual.
 
 const KPIS_VACIOS = { ingresos: 0, ingreso_neto_ad: 0, utilidad: 0, porcentaje: null };
 
@@ -48,12 +48,12 @@ export async function GET(req: NextRequest) {
         COALESCE(SUM(ingresos), 0)        AS ingresos,
         COALESCE(SUM(ingreso_neto_ad), 0) AS ingreso_neto_ad,
         COALESCE(SUM(utilidad), 0)        AS utilidad
-      FROM uti.v_ingresos_utilidad_por_lote
+      FROM pro_uti.v_ingresos_utilidad_por_lote
       WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
     `;
     const pctSql = `
       SELECT AVG(porcentaje_utilidad) AS porcentaje_utilidad
-      FROM uti.v_porcentaje_utilidad_mensual
+      FROM pro_uti.v_porcentaje_utilidad_mensual
       WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM
     `;
 
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
         SUM(ingresos)        AS ingresos,
         SUM(ingreso_neto_ad) AS ingreso_neto_ad,
         SUM(utilidad)        AS utilidad
-      FROM uti.v_ingresos_utilidad_por_lote
+      FROM pro_uti.v_ingresos_utilidad_por_lote
       WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
       GROUP BY lote
       ORDER BY SUM(ingresos) DESC
@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
           COALESCE(SUM(ingresos), 0)        AS ingresos,
           COALESCE(SUM(ingreso_neto_ad), 0) AS ingreso_neto_ad,
           COALESCE(SUM(utilidad), 0)        AS utilidad
-        FROM uti.v_ingresos_utilidad_por_lote
+        FROM pro_uti.v_ingresos_utilidad_por_lote
         WHERE (anio * 100 + mes) <= (@hastaAnio * 100 + @hastaMes)
           AND (anio * 100 + mes) >  ((@hastaAnio - 2) * 100 + @hastaMes)
         GROUP BY anio, mes

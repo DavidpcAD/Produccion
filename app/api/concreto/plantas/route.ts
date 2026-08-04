@@ -12,7 +12,7 @@ export async function GET() {
     const db = await getAdelanteDb();
     const r = await db.request().query(`
       SELECT id, codigo, marca, serial, recurso_bc, activo
-      FROM hor.plantas
+      FROM pro_hor.plantas
       WHERE activo = 1
       ORDER BY codigo
     `);

@@ -13,9 +13,9 @@ export const dynamic = 'force-dynamic';
  *   POST /api/avance/obras/iniciar-lote
  *     { codigos: string[], tipo_casa: TipoCasa | 'auto', sprint_inicial?: number }
  *
- * En modo 'auto' el tipo sale de obc.vw_obras (se omiten las que no lo tienen);
+ * En modo 'auto' el tipo sale de pro_obc.vw_obras (se omiten las que no lo tienen);
  * con un tipo concreto se aplica a todas. Solo habilita obras que existan en
- * obc.vw_obras (OPENJSON del array de códigos).
+ * pro_obc.vw_obras (OPENJSON del array de códigos).
  */
 
 const TIPOS: TipoCasa[] = ['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea'];
@@ -62,10 +62,10 @@ export async function POST(req: NextRequest) {
     const filtroTc = esAuto ? 'AND o.tipo_casa IS NOT NULL' : '';
 
     const result = await request.query<{ accion: string }>(`
-      MERGE obc.obra_estado AS dst
+      MERGE pro_obc.obra_estado AS dst
       USING (
         SELECT o.codigo, ${tcExpr} AS tc
-        FROM obc.vw_obras o
+        FROM pro_obc.vw_obras o
         JOIN OPENJSON(@codigos) j
           ON j.value COLLATE DATABASE_DEFAULT = o.codigo COLLATE DATABASE_DEFAULT
         WHERE 1 = 1 ${filtroTc}

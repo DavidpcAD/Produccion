@@ -6,9 +6,9 @@ import type { Proyecto } from '@/lib/avance/types';
 
 /**
  * GET /api/avance/proyectos
- * Lista los proyectos visibles para el módulo desde `obc.vw_proyectos`.
+ * Lista los proyectos visibles para el módulo desde `pro_obc.vw_proyectos`.
  * Por defecto solo Ciudad del Valle con desarrollos activos (o que tengan
- * obras habilitadas en obc.obra_estado); `?todos=true` devuelve todos.
+ * obras habilitadas en pro_obc.obra_estado); `?todos=true` devuelve todos.
  */
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -21,16 +21,16 @@ export async function GET(req: NextRequest) {
 
   const query = todos
     ? `SELECT id, codigo, nombre, categoria, es_desarrollo, es_homes, es_ventas, color_hex
-       FROM obc.vw_proyectos
+       FROM pro_obc.vw_proyectos
        ORDER BY codigo`
     : `SELECT id, codigo, nombre, categoria, es_desarrollo, es_homes, es_ventas, color_hex
-       FROM obc.vw_proyectos
+       FROM pro_obc.vw_proyectos
        WHERE categoria = 'Ciudad del Valle'
          AND (
            es_desarrollo = 1
            OR codigo COLLATE DATABASE_DEFAULT IN (
              SELECT DISTINCT LEFT(obra_codigo, CHARINDEX('-', obra_codigo) - 1) COLLATE DATABASE_DEFAULT
-             FROM obc.obra_estado
+             FROM pro_obc.obra_estado
              WHERE CHARINDEX('-', obra_codigo) > 1
            )
          )

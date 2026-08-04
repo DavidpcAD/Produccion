@@ -2,7 +2,7 @@ import type { ConnectionPool } from 'mssql';
 import type { EstadoVenta } from './types';
 
 /**
- * Refresca `obc.obra_estado.estado_venta` desde `dbo.V_CasosActivos` (fuente
+ * Refresca `pro_obc.obra_estado.estado_venta` desde `dbo.V_CasosActivos` (fuente
  * real del sistema de ventas, caso más reciente por IDBD). Best-effort e
  * idempotente: solo escribe filas que cambiaron y nunca tumba al endpoint que
  * lo llama. Se invoca al inicio de los endpoints que muestran estado de venta.
@@ -12,7 +12,7 @@ export async function refrescarEstadoVenta(db: ConnectionPool): Promise<void> {
     await db.request().query(`
       UPDATE e
       SET e.estado_venta = m.nuevo, e.actualizado_en = SYSUTCDATETIME()
-      FROM obc.obra_estado e
+      FROM pro_obc.obra_estado e
       JOIN (
         SELECT IDBD,
           CASE Estado

@@ -491,7 +491,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
           <Skeleton className="h-11 w-full" />
         ) : (
           <Combobox
-            label="Obra (bi.dim_obra)"
+            label="Obra (pro_bi.dim_obra)"
             value={obraSel}
             onChange={setObraSel}
             options={obras.map<ComboOption>((o) => ({

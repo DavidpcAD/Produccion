@@ -23,7 +23,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       .request()
       .input('id', sql.BigInt, id)
       .input('oid', sql.NVarChar(50), String(session.idUsuario || session.idCol)).query(`
-        UPDATE uti.comentarios_reporte
+        UPDATE pro_uti.comentarios_reporte
         SET eliminado_en = SYSUTCDATETIME(), eliminado_por_oid = @oid
         WHERE id_comentario = @id AND eliminado_en IS NULL;
         SELECT @@ROWCOUNT AS afectados;

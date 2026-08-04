@@ -44,7 +44,7 @@ export interface EstadoResultado {
 /** Body de POST /api/avance/obras/iniciar-lote — habilitar varias obras de una. */
 export interface IniciarLoteBody {
   codigos: string[];
-  /** 'auto' toma el tipo de cada obra desde obc.vw_obras. */
+  /** 'auto' toma el tipo de cada obra desde pro_obc.vw_obras. */
   tipo_casa: TipoCasa | 'auto';
   sprint_inicial?: number;
 }

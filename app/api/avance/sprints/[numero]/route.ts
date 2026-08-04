@@ -44,7 +44,7 @@ export async function PATCH(
         .request()
         .input('n', sql.SmallInt, numero)
         .query<{ n: number }>(
-          'SELECT COUNT(*) AS n FROM obc.sub_partidas WHERE sprint_numero = @n AND activo = 1',
+          'SELECT COUNT(*) AS n FROM pro_obc.sub_partidas WHERE sprint_numero = @n AND activo = 1',
         );
       const nSubs = Number(subsQ.recordset[0]?.n ?? 0);
       if (nSubs > 0) {
@@ -61,7 +61,7 @@ export async function PATCH(
       .request()
       .input('n', sql.SmallInt, numero)
       .input('esp', sql.Bit, esEspera ? 1 : 0)
-      .query('UPDATE obc.sprints_catalogo SET es_espera = @esp WHERE numero_global = @n');
+      .query('UPDATE pro_obc.sprints_catalogo SET es_espera = @esp WHERE numero_global = @n');
     if ((r.rowsAffected[0] ?? 0) === 0) {
       return NextResponse.json({ error: `Sprint ${numero} no encontrado` }, { status: 404 });
     }

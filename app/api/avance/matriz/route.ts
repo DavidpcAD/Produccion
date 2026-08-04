@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     const db = await getAdelanteDb();
     await refrescarEstadoVenta(db);
 
-    // 1) Obras en ejecución — SOLO de obc.obra_estado. El proyecto/bloque se
+    // 1) Obras en ejecución — SOLO de pro_obc.obra_estado. El proyecto/bloque se
     //    derivan del código (formato PROYECTO-BLOQUE.NUMERO, ej. "VB-5.13").
     const obrasRes = await db
       .request()
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         estado: string;
       }>(`
         SELECT obra_codigo AS codigo, sprint_actual, tipo_casa, estado_venta, estado
-        FROM obc.obra_estado
+        FROM pro_obc.obra_estado
         WHERE estado IN ('en_ejecucion', 'en_espera') AND tipo_casa IS NOT NULL
           AND (@proyectoLike IS NULL OR obra_codigo LIKE @proyectoLike)
         ORDER BY obra_codigo
@@ -90,8 +90,8 @@ export async function GET(req: NextRequest) {
     }>(`
       SELECT p.id, p.codigo, p.nombre,
              g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
-      FROM obc.partidas p
-      LEFT JOIN obc.grupos_partida g ON g.id = p.grupo_id
+      FROM pro_obc.partidas p
+      LEFT JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
       WHERE p.activo = 1
       ORDER BY p.orden, p.codigo
     `);
@@ -116,8 +116,8 @@ export async function GET(req: NextRequest) {
       tipo_casa: TipoCasa;
     }>(`
       SELECT sp.id, sp.partida_id, sp.sprint_numero, t.tipo_casa
-      FROM obc.sub_partidas sp
-      JOIN obc.sub_partida_tipos t ON t.sub_partida_id = sp.id
+      FROM pro_obc.sub_partidas sp
+      JOIN pro_obc.sub_partida_tipos t ON t.sub_partida_id = sp.id
       WHERE sp.activo = 1
     `);
     const subsPorTipo = new Map<TipoCasa, { id: number; partida_id: number; sprint: number }[]>();
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
         .request()
         .input('sem', sql.BigInt, semana)
         .query<{ n: number }>(
-          "SELECT COUNT(*) AS n FROM obc.cierres_produccion WHERE semana_operativa_id = @sem AND tipo = 'A'",
+          "SELECT COUNT(*) AS n FROM pro_obc.cierres_produccion WHERE semana_operativa_id = @sem AND tipo = 'A'",
         );
       usarSnapshot = (cQ.recordset[0]?.n ?? 0) > 0;
     }
@@ -147,8 +147,8 @@ export async function GET(req: NextRequest) {
           .input('sem', sql.BigInt, semana)
           .query<{ obra_codigo: string; sub_partida_id: number; pct_completado: number }>(`
             SELECT s.obra_codigo, s.sub_partida_id, MAX(s.pct_completado) AS pct_completado
-            FROM obc.cierre_produccion_snapshots s
-            JOIN obc.cierres_produccion cp ON cp.id = s.cierre_produccion_id
+            FROM pro_obc.cierre_produccion_snapshots s
+            JOIN pro_obc.cierres_produccion cp ON cp.id = s.cierre_produccion_id
             WHERE cp.semana_operativa_id <= @sem
             GROUP BY s.obra_codigo, s.sub_partida_id
           `)
@@ -156,7 +156,7 @@ export async function GET(req: NextRequest) {
           .request()
           .query<{ obra_codigo: string; sub_partida_id: number; pct_completado: number }>(`
             SELECT obra_codigo, sub_partida_id, pct_completado
-            FROM obc.avance_sub_partidas
+            FROM pro_obc.avance_sub_partidas
           `);
     const pctPorObraSub = new Map<string, number>();
     for (const a of avRes.recordset) {
@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
       .request()
       .query<{ obra_codigo: string; scope_id: number; sub_partida_id: number; peso: number }>(`
         SELECT obra_codigo, scope_id, sub_partida_id, peso
-        FROM obc.obra_pesos
+        FROM pro_obc.obra_pesos
         WHERE ambito = 'sprint'
       `);
     const frozenPesos = new Map<string, { sub_partida_id: number; peso: number }[]>();
@@ -188,7 +188,7 @@ export async function GET(req: NextRequest) {
       peso: number;
     }>(`
       SELECT sprint_numero, tipo_casa, sub_partida_id, peso
-      FROM obc.sub_partida_pesos_sprint
+      FROM pro_obc.sub_partida_pesos_sprint
     `);
     const catPesos = new Map<string, { sub_partida_id: number; peso: number }[]>();
     for (const r of catRes.recordset) {
@@ -206,16 +206,16 @@ export async function GET(req: NextRequest) {
     const totalSprintsRes = await db
       .request()
       .query<{ tipo_casa: string; n: number }>(
-        'SELECT tipo_casa, COUNT(*) AS n FROM obc.tipo_casa_sprints GROUP BY tipo_casa',
+        'SELECT tipo_casa, COUNT(*) AS n FROM pro_obc.tipo_casa_sprints GROUP BY tipo_casa',
       );
     const totalSprintsPorTipo = new Map<string, number>();
     for (const r of totalSprintsRes.recordset) totalSprintsPorTipo.set(r.tipo_casa, Number(r.n));
     const sublessRes = await db.request().query<{ tipo_casa: string; sprint_global: number }>(`
       SELECT tcs.tipo_casa, tcs.sprint_global
-      FROM obc.tipo_casa_sprints tcs
+      FROM pro_obc.tipo_casa_sprints tcs
       WHERE NOT EXISTS (
-        SELECT 1 FROM obc.sub_partidas sp
-        JOIN obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = tcs.tipo_casa
+        SELECT 1 FROM pro_obc.sub_partidas sp
+        JOIN pro_obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = tcs.tipo_casa
         WHERE sp.sprint_numero = tcs.sprint_global AND sp.activo = 1)
     `);
     const sublessPorTipo = new Map<string, number[]>();
@@ -229,7 +229,7 @@ export async function GET(req: NextRequest) {
     const opPartRes = await db
       .request()
       .query<{ obra_codigo: string; sub_partida_id: number; peso: number }>(
-        "SELECT obra_codigo, sub_partida_id, peso FROM obc.obra_pesos WHERE ambito = 'partida'",
+        "SELECT obra_codigo, sub_partida_id, peso FROM pro_obc.obra_pesos WHERE ambito = 'partida'",
       );
     const pesoPartObra = new Map<string, number>();
     for (const r of opPartRes.recordset)
@@ -238,7 +238,7 @@ export async function GET(req: NextRequest) {
     const catPartRes = await db
       .request()
       .query<{ tipo_casa: string; sub_partida_id: number; peso: number }>(
-        'SELECT tipo_casa, sub_partida_id, peso FROM obc.sub_partida_pesos_partida',
+        'SELECT tipo_casa, sub_partida_id, peso FROM pro_obc.sub_partida_pesos_partida',
       );
     const pesoPartCat = new Map<string, number>();
     for (const r of catPartRes.recordset)
@@ -251,7 +251,7 @@ export async function GET(req: NextRequest) {
       .request()
       .query<{ works_no: string; task_no: string; monto: number }>(`
         SELECT works_no, task_no, SUM(line_amount) AS monto
-        FROM bi.fact_presupuesto
+        FROM pro_bi.fact_presupuesto
         WHERE task_type = 'Posting' AND tipo_costo = 'Cost' AND CAST(es_ultima_version AS INT) = 1
         GROUP BY works_no, task_no
       `);

@@ -23,8 +23,8 @@ export async function GET() {
              s.anio, s.numero_semana,
              CONVERT(varchar(10), s.fecha_inicio, 23) AS fecha_inicio,
              CONVERT(varchar(10), s.fecha_fin, 23) AS fecha_fin
-      FROM obc.mo_nomina_semanal n
-      JOIN obc.semanas_operativas s ON s.id = n.semana_operativa_id
+      FROM pro_obc.mo_nomina_semanal n
+      JOIN pro_obc.semanas_operativas s ON s.id = n.semana_operativa_id
       ORDER BY s.fecha_inicio DESC
     `);
     return NextResponse.json({ nomina: r.recordset });
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       .input('teo', sql.Decimal(18, 2), teorico)
       .input('notas', sql.NVarChar(500), notas)
       .query(`
-        MERGE obc.mo_nomina_semanal AS dst
+        MERGE pro_obc.mo_nomina_semanal AS dst
         USING (SELECT @sem AS s) AS src ON dst.semana_operativa_id = src.s
         WHEN MATCHED THEN UPDATE SET
           monto_nomina_directa = @monto, costo_teorico_m2 = @teo, notas = @notas,

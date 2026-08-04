@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 /**
- * CRUD admin de una causa (obc.causas_catalogo). Portado de obrascontrol
+ * CRUD admin de una causa (pro_obc.causas_catalogo). Portado de obrascontrol
  * `causas.ts` (allí era PATCH; aquí PUT parcial + DELETE).
  *   PUT    /api/avance/causas/{id} → edita (cualquier subconjunto de campos)
  *   DELETE /api/avance/causas/{id} → elimina
@@ -39,7 +39,7 @@ export async function PUT(
         .request()
         .input('c', sql.VarChar(50), codigo)
         .input('id', sql.Int, id)
-        .query('SELECT id FROM obc.causas_catalogo WHERE codigo = @c AND id <> @id');
+        .query('SELECT id FROM pro_obc.causas_catalogo WHERE codigo = @c AND id <> @id');
       if (dup.recordset.length > 0) {
         return NextResponse.json(
           { error: `Ya existe otra causa con código '${codigo}'` },
@@ -84,7 +84,7 @@ export async function PUT(
     }
 
     const r = await reqDb.query(
-      `UPDATE obc.causas_catalogo SET ${sets.join(', ')} WHERE id = @id`,
+      `UPDATE pro_obc.causas_catalogo SET ${sets.join(', ')} WHERE id = @id`,
     );
     if (r.rowsAffected[0] === 0) {
       return NextResponse.json({ error: `Causa ${id} no encontrada` }, { status: 404 });
@@ -113,7 +113,7 @@ export async function DELETE(
     const r = await db
       .request()
       .input('id', sql.Int, id)
-      .query('DELETE FROM obc.causas_catalogo WHERE id = @id');
+      .query('DELETE FROM pro_obc.causas_catalogo WHERE id = @id');
     if (r.rowsAffected[0] === 0) {
       return NextResponse.json({ error: `Causa ${id} no encontrada` }, { status: 404 });
     }

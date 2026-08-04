@@ -19,9 +19,9 @@ import {
 } from '@/lib/concreto/tipos-config';
 
 // Configuración del módulo Concreto — 3 tabs:
-//   Actividades  (lab.actividades)        crear/editar/activar
-//   Umbrales     (hor.umbrales_alerta)    editar valor/comparador/unidad
-//   Densidades   (hor.densidades_materiales) crear/editar densidades
+//   Actividades  (pro_lab.actividades)        crear/editar/activar
+//   Umbrales     (pro_hor.umbrales_alerta)    editar valor/comparador/unidad
+//   Densidades   (pro_hor.densidades_materiales) crear/editar densidades
 // Los botones de edición se ocultan si nivelAdmin < 4 (los datos igual se ven).
 
 type Tab = 'actividades' | 'umbrales' | 'densidades';

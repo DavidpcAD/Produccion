@@ -6,7 +6,7 @@ import type { Causa } from '@/lib/avance/causas';
 export const dynamic = 'force-dynamic';
 
 /**
- * Catálogo de causas NC / inactividad (obc.causas_catalogo). Portado de
+ * Catálogo de causas NC / inactividad (pro_obc.causas_catalogo). Portado de
  * obrascontrol `causas.ts`.
  *   GET  /api/avance/causas[?activo=true] → lista (la lee la matriz de avance
  *        y el diálogo "No cumplió"). NO cambiar su forma de respuesta.
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   try {
     const r = await db.request().query<Causa>(`
       SELECT id, codigo, descripcion, aplica_nc, aplica_inactividad, activo, orden
-      FROM obc.causas_catalogo
+      FROM pro_obc.causas_catalogo
       ${soloActivas ? 'WHERE activo = 1' : ''}
       ORDER BY orden, descripcion
     `);
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     const dup = await db
       .request()
       .input('c', sql.VarChar(50), codigo)
-      .query('SELECT id FROM obc.causas_catalogo WHERE codigo = @c');
+      .query('SELECT id FROM pro_obc.causas_catalogo WHERE codigo = @c');
     if (dup.recordset.length > 0) {
       return NextResponse.json(
         { error: `Ya existe una causa con código '${codigo}'` },
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       .input('inact', sql.Bit, aplicaInact)
       .input('orden', sql.Int, orden)
       .query<{ id: number }>(`
-        INSERT INTO obc.causas_catalogo
+        INSERT INTO pro_obc.causas_catalogo
           (codigo, descripcion, aplica_nc, aplica_inactividad, activo, orden)
         OUTPUT INSERTED.id
         VALUES (@codigo, @descripcion, @nc, @inact, 1, @orden)

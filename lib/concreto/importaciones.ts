@@ -7,7 +7,7 @@ import type {
 } from './tipos-ingesta';
 
 // Portado de `api/src/lib/consultar-importaciones.ts` de la app original.
-// SQL contra `hor.importaciones_csv`.
+// SQL contra `pro_hor.importaciones_csv`.
 
 export const LIMITE_MAXIMO = 50;
 export const LIMITE_DEFAULT = 10;
@@ -76,7 +76,7 @@ export async function listarImportaciones(
         usuario_email,
         fecha_archivo,
         archivo_hash
-      FROM hor.importaciones_csv
+      FROM pro_hor.importaciones_csv
       ORDER BY fecha_archivo DESC
       OFFSET @offset ROWS
       FETCH NEXT @limite ROWS ONLY
@@ -84,7 +84,7 @@ export async function listarImportaciones(
 
   const rTotal = await pool
     .request()
-    .query<{ total: number }>('SELECT COUNT(*) AS total FROM hor.importaciones_csv');
+    .query<{ total: number }>('SELECT COUNT(*) AS total FROM pro_hor.importaciones_csv');
 
   const items: ImportacionResumen[] = rItems.recordset.map((row) => ({
     id: row.id,

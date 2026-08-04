@@ -78,7 +78,7 @@ interface RawCaso {
 export async function listarCasos(db: ConnectionPool): Promise<CasoParaFormalizar[]> {
   const r = await db.request().query<RawCaso>(`
     SELECT *
-    FROM [app].vw_casos_para_formalizar
+    FROM [pro_app].vw_casos_para_formalizar
     ORDER BY
       CASE WHEN FechaProyectada IS NULL THEN 1 ELSE 0 END,
       FechaProyectada,
@@ -122,7 +122,7 @@ export async function listarHistorico(db: ConnectionPool, idCaso: number): Promi
   }>(`
     SELECT IDProyeccion, IDCaso, FechaProyectada, NivelConfianza, Notas,
            Activa, FechaCreacion, FechaModificacion
-    FROM [app].proyeccion_formalizacion
+    FROM [pro_app].proyeccion_formalizacion
     WHERE IDCaso = @id
     ORDER BY FechaCreacion DESC;
   `);
@@ -159,7 +159,7 @@ export function validarProyeccion(b: Partial<UpsertProyeccionInput>): string | n
   return null;
 }
 
-// Porta [app].sp_actualizar_proyeccion_formalizacion inline.
+// Porta [pro_app].sp_actualizar_proyeccion_formalizacion inline.
 export async function upsertProyeccion(db: ConnectionPool, i: UpsertProyeccionInput): Promise<{ IDProyeccionCreada: number; VersionesCerradas: number }> {
   const r = await db.request()
     .input('IDCaso', sql.Int, i.IDCaso)
@@ -169,7 +169,7 @@ export async function upsertProyeccion(db: ConnectionPool, i: UpsertProyeccionIn
     .input('UsuarioEmail', sql.NVarChar(200), i.UsuarioEmail)
     .query<{ IDProyeccionCreada: number; VersionesCerradas: number }>(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
-      IF NOT EXISTS (SELECT 1 FROM dbo.Casos WHERE IDCaso = @IDCaso AND IDEstado = 4)
+      IF NOT EXISTS (SELECT 1 FROM pro_ventas.Casos WHERE IDCaso = @IDCaso AND IDEstado = 4)
         THROW 51900, 'IDCaso inválido o no está en estado Reservado.', 1;
       IF @FechaProyectada < CAST(GETDATE() AS DATE)
         THROW 51902, 'FechaProyectada no puede ser anterior a hoy.', 1;
@@ -177,22 +177,22 @@ export async function upsertProyeccion(db: ConnectionPool, i: UpsertProyeccionIn
         BEGIN TRANSACTION;
         DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (
           SELECT IDProyeccion, FechaProyectada, NivelConfianza, Notas
-          FROM [app].proyeccion_formalizacion WHERE IDCaso = @IDCaso AND Activa = 1
+          FROM [pro_app].proyeccion_formalizacion WHERE IDCaso = @IDCaso AND Activa = 1
           FOR JSON PATH);
         DECLARE @CantCerradas INT;
-        UPDATE [app].proyeccion_formalizacion
+        UPDATE [pro_app].proyeccion_formalizacion
         SET Activa = 0, FechaModificacion = SYSUTCDATETIME()
         WHERE IDCaso = @IDCaso AND Activa = 1;
         SET @CantCerradas = @@ROWCOUNT;
-        INSERT INTO [app].proyeccion_formalizacion (IDCaso, FechaProyectada, NivelConfianza, Notas, Activa)
+        INSERT INTO [pro_app].proyeccion_formalizacion (IDCaso, FechaProyectada, NivelConfianza, Notas, Activa)
         VALUES (@IDCaso, @FechaProyectada, @NivelConfianza, @Notas, 1);
         DECLARE @NuevoID INT = SCOPE_IDENTITY();
         DECLARE @ValorNuevoJSON NVARCHAR(MAX) = (
           SELECT IDCaso = @IDCaso, FechaProyectada = @FechaProyectada,
                  NivelConfianza = @NivelConfianza, Notas = @Notas
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.proyeccion_formalizacion', @NuevoID,
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.proyeccion_formalizacion', @NuevoID,
                 CASE WHEN @CantCerradas > 0 THEN 'UPDATE' ELSE 'INSERT' END,
                 @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON,
                 CONCAT('Proyección de formalización del caso ', @IDCaso, ' (', @CantCerradas, ' versión(es) anterior(es) marcadas inactivas)'));
@@ -208,29 +208,29 @@ export async function upsertProyeccion(db: ConnectionPool, i: UpsertProyeccionIn
   return { IDProyeccionCreada: row.IDProyeccionCreada, VersionesCerradas: row.VersionesCerradas };
 }
 
-// Porta [app].sp_desactivar_proyeccion_formalizacion inline.
+// Porta [pro_app].sp_desactivar_proyeccion_formalizacion inline.
 export async function desactivarProyeccion(db: ConnectionPool, idCaso: number, usuarioEmail: string): Promise<{ VersionesCerradas: number }> {
   const r = await db.request()
     .input('IDCaso', sql.Int, idCaso)
     .input('UsuarioEmail', sql.NVarChar(200), usuarioEmail)
     .query<{ VersionesCerradas: number }>(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
-      IF NOT EXISTS (SELECT 1 FROM dbo.Casos WHERE IDCaso = @IDCaso)
+      IF NOT EXISTS (SELECT 1 FROM pro_ventas.Casos WHERE IDCaso = @IDCaso)
         THROW 51910, 'IDCaso no existe.', 1;
       BEGIN TRY
         BEGIN TRANSACTION;
         DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (
           SELECT IDProyeccion, FechaProyectada, NivelConfianza, Notas
-          FROM [app].proyeccion_formalizacion WHERE IDCaso = @IDCaso AND Activa = 1
+          FROM [pro_app].proyeccion_formalizacion WHERE IDCaso = @IDCaso AND Activa = 1
           FOR JSON PATH);
         DECLARE @CantCerradas INT;
-        UPDATE [app].proyeccion_formalizacion
+        UPDATE [pro_app].proyeccion_formalizacion
         SET Activa = 0, FechaModificacion = SYSUTCDATETIME()
         WHERE IDCaso = @IDCaso AND Activa = 1;
         SET @CantCerradas = @@ROWCOUNT;
         IF @CantCerradas > 0
-          INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, Contexto)
-          VALUES ('app.proyeccion_formalizacion', @IDCaso, 'DELETE', @UsuarioEmail, @ValorAnteriorJSON,
+          INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, Contexto)
+          VALUES ('pro_app.proyeccion_formalizacion', @IDCaso, 'DELETE', @UsuarioEmail, @ValorAnteriorJSON,
                   CONCAT('Devuelto a sin proyectar — ', @CantCerradas, ' versión(es) marcada(s) inactiva(s).'));
         COMMIT TRANSACTION;
         SELECT @CantCerradas AS VersionesCerradas;

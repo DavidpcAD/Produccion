@@ -50,9 +50,9 @@ async function armarDetalle(
              sp.activo, sp.descripcion,
              p.id AS partida_id, p.codigo AS partida_codigo, p.nombre AS partida_nombre,
              g.id AS grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
-      FROM obc.sub_partidas sp
-      JOIN obc.partidas p       ON p.id = sp.partida_id
-      JOIN obc.grupos_partida g ON g.id = p.grupo_id
+      FROM pro_obc.sub_partidas sp
+      JOIN pro_obc.partidas p       ON p.id = sp.partida_id
+      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
       WHERE sp.id = @id
     `);
   if (cab.recordset.length === 0) return null;
@@ -62,15 +62,15 @@ async function armarDetalle(
     .request()
     .input('id', sql.Int, id)
     .query<{ tipo_casa: TipoCasa }>(
-      'SELECT tipo_casa FROM obc.sub_partida_tipos WHERE sub_partida_id = @id ORDER BY tipo_casa',
+      'SELECT tipo_casa FROM pro_obc.sub_partida_tipos WHERE sub_partida_id = @id ORDER BY tipo_casa',
     );
 
   const pesosPartida = await db.request().input('id', sql.Int, id).query<PesoPartida>(
-    'SELECT tipo_casa, partida_id, peso FROM obc.sub_partida_pesos_partida WHERE sub_partida_id = @id ORDER BY tipo_casa, partida_id',
+    'SELECT tipo_casa, partida_id, peso FROM pro_obc.sub_partida_pesos_partida WHERE sub_partida_id = @id ORDER BY tipo_casa, partida_id',
   );
 
   const pesosSprint = await db.request().input('id', sql.Int, id).query<PesoSprint>(
-    'SELECT tipo_casa, sprint_numero, peso FROM obc.sub_partida_pesos_sprint WHERE sub_partida_id = @id ORDER BY tipo_casa, sprint_numero',
+    'SELECT tipo_casa, sprint_numero, peso FROM pro_obc.sub_partida_pesos_sprint WHERE sub_partida_id = @id ORDER BY tipo_casa, sprint_numero',
   );
 
   return {
@@ -217,7 +217,7 @@ export async function PATCH(
     const existe = await db
       .request()
       .input('id', sql.Int, id)
-      .query<{ id: number }>('SELECT id FROM obc.sub_partidas WHERE id = @id');
+      .query<{ id: number }>('SELECT id FROM pro_obc.sub_partidas WHERE id = @id');
     if (existe.recordset.length === 0) {
       return NextResponse.json({ error: `Sub-partida ${id} no encontrada` }, { status: 404 });
     }
@@ -228,19 +228,19 @@ export async function PATCH(
       if (sets.length > 0) {
         const r = new sql.Request(tx).input('id', sql.Int, id);
         for (const inp of updInputs) r.input(inp.name, inp.type, inp.value);
-        await r.query(`UPDATE obc.sub_partidas SET ${sets.join(', ')} WHERE id = @id`);
+        await r.query(`UPDATE pro_obc.sub_partidas SET ${sets.join(', ')} WHERE id = @id`);
       }
       if (tiposCasa !== undefined) {
         // Reemplazo completo del set de tipos para esta sub-partida.
         await new sql.Request(tx)
           .input('id', sql.Int, id)
-          .query('DELETE FROM obc.sub_partida_tipos WHERE sub_partida_id = @id');
+          .query('DELETE FROM pro_obc.sub_partida_tipos WHERE sub_partida_id = @id');
         for (const tc of tiposCasa) {
           await new sql.Request(tx)
             .input('id', sql.Int, id)
             .input('tc', sql.VarChar(20), tc)
             .query(
-              'INSERT INTO obc.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)',
+              'INSERT INTO pro_obc.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)',
             );
         }
       }

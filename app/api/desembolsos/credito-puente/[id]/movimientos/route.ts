@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  *   GET  /api/desembolsos/credito-puente/{id}/movimientos → movs del crédito
  *   POST /api/desembolsos/credito-puente/{id}/movimientos → crea un mov (REGISTRADO)
  *
- * Lectura contra `app.vw_credito_puente_movimiento`; escritura con INSERT
+ * Lectura contra `pro_app.vw_credito_puente_movimiento`; escritura con INSERT
  * directo (sin SP). La vinculación de movimientos a hitos de lote
  * (credito_puente_link) queda fuera del alcance de este port.
  */
@@ -35,7 +35,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const db = await getAdelanteDb();
     const r = await db.request().input('idCp', sql.Int, idCp).query<Record<string, unknown>>(`
-      SELECT * FROM [app].vw_credito_puente_movimiento
+      SELECT * FROM [pro_app].vw_credito_puente_movimiento
       WHERE IDCreditoPuente = @idCp
       ORDER BY FechaMovimiento DESC, IDMovCP DESC
     `);
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // El crédito debe existir (evita insertar movs huérfanos).
     const db = await getAdelanteDb();
     const existe = await db.request().input('idCp', sql.Int, idCp).query<{ n: number }>(`
-      SELECT COUNT(*) AS n FROM [app].credito_puente WHERE IDCreditoPuente = @idCp
+      SELECT COUNT(*) AS n FROM [pro_app].credito_puente WHERE IDCreditoPuente = @idCp
     `);
     if ((existe.recordset[0]?.n ?? 0) === 0) {
       return NextResponse.json({ error: 'El crédito puente no existe' }, { status: 404 });
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .input('Notas', sql.NVarChar(1000), notas)
       .input('Usuario', sql.NVarChar(400), usuario)
       .query<{ IDMovCP: number }>(`
-        INSERT INTO [app].credito_puente_movimiento
+        INSERT INTO [pro_app].credito_puente_movimiento
           (IDCreditoPuente, FechaMovimiento, MontoColones, Concepto, NumeroComprobante,
            Estado, Notas, CreadoPor, FechaCreacion)
         OUTPUT INSERTED.IDMovCP

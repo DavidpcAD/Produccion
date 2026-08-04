@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  *   GET  /api/avance/sub-partidas → listado (+ catálogo de partidas para el select)
  *   POST /api/avance/sub-partidas → crear (sin pesos; se asignan luego en Pesos)
  *
- * Fuente: obc.sub_partidas + obc.partidas + obc.grupos_partida + obc.sub_partida_tipos
+ * Fuente: pro_obc.sub_partidas + pro_obc.partidas + pro_obc.grupos_partida + pro_obc.sub_partida_tipos
  */
 
 const TIPOS_CASA_SET = new Set<string>(TIPOS_CASA);
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     }
     if (tipoCasa && TIPOS_CASA_SET.has(tipoCasa)) {
       where.push(`EXISTS (
-        SELECT 1 FROM obc.sub_partida_tipos t
+        SELECT 1 FROM pro_obc.sub_partida_tipos t
         WHERE t.sub_partida_id = sp.id AND t.tipo_casa = @tipo_casa
       )`);
       listReq.input('tipo_casa', sql.VarChar(20), tipoCasa);
@@ -74,14 +74,14 @@ export async function GET(req: NextRequest) {
         g.id AS grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre,
         STUFF((
           SELECT ',' + t.tipo_casa
-          FROM obc.sub_partida_tipos t
+          FROM pro_obc.sub_partida_tipos t
           WHERE t.sub_partida_id = sp.id
           ORDER BY t.tipo_casa
           FOR XML PATH('')
         ), 1, 1, '') AS tipos_casa_str
-      FROM obc.sub_partidas sp
-      JOIN obc.partidas p       ON p.id = sp.partida_id
-      JOIN obc.grupos_partida g ON g.id = p.grupo_id
+      FROM pro_obc.sub_partidas sp
+      JOIN pro_obc.partidas p       ON p.id = sp.partida_id
+      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY sp.sprint_numero, p.codigo, sp.codigo
     `);
@@ -107,8 +107,8 @@ export async function GET(req: NextRequest) {
     const partidasRes = await db.request().query<PartidaConGrupo>(`
       SELECT p.id, p.codigo, p.nombre, p.orden, p.activo,
              g.id AS grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
-      FROM obc.partidas p
-      JOIN obc.grupos_partida g ON g.id = p.grupo_id
+      FROM pro_obc.partidas p
+      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
       WHERE p.activo = 1
       ORDER BY p.orden, p.codigo
     `);
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     const dup = await db
       .request()
       .input('codigo', sql.VarChar(50), codigo)
-      .query<{ id: number }>('SELECT id FROM obc.sub_partidas WHERE codigo = @codigo');
+      .query<{ id: number }>('SELECT id FROM pro_obc.sub_partidas WHERE codigo = @codigo');
     if (dup.recordset.length > 0) {
       return NextResponse.json(
         { error: `Ya existe una sub-partida con el código ${codigo}` },
@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
     const partida = await db
       .request()
       .input('pid', sql.Int, partidaId)
-      .query<{ id: number }>('SELECT id FROM obc.partidas WHERE id = @pid');
+      .query<{ id: number }>('SELECT id FROM pro_obc.partidas WHERE id = @pid');
     if (partida.recordset.length === 0) {
       return NextResponse.json({ error: `La partida ${partidaId} no existe` }, { status: 400 });
     }
@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
         .input('descripcion', sql.NVarChar(4000), descripcion)
         .input('activo', sql.Bit, activo)
         .query<{ id: number }>(`
-          INSERT INTO obc.sub_partidas
+          INSERT INTO pro_obc.sub_partidas
             (codigo, nombre, partida_id, sprint_numero, es_critica, descripcion, activo)
           OUTPUT INSERTED.id
           VALUES
@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
           .input('id', sql.Int, nuevoId)
           .input('tc', sql.VarChar(20), tc)
           .query(
-            'INSERT INTO obc.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)',
+            'INSERT INTO pro_obc.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)',
           );
       }
 

@@ -6,7 +6,7 @@ import { ESTADOS_COLADA } from '@/lib/concreto/estados';
 import type { EstadoColada } from '@/lib/concreto/tipos';
 
 // GET /api/concreto/coladas — listado paginado con filtros.
-// TODO(concreto): login por PIN de laboratorio (lab.pin_acceso) de la app
+// TODO(concreto): login por PIN de laboratorio (pro_lab.pin_acceso) de la app
 // original; hoy basta con sesión válida bajo (protected).
 export async function GET(req: NextRequest) {
   const session = await getSession();

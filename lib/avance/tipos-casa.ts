@@ -12,7 +12,7 @@ export type { TipoCasa };
 /** Catálogo y orden fijo de tipos de casa (igual que el fuente obrascontrol). */
 export const TIPOS: TipoCasa[] = ['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea'];
 
-/** Sprint del catálogo global (obc.sprints_catalogo). */
+/** Sprint del catálogo global (pro_obc.sprints_catalogo). */
 export interface SprintCatalogo {
   numero_global: number;
   nombre: string;
@@ -22,11 +22,11 @@ export interface SprintCatalogo {
 
 /**
  * Sprints (globales) que usa un tipo de casa, en orden ascendente
- * (obc.tipo_casa_sprints). El peso de referencia por sprint = 100% / total.
+ * (pro_obc.tipo_casa_sprints). El peso de referencia por sprint = 100% / total.
  */
 export interface TipoCasaSprints {
   tipo_casa: TipoCasa;
-  /** descripción del tipo (obc.tipos_casa.descripcion) o null si no existe. */
+  /** descripción del tipo (pro_obc.tipos_casa.descripcion) o null si no existe. */
   descripcion: string | null;
   /** numero_global de cada sprint, ascendente. */
   sprints: number[];

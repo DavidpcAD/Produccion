@@ -8,9 +8,9 @@ import type { BatchHuerfano, ListarObrasParams, Obra, ResultadoWorkflow } from '
 //   - api/src/functions/coladas-consolidar.ts   (consolidar coladas 'sugerida')
 //   - api/src/functions/coladas-batches.ts       (excluir/agregar/restaurar/huérfanos)
 //   - api/src/lib/agrupador-coladas.ts           (recalcularAgregadosColada)
-//   - api/src/lib/consultar-obras.ts             (listarObras desde bi.dim_obra)
+//   - api/src/lib/consultar-obras.ts             (listarObras desde pro_bi.dim_obra)
 //
-// Se conservan nombres de tabla/columna (schemas hor.*/bi.*) y las reglas de
+// Se conservan nombres de tabla/columna (schemas pro_hor.*/pro_bi.*) y las reglas de
 // transición EXACTAS. La máquina de estados:
 //
 //   sugerida  ──confirmar──▶  confirmada  ──marcar-digitada──▶  digitada  ──cerrar──▶  cerrada (FINAL)
@@ -45,7 +45,7 @@ interface ArgsTransicion {
   estadoNuevo: string;
   /** Actor de auditoría; disponible como @oid (NVarChar 100) en los SETs. */
   actor: string;
-  /** SETs adicionales sobre hor.coladas además de estado y actualizada_en. */
+  /** SETs adicionales sobre pro_hor.coladas además de estado y actualizada_en. */
   setsAdicionales: string;
   paramsExtra?: Array<{
     nombre: string;
@@ -69,7 +69,7 @@ async function transicionarColada(args: ArgsTransicion): Promise<ResultadoTransi
   }
 
   const r = await req.query<{ filas_afectadas: number }>(`
-    UPDATE hor.coladas
+    UPDATE pro_hor.coladas
     SET estado = @estado_nuevo,
         ${setsAdicionales},
         actualizada_en = SYSUTCDATETIME()
@@ -84,7 +84,7 @@ async function transicionarColada(args: ArgsTransicion): Promise<ResultadoTransi
   const rEstado = await ejecutor
     .request()
     .input('id', sql.Int, idColada)
-    .query<{ estado: string }>('SELECT estado FROM hor.coladas WHERE id_colada = @id');
+    .query<{ estado: string }>('SELECT estado FROM pro_hor.coladas WHERE id_colada = @id');
   const estadoActual = rEstado.recordset[0]?.estado;
   if (!estadoActual) return { tipo: 'no_encontrada' };
   return { tipo: 'conflicto', estadoActual };
@@ -126,16 +126,16 @@ async function recalcularAgregadosColada(ejecutor: EjecutorSql, idColada: number
           COALESCE(SUM(b.cantidad_alarmas), 0)             AS cantidad_alarmas_total,
           MIN(b.fecha_inicio)                              AS fecha_inicio,
           MAX(b.fecha_fin)                                 AS fecha_fin
-        FROM hor.batches b
-        JOIN hor.colada_batches cb ON cb.id_batch = b.id
+        FROM pro_hor.batches b
+        JOIN pro_hor.colada_batches cb ON cb.id_batch = b.id
         WHERE cb.id_colada = @id_colada AND cb.excluido = 0
       ),
       ac AS (
         SELECT
           SUM(b.relacion_agua_cemento * b.m3_producidos)
             / NULLIF(SUM(b.m3_producidos), 0)             AS ac_promedio
-        FROM hor.batches b
-        JOIN hor.colada_batches cb ON cb.id_batch = b.id
+        FROM pro_hor.batches b
+        JOIN pro_hor.colada_batches cb ON cb.id_batch = b.id
         WHERE cb.id_colada = @id_colada
           AND cb.excluido = 0
           AND b.relacion_agua_cemento IS NOT NULL
@@ -150,7 +150,7 @@ async function recalcularAgregadosColada(ejecutor: EjecutorSql, idColada: number
           fecha_inicio                   = COALESCE(agg.fecha_inicio, c.fecha_inicio),
           fecha_fin                      = COALESCE(agg.fecha_fin, c.fecha_fin),
           actualizada_en                 = SYSUTCDATETIME()
-      FROM hor.coladas c
+      FROM pro_hor.coladas c
       CROSS JOIN agg
       CROSS JOIN ac
       WHERE c.id_colada = @id_colada
@@ -290,7 +290,7 @@ export async function anular(
     .input('oid', sql.NVarChar(100), actor)
     .input('motivo', sql.NVarChar(sql.MAX), motivo)
     .query<{ filas_afectadas: number }>(`
-      UPDATE hor.coladas
+      UPDATE pro_hor.coladas
       SET estado = 'anulada',
           fecha_anulada = SYSUTCDATETIME(),
           anulada_por_oid = @oid,
@@ -306,7 +306,7 @@ export async function anular(
     const rEstado = await pool
       .request()
       .input('id', sql.Int, idColada)
-      .query<{ estado: string }>('SELECT estado FROM hor.coladas WHERE id_colada = @id');
+      .query<{ estado: string }>('SELECT estado FROM pro_hor.coladas WHERE id_colada = @id');
     const estadoActual = rEstado.recordset[0]?.estado;
     if (!estadoActual) {
       return { ok: false, status: 404, codigo: 'NO_ENCONTRADA', error: `Colada ${idColada}` };
@@ -334,7 +334,7 @@ export async function desanular(
     .request()
     .input('id', sql.Int, idColada)
     .query<{ filas_afectadas: number }>(`
-      UPDATE hor.coladas
+      UPDATE pro_hor.coladas
       SET estado            = 'sugerida',
           fecha_anulada     = NULL,
           anulada_por_oid   = NULL,
@@ -350,7 +350,7 @@ export async function desanular(
     const rEstado = await pool
       .request()
       .input('id', sql.Int, idColada)
-      .query<{ estado: string }>('SELECT estado FROM hor.coladas WHERE id_colada = @id');
+      .query<{ estado: string }>('SELECT estado FROM pro_hor.coladas WHERE id_colada = @id');
     const estadoActual = rEstado.recordset[0]?.estado;
     if (!estadoActual) {
       return { ok: false, status: 404, codigo: 'NO_ENCONTRADA', error: `Colada ${idColada}` };
@@ -369,7 +369,7 @@ export async function desanular(
 // =============================================================================
 // 7. ASIGNAR OBRA — set obra_works_no mientras estado ≠ anulada
 // =============================================================================
-// No es transición de estado. Valida que la obra exista en bi.dim_obra (salvo
+// No es transición de estado. Valida que la obra exista en pro_bi.dim_obra (salvo
 // null, que la limpia). Permitido incluso en 'cerrada' (la obra es metadata).
 
 export async function asignarObra(
@@ -382,7 +382,7 @@ export async function asignarObra(
     .request()
     .input('id', sql.Int, idColada)
     .query<{ estado: string; destino_raw: string | null }>(
-      'SELECT estado, destino_raw FROM hor.coladas WHERE id_colada = @id',
+      'SELECT estado, destino_raw FROM pro_hor.coladas WHERE id_colada = @id',
     );
   const fila = rEstado.recordset[0];
   if (!fila) {
@@ -405,7 +405,7 @@ export async function asignarObra(
       .input('w', sql.NVarChar(20), obraWorksNo)
       .query<{ existe: number }>(
         `SELECT COUNT(*) AS existe
-         FROM bi.dim_obra
+         FROM pro_bi.dim_obra
          WHERE works_no COLLATE DATABASE_DEFAULT = @w COLLATE DATABASE_DEFAULT`,
       );
     if ((rObra.recordset[0]?.existe ?? 0) === 0) {
@@ -413,7 +413,7 @@ export async function asignarObra(
         ok: false,
         status: 404,
         codigo: 'OBRA_NO_ENCONTRADA',
-        error: `La obra "${obraWorksNo}" no existe en bi.dim_obra.`,
+        error: `La obra "${obraWorksNo}" no existe en pro_bi.dim_obra.`,
       };
     }
   }
@@ -424,7 +424,7 @@ export async function asignarObra(
     .input('id', sql.Int, idColada)
     .input('obra', sql.NVarChar(20), obraWorksNo)
     .query(`
-      UPDATE hor.coladas
+      UPDATE pro_hor.coladas
       SET obra_works_no = @obra, actualizada_en = SYSUTCDATETIME()
       WHERE id_colada = @id
     `);
@@ -475,7 +475,7 @@ export async function consolidar(
     id_planta: number;
   }>(`
     SELECT id_colada, codigo_interno, estado, id_planta
-    FROM hor.coladas
+    FROM pro_hor.coladas
     WHERE id_colada IN (${listaIds})
   `);
   const filas = rColadas.recordset;
@@ -537,7 +537,7 @@ export async function consolidar(
       .request()
       .input('id_principal', sql.Int, idPrincipal)
       .query(`
-        UPDATE hor.colada_batches
+        UPDATE pro_hor.colada_batches
         SET id_colada = @id_principal,
             agregado_en = SYSUTCDATETIME()
         WHERE id_colada IN (${listaAbs})
@@ -550,7 +550,7 @@ export async function consolidar(
       .input('oid', sql.NVarChar(100), actor)
       .input('motivo', sql.NVarChar(sql.MAX), motivo)
       .query(`
-        UPDATE hor.coladas
+        UPDATE pro_hor.coladas
         SET estado = 'anulada',
             fecha_anulada = SYSUTCDATETIME(),
             anulada_por_oid = @oid,
@@ -587,7 +587,7 @@ export async function excluirBatch(
   const rEstado = await pool
     .request()
     .input('id', sql.Int, idColada)
-    .query<{ estado: string }>('SELECT estado FROM hor.coladas WHERE id_colada = @id');
+    .query<{ estado: string }>('SELECT estado FROM pro_hor.coladas WHERE id_colada = @id');
   const estado = rEstado.recordset[0]?.estado;
   if (!estado) {
     return { ok: false, status: 404, codigo: 'NO_ENCONTRADA', error: `Colada ${idColada}` };
@@ -610,7 +610,7 @@ export async function excluirBatch(
     .input('motivo', sql.NVarChar(500), motivo)
     .input('oid', sql.NVarChar(100), actor)
     .query<{ filas_afectadas: number }>(`
-      UPDATE hor.colada_batches
+      UPDATE pro_hor.colada_batches
       SET excluido = 1,
           excluido_motivo = @motivo,
           excluido_por_oid = @oid,
@@ -628,7 +628,7 @@ export async function excluirBatch(
       .input('id_colada', sql.Int, idColada)
       .input('id_batch', sql.BigInt, idBatch)
       .query<{ excluido: boolean }>(
-        'SELECT excluido FROM hor.colada_batches WHERE id_colada = @id_colada AND id_batch = @id_batch',
+        'SELECT excluido FROM pro_hor.colada_batches WHERE id_colada = @id_colada AND id_batch = @id_batch',
       );
     const f = rExiste.recordset[0];
     if (!f) {
@@ -666,7 +666,7 @@ export async function agregarBatch(
   const rEstado = await pool
     .request()
     .input('id', sql.Int, idColadaDestino)
-    .query<{ estado: string }>('SELECT estado FROM hor.coladas WHERE id_colada = @id');
+    .query<{ estado: string }>('SELECT estado FROM pro_hor.coladas WHERE id_colada = @id');
   const estado = rEstado.recordset[0]?.estado;
   if (!estado) {
     return {
@@ -692,7 +692,7 @@ export async function agregarBatch(
     .input('id_batch', sql.BigInt, idBatch)
     .query<{ id_colada_origen: number; excluido: boolean }>(`
       SELECT id_colada AS id_colada_origen, excluido
-      FROM hor.colada_batches
+      FROM pro_hor.colada_batches
       WHERE id_batch = @id_batch
     `);
   const fila = rBatch.recordset[0];
@@ -729,7 +729,7 @@ export async function agregarBatch(
     .input('id_colada_destino', sql.Int, idColadaDestino)
     .input('id_batch', sql.BigInt, idBatch)
     .query(`
-      UPDATE hor.colada_batches
+      UPDATE pro_hor.colada_batches
       SET id_colada = @id_colada_destino,
           excluido = 0,
           excluido_motivo = NULL,
@@ -759,7 +759,7 @@ export async function restaurarBatch(
   const rEstado = await pool
     .request()
     .input('id', sql.Int, idColada)
-    .query<{ estado: string }>('SELECT estado FROM hor.coladas WHERE id_colada = @id');
+    .query<{ estado: string }>('SELECT estado FROM pro_hor.coladas WHERE id_colada = @id');
   const estado = rEstado.recordset[0]?.estado;
   if (!estado) {
     return { ok: false, status: 404, codigo: 'NO_ENCONTRADA', error: `Colada ${idColada}` };
@@ -780,7 +780,7 @@ export async function restaurarBatch(
     .input('id_colada', sql.Int, idColada)
     .input('id_batch', sql.BigInt, idBatch)
     .query<{ filas_afectadas: number }>(`
-      UPDATE hor.colada_batches
+      UPDATE pro_hor.colada_batches
       SET excluido = 0,
           excluido_motivo = NULL,
           excluido_por_oid = NULL,
@@ -799,7 +799,7 @@ export async function restaurarBatch(
       .input('id_colada', sql.Int, idColada)
       .input('id_batch', sql.BigInt, idBatch)
       .query<{ excluido: boolean }>(
-        'SELECT excluido FROM hor.colada_batches WHERE id_colada = @id_colada AND id_batch = @id_batch',
+        'SELECT excluido FROM pro_hor.colada_batches WHERE id_colada = @id_colada AND id_batch = @id_batch',
       );
     const f = rExiste.recordset[0];
     if (!f) {
@@ -857,10 +857,10 @@ export async function listarBatchesHuerfanos(
       cb.excluido_motivo AS motivo_exclusion,
       cb.excluido_en,
       cb.excluido_por_oid
-    FROM hor.colada_batches cb
-    JOIN hor.batches b      ON b.id = cb.id_batch
-    JOIN hor.coladas c      ON c.id_colada = cb.id_colada
-    JOIN hor.plantas p      ON p.id = b.id_planta
+    FROM pro_hor.colada_batches cb
+    JOIN pro_hor.batches b      ON b.id = cb.id_batch
+    JOIN pro_hor.coladas c      ON c.id_colada = cb.id_colada
+    JOIN pro_hor.plantas p      ON p.id = b.id_planta
     WHERE cb.excluido = 1
     ORDER BY cb.excluido_en DESC, b.fecha_inicio DESC
   `);
@@ -884,7 +884,7 @@ export async function listarBatchesHuerfanos(
 }
 
 // =============================================================================
-// 13. LISTAR OBRAS — bi.dim_obra (picker de asignación)
+// 13. LISTAR OBRAS — pro_bi.dim_obra (picker de asignación)
 // =============================================================================
 // Portado de consultar-obras.ts. Solo SELECT sobre el datawarehouse.
 
@@ -917,7 +917,7 @@ export async function listarObras(
       description,
       status,
       centro_costo
-    FROM bi.dim_obra
+    FROM pro_bi.dim_obra
     ${whereClause}
     ORDER BY display_name, works_no
   `);

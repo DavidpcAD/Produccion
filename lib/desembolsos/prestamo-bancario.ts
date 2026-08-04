@@ -2,7 +2,7 @@
 // `api/src/functions/prestamoBancario.ts`).
 //
 // Captura del préstamo bancario por caso: cuánto financia el banco por el lote,
-// el pago del cliente, etc. Datos en AdelanteDB, tabla `app.caso_lote_banco`
+// el pago del cliente, etc. Datos en AdelanteDB, tabla `pro_app.caso_lote_banco`
 // (una fila por caso; se identifica por IDCaso).
 //
 // DIFERENCIA vs. el fuente: el repo original hace un upsert vía

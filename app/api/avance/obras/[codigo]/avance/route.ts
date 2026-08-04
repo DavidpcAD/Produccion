@@ -28,7 +28,7 @@ async function leerEstado(
     .request()
     .input('obra', sql.NVarChar(20), obraCodigo)
     .query<EstadoRow>(
-      'SELECT estado, sprint_actual, tipo_casa FROM obc.obra_estado WHERE obra_codigo = @obra',
+      'SELECT estado, sprint_actual, tipo_casa FROM pro_obc.obra_estado WHERE obra_codigo = @obra',
     );
   return r.recordset[0] ?? null;
 }
@@ -85,14 +85,14 @@ export async function GET(
                ISNULL(a.completada, 0)     AS completada,
                a.nc_causa, a.nc_nota,
                ISNULL(piso.piso, 0) AS piso_pct
-        FROM obc.sub_partidas sp
-        JOIN obc.partidas p ON p.id = sp.partida_id
-        JOIN obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = @tc
-        LEFT JOIN obc.avance_sub_partidas a
+        FROM pro_obc.sub_partidas sp
+        JOIN pro_obc.partidas p ON p.id = sp.partida_id
+        JOIN pro_obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = @tc
+        LEFT JOIN pro_obc.avance_sub_partidas a
           ON a.sub_partida_id = sp.id AND a.obra_codigo = @obra
         LEFT JOIN (
           SELECT sub_partida_id, MAX(pct_completado) AS piso
-          FROM obc.cierre_produccion_snapshots
+          FROM pro_obc.cierre_produccion_snapshots
           WHERE obra_codigo = @obra
           GROUP BY sub_partida_id
         ) piso ON piso.sub_partida_id = sp.id
@@ -195,7 +195,7 @@ export async function PUT(
       .request()
       .input('id', sql.Int, subPartidaId)
       .query<{ sprint_numero: number; partida_id: number }>(
-        'SELECT sprint_numero, partida_id FROM obc.sub_partidas WHERE id = @id',
+        'SELECT sprint_numero, partida_id FROM pro_obc.sub_partidas WHERE id = @id',
       );
     if (sp.recordset.length === 0)
       return NextResponse.json({ error: 'Sub-partida no encontrada' }, { status: 404 });
@@ -209,7 +209,7 @@ export async function PUT(
         .input('sub', sql.Int, subPartidaId)
         .query<{ piso: number }>(`
           SELECT ISNULL(MAX(pct_completado), 0) AS piso
-          FROM obc.cierre_produccion_snapshots
+          FROM pro_obc.cierre_produccion_snapshots
           WHERE sub_partida_id = @sub AND obra_codigo = @obra
         `);
       const piso = Number(pisoQ.recordset[0]?.piso ?? 0);
@@ -240,7 +240,7 @@ export async function PUT(
         .input('tocaNc', sql.Bit, tocaNc)
         .input('uid', sql.Int, session.idCol || null)
         .query(`
-          MERGE obc.avance_sub_partidas AS dst
+          MERGE pro_obc.avance_sub_partidas AS dst
           USING (SELECT @obra AS obra_codigo, @sub AS sub_partida_id) AS src
             ON dst.obra_codigo = src.obra_codigo AND dst.sub_partida_id = src.sub_partida_id
           WHEN MATCHED THEN UPDATE SET

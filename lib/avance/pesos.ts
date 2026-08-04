@@ -3,7 +3,7 @@ import { sql } from '@/lib/db-adelantedb';
 
 /**
  * Pesos efectivos y congelado por obra. Cada obra "congela" su copia de pesos
- * (obc.obra_pesos) al registrar su primer avance > 0 en un sprint/partida; a
+ * (pro_obc.obra_pesos) al registrar su primer avance > 0 en un sprint/partida; a
  * partir de ahí usa SU copia, inmune a cambios posteriores del catálogo. Si
  * nunca inició el scope, usa el catálogo vigente.
  *
@@ -32,7 +32,7 @@ export async function obtenerPesosEfectivos(
     .input('scope', sql.Int, scopeId)
     .query<{ sub_partida_id: number; peso: number }>(`
       SELECT sub_partida_id, peso
-      FROM obc.obra_pesos
+      FROM pro_obc.obra_pesos
       WHERE obra_codigo = @obra AND ambito = @ambito AND scope_id = @scope
     `);
 
@@ -45,7 +45,7 @@ export async function obtenerPesosEfectivos(
   }
 
   const tabla =
-    ambito === 'sprint' ? 'obc.sub_partida_pesos_sprint' : 'obc.sub_partida_pesos_partida';
+    ambito === 'sprint' ? 'pro_obc.sub_partida_pesos_sprint' : 'pro_obc.sub_partida_pesos_partida';
   const col = ambito === 'sprint' ? 'sprint_numero' : 'partida_id';
 
   const catalogo = await db
@@ -67,7 +67,7 @@ export async function obtenerPesosEfectivos(
 
 /**
  * Congela los pesos de un scope para una obra si aún no lo hizo (copia del
- * catálogo vigente a obc.obra_pesos). Idempotente y a prueba de carreras vía
+ * catálogo vigente a pro_obc.obra_pesos). Idempotente y a prueba de carreras vía
  * NOT EXISTS con UPDLOCK+HOLDLOCK. Debe correr dentro de la transacción del avance.
  */
 export async function congelarScopeSiHaceFalta(
@@ -78,7 +78,7 @@ export async function congelarScopeSiHaceFalta(
   tipoCasa: string,
 ): Promise<boolean> {
   const tabla =
-    ambito === 'sprint' ? 'obc.sub_partida_pesos_sprint' : 'obc.sub_partida_pesos_partida';
+    ambito === 'sprint' ? 'pro_obc.sub_partida_pesos_sprint' : 'pro_obc.sub_partida_pesos_partida';
   const col = ambito === 'sprint' ? 'sprint_numero' : 'partida_id';
 
   const r = await new sql.Request(tx)
@@ -87,12 +87,12 @@ export async function congelarScopeSiHaceFalta(
     .input('scope', sql.Int, scopeId)
     .input('tc', sql.VarChar(20), tipoCasa)
     .query(`
-      INSERT INTO obc.obra_pesos (obra_codigo, ambito, scope_id, sub_partida_id, tipo_casa, peso)
+      INSERT INTO pro_obc.obra_pesos (obra_codigo, ambito, scope_id, sub_partida_id, tipo_casa, peso)
       SELECT @obra, @ambito, @scope, c.sub_partida_id, c.tipo_casa, c.peso
       FROM ${tabla} c
       WHERE c.${col} = @scope AND c.tipo_casa = @tc
         AND NOT EXISTS (
-          SELECT 1 FROM obc.obra_pesos op WITH (UPDLOCK, HOLDLOCK)
+          SELECT 1 FROM pro_obc.obra_pesos op WITH (UPDLOCK, HOLDLOCK)
           WHERE op.obra_codigo = @obra AND op.ambito = @ambito
             AND op.scope_id = @scope AND op.sub_partida_id = c.sub_partida_id
         )

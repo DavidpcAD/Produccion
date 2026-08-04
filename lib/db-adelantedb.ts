@@ -1,14 +1,16 @@
 import sql from 'mssql';
 
-// Conexión a AdelanteDB — base del Grupo B (módulos avance / concreto / utilidades),
-// distinta de la del resto del app (AdelanteSBX, en lib/db.ts). Vive en el MISMO servidor
-// Azure SQL y usa las MISMAS credenciales; solo cambia el nombre de base.
+// Conexión de los módulos del Grupo B (avance / concreto / utilidades / desembolsos).
+// Desde 2026-08-04 apunta a AdelanteSBX: el esquema de AdelanteDB se replicó a SBX bajo
+// schemas con prefijo `pro_*` (pro_obc / pro_hor / pro_lab / pro_uti / pro_app / pro_bi /
+// pro_ventas) y el SQL del app ya referencia esos schemas. Mismo servidor y credenciales
+// que getDb() de lib/db.ts; se mantiene por compatibilidad de env (ADELANTEDB_NAME).
 //
 // Importante: usamos un ConnectionPool PROPIO (no el `sql.connect` global de mssql) para
 // que esta conexión no choque con el pool global que usa getDb() de lib/db.ts.
 const config: sql.config = {
   server: (process.env.ADELANTEDB_SERVER || process.env.DB_SERVER || process.env.SQL_SERVER)!,
-  database: process.env.ADELANTEDB_NAME || 'AdelanteDB',
+  database: process.env.ADELANTEDB_NAME || 'AdelanteSBX',
   user: (process.env.ADELANTEDB_USER || process.env.DB_USER || process.env.SQL_USER)!,
   password: (process.env.ADELANTEDB_PASSWORD || process.env.DB_PASSWORD || process.env.SQL_PASSWORD)!,
   port: parseInt(process.env.DB_PORT || '1433'),

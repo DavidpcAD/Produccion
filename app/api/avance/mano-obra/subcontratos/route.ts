@@ -21,7 +21,7 @@ export async function GET() {
     const db = await getAdelanteDb();
     const r = await db.request().query<Subcontrato>(`
       SELECT id, semana_operativa_id, obra_codigo, tipo, monto, descripcion
-      FROM obc.mo_subcontratos
+      FROM pro_obc.mo_subcontratos
       ORDER BY semana_operativa_id DESC, id DESC
     `);
     return NextResponse.json({ subcontratos: r.recordset });
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       .input('monto', sql.Decimal(18, 2), monto)
       .input('desc', sql.NVarChar(500), descripcion)
       .query<{ id: number }>(`
-        INSERT INTO obc.mo_subcontratos (semana_operativa_id, obra_codigo, tipo, monto, descripcion)
+        INSERT INTO pro_obc.mo_subcontratos (semana_operativa_id, obra_codigo, tipo, monto, descripcion)
         OUTPUT INSERTED.id
         VALUES (@sem, @obra, @tipo, @monto, @desc)
       `);

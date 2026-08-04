@@ -15,9 +15,9 @@ import type {
 
 // Portado de `api/src/lib/umbrales-dominio.ts`, `densidades-dominio.ts` y la
 // parte de actividades de `lab-dominio.ts`. CRUD del área de Configuración:
-//   - hor.umbrales_alerta       (umbrales de alerta parametrizables)
-//   - hor.densidades_materiales (densidades por material)
-//   - lab.actividades           (catálogo de actividades — solo escritura acá;
+//   - pro_hor.umbrales_alerta       (umbrales de alerta parametrizables)
+//   - pro_hor.densidades_materiales (densidades por material)
+//   - pro_lab.actividades           (catálogo de actividades — solo escritura acá;
 //     el listado vive en `./lab` como `listarActividades`)
 //
 // Los errores de dominio (clave duplicada, no encontrada, body vacío) se lanzan
@@ -34,7 +34,7 @@ export class ErrorConfig extends Error {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Umbrales de alerta (hor.umbrales_alerta)
+// Umbrales de alerta (pro_hor.umbrales_alerta)
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface FilaUmbral {
@@ -66,7 +66,7 @@ export async function listarUmbrales(pool: sqlModule.ConnectionPool): Promise<Um
   const r = await pool.request().query<FilaUmbral>(`
     SELECT clave, descripcion, umbral, comparador, unidad, activo,
            actualizado_en, actualizado_por_email
-    FROM hor.umbrales_alerta
+    FROM pro_hor.umbrales_alerta
     ORDER BY clave
   `);
   return r.recordset.map(mapearUmbral);
@@ -113,7 +113,7 @@ export async function actualizarUmbral(
   sets.push('actualizado_por_email = @email');
 
   const r = await req.query<FilaUmbral>(`
-    UPDATE hor.umbrales_alerta
+    UPDATE pro_hor.umbrales_alerta
     SET ${sets.join(', ')}
     OUTPUT INSERTED.clave, INSERTED.descripcion, INSERTED.umbral, INSERTED.comparador,
            INSERTED.unidad, INSERTED.activo, INSERTED.actualizado_en,
@@ -128,7 +128,7 @@ export async function actualizarUmbral(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Densidades de materiales (hor.densidades_materiales)
+// Densidades de materiales (pro_hor.densidades_materiales)
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface FilaDensidad {
@@ -164,7 +164,7 @@ export async function listarDensidades(
   const r = await pool.request().query<FilaDensidad>(`
     SELECT clave, nombre, codigo_bc, densidad, unidad, notas, activo,
            actualizado_en, actualizado_por_email
-    FROM hor.densidades_materiales
+    FROM pro_hor.densidades_materiales
     ORDER BY activo DESC, nombre
   `);
   return r.recordset.map(mapearDensidad);
@@ -187,7 +187,7 @@ export async function crearDensidad(
       .input('oid', sql.NVarChar(100), usuario.oid)
       .input('email', sql.NVarChar(200), usuario.email)
       .query<FilaDensidad>(`
-        INSERT INTO hor.densidades_materiales
+        INSERT INTO pro_hor.densidades_materiales
           (clave, nombre, codigo_bc, densidad, unidad, notas,
            actualizado_por_oid, actualizado_por_email)
         OUTPUT INSERTED.clave, INSERTED.nombre, INSERTED.codigo_bc, INSERTED.densidad,
@@ -255,7 +255,7 @@ export async function actualizarDensidad(
   sets.push('actualizado_por_email = @email');
 
   const r = await req.query<FilaDensidad>(`
-    UPDATE hor.densidades_materiales
+    UPDATE pro_hor.densidades_materiales
     SET ${sets.join(', ')}
     OUTPUT INSERTED.clave, INSERTED.nombre, INSERTED.codigo_bc, INSERTED.densidad,
            INSERTED.unidad, INSERTED.notas, INSERTED.activo, INSERTED.actualizado_en,
@@ -270,7 +270,7 @@ export async function actualizarDensidad(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Actividades de laboratorio (lab.actividades) — solo escritura.
+// Actividades de laboratorio (pro_lab.actividades) — solo escritura.
 // El listado (`listarActividades`) vive en `./lab`.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -284,7 +284,7 @@ export async function crearActividad(
       .input('nombre', sql.NVarChar(100), body.nombre)
       .input('orden', sql.Int, body.orden ?? 0)
       .query<{ id: number; nombre: string; activo: boolean; orden: number }>(`
-        INSERT INTO lab.actividades (nombre, orden)
+        INSERT INTO pro_lab.actividades (nombre, orden)
         OUTPUT INSERTED.id, INSERTED.nombre, INSERTED.activo, INSERTED.orden
         VALUES (@nombre, @orden)
       `);
@@ -326,7 +326,7 @@ export async function actualizarActividad(
     throw new ErrorConfig('SIN_CAMBIOS', 'Body vacío: nada que actualizar.', 400);
   }
   const r = await req.query<{ id: number; nombre: string; activo: boolean; orden: number }>(`
-    UPDATE lab.actividades
+    UPDATE pro_lab.actividades
     SET ${sets.join(', ')}
     OUTPUT INSERTED.id, INSERTED.nombre, INSERTED.activo, INSERTED.orden
     WHERE id = @id

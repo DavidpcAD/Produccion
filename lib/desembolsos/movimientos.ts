@@ -3,13 +3,13 @@ import { sql } from '@/lib/db-adelantedb';
 
 /**
  * Movimientos de Flujo de Desembolsos — portado (read-only) de las Azure
- * Functions `movimientos.ts` y `movimientosDbo.ts`. Lee dbo.Movimientos vía la
- * vista [app].vw_movimientos_caso, más los hitos vinculables del caso
+ * Functions `movimientos.ts` y `movimientosDbo.ts`. Lee pro_ventas.Movimientos vía la
+ * vista [pro_app].vw_movimientos_caso, más los hitos vinculables del caso
  * (esquema del banco + huérfanos) y los links existentes en
- * [app].movimiento_hito_link.
+ * [pro_app].movimiento_hito_link.
  *
  * NOTA: la CAPTURA/edición de movimientos y la (des)vinculación a hitos ocurren
- * mediante stored procedures ([app].sp_vincular_a_hito_de_caso, etc.) que NO
+ * mediante stored procedures ([pro_app].sp_vincular_a_hito_de_caso, etc.) que NO
  * están desplegados en AdelanteDB, por lo que aquí solo se portan las lecturas.
  */
 
@@ -251,12 +251,12 @@ export async function listarMovimientosGlobal(
 
   let joinBanco = '';
   if (filtro.idBanco) {
-    joinBanco = 'INNER JOIN dbo.Casos cs2 ON cs2.IDCaso = vw.IDCaso AND cs2.IDBanco = @idBanco';
+    joinBanco = 'INNER JOIN pro_ventas.Casos cs2 ON cs2.IDCaso = vw.IDCaso AND cs2.IDBanco = @idBanco';
     request.input('idBanco', sql.Int, filtro.idBanco);
   }
   let joinProyecto = '';
   if (filtro.idProyecto) {
-    joinProyecto = 'INNER JOIN dbo.Lotes lt2 ON lt2.IDLote = vw.IDLote AND lt2.IDProyecto = @idProyecto';
+    joinProyecto = 'INNER JOIN pro_ventas.Lotes lt2 ON lt2.IDLote = vw.IDLote AND lt2.IDProyecto = @idProyecto';
     request.input('idProyecto', sql.Int, filtro.idProyecto);
   }
 
@@ -266,9 +266,9 @@ export async function listarMovimientosGlobal(
       vw.*,
       csB.IDBanco     AS IDBanco,
       ltB.IDProyecto  AS IDProyecto
-    FROM [app].vw_movimientos_caso vw
-    LEFT JOIN dbo.Casos csB ON csB.IDCaso = vw.IDCaso
-    LEFT JOIN dbo.Lotes ltB ON ltB.IDLote = vw.IDLote
+    FROM [pro_app].vw_movimientos_caso vw
+    LEFT JOIN pro_ventas.Casos csB ON csB.IDCaso = vw.IDCaso
+    LEFT JOIN pro_ventas.Lotes ltB ON ltB.IDLote = vw.IDLote
     ${joinBanco}
     ${joinProyecto}
     ${whereClause}
@@ -320,7 +320,7 @@ export async function listarMovimientosDelCaso(
     .request()
     .input('id', sql.Int, idCaso)
     .query<RawMovimientoCaso>(`
-      SELECT * FROM [app].vw_movimientos_caso
+      SELECT * FROM [pro_app].vw_movimientos_caso
       WHERE IDCaso = @id
       ORDER BY FechaRealizado DESC, IDMovimiento DESC;
     `);
@@ -333,15 +333,15 @@ export async function listarMovimientosDelCaso(
       WITH HitosVigentes AS (
         SELECT cs.IDCaso, e.IDHito, e.OrdenEnEsquema, e.PorcentajeDesembolso, e.EsMontoFijo,
                CAST(0 AS BIT) AS EsHuerfano
-        FROM dbo.Casos cs
-        INNER JOIN [app].banco_esquema_desembolso e ON e.IDBan = cs.IDBanco AND e.VigenteHasta IS NULL
+        FROM pro_ventas.Casos cs
+        INNER JOIN [pro_app].banco_esquema_desembolso e ON e.IDBan = cs.IDBanco AND e.VigenteHasta IS NULL
         WHERE cs.IDCaso = @id
       ),
       HitosHuerfanos AS (
         SELECT chp.IDCaso, chp.IDHito, 999 AS OrdenEnEsquema,
                CAST(0 AS DECIMAL(5,2)) AS PorcentajeDesembolso,
                CAST(0 AS BIT) AS EsMontoFijo, CAST(1 AS BIT) AS EsHuerfano
-        FROM [app].caso_hito_proyeccion chp
+        FROM [pro_app].caso_hito_proyeccion chp
         WHERE chp.IDCaso = @id
           AND NOT EXISTS (SELECT 1 FROM HitosVigentes v WHERE v.IDCaso = chp.IDCaso AND v.IDHito = chp.IDHito)
       ),
@@ -367,11 +367,11 @@ export async function listarMovimientosDelCaso(
         CASE WHEN ISNULL(hp.NumPagos, 0) > 0 THEN 1 ELSE 0 END AS EstaCubierto,
         hp.UltimaFechaPago, th.EsHuerfano
       FROM TodosLosHitos th
-      INNER JOIN dbo.Casos cs ON cs.IDCaso = th.IDCaso
-      INNER JOIN [app].catalogo_hito h ON h.IDHito = th.IDHito
-      LEFT JOIN [app].caso_hito_proyeccion chp ON chp.IDCaso = th.IDCaso AND chp.IDHito = th.IDHito
-      LEFT JOIN [app].vw_hitos_con_pagos hp ON hp.IDCasoHito = chp.IDCasoHito
-      LEFT JOIN [app].caso_lote_banco clb ON clb.IDCaso = th.IDCaso
+      INNER JOIN pro_ventas.Casos cs ON cs.IDCaso = th.IDCaso
+      INNER JOIN [pro_app].catalogo_hito h ON h.IDHito = th.IDHito
+      LEFT JOIN [pro_app].caso_hito_proyeccion chp ON chp.IDCaso = th.IDCaso AND chp.IDHito = th.IDHito
+      LEFT JOIN [pro_app].vw_hitos_con_pagos hp ON hp.IDCasoHito = chp.IDCasoHito
+      LEFT JOIN [pro_app].caso_lote_banco clb ON clb.IDCaso = th.IDCaso
       ORDER BY th.OrdenEnEsquema, h.Codigo;
     `);
 
@@ -383,10 +383,10 @@ export async function listarMovimientosDelCaso(
              tm.Abreviatura    AS AbreviaturaTipo,
              m.FechaMovimiento AS FechaRealizado,
              lk.MontoAplicado_CRC, lk.Notas
-      FROM [app].movimiento_hito_link lk
-      INNER JOIN dbo.Movimientos m ON m.IDMovimiento = lk.IDMovimiento
-      INNER JOIN dbo.TipMovi tm    ON tm.IDTmov = m.IDTipmov
-      INNER JOIN [app].caso_hito_proyeccion chp ON chp.IDCasoHito = lk.IDCasoHito
+      FROM [pro_app].movimiento_hito_link lk
+      INNER JOIN pro_ventas.Movimientos m ON m.IDMovimiento = lk.IDMovimiento
+      INNER JOIN pro_ventas.TipMovi tm    ON tm.IDTmov = m.IDTipmov
+      INNER JOIN [pro_app].caso_hito_proyeccion chp ON chp.IDCasoHito = lk.IDCasoHito
       WHERE chp.IDCaso = @id;
     `);
 
@@ -427,7 +427,7 @@ export async function listarMovimientosDelCaso(
 
 // --------------------------------------------------------- Tipos de movimiento
 
-/** Catálogo de tipos de movimiento (dbo.TipMovi vía vw_tipos_movimiento). */
+/** Catálogo de tipos de movimiento (pro_ventas.TipMovi vía vw_tipos_movimiento). */
 export async function listarTiposMovimiento(db: ConnectionPool): Promise<TipoMovimiento[]> {
   const r = await db.request().query<{
     IDTmov: number;
@@ -439,7 +439,7 @@ export async function listarTiposMovimiento(db: ConnectionPool): Promise<TipoMov
     TgSumaRestaMov: boolean | null;
   }>(`
     SELECT IDTmov, Abreviatura, TipoMovimiento, Categoria, Orden, TgDesembolso, TgSumaRestaMov
-    FROM [app].vw_tipos_movimiento
+    FROM [pro_app].vw_tipos_movimiento
     ORDER BY Orden, Abreviatura;
   `);
   return r.recordset.map((t) => ({

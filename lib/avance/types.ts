@@ -19,7 +19,7 @@ export type EstadoVenta = 'formalizada' | 'reservada' | 'disponible' | 'entregad
 /** Estado de avance visual de una sub-partida. */
 export type EstadoAvance = 'sin_iniciar' | 'en_progreso' | 'completada' | 'nc';
 
-/** Proyecto (chip del dashboard) — obc.vw_proyectos. */
+/** Proyecto (chip del dashboard) — pro_obc.vw_proyectos. */
 export interface Proyecto {
   id: number;
   codigo: string;
@@ -110,7 +110,7 @@ export interface MatrizAvance {
   obras: MatrizObraFila[];
 }
 
-/** Causa NC (obc.causas_catalogo). */
+/** Causa NC (pro_obc.causas_catalogo). */
 export interface Causa {
   id: number;
   codigo: string;

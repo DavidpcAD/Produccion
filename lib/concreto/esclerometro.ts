@@ -65,9 +65,9 @@ const SELECT_ENSAYO_BASE = `
     e.id_casa, e.elemento_estructural, e.edad_dias,
     e.angulo_impacto, e.equipo_serial, e.notas,
     e.creado_por_email, e.creado_en, e.actualizado_en,
-    (SELECT COUNT(*) FROM lab.esclerometro_rebotes r WHERE r.id_ensayo = e.id) AS cantidad_rebotes
-  FROM lab.esclerometro_ensayos e
-  LEFT JOIN bi.dim_obra obra
+    (SELECT COUNT(*) FROM pro_lab.esclerometro_rebotes r WHERE r.id_ensayo = e.id) AS cantidad_rebotes
+  FROM pro_lab.esclerometro_ensayos e
+  LEFT JOIN pro_bi.dim_obra obra
     ON obra.works_no COLLATE DATABASE_DEFAULT = e.obra_works_no COLLATE DATABASE_DEFAULT
 `;
 
@@ -157,7 +157,7 @@ export async function listarEnsayos(
       .request()
       .query<{ id_ensayo: number | string; valor_rebote: number | string }>(`
       SELECT id_ensayo, valor_rebote
-      FROM lab.esclerometro_rebotes
+      FROM pro_lab.esclerometro_rebotes
       WHERE id_ensayo IN (${lista})
       ORDER BY id_ensayo
     `);
@@ -175,8 +175,8 @@ export async function listarEnsayos(
 
   const rTotal = await bind(pool.request()).query<{ total: number }>(`
     SELECT COUNT(*) AS total
-    FROM lab.esclerometro_ensayos e
-    LEFT JOIN bi.dim_obra obra
+    FROM pro_lab.esclerometro_ensayos e
+    LEFT JOIN pro_bi.dim_obra obra
       ON obra.works_no COLLATE DATABASE_DEFAULT = e.obra_works_no COLLATE DATABASE_DEFAULT
     ${whereClause}
   `);
@@ -210,7 +210,7 @@ export async function obtenerEnsayo(
     .input('id', sql.BigInt, id)
     .query<FilaRebote>(`
     SELECT id, id_ensayo, numero_golpe, valor_rebote, notas
-    FROM lab.esclerometro_rebotes
+    FROM pro_lab.esclerometro_rebotes
     WHERE id_ensayo = @id
     ORDER BY numero_golpe
   `);
@@ -236,7 +236,7 @@ export async function crearEnsayo(
   const rMax = await pool
     .request()
     .query<{ next_num: number }>(
-      'SELECT ISNULL(MAX(numero), 0) + 1 AS next_num FROM lab.esclerometro_ensayos',
+      'SELECT ISNULL(MAX(numero), 0) + 1 AS next_num FROM pro_lab.esclerometro_ensayos',
     );
   const numero = rMax.recordset[0]?.next_num ?? 1;
 
@@ -254,7 +254,7 @@ export async function crearEnsayo(
     .input('oid', sql.NVarChar(100), usuario.oid)
     .input('email', sql.NVarChar(200), usuario.email)
     .query<{ id: number | string }>(`
-      INSERT INTO lab.esclerometro_ensayos (
+      INSERT INTO pro_lab.esclerometro_ensayos (
         numero, fecha, obra_works_no, id_casa, elemento_estructural,
         edad_dias, angulo_impacto, equipo_serial, notas,
         creado_por_oid, creado_por_email
@@ -321,7 +321,7 @@ export async function actualizarEnsayo(
   sets.push('actualizado_en = SYSUTCDATETIME()');
 
   const r = await req.query<{ id: number | string }>(`
-    UPDATE lab.esclerometro_ensayos
+    UPDATE pro_lab.esclerometro_ensayos
     SET ${sets.join(', ')}
     OUTPUT INSERTED.id
     WHERE id = @id
@@ -339,7 +339,7 @@ export async function eliminarEnsayo(pool: sqlModule.ConnectionPool, id: number)
     .request()
     .input('id', sql.BigInt, id)
     .query<{ rows: number }>(`
-      DELETE FROM lab.esclerometro_ensayos WHERE id = @id;
+      DELETE FROM pro_lab.esclerometro_ensayos WHERE id = @id;
       SELECT @@ROWCOUNT AS rows;
     `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {
@@ -360,7 +360,7 @@ export async function crearRebote(
   const rE = await pool
     .request()
     .input('id', sql.BigInt, idEnsayo)
-    .query<{ id: number }>('SELECT id FROM lab.esclerometro_ensayos WHERE id = @id');
+    .query<{ id: number }>('SELECT id FROM pro_lab.esclerometro_ensayos WHERE id = @id');
   if (!rE.recordset[0]) {
     throw new ErrorEsclerometro('ENSAYO_NO_ENCONTRADO', `Ensayo ${idEnsayo} no encontrado.`, 404);
   }
@@ -373,7 +373,7 @@ export async function crearRebote(
       .input('valor_rebote', sql.Decimal(5, 1), body.valor_rebote)
       .input('notas', sql.NVarChar(300), body.notas ?? null)
       .query<FilaRebote>(`
-        INSERT INTO lab.esclerometro_rebotes (id_ensayo, numero_golpe, valor_rebote, notas)
+        INSERT INTO pro_lab.esclerometro_rebotes (id_ensayo, numero_golpe, valor_rebote, notas)
         OUTPUT INSERTED.id, INSERTED.id_ensayo, INSERTED.numero_golpe,
                INSERTED.valor_rebote, INSERTED.notas
         VALUES (@id_ensayo, @numero_golpe, @valor_rebote, @notas)
@@ -416,7 +416,7 @@ export async function actualizarRebote(
     throw new ErrorEsclerometro('SIN_CAMBIOS', 'Body vacío: nada para actualizar.');
   }
   const r = await req.query<{ rows: number }>(`
-    UPDATE lab.esclerometro_rebotes SET ${sets.join(', ')} WHERE id = @id;
+    UPDATE pro_lab.esclerometro_rebotes SET ${sets.join(', ')} WHERE id = @id;
     SELECT @@ROWCOUNT AS rows;
   `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {
@@ -429,7 +429,7 @@ export async function eliminarRebote(pool: sqlModule.ConnectionPool, id: number)
     .request()
     .input('id', sql.BigInt, id)
     .query<{ rows: number }>(`
-      DELETE FROM lab.esclerometro_rebotes WHERE id = @id;
+      DELETE FROM pro_lab.esclerometro_rebotes WHERE id = @id;
       SELECT @@ROWCOUNT AS rows;
     `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {

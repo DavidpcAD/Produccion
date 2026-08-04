@@ -21,7 +21,7 @@ export async function GET() {
              CONVERT(varchar(10), fecha_inicio, 23) AS fecha_inicio,
              CONVERT(varchar(10), fecha_fin, 23) AS fecha_fin,
              estado, descripcion, dias_efectivos
-      FROM obc.semanas_operativas
+      FROM pro_obc.semanas_operativas
       WHERE estado = 'abierta'
       ORDER BY fecha_inicio DESC
     `);

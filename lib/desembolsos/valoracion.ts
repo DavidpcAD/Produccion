@@ -68,7 +68,7 @@ function toIsoDate(v: Date | string | null): string | null {
 export async function listarBancos(db: ConnectionPool): Promise<Banco[]> {
   const r = await db.request().query<Banco>(`
     SELECT IDBan, Abreviatura, NombreEntidad, ColorHEXBan AS ColorHexBanco, OrdenGal
-    FROM dbo.Bancos
+    FROM pro_ventas.Bancos
     ORDER BY ISNULL(OrdenGal, 999), Abreviatura
   `);
   return r.recordset;
@@ -91,9 +91,9 @@ export async function valoracionPorProyecto(db: ConnectionPool, idProyecto: numb
            b.ColorHEXBan AS ColorBanco, b.OrdenGal,
            v.IDValoracion, v.ValorM2Lote, v.Moneda, v.PorcentajeFinanciamiento,
            v.VigenteDesde, v.VigenteHasta, v.DiasVigencia, v.Notas, v.FechaCreacion
-    FROM dbo.Bancos b
+    FROM pro_ventas.Bancos b
     OUTER APPLY (
-      SELECT TOP 1 * FROM [app].vw_historico_valoracion_banco h
+      SELECT TOP 1 * FROM [pro_app].vw_historico_valoracion_banco h
       WHERE h.IDProyecto = @id AND h.IDBan = b.IDBan AND h.Estado = 'VIGENTE'
       ORDER BY h.VigenteDesde DESC
     ) v
@@ -138,7 +138,7 @@ export async function historicoPorProyectoBanco(db: ConnectionPool, idProyecto: 
     .input('idp', sql.Int, idProyecto)
     .input('idb', sql.Int, idBan)
     .query<ValoracionConfig & { VigenteDesde: Date; VigenteHasta: Date | null; FechaCreacion: Date }>(`
-      SELECT * FROM [app].vw_historico_valoracion_banco
+      SELECT * FROM [pro_app].vw_historico_valoracion_banco
       WHERE IDProyecto = @idp AND IDBan = @idb
       ORDER BY VigenteDesde DESC
     `);
@@ -191,7 +191,7 @@ export function validarCrear(b: Partial<CrearValoracionInput>): string | null {
   return null;
 }
 
-// Porta [app].sp_actualizar_valoracion_banco inline.
+// Porta [pro_app].sp_actualizar_valoracion_banco inline.
 export async function crearValoracion(db: ConnectionPool, i: CrearValoracionInput): Promise<{ IDValoracionCreada: number; IDValoracionCerrada: number | null }> {
   const r = await db.request()
     .input('IDProyecto', sql.Int, i.IDProyecto)
@@ -206,16 +206,16 @@ export async function crearValoracion(db: ConnectionPool, i: CrearValoracionInpu
       SET NOCOUNT ON; SET XACT_ABORT ON;
       IF NOT EXISTS (SELECT 1 FROM dbo.Proyecto WHERE IDProyecto = @IDProyecto)
         THROW 51200, 'IDProyecto inválido o no existe.', 1;
-      IF NOT EXISTS (SELECT 1 FROM dbo.Bancos WHERE IDBan = @IDBan)
+      IF NOT EXISTS (SELECT 1 FROM pro_ventas.Bancos WHERE IDBan = @IDBan)
         THROW 51201, 'IDBan inválido o no existe.', 1;
       IF @ValorM2Lote <= 0 THROW 51202, 'ValorM2Lote debe ser mayor a 0.', 1;
       IF @PorcentajeFinanciamiento <= 0 OR @PorcentajeFinanciamiento > 100
         THROW 51203, 'PorcentajeFinanciamiento debe estar entre 0 y 100.', 1;
-      IF EXISTS (SELECT 1 FROM [app].banco_valoracion_lote
+      IF EXISTS (SELECT 1 FROM [pro_app].banco_valoracion_lote
                  WHERE IDProyecto = @IDProyecto AND IDBan = @IDBan AND VigenteDesde = @VigenteDesde)
         THROW 51205, 'Ya existe una valoración para ese proyecto/banco con esa fecha.', 1;
       DECLARE @UltimaVigenteDesde DATE = (
-        SELECT MAX(VigenteDesde) FROM [app].banco_valoracion_lote
+        SELECT MAX(VigenteDesde) FROM [pro_app].banco_valoracion_lote
         WHERE IDProyecto = @IDProyecto AND IDBan = @IDBan AND VigenteHasta IS NULL);
       IF @UltimaVigenteDesde IS NOT NULL AND @VigenteDesde <= @UltimaVigenteDesde
         THROW 51206, 'La nueva vigencia debe ser posterior a la valoración actual del proyecto/banco.', 1;
@@ -223,16 +223,16 @@ export async function crearValoracion(db: ConnectionPool, i: CrearValoracionInpu
         BEGIN TRANSACTION;
         DECLARE @IDValoracionCerrada INT;
         DECLARE @VigenteHastaCerrada DATE = DATEADD(DAY, -1, @VigenteDesde);
-        UPDATE [app].banco_valoracion_lote
+        UPDATE [pro_app].banco_valoracion_lote
         SET VigenteHasta = @VigenteHastaCerrada, @IDValoracionCerrada = IDValoracion
         WHERE IDProyecto = @IDProyecto AND IDBan = @IDBan AND VigenteHasta IS NULL;
         IF @IDValoracionCerrada IS NOT NULL
-          INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorNuevoJSON, Contexto)
-          VALUES ('app.banco_valoracion_lote', @IDValoracionCerrada, 'UPDATE', @UsuarioEmail,
+          INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorNuevoJSON, Contexto)
+          VALUES ('pro_app.banco_valoracion_lote', @IDValoracionCerrada, 'UPDATE', @UsuarioEmail,
                   (SELECT VigenteHasta = @VigenteHastaCerrada FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
                   CONCAT('Cierre de vigencia por nueva valoración (proy=', @IDProyecto, ', ban=', @IDBan, ')'));
         DECLARE @NuevoID INT;
-        INSERT INTO [app].banco_valoracion_lote
+        INSERT INTO [pro_app].banco_valoracion_lote
           (IDProyecto, IDBan, ValorM2Lote, Moneda, PorcentajeFinanciamiento, VigenteDesde, VigenteHasta, Notas)
         VALUES (@IDProyecto, @IDBan, @ValorM2Lote, @Moneda, @PorcentajeFinanciamiento, @VigenteDesde, NULL, @Notas);
         SET @NuevoID = SCOPE_IDENTITY();
@@ -241,8 +241,8 @@ export async function crearValoracion(db: ConnectionPool, i: CrearValoracionInpu
                  Moneda = @Moneda, PorcentajeFinanciamiento = @PorcentajeFinanciamiento,
                  VigenteDesde = @VigenteDesde, Notas = @Notas
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorNuevoJSON, Contexto)
-        VALUES ('app.banco_valoracion_lote', @NuevoID, 'INSERT', @UsuarioEmail, @ValorJSON,
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.banco_valoracion_lote', @NuevoID, 'INSERT', @UsuarioEmail, @ValorJSON,
                 CONCAT('Nueva valoración (proy=', @IDProyecto, ', ban=', @IDBan, ')'));
         COMMIT TRANSACTION;
         SELECT @NuevoID AS IDValoracionCreada, @IDValoracionCerrada AS IDValoracionCerrada;
@@ -266,7 +266,7 @@ export interface EditarVigenteInput {
   UsuarioEmail: string;
 }
 
-// Porta [app].sp_editar_valoracion_vigente_banco inline.
+// Porta [pro_app].sp_editar_valoracion_vigente_banco inline.
 export async function editarVigente(db: ConnectionPool, i: EditarVigenteInput): Promise<{ IDValoracionEditada: number }> {
   const r = await db.request()
     .input('IDProyecto', sql.Int, i.IDProyecto)
@@ -280,13 +280,13 @@ export async function editarVigente(db: ConnectionPool, i: EditarVigenteInput): 
       SET NOCOUNT ON; SET XACT_ABORT ON;
       IF NOT EXISTS (SELECT 1 FROM dbo.Proyecto WHERE IDProyecto = @IDProyecto)
         THROW 51700, 'IDProyecto inválido o no existe.', 1;
-      IF NOT EXISTS (SELECT 1 FROM dbo.Bancos WHERE IDBan = @IDBan)
+      IF NOT EXISTS (SELECT 1 FROM pro_ventas.Bancos WHERE IDBan = @IDBan)
         THROW 51701, 'IDBan inválido o no existe.', 1;
       IF @ValorM2Lote <= 0 THROW 51702, 'ValorM2Lote debe ser mayor a 0.', 1;
       IF @PorcentajeFinanciamiento <= 0 OR @PorcentajeFinanciamiento > 100
         THROW 51703, 'PorcentajeFinanciamiento debe estar entre 0 y 100.', 1;
       DECLARE @IDValoracion INT = (
-        SELECT TOP 1 IDValoracion FROM [app].banco_valoracion_lote
+        SELECT TOP 1 IDValoracion FROM [pro_app].banco_valoracion_lote
         WHERE IDProyecto = @IDProyecto AND IDBan = @IDBan AND VigenteHasta IS NULL
         ORDER BY VigenteDesde DESC);
       IF @IDValoracion IS NULL
@@ -295,9 +295,9 @@ export async function editarVigente(db: ConnectionPool, i: EditarVigenteInput): 
         BEGIN TRANSACTION;
         DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (
           SELECT IDProyecto, IDBan, ValorM2Lote, Moneda, PorcentajeFinanciamiento, Notas
-          FROM [app].banco_valoracion_lote WHERE IDValoracion = @IDValoracion
+          FROM [pro_app].banco_valoracion_lote WHERE IDValoracion = @IDValoracion
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        UPDATE [app].banco_valoracion_lote
+        UPDATE [pro_app].banco_valoracion_lote
         SET ValorM2Lote = @ValorM2Lote, Moneda = @Moneda,
             PorcentajeFinanciamiento = @PorcentajeFinanciamiento, Notas = @Notas
         WHERE IDValoracion = @IDValoracion;
@@ -305,8 +305,8 @@ export async function editarVigente(db: ConnectionPool, i: EditarVigenteInput): 
           SELECT IDProyecto = @IDProyecto, IDBan = @IDBan, ValorM2Lote = @ValorM2Lote,
                  Moneda = @Moneda, PorcentajeFinanciamiento = @PorcentajeFinanciamiento, Notas = @Notas
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.banco_valoracion_lote', @IDValoracion, 'UPDATE', @UsuarioEmail,
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.banco_valoracion_lote', @IDValoracion, 'UPDATE', @UsuarioEmail,
                 @ValorAnteriorJSON, @ValorNuevoJSON,
                 CONCAT('Edición in-place de valoración vigente (proy=', @IDProyecto, ', ban=', @IDBan, ')'));
         COMMIT TRANSACTION;

@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  *   GET /api/avance/tipos-casa → { tipos: TipoCasaSprints[], catalogo: SprintCatalogo[] }
  *
  * La secuencia editable de cada tipo se guarda con PUT /api/avance/tipos-casa/{tipo}.
- * El catálogo de sprints (obc.sprints_catalogo) se devuelve aquí mismo para que
+ * El catálogo de sprints (pro_obc.sprints_catalogo) se devuelve aquí mismo para que
  * la pantalla pinte las casillas sin un endpoint aparte.
  */
 
@@ -25,24 +25,24 @@ export async function GET() {
   try {
     const db = await getAdelanteDb();
 
-    // Sprints por tipo (obc.tipo_casa_sprints), en orden.
+    // Sprints por tipo (pro_obc.tipo_casa_sprints), en orden.
     const secQ = await db.request().query<{ tipo_casa: TipoCasa; sprint_global: number }>(`
       SELECT tipo_casa, sprint_global
-      FROM obc.tipo_casa_sprints
+      FROM pro_obc.tipo_casa_sprints
       ORDER BY tipo_casa, orden
     `);
 
-    // Descripción de cada tipo (obc.tipos_casa).
+    // Descripción de cada tipo (pro_obc.tipos_casa).
     const descQ = await db.request().query<{ codigo: TipoCasa; descripcion: string }>(`
-      SELECT codigo, descripcion FROM obc.tipos_casa
+      SELECT codigo, descripcion FROM pro_obc.tipos_casa
     `);
     const descPorTipo = new Map<string, string>();
     for (const d of descQ.recordset) descPorTipo.set(d.codigo, d.descripcion);
 
-    // Catálogo global de sprints activos (obc.sprints_catalogo).
+    // Catálogo global de sprints activos (pro_obc.sprints_catalogo).
     const catQ = await db.request().query<SprintCatalogo>(`
       SELECT numero_global, nombre, es_espera, categoria
-      FROM obc.sprints_catalogo
+      FROM pro_obc.sprints_catalogo
       WHERE activo = 1
       ORDER BY numero_global
     `);

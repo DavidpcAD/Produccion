@@ -373,7 +373,7 @@ export async function listarDesembolsos(
         v.*,
         rd.RealDesembolsado_CRC,
         rd.CantidadMovsVinculados
-      FROM [app].vw_proyeccion_desembolsos v
+      FROM [pro_app].vw_proyeccion_desembolsos v
       LEFT JOIN (
         SELECT
           mhl.IDCasoHito,
@@ -384,11 +384,11 @@ export async function listarDesembolsos(
           SUM(CAST(m.MontoColones AS DECIMAL(38, 4)) * mhl.MontoAplicado_CRC / NULLIF(sa.SumAplicado, 0))
             AS RealDesembolsado_CRC,
           COUNT(*) AS CantidadMovsVinculados
-        FROM [app].movimiento_hito_link mhl
-        INNER JOIN dbo.Movimientos m ON m.IDMovimiento = mhl.IDMovimiento
+        FROM [pro_app].movimiento_hito_link mhl
+        INNER JOIN pro_ventas.Movimientos m ON m.IDMovimiento = mhl.IDMovimiento
         INNER JOIN (
           SELECT IDMovimiento, SUM(MontoAplicado_CRC) AS SumAplicado
-          FROM [app].movimiento_hito_link
+          FROM [pro_app].movimiento_hito_link
           GROUP BY IDMovimiento
         ) sa ON sa.IDMovimiento = mhl.IDMovimiento
         GROUP BY mhl.IDCasoHito
@@ -412,8 +412,8 @@ export async function listarDesembolsos(
                    PARTITION BY v.IDCaso ORDER BY v.OrdenEnEsquema
                  )
                END AS rn
-        FROM [app].vw_proyeccion_desembolsos v
-        INNER JOIN dbo.Casos cs ON cs.IDCaso = v.IDCaso
+        FROM [pro_app].vw_proyeccion_desembolsos v
+        INNER JOIN pro_ventas.Casos cs ON cs.IDCaso = v.IDCaso
         WHERE cs.IDEstado IN (2, 4)
           AND v.HitoCubierto = 0
           AND (v.FechaProyectada IS NULL
@@ -434,8 +434,8 @@ export async function listarDesembolsos(
     .input('hasta', sql.Date, hasta)
     .query<DbDesembolso>(`
       SELECT v.*
-      FROM [app].vw_proyeccion_desembolsos v
-      INNER JOIN dbo.Casos cs ON cs.IDCaso = v.IDCaso
+      FROM [pro_app].vw_proyeccion_desembolsos v
+      INNER JOIN pro_ventas.Casos cs ON cs.IDCaso = v.IDCaso
       WHERE cs.IDEstado IN (2, 4)
         AND v.HitoCubierto = 0
         AND (v.FechaProyectada IS NULL
@@ -508,8 +508,8 @@ export async function listarDesembolsos(
           WHEN v.FechaProyectada BETWEEN @desde AND @hasta THEN CAST(1 AS BIT)
           ELSE CAST(0 AS BIT)
         END AS EnRango
-      FROM [app].vw_credito_puente_lote_hito v
-      INNER JOIN [app].credito_puente cp ON cp.IDCreditoPuente = v.IDCreditoPuente
+      FROM [pro_app].vw_credito_puente_lote_hito v
+      INNER JOIN [pro_app].credito_puente cp ON cp.IDCreditoPuente = v.IDCreditoPuente
       WHERE cp.Estado = 'ACTIVO'
       ORDER BY v.AbrevBancoCP, v.AbreviaturaProyecto, v.CodigoLote, v.OrdenEnEsquema;
     `);
@@ -579,10 +579,10 @@ export async function listarDesembolsos(
         cpl.FechaConfirmacionCancelacion,
         cpl.MontoConfirmadoAlBanco_CRC,
         cpl.Notas
-      FROM [app].credito_puente_lote cpl
-      INNER JOIN [app].credito_puente cp ON cp.IDCreditoPuente = cpl.IDCreditoPuente
-      INNER JOIN dbo.Bancos b            ON b.IDBan = cp.IDBan
-      INNER JOIN dbo.Lotes l             ON l.IDLote = cpl.IDLote
+      FROM [pro_app].credito_puente_lote cpl
+      INNER JOIN [pro_app].credito_puente cp ON cp.IDCreditoPuente = cpl.IDCreditoPuente
+      INNER JOIN pro_ventas.Bancos b            ON b.IDBan = cp.IDBan
+      INNER JOIN pro_ventas.Lotes l             ON l.IDLote = cpl.IDLote
       INNER JOIN dbo.Proyecto p          ON p.IDProyecto = l.IDProyecto
       WHERE cpl.Estado IN ('CANCELACION_PROGRAMADA', 'CANCELACION_CONFIRMADA')
         AND COALESCE(cpl.FechaConfirmacionCancelacion, cpl.FechaCancelacionAlBanco) BETWEEN @desde AND @hasta
@@ -614,7 +614,7 @@ export async function listarDesembolsos(
     .input('hasta', sql.Date, hasta)
     .query<{ IDCaso: number }>(`
       SELECT DISTINCT IDCaso
-      FROM [app].pago_cliente
+      FROM [pro_app].pago_cliente
       WHERE Concepto = 'LOTE'
         AND FechaPlaneada BETWEEN @desde AND @hasta;
     `);
@@ -650,9 +650,9 @@ export async function listarDesembolsos(
         d.NombreEntidad         AS Nombre,
         d.PctEntidad            AS Porcentaje,
         d.MontoEntidad_CRC      AS Monto
-      FROM [app].vw_distribucion_caso d
-      INNER JOIN dbo.Casos c ON c.IDCaso = d.IDCaso
-      INNER JOIN dbo.Lotes l ON l.IDLote = c.IDLote
+      FROM [pro_app].vw_distribucion_caso d
+      INNER JOIN pro_ventas.Casos c ON c.IDCaso = d.IDCaso
+      INNER JOIN pro_ventas.Lotes l ON l.IDLote = c.IDLote
       WHERE d.IDCaso IN (${params})
       ORDER BY d.IDCaso, d.PctEntidad DESC
     `);
@@ -728,14 +728,14 @@ export async function actualizarProyeccion(
         cs.IDEstado,
         h.Codigo                AS CodigoHito,
         (SELECT TOP 1 pf.NivelConfianza
-         FROM [app].proyeccion_formalizacion pf
+         FROM [pro_app].proyeccion_formalizacion pf
          WHERE pf.IDCaso = cs.IDCaso AND pf.Activa = 1
          ORDER BY pf.IDProyeccion DESC) AS NivelConfianzaActual,
         (SELECT TOP 1 chp.FechaRealHito
-         FROM [app].caso_hito_proyeccion chp
+         FROM [pro_app].caso_hito_proyeccion chp
          WHERE chp.IDCaso = cs.IDCaso AND chp.IDHito = @idHito) AS FechaRealHito
-      FROM dbo.Casos cs
-      INNER JOIN [app].catalogo_hito h ON h.IDHito = @idHito
+      FROM pro_ventas.Casos cs
+      INNER JOIN [pro_app].catalogo_hito h ON h.IDHito = @idHito
       WHERE cs.IDCaso = @idCaso;
     `);
   const ctxRow = ctxResult.recordset[0];
@@ -776,7 +776,7 @@ export async function actualizarProyeccion(
       .input('Notas', sql.NVarChar(1000), body.Notas ?? null)
       .input('UsuarioEmail', sql.NVarChar(200), usuarioEmail)
       .execute<{ IDProyeccionCreada: number }>(
-        '[app].sp_actualizar_proyeccion_formalizacion',
+        '[pro_app].sp_actualizar_proyeccion_formalizacion',
       );
     const row = result.recordset[0];
     return { IDProyeccion: row?.IDProyeccionCreada ?? 0 };
@@ -797,7 +797,7 @@ export async function actualizarProyeccion(
   request.input('UsuarioEmail', sql.NVarChar(200), usuarioEmail);
 
   const result = await request.execute<{ IDProyeccion: number }>(
-    '[app].sp_upsert_proyeccion_caso',
+    '[pro_app].sp_upsert_proyeccion_caso',
   );
   const row = result.recordset[0];
   if (!row) throw new Error('SP no devolvió fila de resultado');

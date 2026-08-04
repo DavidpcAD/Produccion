@@ -8,8 +8,8 @@ import { sql } from '@/lib/db-adelantedb';
  *   - migrarEsquemaVigente: sincroniza los hitos del caso con el esquema
  *     vigente del banco (sp_migrar_caso_a_esquema_vigente).
  *
- * Tablas/vistas: [app].vw_casos_activos, dbo.Casos, dbo.Clientes, dbo.Lotes,
- * dbo.Proyecto, dbo.Bancos.
+ * Tablas/vistas: [pro_app].vw_casos_activos, pro_ventas.Casos, pro_ventas.Clientes, pro_ventas.Lotes,
+ * dbo.Proyecto, pro_ventas.Bancos.
  */
 
 // --------------------------------------------------------------------- Tipos
@@ -105,7 +105,7 @@ export async function listarCasos(db: ConnectionPool): Promise<RespuestaCasos> {
       NombreProyecto, AbrevProyecto, NombreBloque, CodigoLote,
       NombreModelo, NombreBanco, AbrevBanco, ColorBanco,
       PrecioVenta, FechaFormalizacion, FechaReserva
-    FROM [app].vw_casos_activos
+    FROM [pro_app].vw_casos_activos
     ORDER BY IDEstado, FechaFormalizacion DESC, FechaReserva DESC
   `);
 
@@ -176,11 +176,11 @@ export async function buscarCasos(
         l.Area,
         cs.PrecioVenta,
         cs.TipoCambio
-      FROM dbo.Casos cs
-      LEFT JOIN dbo.Clientes cl ON cl.IDCliente = cs.IDCliente
-      LEFT JOIN dbo.Lotes l ON l.IDLote = cs.IDLote
+      FROM pro_ventas.Casos cs
+      LEFT JOIN pro_ventas.Clientes cl ON cl.IDCliente = cs.IDCliente
+      LEFT JOIN pro_ventas.Lotes l ON l.IDLote = cs.IDLote
       LEFT JOIN dbo.Proyecto p ON p.IDProyecto = l.IDProyecto
-      LEFT JOIN dbo.Bancos b ON b.IDBan = cs.IDBanco
+      LEFT JOIN pro_ventas.Bancos b ON b.IDBan = cs.IDBanco
       WHERE (cs.DetCaso LIKE @q
          OR cl.NombreCompleto LIKE @q
          OR l.Lote LIKE @q
@@ -223,7 +223,7 @@ export async function migrarEsquemaVigente(
     .request()
     .input('IDCaso', sql.Int, idCaso)
     .input('UsuarioEmail', sql.NVarChar(200), usuarioEmail)
-    .execute<MigrarEsquemaResponse>('[app].sp_migrar_caso_a_esquema_vigente');
+    .execute<MigrarEsquemaResponse>('[pro_app].sp_migrar_caso_a_esquema_vigente');
   const row = result.recordset[0];
   if (!row) throw new Error('SP no devolvió fila');
   return row;

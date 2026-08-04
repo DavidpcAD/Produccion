@@ -23,7 +23,7 @@ function parseId(v: string): number | null {
 
 async function contarLinks(db: Awaited<ReturnType<typeof getAdelanteDb>>, idMov: number): Promise<number> {
   const r = await db.request().input('idMov', sql.Int, idMov).query<{ n: number }>(`
-    SELECT COUNT(*) AS n FROM [app].credito_puente_link WHERE IDMovCP = @idMov
+    SELECT COUNT(*) AS n FROM [pro_app].credito_puente_link WHERE IDMovCP = @idMov
   `);
   return r.recordset[0]?.n ?? 0;
 }
@@ -61,7 +61,7 @@ export async function PATCH(
     const db = await getAdelanteDb();
     // El mov debe existir y pertenecer al crédito indicado.
     const actual = await db.request().input('idMov', sql.Int, idMov).query<{ IDCreditoPuente: number }>(`
-      SELECT IDCreditoPuente FROM [app].credito_puente_movimiento WHERE IDMovCP = @idMov
+      SELECT IDCreditoPuente FROM [pro_app].credito_puente_movimiento WHERE IDMovCP = @idMov
     `);
     const row = actual.recordset[0];
     if (!row) return NextResponse.json({ error: 'Movimiento no existe' }, { status: 404 });
@@ -92,7 +92,7 @@ export async function PATCH(
       .input('Notas', sql.NVarChar(1000), notas)
       .input('Usuario', sql.NVarChar(400), usuario)
       .query(`
-        UPDATE [app].credito_puente_movimiento
+        UPDATE [pro_app].credito_puente_movimiento
         SET FechaMovimiento = @Fecha,
             MontoColones = @Monto,
             Concepto = @Concepto,
@@ -125,7 +125,7 @@ export async function DELETE(
   try {
     const db = await getAdelanteDb();
     const actual = await db.request().input('idMov', sql.Int, idMov).query<{ IDCreditoPuente: number }>(`
-      SELECT IDCreditoPuente FROM [app].credito_puente_movimiento WHERE IDMovCP = @idMov
+      SELECT IDCreditoPuente FROM [pro_app].credito_puente_movimiento WHERE IDMovCP = @idMov
     `);
     const row = actual.recordset[0];
     if (!row) return NextResponse.json({ error: 'Movimiento no existe' }, { status: 404 });
@@ -139,7 +139,7 @@ export async function DELETE(
       );
     }
     await db.request().input('idMov', sql.Int, idMov).query(`
-      DELETE FROM [app].credito_puente_movimiento WHERE IDMovCP = @idMov
+      DELETE FROM [pro_app].credito_puente_movimiento WHERE IDMovCP = @idMov
     `);
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

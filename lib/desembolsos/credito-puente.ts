@@ -11,7 +11,7 @@
 // procedures `sp_*` que usa el repo original — solo las tablas y vistas. Por eso
 // las lecturas van contra las vistas (idénticas al fuente) y las escrituras usan
 // SQL parametrizado directo contra las tablas (patrón de `lib/avance`), en vez de
-// `EXEC [app].sp_...`.
+// `EXEC [pro_app].sp_...`.
 
 export type CreditoPuenteEstado = 'ACTIVO' | 'CANCELADO';
 export type CreditoPuenteLoteEstado =

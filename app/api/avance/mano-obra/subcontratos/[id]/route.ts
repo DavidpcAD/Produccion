@@ -26,7 +26,7 @@ export async function DELETE(
     await db
       .request()
       .input('id', sql.BigInt, id)
-      .query('DELETE FROM obc.mo_subcontratos WHERE id = @id');
+      .query('DELETE FROM pro_obc.mo_subcontratos WHERE id = @id');
     return NextResponse.json({ ok: true, id });
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });

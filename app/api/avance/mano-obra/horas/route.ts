@@ -21,7 +21,7 @@ export async function GET() {
     const db = await getAdelanteDb();
     const r = await db.request().query<HorasObra>(`
       SELECT semana_operativa_id, obra_codigo, horas
-      FROM obc.mo_horas_obra
+      FROM pro_obc.mo_horas_obra
       ORDER BY semana_operativa_id DESC, obra_codigo
     `);
     return NextResponse.json({ horas: r.recordset });
@@ -58,14 +58,14 @@ export async function POST(req: NextRequest) {
     try {
       await new sql.Request(tx)
         .input('sem', sql.BigInt, semana)
-        .query('DELETE FROM obc.mo_horas_obra WHERE semana_operativa_id = @sem');
+        .query('DELETE FROM pro_obc.mo_horas_obra WHERE semana_operativa_id = @sem');
       for (const f of filas) {
         await new sql.Request(tx)
           .input('sem', sql.BigInt, semana)
           .input('obra', sql.NVarChar(20), f.obra_codigo)
           .input('horas', sql.Decimal(10, 2), f.horas)
           .query(`
-            INSERT INTO obc.mo_horas_obra (semana_operativa_id, obra_codigo, horas)
+            INSERT INTO pro_obc.mo_horas_obra (semana_operativa_id, obra_codigo, horas)
             VALUES (@sem, @obra, @horas)
           `);
       }

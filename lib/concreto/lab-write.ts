@@ -56,7 +56,7 @@ export async function crearMuestra(
   const rAct = await pool
     .request()
     .input('id', sql.Int, body.id_actividad)
-    .query('SELECT activo FROM lab.actividades WHERE id = @id');
+    .query('SELECT activo FROM pro_lab.actividades WHERE id = @id');
   if (rAct.recordset.length === 0) {
     throw new ErrorLab('ACTIVIDAD_NO_ENCONTRADA', `Actividad ${body.id_actividad} no existe.`, 404);
   }
@@ -69,7 +69,7 @@ export async function crearMuestra(
     const rCol = await pool
       .request()
       .input('id', sql.Int, body.id_colada)
-      .query('SELECT 1 FROM hor.coladas WHERE id_colada = @id');
+      .query('SELECT 1 FROM pro_hor.coladas WHERE id_colada = @id');
     if (rCol.recordset.length === 0) {
       throw new ErrorLab('COLADA_NO_ENCONTRADA', `Colada ${body.id_colada} no existe.`, 404);
     }
@@ -80,20 +80,20 @@ export async function crearMuestra(
     const rRec = await pool
       .request()
       .input('id', sql.Int, body.id_receta_bc)
-      .query('SELECT 1 FROM hor.recetas_bc WHERE id = @id');
+      .query('SELECT 1 FROM pro_hor.recetas_bc WHERE id = @id');
     if (rRec.recordset.length === 0) {
       throw new ErrorLab('RECETA_NO_ENCONTRADA', `Receta BC ${body.id_receta_bc} no existe.`, 404);
     }
   }
 
-  // 4) Si tiene obra, validar contra bi.dim_obra (mismo patrón que coladas).
+  // 4) Si tiene obra, validar contra pro_bi.dim_obra (mismo patrón que coladas).
   if (body.obra_works_no) {
     const rObra = await pool
       .request()
       .input('w', sql.NVarChar(20), body.obra_works_no)
       .query<{ existe: number }>(
         `SELECT COUNT(*) AS existe
-         FROM bi.dim_obra
+         FROM pro_bi.dim_obra
          WHERE works_no COLLATE DATABASE_DEFAULT = @w COLLATE DATABASE_DEFAULT`,
       );
     if ((rObra.recordset[0]?.existe ?? 0) === 0) {
@@ -103,7 +103,7 @@ export async function crearMuestra(
 
   // 5) Resolver siguiente numero_muestra (max + 1, o 1 si tabla vacía).
   const rNum = await pool.request().query<{ next_num: number }>(`
-    SELECT ISNULL(MAX(numero_muestra), 0) + 1 AS next_num FROM lab.muestras
+    SELECT ISNULL(MAX(numero_muestra), 0) + 1 AS next_num FROM pro_lab.muestras
   `);
   const numero = rNum.recordset[0]?.next_num ?? 1;
 
@@ -126,7 +126,7 @@ export async function crearMuestra(
     .input('oid', sql.NVarChar(100), usuario.oid)
     .input('email', sql.NVarChar(200), usuario.email)
     .query<{ id: number }>(`
-      INSERT INTO lab.muestras (
+      INSERT INTO pro_lab.muestras (
         numero_muestra, obra_works_no, id_casa, planta_nombre, id_actividad, fecha_colado,
         proveedor, id_colada, id_receta_bc, fc_objetivo, categoria_concreto,
         tipo_concreto_libre, notas, creado_por_oid, creado_por_email
@@ -162,7 +162,7 @@ export async function crearMuestra(
         .input('fecha_prueba', sql.Date, fechaPruebaIso)
         .input('oid', sql.NVarChar(100), usuario.oid)
         .query(`
-          INSERT INTO lab.ensayos (id_muestra, edad_dias, fecha_prueba, fecha_prueba_programada, creado_por_oid)
+          INSERT INTO pro_lab.ensayos (id_muestra, edad_dias, fecha_prueba, fecha_prueba_programada, creado_por_oid)
           VALUES (@id_muestra, @edad_dias, @fecha_prueba, @fecha_prueba, @oid)
         `);
     }
@@ -236,7 +236,7 @@ export async function actualizarMuestra(
   }
 
   const r = await req.query<{ rows: number }>(`
-    UPDATE lab.muestras SET ${sets.join(', ')} WHERE id = @id;
+    UPDATE pro_lab.muestras SET ${sets.join(', ')} WHERE id = @id;
     SELECT @@ROWCOUNT AS rows;
   `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {
@@ -254,7 +254,7 @@ export async function borrarMuestra(pool: sqlModule.ConnectionPool, id: number):
     .request()
     .input('id', sql.BigInt, id)
     .query<{ rows: number }>(`
-    DELETE FROM lab.muestras WHERE id = @id;
+    DELETE FROM pro_lab.muestras WHERE id = @id;
     SELECT @@ROWCOUNT AS rows;
   `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {
@@ -275,7 +275,7 @@ export async function crearEnsayo(
   const rM = await pool
     .request()
     .input('id', sql.BigInt, idMuestra)
-    .query('SELECT 1 FROM lab.muestras WHERE id = @id');
+    .query('SELECT 1 FROM pro_lab.muestras WHERE id = @id');
   if (rM.recordset.length === 0) {
     throw new ErrorLab('MUESTRA_NO_ENCONTRADA', `Muestra ${idMuestra} no existe.`, 404);
   }
@@ -289,7 +289,7 @@ export async function crearEnsayo(
       .input('notas', sql.NVarChar(sql.MAX), body.notas ?? null)
       .input('oid', sql.NVarChar(100), usuario.oid)
       .query<{ id: number }>(`
-        INSERT INTO lab.ensayos (id_muestra, edad_dias, fecha_prueba, fecha_prueba_programada, notas, creado_por_oid)
+        INSERT INTO pro_lab.ensayos (id_muestra, edad_dias, fecha_prueba, fecha_prueba_programada, notas, creado_por_oid)
         OUTPUT INSERTED.id
         VALUES (@id_muestra, @edad_dias, @fecha_prueba, @fecha_prueba, @notas, @oid)
       `);
@@ -336,7 +336,7 @@ export async function actualizarEnsayo(
     throw new ErrorLab('SIN_CAMBIOS', 'Body vacío: nada que actualizar.', 400);
   }
   const r = await req.query<{ rows: number }>(`
-    UPDATE lab.ensayos SET ${sets.join(', ')} WHERE id = @id;
+    UPDATE pro_lab.ensayos SET ${sets.join(', ')} WHERE id = @id;
     SELECT @@ROWCOUNT AS rows;
   `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {
@@ -354,8 +354,8 @@ export async function borrarEnsayo(
     .request()
     .input('id', sql.BigInt, idEnsayo)
     .query<{ rows: number }>(`
-    UPDATE lab.fotos_muestra SET id_ensayo = NULL WHERE id_ensayo = @id;
-    DELETE FROM lab.ensayos WHERE id = @id;
+    UPDATE pro_lab.fotos_muestra SET id_ensayo = NULL WHERE id_ensayo = @id;
+    DELETE FROM pro_lab.ensayos WHERE id = @id;
     SELECT @@ROWCOUNT AS rows;
   `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {
@@ -375,7 +375,7 @@ export async function crearMedicion(
   const rE = await pool
     .request()
     .input('id', sql.BigInt, idEnsayo)
-    .query('SELECT 1 FROM lab.ensayos WHERE id = @id');
+    .query('SELECT 1 FROM pro_lab.ensayos WHERE id = @id');
   if (rE.recordset.length === 0) {
     throw new ErrorLab('ENSAYO_NO_ENCONTRADO', `Ensayo ${idEnsayo} no existe.`, 404);
   }
@@ -387,7 +387,7 @@ export async function crearMedicion(
     .input('orden', sql.Int, body.orden ?? 1)
     .input('notas', sql.NVarChar(500), body.notas ?? null)
     .query<{ id: number }>(`
-      INSERT INTO lab.mediciones (id_ensayo, resistencia_mpa, orden, notas)
+      INSERT INTO pro_lab.mediciones (id_ensayo, resistencia_mpa, orden, notas)
       OUTPUT INSERTED.id
       VALUES (@id_ensayo, @resistencia_mpa, @orden, @notas)
     `);
@@ -419,7 +419,7 @@ export async function actualizarMedicion(
     throw new ErrorLab('SIN_CAMBIOS', 'Body vacío: nada que actualizar.', 400);
   }
   const r = await req.query<{ rows: number }>(`
-    UPDATE lab.mediciones SET ${sets.join(', ')} WHERE id = @id;
+    UPDATE pro_lab.mediciones SET ${sets.join(', ')} WHERE id = @id;
     SELECT @@ROWCOUNT AS rows;
   `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {
@@ -435,7 +435,7 @@ export async function borrarMedicion(
     .request()
     .input('id', sql.BigInt, idMedicion)
     .query<{ rows: number }>(`
-    DELETE FROM lab.mediciones WHERE id = @id;
+    DELETE FROM pro_lab.mediciones WHERE id = @id;
     SELECT @@ROWCOUNT AS rows;
   `);
   if ((r.recordset[0]?.rows ?? 0) === 0) {
@@ -456,7 +456,7 @@ export async function obtenerCurvaTeorica(
     descripcion: string | null;
   }>(`
     SELECT edad_dias, pct_resistencia, descripcion
-    FROM lab.curva_teorica
+    FROM pro_lab.curva_teorica
     ORDER BY edad_dias
   `);
   return r.recordset.map((row) => ({
@@ -477,7 +477,7 @@ export async function obtenerCurvaTeorica(
 // Columnas (0-indexed):
 //    1  N° MUESTRA       "M - 1"
 //    2  PROYECTO         "VALLE NOVARUM"
-//    3  ID CASA          "VN-M.12" (works_no si matchea con bi.dim_obra)
+//    3  ID CASA          "VN-M.12" (works_no si matchea con pro_bi.dim_obra)
 //    4  ACTIVIDAD        "MUROS 1N"
 //    5  FECHA DE COLADO  DD/MM/YY
 //    6  PROVEEDOR        "ADELANTE DESARROLLOS"
@@ -764,7 +764,7 @@ export async function importarExcelLab(
       id_actividad: number;
     }>(`
       SELECT id, numero_muestra, fecha_colado, obra_works_no, id_casa, id_actividad
-      FROM lab.muestras
+      FROM pro_lab.muestras
     `);
     const indexMuestras = new Map<string, MuestraExistente[]>();
     let maxNumero = 0;
@@ -792,7 +792,7 @@ export async function importarExcelLab(
     // --- Pre-cargar actividades (case-insensitive) ---
     const rAct = await tx
       .request()
-      .query<{ id: number; nombre: string }>('SELECT id, nombre FROM lab.actividades');
+      .query<{ id: number; nombre: string }>('SELECT id, nombre FROM pro_lab.actividades');
     const actividadesPorNombre = new Map<string, number>();
     let idActividadPorAsignar: number | null = null;
     for (const a of rAct.recordset) {
@@ -801,8 +801,8 @@ export async function importarExcelLab(
       if (clave === 'POR ASIGNAR') idActividadPorAsignar = a.id;
     }
 
-    // --- Pre-cargar works_no de bi.dim_obra ---
-    const rObras = await tx.request().query<{ works_no: string }>('SELECT works_no FROM bi.dim_obra');
+    // --- Pre-cargar works_no de pro_bi.dim_obra ---
+    const rObras = await tx.request().query<{ works_no: string }>('SELECT works_no FROM pro_bi.dim_obra');
     const worksNoExistentes = new Set(rObras.recordset.map((x) => x.works_no));
 
     // Resuelve/crea id de actividad por nombre.
@@ -815,7 +815,7 @@ export async function importarExcelLab(
         .input('nombre', sql.NVarChar(100), nombre)
         .input('orden', sql.Int, 100)
         .query<{ id: number }>(
-          'INSERT INTO lab.actividades (nombre, orden) OUTPUT INSERTED.id VALUES (@nombre, @orden)',
+          'INSERT INTO pro_lab.actividades (nombre, orden) OUTPUT INSERTED.id VALUES (@nombre, @orden)',
         );
       const id = rNueva.recordset[0]?.id;
       if (id === undefined) throw new Error('INSERT actividad no devolvió id');
@@ -840,7 +840,7 @@ export async function importarExcelLab(
         .input('fecha_programada', sql.Date, fechaProgramada)
         .input('oid', sql.NVarChar(100), usuario.oid)
         .query<{ id: number }>(`
-          INSERT INTO lab.ensayos (id_muestra, edad_dias, fecha_prueba, fecha_prueba_programada, creado_por_oid)
+          INSERT INTO pro_lab.ensayos (id_muestra, edad_dias, fecha_prueba, fecha_prueba_programada, creado_por_oid)
           OUTPUT INSERTED.id
           VALUES (@id_muestra, @edad_dias, @fecha_prueba, @fecha_programada, @oid)
         `);
@@ -853,7 +853,7 @@ export async function importarExcelLab(
         .input('mpa', sql.Decimal(7, 2), mpa)
         .input('orden', sql.Int, 1)
         .query(
-          'INSERT INTO lab.mediciones (id_ensayo, resistencia_mpa, orden) VALUES (@id_ensayo, @mpa, @orden)',
+          'INSERT INTO pro_lab.mediciones (id_ensayo, resistencia_mpa, orden) VALUES (@id_ensayo, @mpa, @orden)',
         );
       medicionesIns++;
     };
@@ -887,7 +887,7 @@ export async function importarExcelLab(
             .input('oid', sql.NVarChar(100), usuario.oid)
             .input('email', sql.NVarChar(200), usuario.email)
             .query<{ id: number }>(`
-              INSERT INTO lab.muestras (
+              INSERT INTO pro_lab.muestras (
                 numero_muestra, obra_works_no, id_casa, id_actividad, fecha_colado,
                 proveedor, fc_objetivo, categoria_concreto, tipo_concreto_libre,
                 creado_por_oid, creado_por_email
@@ -939,7 +939,7 @@ export async function importarExcelLab(
               .input('id', sql.BigInt, match.id)
               .input('act', sql.Int, idActNueva)
               .query(
-                'UPDATE lab.muestras SET id_actividad = @act, actualizado_en = SYSUTCDATETIME() WHERE id = @id',
+                'UPDATE pro_lab.muestras SET id_actividad = @act, actualizado_en = SYSUTCDATETIME() WHERE id = @id',
               );
             match.id_actividad = idActNueva;
             huboCambio = true;
@@ -957,8 +957,8 @@ export async function importarExcelLab(
             med: number;
           }>(`
             SELECT e.id, e.edad_dias, e.fecha_prueba,
-                   (SELECT COUNT(*) FROM lab.mediciones md WHERE md.id_ensayo = e.id) AS med
-            FROM lab.ensayos e
+                   (SELECT COUNT(*) FROM pro_lab.mediciones md WHERE md.id_ensayo = e.id) AS med
+            FROM pro_lab.ensayos e
             WHERE e.id_muestra = @id
           `);
         const ensayosPorEdad = new Map<number, EnsayoExistente>();
@@ -997,7 +997,7 @@ export async function importarExcelLab(
               .input('id', sql.BigInt, existente.id)
               .input('fp', sql.Date, e.fecha_prueba)
               .query(
-                'UPDATE lab.ensayos SET fecha_prueba = @fp, actualizado_en = SYSUTCDATETIME() WHERE id = @id',
+                'UPDATE pro_lab.ensayos SET fecha_prueba = @fp, actualizado_en = SYSUTCDATETIME() WHERE id = @id',
               );
             ensayosAct++;
           }
@@ -1007,7 +1007,7 @@ export async function importarExcelLab(
             .input('mpa', sql.Decimal(7, 2), e.mpa)
             .input('orden', sql.Int, 1)
             .query(
-              'INSERT INTO lab.mediciones (id_ensayo, resistencia_mpa, orden) VALUES (@id_ensayo, @mpa, @orden)',
+              'INSERT INTO pro_lab.mediciones (id_ensayo, resistencia_mpa, orden) VALUES (@id_ensayo, @mpa, @orden)',
             );
           medicionesIns++;
           huboCambio = true;

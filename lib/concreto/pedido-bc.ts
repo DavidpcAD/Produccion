@@ -159,8 +159,8 @@ interface FilaColadaBC {
 
 /**
  * Lee la colada + receta_bc + obra en una sola query. Devuelve null si no
- * existe. Nota: la PK de hor.coladas es `id_colada` (excepción histórica) y el
- * JOIN con bi.dim_obra necesita COLLATE DATABASE_DEFAULT en ambos lados.
+ * existe. Nota: la PK de pro_hor.coladas es `id_colada` (excepción histórica) y el
+ * JOIN con pro_bi.dim_obra necesita COLLATE DATABASE_DEFAULT en ambos lados.
  */
 async function leerColadaParaBC(
   pool: sqlModule.ConnectionPool,
@@ -182,10 +182,10 @@ async function leerColadaParaBC(
         rbc.descripcion AS descripcion_receta_bc,
         rbc.codigo_recurso_bc,
         rbc.recurso_bc_descripcion
-      FROM hor.coladas c
-      LEFT JOIN hor.recetas_bc rbc
+      FROM pro_hor.coladas c
+      LEFT JOIN pro_hor.recetas_bc rbc
         ON rbc.id = c.id_receta_bc
-      LEFT JOIN bi.dim_obra obra
+      LEFT JOIN pro_bi.dim_obra obra
         ON obra.works_no COLLATE DATABASE_DEFAULT = c.obra_works_no COLLATE DATABASE_DEFAULT
       WHERE c.id_colada = @id
     `);
@@ -296,14 +296,14 @@ async function construirLineasPedido(
     }>(`
       SELECT
         (SELECT TOP 1 b.arido_a_nombre
-         FROM hor.batches b
-         JOIN hor.colada_batches cb ON cb.id_batch = b.id
+         FROM pro_hor.batches b
+         JOIN pro_hor.colada_batches cb ON cb.id_batch = b.id
          WHERE cb.id_colada = @id AND cb.excluido = 0 AND b.arido_a_nombre IS NOT NULL
          ORDER BY b.fecha_inicio)                                    AS arido_a_nombre,
         SUM(CASE WHEN cb.excluido = 0 THEN b.arido_a_kg ELSE 0 END)  AS arido_a_total_kg,
         (SELECT TOP 1 b.arido_b_nombre
-         FROM hor.batches b
-         JOIN hor.colada_batches cb ON cb.id_batch = b.id
+         FROM pro_hor.batches b
+         JOIN pro_hor.colada_batches cb ON cb.id_batch = b.id
          WHERE cb.id_colada = @id AND cb.excluido = 0 AND b.arido_b_nombre IS NOT NULL
          ORDER BY b.fecha_inicio)                                    AS arido_b_nombre,
         SUM(CASE WHEN cb.excluido = 0 THEN b.arido_b_kg ELSE 0 END)  AS arido_b_total_kg,
@@ -312,8 +312,8 @@ async function construirLineasPedido(
         SUM(CASE WHEN cb.excluido = 0 THEN b.aditivo1_l ELSE 0 END)  AS aditivo1_total_l,
         SUM(CASE WHEN cb.excluido = 0 THEN b.aditivo2_l ELSE 0 END)  AS aditivo2_total_l,
         SUM(CASE WHEN cb.excluido = 0 THEN b.aditivo3_l ELSE 0 END)  AS aditivo3_total_l
-      FROM hor.batches b
-      JOIN hor.colada_batches cb ON cb.id_batch = b.id
+      FROM pro_hor.batches b
+      JOIN pro_hor.colada_batches cb ON cb.id_batch = b.id
       WHERE cb.id_colada = @id
     `);
 
@@ -322,7 +322,7 @@ async function construirLineasPedido(
 
   const rMats = await pool.request().query<MaterialRow>(`
     SELECT id, codigo_bc AS codigoBc, nombre, tipo, unidad_bc, unidad_blend, densidad_kg_m3
-    FROM hor.materiales
+    FROM pro_hor.materiales
     WHERE activo = 1
   `);
   const matsPorCodigoBc = new Map<string, MaterialRow>();
@@ -601,7 +601,7 @@ export async function crearPedidoEnsamblado(
     .input('numero', sql.NVarChar(50), numeroPedido)
     .input('actor', sql.NVarChar(100), actorEmail)
     .query(`
-      UPDATE hor.coladas
+      UPDATE pro_hor.coladas
       SET numero_pedido_ensamblado_bc = @numero,
           digitada_por_oid            = @actor,
           fecha_digitada              = SYSUTCDATETIME()

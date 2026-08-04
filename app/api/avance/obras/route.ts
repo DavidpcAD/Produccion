@@ -8,7 +8,7 @@ import type { ObraAvance } from '@/lib/avance/types';
 /**
  * GET /api/avance/obras[?proyecto=VN]
  * Listado LIVIANO del estado operativo de las obras habilitadas
- * (en_ejecucion / en_espera) desde `obc.obra_estado`. Alimenta el dashboard
+ * (en_ejecucion / en_espera) desde `pro_obc.obra_estado`. Alimenta el dashboard
  * del módulo (lista de casas por bloque). El proyecto y bloque se derivan del
  * código (formato PROYECTO-BLOQUE.NUMERO, ej. "VN-C.08").
  */
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         estado_venta: ObraAvance['estado_venta'];
       }>(`
         SELECT obra_codigo AS codigo, estado, tipo_casa, sprint_actual, estado_venta
-        FROM obc.obra_estado
+        FROM pro_obc.obra_estado
         WHERE estado IN ('en_ejecucion', 'en_espera')
           AND (@like IS NULL OR obra_codigo LIKE @like)
         ORDER BY obra_codigo

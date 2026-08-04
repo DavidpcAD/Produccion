@@ -5,7 +5,7 @@ import { listarTiposMovimiento } from '@/lib/desembolsos/movimientos';
 
 export const dynamic = 'force-dynamic';
 
-/** GET /api/desembolsos/tipos-movimiento — catálogo de tipos (dbo.TipMovi). */
+/** GET /api/desembolsos/tipos-movimiento — catálogo de tipos (pro_ventas.TipMovi). */
 export async function GET() {
   const session = await getSession();
   if (!session || session.nivelAdmin < 1) {

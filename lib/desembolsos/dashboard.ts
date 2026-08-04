@@ -5,7 +5,7 @@ import { sql } from '@/lib/db-adelantedb';
  * Dashboard ejecutivo de Flujo de Desembolsos — portado de la Azure Function
  * `dashboard.ts` de adelante-flujo-desembolsos. Read-only: lee las vistas del
  * esquema `app` (vw_dashboard_caso, vw_proyeccion_desembolsos, pago_cliente,
- * vw_monto_banco_por_lote, distribucion_config) más dbo.Casos / dbo.Lotes.
+ * vw_monto_banco_por_lote, distribucion_config) más pro_ventas.Casos / pro_ventas.Lotes.
  *
  * Devuelve, en una sola llamada, los KPIs, la serie de ingresos por semana y la
  * lista de casos de la cartera. Todos los montos vienen en versión "Bruto" (CRC
@@ -274,13 +274,13 @@ export async function calcularDashboard(
       dc.PrecioInternoM2 AS LotePrecioInternoM2,
       dc.Moneda          AS LoteMonedaConfig,
       cs.TipoCambio      AS TipoCambio
-    FROM [app].vw_dashboard_caso v
-    LEFT JOIN [app].vw_monto_banco_por_lote mb ON mb.IDCaso = v.IDCaso
-    LEFT JOIN dbo.Casos cs ON cs.IDCaso = v.IDCaso
+    FROM [pro_app].vw_dashboard_caso v
+    LEFT JOIN [pro_app].vw_monto_banco_por_lote mb ON mb.IDCaso = v.IDCaso
+    LEFT JOIN pro_ventas.Casos cs ON cs.IDCaso = v.IDCaso
     OUTER APPLY (
       SELECT TOP 1 dc1.PrecioInternoM2, dc1.Moneda
-      FROM [app].distribucion_config dc1
-      INNER JOIN dbo.Lotes l ON l.IDLote = cs.IDLote
+      FROM [pro_app].distribucion_config dc1
+      INNER JOIN pro_ventas.Lotes l ON l.IDLote = cs.IDLote
       WHERE dc1.IDProyecto = l.IDProyecto
         AND dc1.VigenteDesde <= ISNULL(cs.FechaFormalizacion, GETDATE())
         AND (dc1.VigenteHasta IS NULL OR dc1.VigenteHasta >= ISNULL(cs.FechaFormalizacion, GETDATE()))
@@ -298,10 +298,10 @@ export async function calcularDashboard(
   kpisReq.input('finMes', sql.Date, isoDate(finMesActual));
   const kpisPromise = kpisReq.query<RawKPIs>(`
     WITH CasosFiltrados AS (
-        SELECT v.* FROM [app].vw_dashboard_caso v ${whereCaso}
+        SELECT v.* FROM [pro_app].vw_dashboard_caso v ${whereCaso}
     ),
     HitosFiltrados AS (
-        SELECT h.* FROM [app].vw_proyeccion_desembolsos h ${whereHito}
+        SELECT h.* FROM [pro_app].vw_proyeccion_desembolsos h ${whereHito}
     )
     SELECT
         SUM(CasosFiltrados.Pendiente_CRC)   AS TotalPendiente_CRC,
@@ -314,9 +314,9 @@ export async function calcularDashboard(
         (SELECT SUM(MontoHitoEsperado * (ISNULL(IngresoTotalAD_CRC,0) / NULLIF(MontoBanco,0))) FROM HitosFiltrados WHERE FechaProyectada BETWEEN @lunesSem AND @domingoSem) AS ProyectadoSemanaAD_CRC,
         (SELECT SUM(MontoHitoEsperado) FROM HitosFiltrados WHERE FechaProyectada BETWEEN @inicioMes AND @finMes) AS ProyectadoMes_CRC,
         (SELECT SUM(MontoHitoEsperado * (ISNULL(IngresoTotalAD_CRC,0) / NULLIF(MontoBanco,0))) FROM HitosFiltrados WHERE FechaProyectada BETWEEN @inicioMes AND @finMes) AS ProyectadoMesAD_CRC,
-        (SELECT SUM(MontoPlaneado_CRC) FROM [app].pago_cliente pc INNER JOIN CasosFiltrados cf ON cf.IDCaso = pc.IDCaso) AS TotalPagoCliente_CRC,
-        (SELECT SUM(MontoPlaneado_CRC) FROM [app].pago_cliente pc INNER JOIN CasosFiltrados cf ON cf.IDCaso = pc.IDCaso WHERE pc.FechaPlaneada BETWEEN @lunesSem AND @domingoSem) AS PagoClienteSemana_CRC,
-        (SELECT SUM(MontoPlaneado_CRC) FROM [app].pago_cliente pc INNER JOIN CasosFiltrados cf ON cf.IDCaso = pc.IDCaso WHERE pc.FechaPlaneada BETWEEN @inicioMes AND @finMes) AS PagoClienteMes_CRC
+        (SELECT SUM(MontoPlaneado_CRC) FROM [pro_app].pago_cliente pc INNER JOIN CasosFiltrados cf ON cf.IDCaso = pc.IDCaso) AS TotalPagoCliente_CRC,
+        (SELECT SUM(MontoPlaneado_CRC) FROM [pro_app].pago_cliente pc INNER JOIN CasosFiltrados cf ON cf.IDCaso = pc.IDCaso WHERE pc.FechaPlaneada BETWEEN @lunesSem AND @domingoSem) AS PagoClienteSemana_CRC,
+        (SELECT SUM(MontoPlaneado_CRC) FROM [pro_app].pago_cliente pc INNER JOIN CasosFiltrados cf ON cf.IDCaso = pc.IDCaso WHERE pc.FechaPlaneada BETWEEN @inicioMes AND @finMes) AS PagoClienteMes_CRC
     FROM CasosFiltrados;
   `);
 
@@ -325,7 +325,7 @@ export async function calcularDashboard(
     SELECT
       SUM(CASE WHEN EsReservado = 0 THEN Pendiente_CRC ELSE 0 END) AS TotalPendienteFormalizadoGlobal_CRC,
       SUM(CASE WHEN EsReservado = 1 THEN Pendiente_CRC ELSE 0 END) AS TotalPendienteReservadoGlobal_CRC
-    FROM [app].vw_dashboard_caso;
+    FROM [pro_app].vw_dashboard_caso;
   `);
 
   // 3) Serie semanal (hitos).
@@ -334,7 +334,7 @@ export async function calcularDashboard(
   serieReq.input('hasta', sql.Date, isoDate(hasta));
   const seriePromise = serieReq.query<RawSemana>(`
     WITH HitosFiltrados AS (
-        SELECT h.* FROM [app].vw_proyeccion_desembolsos h ${whereHito}
+        SELECT h.* FROM [pro_app].vw_proyeccion_desembolsos h ${whereHito}
     ),
     Bucketed AS (
         SELECT DATEDIFF(day, @desde, FechaProyectada) / 7 AS WeekIdx,
@@ -358,11 +358,11 @@ export async function calcularDashboard(
   serieCliReq.input('hasta', sql.Date, isoDate(hasta));
   const serieClientePromise = serieCliReq.query<RawSemanaCliente>(`
     WITH CasosFiltrados AS (
-      SELECT v.* FROM [app].vw_dashboard_caso v ${whereCaso}
+      SELECT v.* FROM [pro_app].vw_dashboard_caso v ${whereCaso}
     )
     SELECT DATEDIFF(day, @desde, pc.FechaPlaneada) / 7 AS WeekIdx,
            SUM(pc.MontoPlaneado_CRC) AS PagoCliente_CRC
-    FROM [app].pago_cliente pc
+    FROM [pro_app].pago_cliente pc
     INNER JOIN CasosFiltrados cf ON cf.IDCaso = pc.IDCaso
     WHERE pc.FechaPlaneada >= @desde AND pc.FechaPlaneada <= @hasta
     GROUP BY DATEDIFF(day, @desde, pc.FechaPlaneada) / 7
@@ -499,11 +499,11 @@ export async function calcularDashboard(
 
 // -------------------------------------------------------------------- Bancos
 
-/** Catálogo de bancos (dbo.Bancos, sin la columna Imagen base64). */
+/** Catálogo de bancos (pro_ventas.Bancos, sin la columna Imagen base64). */
 export async function listarBancos(db: ConnectionPool): Promise<Banco[]> {
   const r = await db.request().query<Banco>(`
     SELECT IDBan, Abreviatura, NombreEntidad, ColorHEXBan AS ColorHexBanco, OrdenGal
-    FROM dbo.Bancos
+    FROM pro_ventas.Bancos
     ORDER BY ISNULL(OrdenGal, 999), Abreviatura
   `);
   return r.recordset.map((b) => ({

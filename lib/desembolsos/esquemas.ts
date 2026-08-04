@@ -11,8 +11,8 @@ import { sql } from '@/lib/db-adelantedb';
  * vía sp_actualizar_esquema_banco / sp_editar_esquema_vigente_banco. El catálogo
  * de hitos (catalogo_hito) se administra con sp_actualizar_catalogo_hito.
  *
- * Tablas/vistas: dbo.Bancos, [app].catalogo_hito, [app].vw_hitos_con_uso,
- * [app].vw_historico_esquema_banco.
+ * Tablas/vistas: pro_ventas.Bancos, [pro_app].catalogo_hito, [pro_app].vw_hitos_con_uso,
+ * [pro_app].vw_historico_esquema_banco.
  */
 
 // --------------------------------------------------------------------- Tipos
@@ -240,14 +240,14 @@ export async function listarHitos(
     const result = await db.request().query<HitoConUso>(`
       SELECT IDHito, Codigo, Nombre, OrdenEstandar, Descripcion, ColorHEX, Activo,
              BancosUsando, RowsTotales
-      FROM [app].vw_hitos_con_uso
+      FROM [pro_app].vw_hitos_con_uso
       ORDER BY OrdenEstandar
     `);
     return result.recordset;
   }
   const result = await db.request().query<CatalogoHito>(`
     SELECT IDHito, Codigo, Nombre, OrdenEstandar, Descripcion, ColorHEX, Activo
-    FROM [app].catalogo_hito
+    FROM [pro_app].catalogo_hito
     WHERE Activo = 1
     ORDER BY OrdenEstandar
   `);
@@ -280,7 +280,7 @@ export async function upsertHito(
   request.input('Activo', sql.Bit, args.Activo);
   request.input('UsuarioEmail', sql.NVarChar(200), usuarioEmail);
 
-  const result = await request.execute<{ IDHito: number }>('[app].sp_actualizar_catalogo_hito');
+  const result = await request.execute<{ IDHito: number }>('[pro_app].sp_actualizar_catalogo_hito');
   const row = result.recordset[0];
   if (!row) throw new Error('SP no devolvió fila de resultado');
   return { IDHito: row.IDHito };
@@ -343,10 +343,10 @@ export async function listarEsquemas(db: ConnectionPool): Promise<RespuestaEsque
       h.HitosJSON,
       h.SumaPorcentaje,
       h.FechaCreacion
-    FROM dbo.Bancos b
+    FROM pro_ventas.Bancos b
     OUTER APPLY (
       SELECT TOP 1 *
-      FROM [app].vw_historico_esquema_banco v
+      FROM [pro_app].vw_historico_esquema_banco v
       WHERE v.IDBan = b.IDBan AND v.Estado = 'VIGENTE'
       ORDER BY v.VigenteDesde DESC
     ) h
@@ -394,7 +394,7 @@ export async function esquemaPorBanco(
     .request()
     .input('id', sql.Int, idBan)
     .query<{ Abreviatura: string; NombreEntidad: string }>(
-      'SELECT Abreviatura, NombreEntidad FROM dbo.Bancos WHERE IDBan = @id',
+      'SELECT Abreviatura, NombreEntidad FROM pro_ventas.Bancos WHERE IDBan = @id',
     );
   const banco = bancoRs.recordset[0];
   if (!banco) return null;
@@ -419,7 +419,7 @@ export async function esquemaPorBanco(
       FechaCreacion: Date;
     }>(`
       SELECT *
-      FROM [app].vw_historico_esquema_banco
+      FROM [pro_app].vw_historico_esquema_banco
       WHERE IDBan = @id
       ORDER BY VigenteDesde DESC
     `);
@@ -467,7 +467,7 @@ export async function crearEsquema(
     IDBanActualizado: number;
     VigenteDesde: Date;
     FilasCerradas: number;
-  }>('[app].sp_actualizar_esquema_banco');
+  }>('[pro_app].sp_actualizar_esquema_banco');
   const row = result.recordset[0];
   if (!row) throw new Error('SP no devolvió fila de resultado');
   return {
@@ -492,7 +492,7 @@ export async function editarEsquemaVigente(
   request.input('UsuarioEmail', sql.NVarChar(200), usuarioEmail);
 
   const result = await request.execute<{ IDBanEditado: number; VigenteDesde: Date }>(
-    '[app].sp_editar_esquema_vigente_banco',
+    '[pro_app].sp_editar_esquema_vigente_banco',
   );
   const row = result.recordset[0];
   if (!row) throw new Error('SP no devolvió fila de resultado');

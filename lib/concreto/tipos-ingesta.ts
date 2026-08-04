@@ -37,7 +37,7 @@ export interface BatchParseado {
   swVersion: string | null;
   /**
    * Serial de la máquina Blend. Es el campo que se usa para lookup contra
-   * `hor.plantas.serial` (NO `serial_number`).
+   * `pro_hor.plantas.serial` (NO `serial_number`).
    */
   machineSn: string;
 

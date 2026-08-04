@@ -8,7 +8,7 @@
 
 // ─── Categoría del concreto ──────────────────────────────────────────────
 // Afecta el análisis de curvas (auto vs convencional). Se guarda tal cual en
-// lab.muestras.categoria_concreto.
+// pro_lab.muestras.categoria_concreto.
 export const CATEGORIAS_CONCRETO = ['convencional', 'autocompactable', 'otro'] as const;
 export type CategoriaConcreto = (typeof CATEGORIAS_CONCRETO)[number];
 

@@ -10,7 +10,7 @@ import type {
 
 // Portado de `api/src/lib/consultar-coladas.ts` + `obtener-colada.ts` de la app
 // original. SQL contra los schemas `hor` (concreto) y la dependencia externa
-// de solo-lectura `bi.dim_obra` (data warehouse de Business Central).
+// de solo-lectura `pro_bi.dim_obra` (data warehouse de Business Central).
 
 export interface ListarColadasParams {
   estado?: EstadoColada[];
@@ -90,12 +90,12 @@ export async function consultarColadas(
       c.obra_works_no,
       obra.display_name         AS obra_display_name,
       c.motivo_anulacion
-    FROM hor.coladas c
-    INNER JOIN hor.plantas p             ON p.id = c.id_planta
-    INNER JOIN hor.recetas_blend rb      ON rb.id = c.id_receta_blend
-    LEFT  JOIN hor.recetas_bc rc         ON rc.id = c.id_receta_bc
-    LEFT  JOIN hor.destinos_canonicos dc ON dc.id_destino_canonico = c.id_destino_canonico
-    LEFT  JOIN bi.dim_obra obra
+    FROM pro_hor.coladas c
+    INNER JOIN pro_hor.plantas p             ON p.id = c.id_planta
+    INNER JOIN pro_hor.recetas_blend rb      ON rb.id = c.id_receta_blend
+    LEFT  JOIN pro_hor.recetas_bc rc         ON rc.id = c.id_receta_bc
+    LEFT  JOIN pro_hor.destinos_canonicos dc ON dc.id_destino_canonico = c.id_destino_canonico
+    LEFT  JOIN pro_bi.dim_obra obra
       ON obra.works_no COLLATE DATABASE_DEFAULT = c.obra_works_no COLLATE DATABASE_DEFAULT
     ${whereClause}
     ORDER BY c.fecha_inicio DESC, c.codigo_interno DESC
@@ -111,10 +111,10 @@ export async function consultarColadas(
 
   const rTotal = await reqTotal.query(`
     SELECT COUNT(*) AS total
-    FROM hor.coladas c
-    INNER JOIN hor.recetas_blend rb      ON rb.id = c.id_receta_blend
-    LEFT  JOIN hor.destinos_canonicos dc ON dc.id_destino_canonico = c.id_destino_canonico
-    LEFT  JOIN bi.dim_obra obra
+    FROM pro_hor.coladas c
+    INNER JOIN pro_hor.recetas_blend rb      ON rb.id = c.id_receta_blend
+    LEFT  JOIN pro_hor.destinos_canonicos dc ON dc.id_destino_canonico = c.id_destino_canonico
+    LEFT  JOIN pro_bi.dim_obra obra
       ON obra.works_no COLLATE DATABASE_DEFAULT = c.obra_works_no COLLATE DATABASE_DEFAULT
     ${whereClause}
   `);
@@ -149,7 +149,7 @@ export async function consultarColadas(
 
 /**
  * Detalle de una colada: header + batches (incluidos y excluidos, vía
- * junction `hor.colada_batches`) + cilindros del laboratorio de campo.
+ * junction `pro_hor.colada_batches`) + cilindros del laboratorio de campo.
  * Devuelve `null` si no existe.
  */
 export async function obtenerColada(
@@ -167,7 +167,7 @@ export async function obtenerColada(
       rc.codigo_bc            AS codigo_receta_bc,
       rc.descripcion          AS descripcion_receta_bc,
       (SELECT TOP 1 mr.fc_teorica_kg_cm2
-       FROM hor.mapeo_recetas mr
+       FROM pro_hor.mapeo_recetas mr
        WHERE mr.id_receta_blend = c.id_receta_blend
          AND mr.vigente_desde <= CAST(GETUTCDATE() AS DATE)
          AND (mr.vigente_hasta IS NULL OR mr.vigente_hasta >= CAST(GETUTCDATE() AS DATE))
@@ -188,12 +188,12 @@ export async function obtenerColada(
       c.creada_en,
       c.actualizada_en,
       c.motivo_anulacion
-    FROM hor.coladas c
-    INNER JOIN hor.plantas p             ON p.id = c.id_planta
-    INNER JOIN hor.recetas_blend rb      ON rb.id = c.id_receta_blend
-    LEFT  JOIN hor.recetas_bc rc         ON rc.id = c.id_receta_bc
-    LEFT  JOIN hor.destinos_canonicos dc ON dc.id_destino_canonico = c.id_destino_canonico
-    LEFT  JOIN bi.dim_obra obra
+    FROM pro_hor.coladas c
+    INNER JOIN pro_hor.plantas p             ON p.id = c.id_planta
+    INNER JOIN pro_hor.recetas_blend rb      ON rb.id = c.id_receta_blend
+    LEFT  JOIN pro_hor.recetas_bc rc         ON rc.id = c.id_receta_bc
+    LEFT  JOIN pro_hor.destinos_canonicos dc ON dc.id_destino_canonico = c.id_destino_canonico
+    LEFT  JOIN pro_bi.dim_obra obra
       ON obra.works_no COLLATE DATABASE_DEFAULT = c.obra_works_no COLLATE DATABASE_DEFAULT
     WHERE c.id_colada = @id
   `);
@@ -212,8 +212,8 @@ export async function obtenerColada(
       b.cantidad_alarmas,
       cb.excluido,
       cb.excluido_motivo
-    FROM hor.colada_batches cb
-    INNER JOIN hor.batches b ON b.id = cb.id_batch
+    FROM pro_hor.colada_batches cb
+    INNER JOIN pro_hor.batches b ON b.id = cb.id_batch
     WHERE cb.id_colada = @id
     ORDER BY b.fecha_inicio
   `);
@@ -235,7 +235,7 @@ export async function obtenerColada(
       id_cilindro, numero_serie, fecha_toma, slump_cm,
       fecha_ensayo_7d, resistencia_7d_kg_cm2,
       fecha_ensayo_28d, resistencia_28d_kg_cm2, observaciones
-    FROM hor.cilindros
+    FROM pro_hor.cilindros
     WHERE id_colada = @id
     ORDER BY fecha_toma, numero_serie
   `);

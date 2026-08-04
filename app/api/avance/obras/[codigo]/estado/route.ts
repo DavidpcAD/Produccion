@@ -62,7 +62,7 @@ export async function POST(
       .request()
       .input('obra', sql.NVarChar(20), codigo)
       .query<ObraRow>(
-        'SELECT estado, tipo_casa FROM obc.obra_estado WHERE obra_codigo = @obra',
+        'SELECT estado, tipo_casa FROM pro_obc.obra_estado WHERE obra_codigo = @obra',
       );
     const actual = estadoRes.recordset[0];
     if (!actual) {
@@ -78,9 +78,9 @@ export async function POST(
         .input('tc', sql.VarChar(20), actual.tipo_casa)
         .query<{ pend: number }>(`
           SELECT COUNT(*) AS pend
-          FROM obc.sub_partidas sp
-          JOIN obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = @tc
-          LEFT JOIN obc.avance_sub_partidas a
+          FROM pro_obc.sub_partidas sp
+          JOIN pro_obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = @tc
+          LEFT JOIN pro_obc.avance_sub_partidas a
             ON a.sub_partida_id = sp.id AND a.obra_codigo = @obra
           WHERE sp.activo = 1 AND ISNULL(a.completada, 0) = 0
         `);
@@ -100,7 +100,7 @@ export async function POST(
       .input('motivo', sql.NVarChar(200), motivo)
       .input('uid', sql.Int, session.idCol || null)
       .query(`
-        UPDATE obc.obra_estado
+        UPDATE pro_obc.obra_estado
         SET estado = @estado,
             motivo_inactiva = @motivo,
             actualizado_en = SYSUTCDATETIME(),

@@ -31,7 +31,7 @@ async function getStats() {
         SELECT
           SUM(CASE WHEN estado = 'en_ejecucion' THEN 1 ELSE 0 END) AS enEjecucion,
           SUM(CASE WHEN estado = 'en_espera'    THEN 1 ELSE 0 END) AS enEspera
-        FROM obc.obra_estado`);
+        FROM pro_obc.obra_estado`);
       return { enEjecucion: r.recordset[0]?.enEjecucion ?? 0, enEspera: r.recordset[0]?.enEspera ?? 0 };
     }, { enEjecucion: 0, enEspera: 0 }),
     // Lista corta de obras en ejecución (AdelanteDB)
@@ -39,7 +39,7 @@ async function getStats() {
       const db = await getAdelanteDb();
       const r = await db.request().query<{ codigo: string; sprint: number }>(`
         SELECT TOP 8 obra_codigo AS codigo, sprint_actual AS sprint
-        FROM obc.obra_estado WHERE estado = 'en_ejecucion' ORDER BY obra_codigo`);
+        FROM pro_obc.obra_estado WHERE estado = 'en_ejecucion' ORDER BY obra_codigo`);
       return r.recordset;
     }, [] as Array<{ codigo: string; sprint: number }>),
     // Reporte H4 — jornada de hoy (AdelanteSBX)
@@ -51,7 +51,7 @@ async function getStats() {
     safe(async () => {
       const db = await getAdelanteDb();
       const r = await db.request().input('ym', sql.Int, ym).query<{ neta: number }>(
-        `SELECT SUM(utilidad_neta) AS neta FROM uti.v_resumen_mensual WHERE (anio * 100 + mes) = @ym`);
+        `SELECT SUM(utilidad_neta) AS neta FROM pro_uti.v_resumen_mensual WHERE (anio * 100 + mes) = @ym`);
       return r.recordset[0]?.neta ?? 0;
     }, 0),
   ]);

@@ -11,8 +11,8 @@ import { sql } from '@/lib/db-adelantedb';
  * sp_actualizar_distribucion_config, o edita la vigente in-place vía
  * sp_editar_distribucion_vigente.
  *
- * Tablas/vistas: dbo.Proyecto, [app].catalogo_entidad_distribucion,
- * [app].vw_historico_distribucion.
+ * Tablas/vistas: dbo.Proyecto, [pro_app].catalogo_entidad_distribucion,
+ * [pro_app].vw_historico_distribucion.
  */
 
 // --------------------------------------------------------------------- Tipos
@@ -165,7 +165,7 @@ export function validarEditarVigente(body: EditarDistribucionVigenteRequest): st
 export async function listarEntidades(db: ConnectionPool): Promise<RespuestaEntidades> {
   const result = await db.request().query<EntidadDistribucion>(`
     SELECT IDEntidad, Codigo, Nombre, Descripcion, Activo
-    FROM [app].catalogo_entidad_distribucion
+    FROM [pro_app].catalogo_entidad_distribucion
     WHERE Activo = 1
     ORDER BY IDEntidad
   `);
@@ -206,7 +206,7 @@ export async function listarDistribucion(db: ConnectionPool): Promise<RespuestaD
     FROM dbo.Proyecto p
     OUTER APPLY (
       SELECT TOP 1 *
-      FROM [app].vw_historico_distribucion v
+      FROM [pro_app].vw_historico_distribucion v
       WHERE v.IDProyecto = p.IDProyecto AND v.Estado = 'VIGENTE'
       ORDER BY v.VigenteDesde DESC
     ) h
@@ -275,7 +275,7 @@ export async function distribucionPorProyecto(
       FechaCreacion: Date;
     }>(`
       SELECT *
-      FROM [app].vw_historico_distribucion
+      FROM [pro_app].vw_historico_distribucion
       WHERE IDProyecto = @id
       ORDER BY VigenteDesde DESC
     `);
@@ -320,7 +320,7 @@ export async function crearDistribucion(
   const result = await request.execute<{
     IDConfigCreado: number;
     IDConfigCerrado: number | null;
-  }>('[app].sp_actualizar_distribucion_config');
+  }>('[pro_app].sp_actualizar_distribucion_config');
   const row = result.recordset[0];
   if (!row) throw new Error('SP no devolvió fila de resultado');
   return { IDConfigCreado: row.IDConfigCreado, IDConfigCerrado: row.IDConfigCerrado };
@@ -342,7 +342,7 @@ export async function editarDistribucionVigente(
   request.input('UsuarioEmail', sql.NVarChar(200), usuarioEmail);
 
   const result = await request.execute<{ IDConfigEditado: number }>(
-    '[app].sp_editar_distribucion_vigente',
+    '[pro_app].sp_editar_distribucion_vigente',
   );
   const row = result.recordset[0];
   if (!row) throw new Error('SP no devolvió fila de resultado');

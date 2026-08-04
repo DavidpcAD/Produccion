@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  *   GET   /api/desembolsos/prestamo-bancario?idCaso=  → fila del caso (o null)
  *   PATCH /api/desembolsos/prestamo-bancario          → upsert por IDCaso (body.IDCaso)
  *
- * Datos en `app.caso_lote_banco` (una fila por caso). Upsert con SQL directo
+ * Datos en `pro_app.caso_lote_banco` (una fila por caso). Upsert con SQL directo
  * (la base de Producción no tiene `sp_actualizar_monto_financia_banco`).
  * SUPUESTO: al insertar una fila nueva, `MontoPagaBancoPorLote_CRC` (NOT NULL)
  * se siembra con `MontoFinanciaBanco_CRC` (o 0), ya que ese SP lo resolvía.
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       SELECT TOP 1 IDCasoLoteBanco, IDCaso, MontoPagaBancoPorLote_CRC, MontoFinanciaBanco_CRC,
              MontoLoteFinanciado_CRC, LoteHistoricoCobrado_CRC, PagoCliente_CRC,
              FechaPagoCliente, Notas
-      FROM [app].caso_lote_banco
+      FROM [pro_app].caso_lote_banco
       WHERE IDCaso = @idCaso
       ORDER BY IDCasoLoteBanco DESC
     `);
@@ -117,7 +117,7 @@ export async function PATCH(req: NextRequest) {
     const uid = session.idCol || null;
     const db = await getAdelanteDb();
     const existente = await db.request().input('idCaso', sql.Int, idCaso).query<{ IDCasoLoteBanco: number }>(`
-      SELECT TOP 1 IDCasoLoteBanco FROM [app].caso_lote_banco WHERE IDCaso = @idCaso ORDER BY IDCasoLoteBanco DESC
+      SELECT TOP 1 IDCasoLoteBanco FROM [pro_app].caso_lote_banco WHERE IDCaso = @idCaso ORDER BY IDCasoLoteBanco DESC
     `);
 
     let idClb: number;
@@ -152,7 +152,7 @@ export async function PATCH(req: NextRequest) {
         request.input('notas', sql.NVarChar(1000), notas);
         sets.push('Notas = @notas');
       }
-      await request.query(`UPDATE [app].caso_lote_banco SET ${sets.join(', ')} WHERE IDCasoLoteBanco = @id`);
+      await request.query(`UPDATE [pro_app].caso_lote_banco SET ${sets.join(', ')} WHERE IDCasoLoteBanco = @id`);
     } else {
       // INSERT — la tabla exige MontoPagaBancoPorLote_CRC > 0 (CK_monto_positivo).
       // El SP original lo resolvía; acá lo sembramos con el primer monto positivo
@@ -181,7 +181,7 @@ export async function PATCH(req: NextRequest) {
         .input('notas', sql.NVarChar(1000), notas ?? null)
         .input('uid', sql.Int, uid)
         .query<{ IDCasoLoteBanco: number }>(`
-          INSERT INTO [app].caso_lote_banco
+          INSERT INTO [pro_app].caso_lote_banco
             (IDCaso, MontoPagaBancoPorLote_CRC, MontoFinanciaBanco_CRC, MontoLoteFinanciado_CRC,
              LoteHistoricoCobrado_CRC, PagoCliente_CRC, FechaPagoCliente, Notas,
              FechaRegistro, IDCreadopor)

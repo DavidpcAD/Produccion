@@ -1,8 +1,8 @@
 // Tipos del módulo Sub-partidas (portado de obrascontrol `sub-partidas.ts`).
 // Catálogo núcleo de ObrasControl: unidades atómicas que conectan sprints con
 // partidas de costo. Datos en AdelanteDB, esquema `obc`:
-//   obc.sub_partidas + obc.partidas + obc.grupos_partida +
-//   obc.sub_partida_tipos + obc.sub_partida_pesos_partida / _sprint
+//   pro_obc.sub_partidas + pro_obc.partidas + pro_obc.grupos_partida +
+//   pro_obc.sub_partida_tipos + pro_obc.sub_partida_pesos_partida / _sprint
 
 import type { TipoCasa } from './types';
 
@@ -11,7 +11,7 @@ export type { TipoCasa };
 /** Los cuatro tipos de casa válidos (fuente de columnas de peso). */
 export const TIPOS_CASA: TipoCasa[] = ['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea'];
 
-/** Partida del catálogo (obc.partidas + su grupo). Opciones del dropdown. */
+/** Partida del catálogo (pro_obc.partidas + su grupo). Opciones del dropdown. */
 export interface PartidaConGrupo {
   id: number;
   codigo: string;

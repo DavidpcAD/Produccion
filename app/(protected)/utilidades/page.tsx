@@ -340,7 +340,7 @@ export default function UtilidadesPage() {
 
       {/* TODO(utilidades): drilldown de movimientos por lote (v_movimientos_con_indirecto),
           indirectos por obra, evolución mensual como gráfico, export PDF/Excel del reporte,
-          envío del reporte (uti.envios_reporte), comentarios a nivel de celda (3ª capa),
+          envío del reporte (pro_uti.envios_reporte), comentarios a nivel de celda (3ª capa),
           filtros por tipo/lote y selector de período por trimestre/año/rango. */}
     </PageShell>
   );

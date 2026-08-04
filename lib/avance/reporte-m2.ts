@@ -90,7 +90,7 @@ export async function calcularReporteM2(
              CONVERT(varchar(10), fecha_inicio, 23) AS fecha_inicio,
              CONVERT(varchar(10), fecha_fin, 23) AS fecha_fin,
              estado, descripcion, dias_efectivos
-      FROM obc.semanas_operativas WHERE id = @id
+      FROM pro_obc.semanas_operativas WHERE id = @id
     `);
   if (semQ.recordset.length === 0) return null;
   const semana = semQ.recordset[0]!;
@@ -102,7 +102,7 @@ export async function calcularReporteM2(
         .request()
         .input('id', sql.BigInt, semanaId)
         .query<{ n: number }>(
-          "SELECT COUNT(*) AS n FROM obc.cierres_produccion WHERE semana_operativa_id = @id AND tipo = 'A'",
+          "SELECT COUNT(*) AS n FROM pro_obc.cierres_produccion WHERE semana_operativa_id = @id AND tipo = 'A'",
         )
     ).recordset[0]?.n ?? 0) > 0;
   const hayCierrePrevio =
@@ -111,7 +111,7 @@ export async function calcularReporteM2(
         .request()
         .input('id', sql.BigInt, semanaId)
         .query<{ n: number }>(
-          'SELECT COUNT(*) AS n FROM obc.cierres_produccion WHERE semana_operativa_id < @id',
+          'SELECT COUNT(*) AS n FROM pro_obc.cierres_produccion WHERE semana_operativa_id < @id',
         )
     ).recordset[0]?.n ?? 0) > 0;
   const tieneBaseLinea =
@@ -120,7 +120,7 @@ export async function calcularReporteM2(
         .request()
         .input('id', sql.BigInt, semanaId)
         .query<{ n: number }>(
-          'SELECT COUNT(*) AS n FROM obc.avance_base_semanal WHERE semana_operativa_id = @id',
+          'SELECT COUNT(*) AS n FROM pro_obc.avance_base_semanal WHERE semana_operativa_id = @id',
         )
     ).recordset[0]?.n ?? 0) > 0;
   const baseSemanal = tieneBaseLinea || hayCierrePrevio;
@@ -131,7 +131,7 @@ export async function calcularReporteM2(
         .request()
         .input('id', sql.BigInt, semanaId)
         .query<{ id: number }>(
-          'SELECT MIN(semana_operativa_id) AS id FROM obc.avance_base_semanal WHERE semana_operativa_id > @id',
+          'SELECT MIN(semana_operativa_id) AS id FROM pro_obc.avance_base_semanal WHERE semana_operativa_id > @id',
         )
     ).recordset[0]?.id ?? null;
 
@@ -141,7 +141,7 @@ export async function calcularReporteM2(
         .request()
         .input('id', sql.BigInt, semanaId)
         .query<{ n: number }>(
-          "SELECT COUNT(*) AS n FROM obc.avance_semanal_obra WHERE semana_operativa_id = @id AND tipo_cierre = 'A'",
+          "SELECT COUNT(*) AS n FROM pro_obc.avance_semanal_obra WHERE semana_operativa_id = @id AND tipo_cierre = 'A'",
         )
     ).recordset[0]?.n ?? 0) > 0;
   const esAbierta = semana.estado === 'abierta';
@@ -166,16 +166,16 @@ export async function calcularReporteM2(
              ISNULL(o.area_prorrateada, 0) AS m2,
              CASE WHEN prod.obra_codigo IS NOT NULL THEN 1 ELSE 0 END AS produjo,
              CASE WHEN aso.estado_obra IS NOT NULL THEN 1 ELSE 0 END AS en_foto
-      FROM obc.obra_estado e
-      LEFT JOIN obc.vw_obras o
+      FROM pro_obc.obra_estado e
+      LEFT JOIN pro_obc.vw_obras o
         ON o.codigo COLLATE DATABASE_DEFAULT = e.obra_codigo COLLATE DATABASE_DEFAULT
-      LEFT JOIN obc.avance_semanal_obra aso
+      LEFT JOIN pro_obc.avance_semanal_obra aso
         ON aso.obra_codigo COLLATE DATABASE_DEFAULT = e.obra_codigo COLLATE DATABASE_DEFAULT
        AND aso.semana_operativa_id = @id AND aso.tipo_cierre = 'A'
       LEFT JOIN (
         SELECT DISTINCT sn.obra_codigo
-        FROM obc.cierre_produccion_snapshots sn
-        JOIN obc.cierres_produccion cp ON cp.id = sn.cierre_produccion_id
+        FROM pro_obc.cierre_produccion_snapshots sn
+        JOIN pro_obc.cierres_produccion cp ON cp.id = sn.cierre_produccion_id
         WHERE cp.semana_operativa_id = @id
       ) prod ON prod.obra_codigo COLLATE DATABASE_DEFAULT = e.obra_codigo COLLATE DATABASE_DEFAULT
     `);
@@ -212,47 +212,47 @@ export async function calcularReporteM2(
                   ELSE ISNULL(a.pct_completado, 0) END AS pct_actual,
              CASE WHEN @tieneBase = 1 THEN ISNULL(lb.pct_completado, 0)
                   ELSE ISNULL(snapBase.pct, 0) END AS pct_base
-      FROM obc.obra_estado e
-      JOIN obc.sub_partidas sp ON sp.activo = 1
-      JOIN obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = e.tipo_casa
-      LEFT JOIN obc.obra_pesos opp
+      FROM pro_obc.obra_estado e
+      JOIN pro_obc.sub_partidas sp ON sp.activo = 1
+      JOIN pro_obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = e.tipo_casa
+      LEFT JOIN pro_obc.obra_pesos opp
         ON opp.obra_codigo = e.obra_codigo AND opp.ambito = 'partida'
        AND opp.scope_id = sp.partida_id AND opp.sub_partida_id = sp.id
-      LEFT JOIN obc.sub_partida_pesos_partida catp
+      LEFT JOIN pro_obc.sub_partida_pesos_partida catp
         ON catp.partida_id = sp.partida_id AND catp.tipo_casa = e.tipo_casa
        AND catp.sub_partida_id = sp.id
-      LEFT JOIN obc.avance_sub_partidas a
+      LEFT JOIN pro_obc.avance_sub_partidas a
         ON a.obra_codigo = e.obra_codigo AND a.sub_partida_id = sp.id
       LEFT JOIN (
         SELECT s.obra_codigo, s.sub_partida_id, MAX(s.pct_completado) AS pct
-        FROM obc.cierre_produccion_snapshots s
-        JOIN obc.cierres_produccion cp ON cp.id = s.cierre_produccion_id
+        FROM pro_obc.cierre_produccion_snapshots s
+        JOIN pro_obc.cierres_produccion cp ON cp.id = s.cierre_produccion_id
         WHERE cp.semana_operativa_id <= @sem
         GROUP BY s.obra_codigo, s.sub_partida_id
       ) snapAct ON snapAct.obra_codigo = e.obra_codigo AND snapAct.sub_partida_id = sp.id
       LEFT JOIN (
         SELECT s.obra_codigo, s.sub_partida_id, MAX(s.pct_completado) AS pct
-        FROM obc.cierre_produccion_snapshots s
-        JOIN obc.cierres_produccion cp ON cp.id = s.cierre_produccion_id
+        FROM pro_obc.cierre_produccion_snapshots s
+        JOIN pro_obc.cierres_produccion cp ON cp.id = s.cierre_produccion_id
         WHERE cp.semana_operativa_id < @sem
         GROUP BY s.obra_codigo, s.sub_partida_id
       ) snapBase ON snapBase.obra_codigo = e.obra_codigo AND snapBase.sub_partida_id = sp.id
-      LEFT JOIN obc.avance_base_semanal lb
+      LEFT JOIN pro_obc.avance_base_semanal lb
         ON lb.semana_operativa_id = @sem
        AND lb.obra_codigo = e.obra_codigo AND lb.sub_partida_id = sp.id
-      LEFT JOIN obc.avance_base_semanal lbNext
+      LEFT JOIN pro_obc.avance_base_semanal lbNext
         ON lbNext.semana_operativa_id = @nextLb
        AND lbNext.obra_codigo = e.obra_codigo AND lbNext.sub_partida_id = sp.id
       WHERE (
           ((@esAbierta = 1 OR @hayFoto = 0) AND e.estado IN ('en_ejecucion', 'en_espera'))
           OR EXISTS (
-             SELECT 1 FROM obc.avance_semanal_obra aso2
+             SELECT 1 FROM pro_obc.avance_semanal_obra aso2
              WHERE aso2.obra_codigo COLLATE DATABASE_DEFAULT = e.obra_codigo COLLATE DATABASE_DEFAULT
                AND aso2.semana_operativa_id = @sem AND aso2.tipo_cierre = 'A'
                AND aso2.estado_obra IN ('en_ejecucion', 'en_espera'))
           OR EXISTS (
-             SELECT 1 FROM obc.cierre_produccion_snapshots sn2
-             JOIN obc.cierres_produccion cp2 ON cp2.id = sn2.cierre_produccion_id
+             SELECT 1 FROM pro_obc.cierre_produccion_snapshots sn2
+             JOIN pro_obc.cierres_produccion cp2 ON cp2.id = sn2.cierre_produccion_id
              WHERE cp2.semana_operativa_id = @sem
                AND sn2.obra_codigo COLLATE DATABASE_DEFAULT = e.obra_codigo COLLATE DATABASE_DEFAULT)
         )
@@ -265,14 +265,14 @@ export async function calcularReporteM2(
     .request()
     .query<{ works_no: string; task_no: string; monto: number }>(`
       SELECT works_no, task_no, SUM(line_amount) AS monto
-      FROM bi.fact_presupuesto
+      FROM pro_bi.fact_presupuesto
       WHERE task_type = 'Posting' AND tipo_costo = 'Cost' AND CAST(es_ultima_version AS INT) = 1
       GROUP BY works_no, task_no
     `);
   const partidasQ = await db
     .request()
     .query<{ id: number; codigo: string; nombre: string }>(
-      'SELECT id, codigo, nombre FROM obc.partidas',
+      'SELECT id, codigo, nombre FROM pro_obc.partidas',
     );
   const codigoPorPartida = new Map<number, string>();
   const partidaMeta = new Map<number, { codigo: string; nombre: string }>();
@@ -301,7 +301,7 @@ export async function calcularReporteM2(
     partida_id: number;
   }>(`
     SELECT id, codigo, nombre, sprint_numero, partida_id
-    FROM obc.sub_partidas WHERE activo = 1
+    FROM pro_obc.sub_partidas WHERE activo = 1
   `);
   const subMeta = new Map<
     number,

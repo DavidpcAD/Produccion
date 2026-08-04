@@ -9,9 +9,9 @@ import { sql } from '@/lib/db-adelantedb';
  * del original (exceljs/pdfkit) no se porta porque esas dependencias no están en
  * este proyecto — el front puede exportar client-side si hace falta.
  *
- * Tablas/vistas: [app].vw_dashboard_caso, [app].vw_caso_extras,
- * [app].vw_pagos_cliente_caso, [app].movimiento_hito_link,
- * [app].caso_hito_proyeccion, [app].catalogo_hito, dbo.Movimientos, dbo.TipMovi.
+ * Tablas/vistas: [pro_app].vw_dashboard_caso, [pro_app].vw_caso_extras,
+ * [pro_app].vw_pagos_cliente_caso, [pro_app].movimiento_hito_link,
+ * [pro_app].caso_hito_proyeccion, [pro_app].catalogo_hito, pro_ventas.Movimientos, pro_ventas.TipMovi.
  */
 
 // --------------------------------------------------------------------- Tipos
@@ -170,7 +170,7 @@ export async function obtenerEstadoCuenta(
         d.TotalExtras_CRC, d.TotalDescuentos_CRC,
         d.MontoFinanciaBancoCapturado_CRC   AS MontoFinanciaBanco_CRC,
         d.PagoCliente_CRC
-      FROM [app].vw_dashboard_caso d
+      FROM [pro_app].vw_dashboard_caso d
       WHERE d.IDCaso = @id;
     `);
   const [r] = cab.recordset;
@@ -184,7 +184,7 @@ export async function obtenerEstadoCuenta(
              CAST(FechaCotizacion AS DATE) AS FechaCotizacion,
              CAST(FechaAprobacion AS DATE) AS FechaAprobacion,
              Estado
-      FROM [app].vw_caso_extras
+      FROM [pro_app].vw_caso_extras
       WHERE IDCaso = @id AND Estado = 'APROBADA'
       ORDER BY FechaAprobacion, IDExtra;
     `);
@@ -197,7 +197,7 @@ export async function obtenerEstadoCuenta(
              CAST(FechaPlaneada AS DATE) AS FechaPlaneada,
              CAST(FechaReal AS DATE)     AS FechaReal,
              Notas, Estado, MontoAplicado_CRC, NumLinks
-      FROM [app].vw_pagos_cliente_caso
+      FROM [pro_app].vw_pagos_cliente_caso
       WHERE IDCaso = @id
       ORDER BY FechaPlaneada, IDPago;
     `);
@@ -214,11 +214,11 @@ export async function obtenerEstadoCuenta(
         lk.MontoAplicado_CRC,
         tm.Abreviatura                      AS AbreviaturaTipo,
         LTRIM(RTRIM(ISNULL(m.Depositante, ''))) AS Depositante
-      FROM [app].movimiento_hito_link lk
-      INNER JOIN [app].caso_hito_proyeccion chp ON chp.IDCasoHito = lk.IDCasoHito
-      INNER JOIN [app].catalogo_hito h ON h.IDHito = chp.IDHito
-      INNER JOIN dbo.Movimientos m ON m.IDMovimiento = lk.IDMovimiento
-      INNER JOIN dbo.TipMovi tm ON tm.IDTmov = m.IDTipmov
+      FROM [pro_app].movimiento_hito_link lk
+      INNER JOIN [pro_app].caso_hito_proyeccion chp ON chp.IDCasoHito = lk.IDCasoHito
+      INNER JOIN [pro_app].catalogo_hito h ON h.IDHito = chp.IDHito
+      INNER JOIN pro_ventas.Movimientos m ON m.IDMovimiento = lk.IDMovimiento
+      INNER JOIN pro_ventas.TipMovi tm ON tm.IDTmov = m.IDTipmov
       WHERE chp.IDCaso = @id
       ORDER BY m.FechaMovimiento, chp.OrdenEnCaso;
     `);

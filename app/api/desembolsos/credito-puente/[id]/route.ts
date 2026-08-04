@@ -41,13 +41,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const db = await getAdelanteDb();
     const cab = await db.request().input('id', sql.Int, id).query<Record<string, unknown>>(`
-      SELECT * FROM [app].vw_credito_puente_resumen WHERE IDCreditoPuente = @id
+      SELECT * FROM [pro_app].vw_credito_puente_resumen WHERE IDCreditoPuente = @id
     `);
     if (!cab.recordset[0]) {
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
     }
     const lotes = await db.request().input('id', sql.Int, id).query<Record<string, unknown>>(`
-      SELECT * FROM [app].vw_lote_credito_puente
+      SELECT * FROM [pro_app].vw_lote_credito_puente
       WHERE IDCreditoPuente = @id
       ORDER BY AbreviaturaProyecto, CodigoLote
     `);
@@ -105,7 +105,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       .input('Notas', sql.NVarChar(sql.MAX), body.Notas != null ? String(body.Notas) : null)
       .input('Usuario', sql.NVarChar(400), usuario)
       .query(`
-        UPDATE [app].credito_puente
+        UPDATE [pro_app].credito_puente
         SET IDBan = @IDBan,
             Codigo = @Codigo,
             MontoTotal_CRC = @MontoTotal,
@@ -138,7 +138,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   try {
     const db = await getAdelanteDb();
     const lotes = await db.request().input('id', sql.Int, id).query<{ n: number }>(`
-      SELECT COUNT(*) AS n FROM [app].credito_puente_lote WHERE IDCreditoPuente = @id
+      SELECT COUNT(*) AS n FROM [pro_app].credito_puente_lote WHERE IDCreditoPuente = @id
     `);
     if ((lotes.recordset[0]?.n ?? 0) > 0) {
       return NextResponse.json(
@@ -147,7 +147,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       );
     }
     const r = await db.request().input('id', sql.Int, id).query(`
-      DELETE FROM [app].credito_puente WHERE IDCreditoPuente = @id
+      DELETE FROM [pro_app].credito_puente WHERE IDCreditoPuente = @id
     `);
     if (r.rowsAffected[0] === 0) {
       return NextResponse.json({ error: 'No encontrado' }, { status: 404 });

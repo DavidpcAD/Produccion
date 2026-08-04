@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth';
 
 // Comentarios del reporte, anclados a (anio, mes) y a un scope
 // ('ejecutivo' | 'seccion' | 'celda'). Portado de la Azure Function
-// `comentarios`. Tabla: uti.comentarios_reporte.
+// `comentarios`. Tabla: pro_uti.comentarios_reporte.
 //
 // Nota de auth: en el modelo nuevo la sesión (getSession) trae idUsuario /
 // nombre / cedula, NO el oid/email de Entra ID. Mapeamos:
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
         SELECT id_comentario, anio, mes, scope, seccion_id, celda_id,
                contenido_markdown, autor_nombre, autor_email, autor_rol,
                estado, creado_en, editado_en
-        FROM uti.comentarios_reporte
+        FROM pro_uti.comentarios_reporte
         WHERE anio = @anio AND mes = @mes AND eliminado_en IS NULL
         ORDER BY scope, seccion_id, creado_en
       `);
@@ -99,20 +99,20 @@ export async function POST(req: NextRequest) {
         DECLARE @id BIGINT;
 
         SELECT @id = id_comentario
-        FROM uti.comentarios_reporte
+        FROM pro_uti.comentarios_reporte
         WHERE anio = @anio AND mes = @mes AND scope = @scope
           AND (seccion_id = @seccion_id OR (seccion_id IS NULL AND @seccion_id IS NULL))
           AND eliminado_en IS NULL;
 
         IF @id IS NOT NULL
         BEGIN
-          UPDATE uti.comentarios_reporte
+          UPDATE pro_uti.comentarios_reporte
           SET contenido_markdown = @contenido, editado_en = SYSUTCDATETIME()
           WHERE id_comentario = @id;
         END
         ELSE
         BEGIN
-          INSERT INTO uti.comentarios_reporte
+          INSERT INTO pro_uti.comentarios_reporte
             (anio, mes, scope, seccion_id, celda_id, contenido_markdown,
              autor_oid, autor_email, autor_nombre, autor_rol, estado)
           VALUES
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
         SELECT id_comentario, anio, mes, scope, seccion_id, celda_id,
                contenido_markdown, autor_nombre, autor_email, autor_rol,
                estado, creado_en, editado_en
-        FROM uti.comentarios_reporte
+        FROM pro_uti.comentarios_reporte
         WHERE id_comentario = @id;
       `);
 

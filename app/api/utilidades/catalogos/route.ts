@@ -9,7 +9,7 @@ import { getSession } from '@/lib/auth';
 // `catalogos-lotes`) en una sola respuesta, siguiendo el patrón de
 // /api/partidas de la base (un endpoint devuelve varios catálogos).
 //
-// Depende de: uti.tipo_movimiento, uti.v_lotes_activos.
+// Depende de: pro_uti.tipo_movimiento, pro_uti.v_lotes_activos.
 
 export async function GET() {
   const session = await getSession();
@@ -22,13 +22,13 @@ export async function GET() {
     const [tipos, lotes] = await Promise.all([
       db.request().query(`
         SELECT codigo AS valor, nombre_display AS etiqueta, categoria AS grupo
-        FROM uti.tipo_movimiento
+        FROM pro_uti.tipo_movimiento
         WHERE activo = 1
         ORDER BY orden_ui
       `),
       db.request().query(`
         SELECT lote AS valor, lote AS etiqueta, bloque AS grupo
-        FROM uti.v_lotes_activos
+        FROM pro_uti.v_lotes_activos
         ORDER BY bloque, lote
       `),
     ]);

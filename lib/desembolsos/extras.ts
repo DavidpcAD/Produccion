@@ -5,7 +5,7 @@ import { sql } from '@/lib/db-adelantedb';
 // Extras y descuentos por caso. Portado de adelante-flujo-desembolsos
 // (api/src/functions/extras.ts + sql/migrations fase4.6c). SPs portados inline.
 // Al aprobar/rechazar una APROBADA se recalcula PrecioVentaActual del caso
-// (porta sp_recalcular_precio_venta_actual sobre [app].caso_lote_banco).
+// (porta sp_recalcular_precio_venta_actual sobre [pro_app].caso_lote_banco).
 // =============================================================================
 
 export type ExtraTipo = 'EXTRA' | 'DESCUENTO';
@@ -77,7 +77,7 @@ function mapExtra(r: RawExtra): CasoExtra {
 
 export async function listarPorCaso(db: ConnectionPool, idCaso: number): Promise<CasoExtra[]> {
   const r = await db.request().input('id', sql.Int, idCaso).query<RawExtra>(`
-    SELECT * FROM [app].vw_caso_extras WHERE IDCaso = @id
+    SELECT * FROM [pro_app].vw_caso_extras WHERE IDCaso = @id
     ORDER BY FechaCotizacion DESC, IDExtra DESC;
   `);
   return r.recordset.map(mapExtra);
@@ -96,7 +96,7 @@ export async function listarGlobal(db: ConnectionPool, f: FiltroExtras): Promise
   if (f.estado) { conds.push('Estado = @estado'); request.input('estado', sql.VarChar(20), f.estado); }
   if (f.tipo) { conds.push('Tipo = @tipo'); request.input('tipo', sql.VarChar(20), f.tipo); }
   if (f.idProyecto) {
-    conds.push('IDCaso IN (SELECT cs.IDCaso FROM dbo.Casos cs INNER JOIN dbo.Lotes lt ON lt.IDLote = cs.IDLote WHERE lt.IDProyecto = @idProyecto)');
+    conds.push('IDCaso IN (SELECT cs.IDCaso FROM pro_ventas.Casos cs INNER JOIN pro_ventas.Lotes lt ON lt.IDLote = cs.IDLote WHERE lt.IDProyecto = @idProyecto)');
     request.input('idProyecto', sql.Int, f.idProyecto);
   }
   if (f.q) {
@@ -104,7 +104,7 @@ export async function listarGlobal(db: ConnectionPool, f: FiltroExtras): Promise
     request.input('q', sql.NVarChar(200), `%${f.q}%`);
   }
   const r = await request.query<RawExtra>(`
-    SELECT TOP 500 * FROM [app].vw_caso_extras WHERE ${conds.join(' AND ')}
+    SELECT TOP 500 * FROM [pro_app].vw_caso_extras WHERE ${conds.join(' AND ')}
     ORDER BY CASE Estado WHEN 'COTIZADA' THEN 0 WHEN 'APROBADA' THEN 1 ELSE 2 END,
              FechaCotizacion DESC, IDExtra DESC;
   `);
@@ -121,7 +121,7 @@ export interface CrearExtraInput {
   UsuarioEmail: string;
 }
 
-// Porta [app].sp_crear_extra inline.
+// Porta [pro_app].sp_crear_extra inline.
 export async function crearExtra(db: ConnectionPool, i: CrearExtraInput): Promise<{ IDExtra: number }> {
   const r = await db.request()
     .input('IDCaso', sql.Int, i.IDCaso)
@@ -133,21 +133,21 @@ export async function crearExtra(db: ConnectionPool, i: CrearExtraInput): Promis
     .input('UsuarioEmail', sql.NVarChar(200), i.UsuarioEmail)
     .query<{ IDExtra: number }>(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
-      IF NOT EXISTS (SELECT 1 FROM dbo.Casos WHERE IDCaso = @IDCaso) THROW 52000, 'IDCaso no existe.', 1;
+      IF NOT EXISTS (SELECT 1 FROM pro_ventas.Casos WHERE IDCaso = @IDCaso) THROW 52000, 'IDCaso no existe.', 1;
       IF @Tipo NOT IN ('EXTRA','DESCUENTO') THROW 52001, 'Tipo inválido (EXTRA, DESCUENTO).', 1;
       IF @MontoAjuste_CRC IS NULL OR @MontoAjuste_CRC <= 0 THROW 52002, 'MontoAjuste_CRC debe ser mayor a cero.', 1;
       IF @Descripcion IS NULL OR LTRIM(RTRIM(@Descripcion)) = '' THROW 52003, 'Descripcion es obligatoria.', 1;
       BEGIN TRY
         BEGIN TRANSACTION;
-        INSERT INTO [app].caso_extra (IDCaso, Tipo, Descripcion, MontoAjuste_CRC, FechaCotizacion, Notas, CreadoPor)
+        INSERT INTO [pro_app].caso_extra (IDCaso, Tipo, Descripcion, MontoAjuste_CRC, FechaCotizacion, Notas, CreadoPor)
         VALUES (@IDCaso, @Tipo, @Descripcion, @MontoAjuste_CRC, @FechaCotizacion, @Notas, @UsuarioEmail);
         DECLARE @NuevoID INT = SCOPE_IDENTITY();
         DECLARE @ValorNuevoJSON NVARCHAR(MAX) = (
           SELECT IDExtra = @NuevoID, IDCaso = @IDCaso, Tipo = @Tipo, Descripcion = @Descripcion,
                  MontoAjuste_CRC = @MontoAjuste_CRC, FechaCotizacion = @FechaCotizacion, Estado = 'COTIZADA', Notas = @Notas
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.caso_extra', @NuevoID, 'INSERT', @UsuarioEmail, NULL, @ValorNuevoJSON,
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.caso_extra', @NuevoID, 'INSERT', @UsuarioEmail, NULL, @ValorNuevoJSON,
                 CONCAT('Extra creada caso ', @IDCaso, ' · ', @Tipo, ' · ', CAST(@MontoAjuste_CRC AS NVARCHAR(40))));
         COMMIT TRANSACTION;
         SELECT @NuevoID AS IDExtra;
@@ -169,7 +169,7 @@ export interface ActualizarExtraInput {
   UsuarioEmail: string;
 }
 
-// Porta [app].sp_actualizar_extra inline (solo si Estado=COTIZADA).
+// Porta [pro_app].sp_actualizar_extra inline (solo si Estado=COTIZADA).
 export async function actualizarExtra(db: ConnectionPool, idExtra: number, i: ActualizarExtraInput): Promise<void> {
   await db.request()
     .input('IDExtra', sql.Int, idExtra)
@@ -181,7 +181,7 @@ export async function actualizarExtra(db: ConnectionPool, idExtra: number, i: Ac
     .query(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
       DECLARE @Estado VARCHAR(20);
-      SELECT @Estado = Estado FROM [app].caso_extra WHERE IDExtra = @IDExtra;
+      SELECT @Estado = Estado FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra;
       IF @Estado IS NULL THROW 52004, 'IDExtra no existe.', 1;
       IF @Estado <> 'COTIZADA' THROW 52005, 'Solo se puede editar una extra en estado COTIZADA.', 1;
       IF @MontoAjuste_CRC IS NOT NULL AND @MontoAjuste_CRC <= 0 THROW 52002, 'MontoAjuste_CRC debe ser mayor a cero.', 1;
@@ -189,8 +189,8 @@ export async function actualizarExtra(db: ConnectionPool, idExtra: number, i: Ac
         BEGIN TRANSACTION;
         DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (
           SELECT IDExtra, IDCaso, Tipo, Descripcion, MontoAjuste_CRC, FechaCotizacion, Estado, Notas
-          FROM [app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        UPDATE [app].caso_extra
+          FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        UPDATE [pro_app].caso_extra
         SET Descripcion = COALESCE(@Descripcion, Descripcion),
             MontoAjuste_CRC = COALESCE(@MontoAjuste_CRC, MontoAjuste_CRC),
             FechaCotizacion = COALESCE(@FechaCotizacion, FechaCotizacion),
@@ -199,9 +199,9 @@ export async function actualizarExtra(db: ConnectionPool, idExtra: number, i: Ac
         WHERE IDExtra = @IDExtra;
         DECLARE @ValorNuevoJSON NVARCHAR(MAX) = (
           SELECT IDExtra, IDCaso, Tipo, Descripcion, MontoAjuste_CRC, FechaCotizacion, Estado, Notas
-          FROM [app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.caso_extra', @IDExtra, 'UPDATE', @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON,
+          FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.caso_extra', @IDExtra, 'UPDATE', @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON,
                 CONCAT('Edición extra ', @IDExtra));
         COMMIT TRANSACTION;
       END TRY
@@ -215,20 +215,20 @@ export async function actualizarExtra(db: ConnectionPool, idExtra: number, i: Ac
 // como bloque reusable dentro de aprobar/rechazar.
 const RECALCULAR_PRECIO = `
   DECLARE @PrecioBase MONEY;
-  SELECT @PrecioBase = PrecioVenta FROM dbo.Casos WHERE IDCaso = @IDCaso;
+  SELECT @PrecioBase = PrecioVenta FROM pro_ventas.Casos WHERE IDCaso = @IDCaso;
   IF @PrecioBase IS NOT NULL
   BEGIN
-    DECLARE @SumaExtras MONEY = (SELECT ISNULL(SUM(MontoAjuste_CRC),0) FROM [app].caso_extra WHERE IDCaso = @IDCaso AND Estado='APROBADA' AND Tipo='EXTRA');
-    DECLARE @SumaDescuentos MONEY = (SELECT ISNULL(SUM(MontoAjuste_CRC),0) FROM [app].caso_extra WHERE IDCaso = @IDCaso AND Estado='APROBADA' AND Tipo='DESCUENTO');
+    DECLARE @SumaExtras MONEY = (SELECT ISNULL(SUM(MontoAjuste_CRC),0) FROM [pro_app].caso_extra WHERE IDCaso = @IDCaso AND Estado='APROBADA' AND Tipo='EXTRA');
+    DECLARE @SumaDescuentos MONEY = (SELECT ISNULL(SUM(MontoAjuste_CRC),0) FROM [pro_app].caso_extra WHERE IDCaso = @IDCaso AND Estado='APROBADA' AND Tipo='DESCUENTO');
     DECLARE @PrecioActual MONEY = @PrecioBase + @SumaExtras - @SumaDescuentos;
-    IF EXISTS (SELECT 1 FROM [app].caso_lote_banco WHERE IDCaso = @IDCaso)
-      UPDATE [app].caso_lote_banco SET PrecioVentaActual_CRC = @PrecioActual, FechaModificacion = SYSUTCDATETIME() WHERE IDCaso = @IDCaso;
+    IF EXISTS (SELECT 1 FROM [pro_app].caso_lote_banco WHERE IDCaso = @IDCaso)
+      UPDATE [pro_app].caso_lote_banco SET PrecioVentaActual_CRC = @PrecioActual, FechaModificacion = SYSUTCDATETIME() WHERE IDCaso = @IDCaso;
     ELSE
-      INSERT INTO [app].caso_lote_banco (IDCaso, MontoPagaBancoPorLote_CRC, PrecioVentaActual_CRC) VALUES (@IDCaso, @PrecioActual, @PrecioActual);
+      INSERT INTO [pro_app].caso_lote_banco (IDCaso, MontoPagaBancoPorLote_CRC, PrecioVentaActual_CRC) VALUES (@IDCaso, @PrecioActual, @PrecioActual);
   END
 `;
 
-// Porta [app].sp_aprobar_extra inline.
+// Porta [pro_app].sp_aprobar_extra inline.
 export async function aprobarExtra(db: ConnectionPool, idExtra: number, fechaAprobacion: string, usuarioEmail: string): Promise<void> {
   await db.request()
     .input('IDExtra', sql.Int, idExtra)
@@ -237,20 +237,20 @@ export async function aprobarExtra(db: ConnectionPool, idExtra: number, fechaApr
     .query(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
       DECLARE @Estado VARCHAR(20), @IDCaso INT;
-      SELECT @Estado = Estado, @IDCaso = IDCaso FROM [app].caso_extra WHERE IDExtra = @IDExtra;
+      SELECT @Estado = Estado, @IDCaso = IDCaso FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra;
       IF @Estado IS NULL THROW 52004, 'IDExtra no existe.', 1;
       IF @Estado <> 'COTIZADA' THROW 52006, 'Solo se puede aprobar una extra en estado COTIZADA.', 1;
       IF @FechaAprobacion IS NULL THROW 52007, 'FechaAprobacion es obligatoria.', 1;
       BEGIN TRY
         BEGIN TRANSACTION;
-        DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (SELECT IDExtra, Estado, FechaAprobacion, AprobadoPor FROM [app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        UPDATE [app].caso_extra
+        DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (SELECT IDExtra, Estado, FechaAprobacion, AprobadoPor FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        UPDATE [pro_app].caso_extra
         SET Estado = 'APROBADA', FechaAprobacion = @FechaAprobacion, AprobadoPor = @UsuarioEmail,
             ModificadoPor = @UsuarioEmail, FechaModificacion = SYSUTCDATETIME()
         WHERE IDExtra = @IDExtra;
-        DECLARE @ValorNuevoJSON NVARCHAR(MAX) = (SELECT IDExtra, Estado, FechaAprobacion, AprobadoPor FROM [app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.caso_extra', @IDExtra, 'UPDATE', @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON, CONCAT('Aprobación extra ', @IDExtra));
+        DECLARE @ValorNuevoJSON NVARCHAR(MAX) = (SELECT IDExtra, Estado, FechaAprobacion, AprobadoPor FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.caso_extra', @IDExtra, 'UPDATE', @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON, CONCAT('Aprobación extra ', @IDExtra));
         ${RECALCULAR_PRECIO}
         COMMIT TRANSACTION;
       END TRY
@@ -260,7 +260,7 @@ export async function aprobarExtra(db: ConnectionPool, idExtra: number, fechaApr
     `);
 }
 
-// Porta [app].sp_rechazar_extra inline.
+// Porta [pro_app].sp_rechazar_extra inline.
 export async function rechazarExtra(db: ConnectionPool, idExtra: number, notas: string | null, usuarioEmail: string): Promise<void> {
   await db.request()
     .input('IDExtra', sql.Int, idExtra)
@@ -269,17 +269,17 @@ export async function rechazarExtra(db: ConnectionPool, idExtra: number, notas: 
     .query(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
       DECLARE @Estado VARCHAR(20), @IDCaso INT;
-      SELECT @Estado = Estado, @IDCaso = IDCaso FROM [app].caso_extra WHERE IDExtra = @IDExtra;
+      SELECT @Estado = Estado, @IDCaso = IDCaso FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra;
       IF @Estado IS NULL THROW 52004, 'IDExtra no existe.', 1;
       IF @Estado = 'RECHAZADA' THROW 52008, 'La extra ya está rechazada.', 1;
       BEGIN TRY
         BEGIN TRANSACTION;
         DECLARE @EstadoAnterior VARCHAR(20) = @Estado;
-        UPDATE [app].caso_extra
+        UPDATE [pro_app].caso_extra
         SET Estado = 'RECHAZADA', Notas = COALESCE(@Notas, Notas), ModificadoPor = @UsuarioEmail, FechaModificacion = SYSUTCDATETIME()
         WHERE IDExtra = @IDExtra;
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.caso_extra', @IDExtra, 'UPDATE', @UsuarioEmail, CONCAT('{"Estado":"', @EstadoAnterior, '"}'), '{"Estado":"RECHAZADA"}', CONCAT('Rechazo extra ', @IDExtra));
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.caso_extra', @IDExtra, 'UPDATE', @UsuarioEmail, CONCAT('{"Estado":"', @EstadoAnterior, '"}'), '{"Estado":"RECHAZADA"}', CONCAT('Rechazo extra ', @IDExtra));
         IF @EstadoAnterior = 'APROBADA'
         BEGIN
           ${RECALCULAR_PRECIO}
@@ -292,7 +292,7 @@ export async function rechazarExtra(db: ConnectionPool, idExtra: number, notas: 
     `);
 }
 
-// Porta [app].sp_eliminar_extra inline (no si APROBADA).
+// Porta [pro_app].sp_eliminar_extra inline (no si APROBADA).
 export async function eliminarExtra(db: ConnectionPool, idExtra: number, usuarioEmail: string): Promise<void> {
   await db.request()
     .input('IDExtra', sql.Int, idExtra)
@@ -300,17 +300,17 @@ export async function eliminarExtra(db: ConnectionPool, idExtra: number, usuario
     .query(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
       DECLARE @Estado VARCHAR(20);
-      SELECT @Estado = Estado FROM [app].caso_extra WHERE IDExtra = @IDExtra;
+      SELECT @Estado = Estado FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra;
       IF @Estado IS NULL THROW 52004, 'IDExtra no existe.', 1;
       IF @Estado = 'APROBADA' THROW 52009, 'No se puede eliminar una extra aprobada. Rechazala primero.', 1;
       DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (
         SELECT IDExtra, IDCaso, Tipo, Descripcion, MontoAjuste_CRC, Estado, FechaCotizacion, Notas
-        FROM [app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
       BEGIN TRY
         BEGIN TRANSACTION;
-        DELETE FROM [app].caso_extra WHERE IDExtra = @IDExtra;
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.caso_extra', @IDExtra, 'DELETE', @UsuarioEmail, @ValorAnteriorJSON, NULL, CONCAT('Eliminación extra ', @IDExtra));
+        DELETE FROM [pro_app].caso_extra WHERE IDExtra = @IDExtra;
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.caso_extra', @IDExtra, 'DELETE', @UsuarioEmail, @ValorAnteriorJSON, NULL, CONCAT('Eliminación extra ', @IDExtra));
         COMMIT TRANSACTION;
       END TRY
       BEGIN CATCH

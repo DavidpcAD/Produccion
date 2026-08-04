@@ -6,7 +6,7 @@ import type { SprintCatalogoDetalle } from '@/lib/avance/sprints';
 export const dynamic = 'force-dynamic';
 
 /**
- * Catálogo global de sprints (obc.sprints_catalogo). Portado de obrascontrol
+ * Catálogo global de sprints (pro_obc.sprints_catalogo). Portado de obrascontrol
  * `sprint.ts` (GET /api/sprints).
  *   GET /api/avance/sprints → { sprints: SprintCatalogoDetalle[] }
  *
@@ -25,10 +25,10 @@ export async function GET() {
       SELECT sc.id, sc.codigo, sc.numero_global, sc.nombre, sc.descripcion,
              sc.categoria, sc.es_espera,
              (SELECT COUNT(*)
-                FROM obc.sub_partidas sp
+                FROM pro_obc.sub_partidas sp
                WHERE sp.sprint_numero = sc.numero_global
                  AND sp.es_critica = 1 AND sp.activo = 1) AS criticas
-      FROM obc.sprints_catalogo sc
+      FROM pro_obc.sprints_catalogo sc
       WHERE sc.activo = 1
       ORDER BY sc.numero_global
     `);

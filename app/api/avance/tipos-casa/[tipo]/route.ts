@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * PUT /api/avance/tipos-casa/{tipo} — reemplaza la secuencia de sprints de un
- * tipo de casa (obc.tipo_casa_sprints). Portado de obrascontrol `tipos-casa.ts`.
+ * tipo de casa (pro_obc.tipo_casa_sprints). Portado de obrascontrol `tipos-casa.ts`.
  *
  * Body: { sprints: number[] }. Se guardan únicos, ascendente; el orden va en
  * orden de sprint global (1-based).
@@ -51,7 +51,7 @@ export async function PUT(
     try {
       await new sql.Request(tx)
         .input('tc', sql.VarChar(20), tipo)
-        .query('DELETE FROM obc.tipo_casa_sprints WHERE tipo_casa = @tc');
+        .query('DELETE FROM pro_obc.tipo_casa_sprints WHERE tipo_casa = @tc');
 
       if (sprints.length > 0) {
         const request = new sql.Request(tx).input('tc', sql.VarChar(20), tipo);
@@ -61,7 +61,7 @@ export async function PUT(
           return `(@tc, @s${i}, @o${i})`;
         });
         await request.query(
-          `INSERT INTO obc.tipo_casa_sprints (tipo_casa, sprint_global, orden) VALUES ${values.join(', ')}`,
+          `INSERT INTO pro_obc.tipo_casa_sprints (tipo_casa, sprint_global, orden) VALUES ${values.join(', ')}`,
         );
       }
       await tx.commit();

@@ -27,7 +27,7 @@ export interface ErrorWorkflow {
 
 export type ResultadoWorkflow = { ok: true } | ErrorWorkflow;
 
-// ─── Obras (bi.dim_obra) — picker de asignación en coladas ──────────────────
+// ─── Obras (pro_bi.dim_obra) — picker de asignación en coladas ──────────────────
 
 export interface Obra {
   works_no: string;

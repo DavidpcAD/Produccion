@@ -164,15 +164,15 @@ async function cargarNomina(db: ConnectionPool): Promise<NominaSemanal[]> {
            s.anio, s.numero_semana,
            CONVERT(varchar(10), s.fecha_inicio, 23) AS fecha_inicio,
            CONVERT(varchar(10), s.fecha_fin, 23) AS fecha_fin
-    FROM obc.mo_nomina_semanal n
-    JOIN obc.semanas_operativas s ON s.id = n.semana_operativa_id
+    FROM pro_obc.mo_nomina_semanal n
+    JOIN pro_obc.semanas_operativas s ON s.id = n.semana_operativa_id
   `);
   return r.recordset;
 }
 
 async function cargarHoras(db: ConnectionPool): Promise<HorasObra[]> {
   const r = await db.request().query<HorasObra>(`
-    SELECT semana_operativa_id, obra_codigo, horas FROM obc.mo_horas_obra
+    SELECT semana_operativa_id, obra_codigo, horas FROM pro_obc.mo_horas_obra
   `);
   return r.recordset;
 }
@@ -180,7 +180,7 @@ async function cargarHoras(db: ConnectionPool): Promise<HorasObra[]> {
 async function cargarSubcontratos(db: ConnectionPool): Promise<Subcontrato[]> {
   const r = await db.request().query<Subcontrato>(`
     SELECT id, semana_operativa_id, obra_codigo, tipo, monto, descripcion
-    FROM obc.mo_subcontratos
+    FROM pro_obc.mo_subcontratos
   `);
   return r.recordset;
 }
@@ -245,7 +245,7 @@ export async function calcularResumenMesMO(
 ): Promise<ResumenMesMO | null> {
   const semanasQ = await db.request().query<{ id: number; fecha_inicio: string }>(`
     SELECT id, CONVERT(varchar(10), fecha_inicio, 23) AS fecha_inicio
-    FROM obc.semanas_operativas
+    FROM pro_obc.semanas_operativas
     ORDER BY fecha_inicio ASC
   `);
   const sel = semanasQ.recordset.find((s) => Number(s.id) === semanaSel);

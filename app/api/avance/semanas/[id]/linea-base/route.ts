@@ -39,7 +39,7 @@ export async function POST(
     const semQ = await db
       .request()
       .input('id', sql.BigInt, id)
-      .query<{ estado: string }>('SELECT estado FROM obc.semanas_operativas WHERE id = @id');
+      .query<{ estado: string }>('SELECT estado FROM pro_obc.semanas_operativas WHERE id = @id');
     if (semQ.recordset.length === 0) {
       return NextResponse.json({ error: 'Semana no encontrada' }, { status: 404 });
     }
@@ -55,7 +55,7 @@ export async function POST(
       .request()
       .input('sem', sql.BigInt, id)
       .query<{ n: number }>(
-        'SELECT COUNT(*) AS n FROM obc.avance_base_semanal WHERE semana_operativa_id = @sem',
+        'SELECT COUNT(*) AS n FROM pro_obc.avance_base_semanal WHERE semana_operativa_id = @sem',
       );
     if ((fotoQ.recordset[0]?.n ?? 0) > 0) {
       const sueltoQ = await db
@@ -63,8 +63,8 @@ export async function POST(
         .input('sem', sql.BigInt, id)
         .query<{ obra_codigo: string }>(`
           SELECT DISTINCT a.obra_codigo
-          FROM obc.avance_sub_partidas a
-          LEFT JOIN obc.avance_base_semanal f
+          FROM pro_obc.avance_sub_partidas a
+          LEFT JOIN pro_obc.avance_base_semanal f
             ON f.semana_operativa_id = @sem
            AND f.obra_codigo = a.obra_codigo AND f.sub_partida_id = a.sub_partida_id
           WHERE ISNULL(a.pct_completado, 0) > ISNULL(f.pct_completado, 0)
@@ -86,10 +86,10 @@ export async function POST(
       .request()
       .input('sem', sql.BigInt, id)
       .query<{ accion: 'INSERT' | 'UPDATE' }>(`
-        MERGE obc.plan_semanal AS dst
+        MERGE pro_obc.plan_semanal AS dst
         USING (
           SELECT @sem AS semana_operativa_id, e.obra_codigo, e.sprint_actual AS sprint_objetivo
-          FROM obc.obra_estado e
+          FROM pro_obc.obra_estado e
           WHERE e.estado IN ('en_ejecucion', 'en_espera') AND e.tipo_casa IS NOT NULL
         ) AS src
           ON dst.semana_operativa_id = src.semana_operativa_id
@@ -107,16 +107,16 @@ export async function POST(
       .request()
       .input('sem', sql.BigInt, id)
       .query(`
-        DELETE FROM obc.avance_base_semanal WHERE semana_operativa_id = @sem;
-        INSERT INTO obc.avance_base_semanal (semana_operativa_id, obra_codigo, sub_partida_id, pct_completado)
+        DELETE FROM pro_obc.avance_base_semanal WHERE semana_operativa_id = @sem;
+        INSERT INTO pro_obc.avance_base_semanal (semana_operativa_id, obra_codigo, sub_partida_id, pct_completado)
         SELECT @sem, a.obra_codigo, a.sub_partida_id, ISNULL(a.pct_completado, 0)
-        FROM obc.avance_sub_partidas a;
+        FROM pro_obc.avance_sub_partidas a;
       `);
 
     const fijadas = r.recordset.length;
     const totalQ = await db.request().query<{ n: number }>(`
       SELECT COUNT(*) AS n
-      FROM obc.obra_estado
+      FROM pro_obc.obra_estado
       WHERE estado IN ('en_ejecucion', 'en_espera') AND tipo_casa IS NOT NULL
     `);
     const resultado: LineaBaseResultado = {

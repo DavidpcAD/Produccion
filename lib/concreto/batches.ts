@@ -3,7 +3,7 @@ import { sql } from '@/lib/db-adelantedb';
 import type { BatchDetallePlanta, KpisResponse, M3PorDia } from './tipos';
 
 // Portado de `api/src/lib/consultar-batches.ts` y `consultar-kpis.ts` de la app
-// original. SQL contra `hor.batches` / `hor.plantas` / `hor.colada_batches`.
+// original. SQL contra `pro_hor.batches` / `pro_hor.plantas` / `pro_hor.colada_batches`.
 
 // ─── KPIs de producción ───────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ export async function consultarKpis(
       SUM(m3_producidos) AS total_m3,
       100.0 * SUM(CASE WHEN tuvo_alarma = 1 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) AS pct_con_alarma,
       100.0 * SUM(CASE WHEN receta_modificada = 1 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) AS pct_receta_modificada
-    FROM hor.batches
+    FROM pro_hor.batches
     WHERE fecha_inicio >= @desde
       AND fecha_inicio < DATEADD(day, 1, @hasta)
       ${filtroPlantaSinAlias}
@@ -49,8 +49,8 @@ export async function consultarKpis(
       CAST(b.fecha_inicio AS DATE) AS fecha,
       p.codigo AS planta_nombre,
       SUM(b.m3_producidos) AS m3
-    FROM hor.batches b
-    INNER JOIN hor.plantas p ON p.id = b.id_planta
+    FROM pro_hor.batches b
+    INNER JOIN pro_hor.plantas p ON p.id = b.id_planta
     WHERE b.fecha_inicio >= @desde
       AND b.fecha_inicio < DATEADD(day, 1, @hasta)
       ${filtroPlantaConBatchAlias}
@@ -148,10 +148,10 @@ export async function consultarBatches(
   const offset = (pagina - 1) * por_pagina;
 
   const baseFrom = `
-    FROM hor.batches b
-    INNER JOIN hor.plantas p ON p.id = b.id_planta
-    LEFT JOIN hor.colada_batches cb ON cb.id_batch = b.id AND cb.excluido = 0
-    LEFT JOIN hor.coladas c ON c.id_colada = cb.id_colada
+    FROM pro_hor.batches b
+    INNER JOIN pro_hor.plantas p ON p.id = b.id_planta
+    LEFT JOIN pro_hor.colada_batches cb ON cb.id_batch = b.id AND cb.excluido = 0
+    LEFT JOIN pro_hor.coladas c ON c.id_colada = cb.id_colada
   `;
 
   const bind = (req: sqlModule.Request) => {

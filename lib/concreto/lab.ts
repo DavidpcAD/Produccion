@@ -10,7 +10,7 @@ import type {
 
 // Portado de `api/src/lib/lab-dominio.ts`. Laboratorio de concreto: muestras
 // (grupos de probetas), ensayos (uno por edad) y mediciones (cada probeta).
-// La vista `lab.v_ensayos_resumen` precalcula promedio/min/max y convierte
+// La vista `pro_lab.v_ensayos_resumen` precalcula promedio/min/max y convierte
 // MPa → kg/cm² (× 10.197).
 
 function rowToFecha(d: Date | string): string {
@@ -19,7 +19,7 @@ function rowToFecha(d: Date | string): string {
 }
 
 // SELECT base de muestra reutilizado por listar + obtener. LEFT JOIN a
-// recetas_bc/coladas/bi.dim_obra para que la muestra sobreviva sin vínculos.
+// recetas_bc/coladas/pro_bi.dim_obra para que la muestra sobreviva sin vínculos.
 const SELECT_MUESTRA_BASE = `
   SELECT
     m.id,
@@ -43,12 +43,12 @@ const SELECT_MUESTRA_BASE = `
              CONCAT(N'F''C ', m.fc_objetivo, N' KG/CM²'))  AS tipo_concreto_display,
     m.notas,
     m.creado_por_email,
-    (SELECT COUNT(*) FROM lab.ensayos e WHERE e.id_muestra = m.id) AS cantidad_ensayos
-  FROM lab.muestras m
-  INNER JOIN lab.actividades a            ON a.id = m.id_actividad
-  LEFT  JOIN hor.coladas c                ON c.id_colada = m.id_colada
-  LEFT  JOIN hor.recetas_bc rbc           ON rbc.id = m.id_receta_bc
-  LEFT  JOIN bi.dim_obra obra
+    (SELECT COUNT(*) FROM pro_lab.ensayos e WHERE e.id_muestra = m.id) AS cantidad_ensayos
+  FROM pro_lab.muestras m
+  INNER JOIN pro_lab.actividades a            ON a.id = m.id_actividad
+  LEFT  JOIN pro_hor.coladas c                ON c.id_colada = m.id_colada
+  LEFT  JOIN pro_hor.recetas_bc rbc           ON rbc.id = m.id_receta_bc
+  LEFT  JOIN pro_bi.dim_obra obra
     ON obra.works_no COLLATE DATABASE_DEFAULT = m.obra_works_no COLLATE DATABASE_DEFAULT
 `;
 
@@ -139,7 +139,7 @@ export async function consultarMuestras(
   if (ids.length > 0) {
     const rEns = await pool.request().query(`
       SELECT v.id_muestra, v.edad_dias, v.resistencia_kg_cm2_promedio
-      FROM lab.v_ensayos_resumen v
+      FROM pro_lab.v_ensayos_resumen v
       WHERE v.id_muestra IN (${ids.join(',')})
       ORDER BY v.id_muestra, v.edad_dias
     `);
@@ -165,9 +165,9 @@ export async function consultarMuestras(
 
   const rTotal = await reqTotal.query(`
     SELECT COUNT(*) AS total
-    FROM lab.muestras m
-    INNER JOIN lab.actividades a ON a.id = m.id_actividad
-    LEFT JOIN bi.dim_obra obra
+    FROM pro_lab.muestras m
+    INNER JOIN pro_lab.actividades a ON a.id = m.id_actividad
+    LEFT JOIN pro_bi.dim_obra obra
       ON obra.works_no COLLATE DATABASE_DEFAULT = m.obra_works_no COLLATE DATABASE_DEFAULT
     ${whereClause}
   `);
@@ -197,8 +197,8 @@ export async function obtenerMuestra(
       v.id_ensayo, v.id_muestra, v.edad_dias, v.fecha_prueba,
       v.cantidad_mediciones, v.resistencia_mpa_promedio, v.resistencia_kg_cm2_promedio,
       e.notas
-    FROM lab.v_ensayos_resumen v
-    INNER JOIN lab.ensayos e ON e.id = v.id_ensayo
+    FROM pro_lab.v_ensayos_resumen v
+    INNER JOIN pro_lab.ensayos e ON e.id = v.id_ensayo
     WHERE v.id_muestra = @id_muestra
     ORDER BY v.edad_dias ASC
   `);
@@ -208,7 +208,7 @@ export async function obtenerMuestra(
   if (idsEnsayos.length > 0) {
     const rMed = await pool.request().query(`
       SELECT id, id_ensayo, resistencia_mpa, orden, notas
-      FROM lab.mediciones
+      FROM pro_lab.mediciones
       WHERE id_ensayo IN (${idsEnsayos.join(',')})
       ORDER BY id_ensayo, orden
     `);
@@ -256,7 +256,7 @@ export async function listarActividades(
 ): Promise<ActividadLab[]> {
   const r = await pool.request().query(`
     SELECT id, nombre, activo, orden
-    FROM lab.actividades
+    FROM pro_lab.actividades
     ${soloActivas ? 'WHERE activo = 1' : ''}
     ORDER BY orden, nombre
   `);

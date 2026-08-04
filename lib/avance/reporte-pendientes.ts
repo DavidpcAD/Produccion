@@ -47,15 +47,15 @@ export async function calcularPendientes(db: ConnectionPool): Promise<Pendientes
            sp.id AS sub_id, sp.codigo AS sub_codigo, sp.nombre AS sub_nombre,
            sp.sprint_numero AS sprint_origen, sc.nombre AS sprint_origen_nombre,
            sp.es_critica, ISNULL(a.pct_completado, 0) AS pct, a.nc_causa
-    FROM obc.obra_estado e
-    JOIN obc.sub_partidas sp ON sp.sprint_numero < e.sprint_actual AND sp.activo = 1
-    JOIN obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = e.tipo_casa
-    LEFT JOIN obc.sprints_catalogo sc ON sc.numero_global = sp.sprint_numero
-    LEFT JOIN obc.avance_sub_partidas a
+    FROM pro_obc.obra_estado e
+    JOIN pro_obc.sub_partidas sp ON sp.sprint_numero < e.sprint_actual AND sp.activo = 1
+    JOIN pro_obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = e.tipo_casa
+    LEFT JOIN pro_obc.sprints_catalogo sc ON sc.numero_global = sp.sprint_numero
+    LEFT JOIN pro_obc.avance_sub_partidas a
       ON a.sub_partida_id = sp.id AND a.obra_codigo = e.obra_codigo
     LEFT JOIN (
       SELECT obra_codigo, sub_partida_id, MAX(pct_completado) AS maxpct
-      FROM obc.cierre_produccion_snapshots GROUP BY obra_codigo, sub_partida_id
+      FROM pro_obc.cierre_produccion_snapshots GROUP BY obra_codigo, sub_partida_id
     ) lk ON lk.obra_codigo = e.obra_codigo AND lk.sub_partida_id = sp.id
     WHERE e.estado IN ('en_ejecucion', 'en_espera') AND e.tipo_casa IS NOT NULL
       AND ISNULL(a.completada, 0) = 0
@@ -67,7 +67,7 @@ export async function calcularPendientes(db: ConnectionPool): Promise<Pendientes
   // Proyecto (nombre) por código de proyecto (prefijo del código de obra).
   const proyQ = await db
     .request()
-    .query<{ codigo: string; nombre: string }>('SELECT codigo, nombre FROM obc.vw_proyectos');
+    .query<{ codigo: string; nombre: string }>('SELECT codigo, nombre FROM pro_obc.vw_proyectos');
   const nombreProy = new Map<string, string>();
   for (const p of proyQ.recordset) nombreProy.set(p.codigo.toUpperCase(), p.nombre);
   const proyectoDe = (obra: string) => {
@@ -80,7 +80,7 @@ export async function calcularPendientes(db: ConnectionPool): Promise<Pendientes
   const cerrQ = await db
     .request()
     .query<{ obra_codigo: string; sprint_numero: number; semana: number }>(
-      'SELECT obra_codigo, sprint_numero, semana_operativa_id AS semana FROM obc.sprints_cerrados',
+      'SELECT obra_codigo, sprint_numero, semana_operativa_id AS semana FROM pro_obc.sprints_cerrados',
     );
   const cierreSprintSem = new Map<string, number>();
   for (const r of cerrQ.recordset) {
@@ -91,7 +91,7 @@ export async function calcularPendientes(db: ConnectionPool): Promise<Pendientes
   const semQ = await db
     .request()
     .query<{ semana: number }>(
-      "SELECT DISTINCT semana_operativa_id AS semana FROM obc.cierres_produccion WHERE tipo = 'A' ORDER BY semana_operativa_id",
+      "SELECT DISTINCT semana_operativa_id AS semana FROM pro_obc.cierres_produccion WHERE tipo = 'A' ORDER BY semana_operativa_id",
     );
   const semanasCierre = semQ.recordset.map((r) => Number(r.semana));
   const semArrastrada = (obra: string, sprintOrigen: number) => {

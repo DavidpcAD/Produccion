@@ -15,8 +15,8 @@ import type {
 
 // Portado FIEL de `api/src/lib/ingestor-blend.ts` (parser) y
 // `api/src/lib/procesar-ingesta.ts` (transacción/dedup/validación/inserts) de la
-// app original `adelante-control-concreto`. SQL contra `hor.batches`,
-// `hor.batches_alarmas`, `hor.importaciones_csv`, `hor.plantas`, `hor.recetas_blend`.
+// app original `adelante-control-concreto`. SQL contra `pro_hor.batches`,
+// `pro_hor.batches_alarmas`, `pro_hor.importaciones_csv`, `pro_hor.plantas`, `pro_hor.recetas_blend`.
 
 // =============================================================================
 // PARSER DEL CSV BLEND
@@ -385,7 +385,7 @@ function parsearFilaBatch(fila: readonly string[]): BatchConAlarmas {
 
 /**
  * SHA-256 hexadecimal del contenido. Determinístico: mismo input → mismo hash.
- * Se usa como clave de duplicación en `hor.importaciones_csv.archivo_hash`.
+ * Se usa como clave de duplicación en `pro_hor.importaciones_csv.archivo_hash`.
  */
 export function calcularHashArchivo(contenido: string): string {
   return createHash('sha256').update(contenido, 'utf-8').digest('hex');
@@ -551,7 +551,7 @@ async function resolverIdPlanta(
   const r = await tx
     .request()
     .input('sn', sql.NVarChar(20), machineSn)
-    .query<{ id: number }>('SELECT id FROM hor.plantas WHERE serial = @sn');
+    .query<{ id: number }>('SELECT id FROM pro_hor.plantas WHERE serial = @sn');
   return r.recordset[0]?.id ?? null;
 }
 
@@ -579,7 +579,7 @@ async function insertarRegistroImportacion(
     .input('usuarioOid', sql.NVarChar(50), args.usuarioOid)
     .input('usuarioEmail', sql.NVarChar(200), args.usuarioEmail)
     .query<{ id: number }>(`
-      INSERT INTO hor.importaciones_csv (
+      INSERT INTO pro_hor.importaciones_csv (
         id_planta, archivo_nombre, archivo_hash, fecha_archivo,
         filas_totales, batches_nuevos, batches_duplicados, batches_con_error,
         errores_json, usuario, usuario_oid, usuario_email,
@@ -596,7 +596,7 @@ async function insertarRegistroImportacion(
 
   const fila = r.recordset[0];
   if (!fila) {
-    throw new Error('INSERT en hor.importaciones_csv no devolvió id');
+    throw new Error('INSERT en pro_hor.importaciones_csv no devolvió id');
   }
   return fila.id;
 }
@@ -632,7 +632,7 @@ async function resolverOCrearRecetaBlend(
     .input('id_planta', sql.Int, idPlanta)
     .input('nombre', sql.NVarChar(50), nombreNormalizado)
     .query<{ id: number }>(`
-      SELECT TOP 1 id FROM hor.recetas_blend
+      SELECT TOP 1 id FROM pro_hor.recetas_blend
       WHERE id_planta = @id_planta AND nombre_texto = @nombre
     `);
   const existente = r.recordset[0]?.id;
@@ -643,7 +643,7 @@ async function resolverOCrearRecetaBlend(
     .input('id_planta', sql.Int, idPlanta)
     .input('nombre', sql.NVarChar(50), nombreNormalizado)
     .query<{ id: number }>(`
-      INSERT INTO hor.recetas_blend (id_planta, nombre_texto)
+      INSERT INTO pro_hor.recetas_blend (id_planta, nombre_texto)
       OUTPUT INSERTED.id
       VALUES (@id_planta, @nombre)
     `);
@@ -670,7 +670,7 @@ async function precargarRecordNosExistentes(
   const r = await tx
     .request()
     .query<{ id_planta: number; record_no: number }>(
-      `SELECT id_planta, record_no FROM hor.batches WHERE id_planta IN (${lista})`,
+      `SELECT id_planta, record_no FROM pro_hor.batches WHERE id_planta IN (${lista})`,
     );
 
   const set = new Set<string>();
@@ -770,7 +770,7 @@ async function insertarBatch(
     .input('archivo_origen', sql.NVarChar(200), args.archivoOrigen)
     .input('id_importacion', sql.BigInt, args.idImportacion)
     .query<{ id: number }>(`
-      INSERT INTO hor.batches (
+      INSERT INTO pro_hor.batches (
         id_planta, id_receta_blend, record_no, fecha_inicio, fecha_fin,
         cliente_raw, recipe_name_raw, receta_modificada,
         gps_lat, gps_lon, gps_valido,
@@ -837,7 +837,7 @@ async function insertarBatch(
 
   const fila = r.recordset[0];
   if (!fila) {
-    throw new Error(`INSERT en hor.batches no devolvió id para record_no=${b.recordNo}`);
+    throw new Error(`INSERT en pro_hor.batches no devolvió id para record_no=${b.recordNo}`);
   }
   return fila.id;
 }
@@ -862,7 +862,7 @@ async function insertarAlarmasDeBatch(
   }
 
   await req.query(`
-    INSERT INTO hor.batches_alarmas (id_batch, posicion, codigo, descripcion)
+    INSERT INTO pro_hor.batches_alarmas (id_batch, posicion, codigo, descripcion)
     VALUES ${valuesClauses.join(', ')}
   `);
 }
@@ -878,7 +878,7 @@ async function actualizarEstadoImportacion(
     .input('dup', sql.Int, args.duplicados)
     .input('estado', sql.NVarChar(20), args.estado)
     .query(`
-      UPDATE hor.importaciones_csv
+      UPDATE pro_hor.importaciones_csv
       SET batches_nuevos = @ins,
           batches_duplicados = @dup,
           estado = @estado
@@ -894,7 +894,7 @@ async function existeImportacionConHash(
     .request()
     .input('h', sql.NVarChar(64), hash)
     .query<{ id: number }>(
-      'SELECT TOP 1 id FROM hor.importaciones_csv WHERE archivo_hash = @h ORDER BY id DESC',
+      'SELECT TOP 1 id FROM pro_hor.importaciones_csv WHERE archivo_hash = @h ORDER BY id DESC',
     );
   return r.recordset[0]?.id ?? null;
 }
@@ -1025,7 +1025,7 @@ export async function procesarIngesta(
       const id = await resolverIdPlanta(tx, sn);
       if (id === null) {
         throw new Error(
-          `Planta SN ${sn} no encontrada en hor.plantas. Cargá la planta antes de reingestar.`,
+          `Planta SN ${sn} no encontrada en pro_hor.plantas. Cargá la planta antes de reingestar.`,
         );
       }
       cachePlantas.set(sn, id);

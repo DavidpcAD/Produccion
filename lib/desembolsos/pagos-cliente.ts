@@ -7,7 +7,7 @@ import { sql } from '@/lib/db-adelantedb';
 // sql/migrations fase4.6a / fase4.6k / fase6.8). SPs portados inline.
 //
 // NOTA: el repo origen, tras vincular/desvincular, llama a
-// [app].sp_recalcular_utilidad_mov (dominio movimientos, best-effort). Ese SP
+// [pro_app].sp_recalcular_utilidad_mov (dominio movimientos, best-effort). Ese SP
 // no existe en AdelanteDB y pertenece a otro módulo, así que se omite (el
 // origen ya tolera que falle). El refresco de FechaReal del pago SÍ se porta.
 // =============================================================================
@@ -126,9 +126,9 @@ const LINKS_SUBQUERY = `(
          CONVERT(VARCHAR(10), mm.FechaMovimiento, 23) AS FechaRealizado,
          mm.MontoColones AS MontoMovimiento_CRC, lk.MontoAplicado_CRC AS MontoAplicado_CRC,
          lk.Notas AS Notas
-  FROM [app].pago_cliente_mov_link lk
-  INNER JOIN dbo.Movimientos mm ON mm.IDMovimiento = lk.IDMovimiento
-  LEFT JOIN dbo.TipMovi tm ON tm.IDTmov = mm.IDTipmov
+  FROM [pro_app].pago_cliente_mov_link lk
+  INNER JOIN pro_ventas.Movimientos mm ON mm.IDMovimiento = lk.IDMovimiento
+  LEFT JOIN pro_ventas.TipMovi tm ON tm.IDTmov = mm.IDTipmov
   WHERE lk.IDPago = v.IDPago
   ORDER BY mm.FechaMovimiento, lk.IDLink
   FOR JSON PATH
@@ -139,8 +139,8 @@ export async function listarPorCaso(db: ConnectionPool, idCaso: number): Promise
     SELECT v.*, m.MontoColones AS MontoMovimientoVinculado_CRC,
            m.FechaMovimiento AS FechaMovimientoVinculado,
            ${LINKS_SUBQUERY}
-    FROM [app].vw_pagos_cliente_caso v
-    LEFT JOIN dbo.Movimientos m ON m.IDMovimiento = v.IDMovimientoVinculado
+    FROM [pro_app].vw_pagos_cliente_caso v
+    LEFT JOIN pro_ventas.Movimientos m ON m.IDMovimiento = v.IDMovimientoVinculado
     WHERE v.IDCaso = @id
     ORDER BY v.FechaPlaneada, v.IDPago;
   `);
@@ -160,12 +160,12 @@ export async function listarEnRango(db: ConnectionPool, desde: string, hasta: st
              p.AbreviaturaProyecto AS AbreviaturaProyecto, lt.Lote AS CodigoLote,
              m.MontoColones AS MontoMovimientoVinculado_CRC, m.FechaMovimiento AS FechaMovimientoVinculado,
              ${LINKS_SUBQUERY}
-      FROM [app].vw_pagos_cliente_caso v
-      INNER JOIN dbo.Casos cs ON cs.IDCaso = v.IDCaso
-      LEFT JOIN dbo.Clientes cl ON cl.IDCliente = cs.IDCliente
-      LEFT JOIN dbo.Lotes lt ON lt.IDLote = cs.IDLote
+      FROM [pro_app].vw_pagos_cliente_caso v
+      INNER JOIN pro_ventas.Casos cs ON cs.IDCaso = v.IDCaso
+      LEFT JOIN pro_ventas.Clientes cl ON cl.IDCliente = cs.IDCliente
+      LEFT JOIN pro_ventas.Lotes lt ON lt.IDLote = cs.IDLote
       LEFT JOIN dbo.Proyecto p ON p.IDProyecto = lt.IDProyecto
-      LEFT JOIN dbo.Movimientos m ON m.IDMovimiento = v.IDMovimientoVinculado
+      LEFT JOIN pro_ventas.Movimientos m ON m.IDMovimiento = v.IDMovimientoVinculado
       WHERE v.FechaPlaneada >= @desde AND v.FechaPlaneada <= @hasta
       ORDER BY v.FechaPlaneada, v.IDPago;
     `);
@@ -188,7 +188,7 @@ export interface CrearPagoInput {
   UsuarioEmail: string;
 }
 
-// Porta [app].sp_crear_pago_cliente inline.
+// Porta [pro_app].sp_crear_pago_cliente inline.
 export async function crearPago(db: ConnectionPool, i: CrearPagoInput): Promise<{ IDPago: number }> {
   const r = await db.request()
     .input('IDCaso', sql.Int, i.IDCaso)
@@ -200,22 +200,22 @@ export async function crearPago(db: ConnectionPool, i: CrearPagoInput): Promise<
     .input('UsuarioEmail', sql.NVarChar(200), i.UsuarioEmail)
     .query<{ IDPago: number }>(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
-      IF NOT EXISTS (SELECT 1 FROM dbo.Casos WHERE IDCaso = @IDCaso) THROW 51990, 'IDCaso no existe.', 1;
+      IF NOT EXISTS (SELECT 1 FROM pro_ventas.Casos WHERE IDCaso = @IDCaso) THROW 51990, 'IDCaso no existe.', 1;
       IF @Concepto NOT IN ('PRIMA','EXTRA','GASTO_ADICIONAL','CUOTA','LOTE')
         THROW 51991, 'Concepto inválido (PRIMA, EXTRA, GASTO_ADICIONAL, CUOTA, LOTE).', 1;
       IF @MontoPlaneado_CRC IS NULL OR @MontoPlaneado_CRC <= 0 THROW 51992, 'MontoPlaneado_CRC debe ser mayor a cero.', 1;
       IF @FechaPlaneada IS NULL THROW 51993, 'FechaPlaneada es obligatoria.', 1;
       BEGIN TRY
         BEGIN TRANSACTION;
-        INSERT INTO [app].pago_cliente (IDCaso, Concepto, IDExtra, MontoPlaneado_CRC, FechaPlaneada, Notas, CreadoPor)
+        INSERT INTO [pro_app].pago_cliente (IDCaso, Concepto, IDExtra, MontoPlaneado_CRC, FechaPlaneada, Notas, CreadoPor)
         VALUES (@IDCaso, @Concepto, @IDExtra, @MontoPlaneado_CRC, @FechaPlaneada, @Notas, @UsuarioEmail);
         DECLARE @NuevoID INT = SCOPE_IDENTITY();
         DECLARE @ValorNuevoJSON NVARCHAR(MAX) = (
           SELECT IDPago = @NuevoID, IDCaso = @IDCaso, Concepto = @Concepto, IDExtra = @IDExtra,
                  MontoPlaneado_CRC = @MontoPlaneado_CRC, FechaPlaneada = @FechaPlaneada, Notas = @Notas
           FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.pago_cliente', @NuevoID, 'INSERT', @UsuarioEmail, NULL, @ValorNuevoJSON,
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.pago_cliente', @NuevoID, 'INSERT', @UsuarioEmail, NULL, @ValorNuevoJSON,
                 CONCAT('Pago cliente caso ', @IDCaso, ' · ', @Concepto));
         COMMIT TRANSACTION;
         SELECT @NuevoID AS IDPago;
@@ -240,7 +240,7 @@ export interface ActualizarPagoInput {
   UsuarioEmail: string;
 }
 
-// Porta [app].sp_actualizar_pago_cliente inline.
+// Porta [pro_app].sp_actualizar_pago_cliente inline.
 export async function actualizarPago(db: ConnectionPool, idPago: number, i: ActualizarPagoInput): Promise<void> {
   await db.request()
     .input('IDPago', sql.Int, idPago)
@@ -254,7 +254,7 @@ export async function actualizarPago(db: ConnectionPool, idPago: number, i: Actu
     .input('UsuarioEmail', sql.NVarChar(200), i.UsuarioEmail)
     .query(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
-      IF NOT EXISTS (SELECT 1 FROM [app].pago_cliente WHERE IDPago = @IDPago) THROW 51994, 'IDPago no existe.', 1;
+      IF NOT EXISTS (SELECT 1 FROM [pro_app].pago_cliente WHERE IDPago = @IDPago) THROW 51994, 'IDPago no existe.', 1;
       IF @Concepto IS NOT NULL AND @Concepto NOT IN ('PRIMA','EXTRA','GASTO_ADICIONAL','CUOTA','LOTE')
         THROW 51991, 'Concepto inválido.', 1;
       IF @MontoPlaneado_CRC IS NOT NULL AND @MontoPlaneado_CRC <= 0 THROW 51992, 'MontoPlaneado_CRC debe ser mayor a cero.', 1;
@@ -262,8 +262,8 @@ export async function actualizarPago(db: ConnectionPool, idPago: number, i: Actu
         BEGIN TRANSACTION;
         DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (
           SELECT IDPago, IDCaso, Concepto, IDExtra, MontoPlaneado_CRC, FechaPlaneada, FechaReal, IDMovimientoVinculado, Notas
-          FROM [app].pago_cliente WHERE IDPago = @IDPago FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        UPDATE [app].pago_cliente
+          FROM [pro_app].pago_cliente WHERE IDPago = @IDPago FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        UPDATE [pro_app].pago_cliente
         SET Concepto = COALESCE(@Concepto, Concepto),
             MontoPlaneado_CRC = COALESCE(@MontoPlaneado_CRC, MontoPlaneado_CRC),
             FechaPlaneada = COALESCE(@FechaPlaneada, FechaPlaneada),
@@ -275,9 +275,9 @@ export async function actualizarPago(db: ConnectionPool, idPago: number, i: Actu
         WHERE IDPago = @IDPago;
         DECLARE @ValorNuevoJSON NVARCHAR(MAX) = (
           SELECT IDPago, IDCaso, Concepto, IDExtra, MontoPlaneado_CRC, FechaPlaneada, FechaReal, IDMovimientoVinculado, Notas
-          FROM [app].pago_cliente WHERE IDPago = @IDPago FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.pago_cliente', @IDPago, 'UPDATE', @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON,
+          FROM [pro_app].pago_cliente WHERE IDPago = @IDPago FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.pago_cliente', @IDPago, 'UPDATE', @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON,
                 CONCAT('Update pago cliente IDPago=', @IDPago));
         COMMIT TRANSACTION;
       END TRY
@@ -287,7 +287,7 @@ export async function actualizarPago(db: ConnectionPool, idPago: number, i: Actu
     `);
 }
 
-// Porta [app].sp_eliminar_pago_cliente inline.
+// Porta [pro_app].sp_eliminar_pago_cliente inline.
 export async function eliminarPago(db: ConnectionPool, idPago: number, usuarioEmail: string): Promise<void> {
   await db.request()
     .input('IDPago', sql.Int, idPago)
@@ -296,13 +296,13 @@ export async function eliminarPago(db: ConnectionPool, idPago: number, usuarioEm
       SET NOCOUNT ON; SET XACT_ABORT ON;
       DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (
         SELECT IDPago, IDCaso, Concepto, IDExtra, MontoPlaneado_CRC, FechaPlaneada, FechaReal, IDMovimientoVinculado, Notas
-        FROM [app].pago_cliente WHERE IDPago = @IDPago FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        FROM [pro_app].pago_cliente WHERE IDPago = @IDPago FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
       IF @ValorAnteriorJSON IS NULL THROW 51994, 'IDPago no existe.', 1;
       BEGIN TRY
         BEGIN TRANSACTION;
-        DELETE FROM [app].pago_cliente WHERE IDPago = @IDPago;
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.pago_cliente', @IDPago, 'DELETE', @UsuarioEmail, @ValorAnteriorJSON, NULL,
+        DELETE FROM [pro_app].pago_cliente WHERE IDPago = @IDPago;
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.pago_cliente', @IDPago, 'DELETE', @UsuarioEmail, @ValorAnteriorJSON, NULL,
                 CONCAT('Eliminación pago cliente ', @IDPago));
         COMMIT TRANSACTION;
       END TRY
@@ -320,7 +320,7 @@ export interface VincularInput {
   UsuarioEmail: string;
 }
 
-// Porta [app].sp_vincular_mov_a_pago_cliente inline (incluye refresco de
+// Porta [pro_app].sp_vincular_mov_a_pago_cliente inline (incluye refresco de
 // FechaReal — sp_refrescar_pago_cliente — dentro de la misma transacción).
 // Omite sp_recalcular_utilidad_mov (dominio movimientos, no portado aquí).
 export async function vincularMov(db: ConnectionPool, i: VincularInput): Promise<{ IDLink: number; Accion: 'INSERT' | 'UPDATE' }> {
@@ -333,18 +333,18 @@ export async function vincularMov(db: ConnectionPool, i: VincularInput): Promise
     .query<{ IDLink: number; Accion: 'INSERT' | 'UPDATE' }>(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
       DECLARE @IDCasoMov INT, @MontoMov MONEY;
-      SELECT @IDCasoMov = IDCaso, @MontoMov = MontoColones FROM dbo.Movimientos WHERE IDMovimiento = @IDMovimiento;
-      IF @IDCasoMov IS NULL THROW 52200, 'IDMovimiento no existe en dbo.Movimientos.', 1;
+      SELECT @IDCasoMov = IDCaso, @MontoMov = MontoColones FROM pro_ventas.Movimientos WHERE IDMovimiento = @IDMovimiento;
+      IF @IDCasoMov IS NULL THROW 52200, 'IDMovimiento no existe en pro_ventas.Movimientos.', 1;
       DECLARE @IDCasoPago INT;
-      SELECT @IDCasoPago = IDCaso FROM [app].pago_cliente WHERE IDPago = @IDPago;
-      IF @IDCasoPago IS NULL THROW 52201, 'IDPago no existe en [app].pago_cliente.', 1;
+      SELECT @IDCasoPago = IDCaso FROM [pro_app].pago_cliente WHERE IDPago = @IDPago;
+      IF @IDCasoPago IS NULL THROW 52201, 'IDPago no existe en [pro_app].pago_cliente.', 1;
       IF @IDCasoMov <> @IDCasoPago THROW 52202, 'El movimiento y el pago cliente pertenecen a casos distintos.', 1;
       IF @MontoAplicado_CRC IS NULL OR @MontoAplicado_CRC <= 0 THROW 52203, 'MontoAplicado_CRC debe ser mayor a cero.', 1;
       DECLARE @MontoActualEnLink MONEY;
-      SELECT @MontoActualEnLink = MontoAplicado_CRC FROM [app].pago_cliente_mov_link
+      SELECT @MontoActualEnLink = MontoAplicado_CRC FROM [pro_app].pago_cliente_mov_link
       WHERE IDMovimiento = @IDMovimiento AND IDPago = @IDPago;
-      DECLARE @SumaHitos MONEY = ISNULL((SELECT SUM(MontoAplicado_CRC) FROM [app].movimiento_hito_link WHERE IDMovimiento = @IDMovimiento), 0);
-      DECLARE @SumaOtrosPagos MONEY = ISNULL((SELECT SUM(MontoAplicado_CRC) FROM [app].pago_cliente_mov_link WHERE IDMovimiento = @IDMovimiento AND IDPago <> @IDPago), 0);
+      DECLARE @SumaHitos MONEY = ISNULL((SELECT SUM(MontoAplicado_CRC) FROM [pro_app].movimiento_hito_link WHERE IDMovimiento = @IDMovimiento), 0);
+      DECLARE @SumaOtrosPagos MONEY = ISNULL((SELECT SUM(MontoAplicado_CRC) FROM [pro_app].pago_cliente_mov_link WHERE IDMovimiento = @IDMovimiento AND IDPago <> @IDPago), 0);
       IF (@SumaHitos + @SumaOtrosPagos + @MontoAplicado_CRC) > ISNULL(@MontoMov, 0)
         THROW 52204, 'La suma de montos vinculados (hitos + pagos cliente) excede el MontoColones del movimiento.', 1;
       BEGIN TRY
@@ -355,29 +355,29 @@ export async function vincularMov(db: ConnectionPool, i: VincularInput): Promise
         IF @MontoActualEnLink IS NOT NULL
         BEGIN
           SET @ValorAnteriorJSON = (SELECT IDLink, IDPago, IDMovimiento, MontoAplicado_CRC, Notas, UsuarioVinculo, FechaVinculacion
-            FROM [app].pago_cliente_mov_link WHERE IDPago = @IDPago AND IDMovimiento = @IDMovimiento FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-          UPDATE [app].pago_cliente_mov_link
+            FROM [pro_app].pago_cliente_mov_link WHERE IDPago = @IDPago AND IDMovimiento = @IDMovimiento FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+          UPDATE [pro_app].pago_cliente_mov_link
           SET MontoAplicado_CRC = @MontoAplicado_CRC, Notas = @Notas, UsuarioVinculo = @UsuarioEmail, FechaVinculacion = SYSUTCDATETIME()
           WHERE IDPago = @IDPago AND IDMovimiento = @IDMovimiento;
-          SELECT @IDLink = IDLink FROM [app].pago_cliente_mov_link WHERE IDPago = @IDPago AND IDMovimiento = @IDMovimiento;
+          SELECT @IDLink = IDLink FROM [pro_app].pago_cliente_mov_link WHERE IDPago = @IDPago AND IDMovimiento = @IDMovimiento;
           SET @Accion = 'UPDATE';
         END
         ELSE
         BEGIN
-          INSERT INTO [app].pago_cliente_mov_link (IDPago, IDMovimiento, MontoAplicado_CRC, Notas, UsuarioVinculo)
+          INSERT INTO [pro_app].pago_cliente_mov_link (IDPago, IDMovimiento, MontoAplicado_CRC, Notas, UsuarioVinculo)
           VALUES (@IDPago, @IDMovimiento, @MontoAplicado_CRC, @Notas, @UsuarioEmail);
           SET @IDLink = SCOPE_IDENTITY();
           SET @Accion = 'INSERT';
         END
         DECLARE @ValorNuevoJSON NVARCHAR(MAX) = (SELECT IDLink = @IDLink, IDPago = @IDPago, IDMovimiento = @IDMovimiento,
           MontoAplicado_CRC = @MontoAplicado_CRC, Notas = @Notas FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.pago_cliente_mov_link', @IDLink, @Accion, @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON,
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.pago_cliente_mov_link', @IDLink, @Accion, @UsuarioEmail, @ValorAnteriorJSON, @ValorNuevoJSON,
                 CONCAT('Vinculación mov ', @IDMovimiento, ' -> pago cliente ', @IDPago, ' por ', CAST(@MontoAplicado_CRC AS NVARCHAR(40)), ' CRC'));
         -- Refrescar FechaReal (porta sp_refrescar_pago_cliente).
-        UPDATE [app].pago_cliente
-        SET FechaReal = (SELECT MAX(m.FechaMovimiento) FROM [app].pago_cliente_mov_link lk
-                         INNER JOIN dbo.Movimientos m ON m.IDMovimiento = lk.IDMovimiento WHERE lk.IDPago = @IDPago)
+        UPDATE [pro_app].pago_cliente
+        SET FechaReal = (SELECT MAX(m.FechaMovimiento) FROM [pro_app].pago_cliente_mov_link lk
+                         INNER JOIN pro_ventas.Movimientos m ON m.IDMovimiento = lk.IDMovimiento WHERE lk.IDPago = @IDPago)
         WHERE IDPago = @IDPago;
         COMMIT TRANSACTION;
         SELECT @IDLink AS IDLink, @Accion AS Accion;
@@ -391,7 +391,7 @@ export async function vincularMov(db: ConnectionPool, i: VincularInput): Promise
   return { IDLink: row.IDLink, Accion: row.Accion };
 }
 
-// Porta [app].sp_desvincular_mov_de_pago_cliente inline (con refresco).
+// Porta [pro_app].sp_desvincular_mov_de_pago_cliente inline (con refresco).
 export async function desvincularMov(db: ConnectionPool, idLink: number, usuarioEmail: string): Promise<void> {
   await db.request()
     .input('IDLink', sql.Int, idLink)
@@ -399,21 +399,21 @@ export async function desvincularMov(db: ConnectionPool, idLink: number, usuario
     .query(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
       DECLARE @IDPago INT;
-      SELECT @IDPago = IDPago FROM [app].pago_cliente_mov_link WHERE IDLink = @IDLink;
+      SELECT @IDPago = IDPago FROM [pro_app].pago_cliente_mov_link WHERE IDLink = @IDLink;
       DECLARE @ValorAnteriorJSON NVARCHAR(MAX) = (
         SELECT IDLink, IDPago, IDMovimiento, MontoAplicado_CRC, Notas, UsuarioVinculo, FechaVinculacion
-        FROM [app].pago_cliente_mov_link WHERE IDLink = @IDLink FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
+        FROM [pro_app].pago_cliente_mov_link WHERE IDLink = @IDLink FOR JSON PATH, WITHOUT_ARRAY_WRAPPER);
       IF @ValorAnteriorJSON IS NULL THROW 52205, 'IDLink no existe.', 1;
       BEGIN TRY
         BEGIN TRANSACTION;
-        DELETE FROM [app].pago_cliente_mov_link WHERE IDLink = @IDLink;
-        INSERT INTO [app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
-        VALUES ('app.pago_cliente_mov_link', @IDLink, 'DELETE', @UsuarioEmail, @ValorAnteriorJSON, NULL,
+        DELETE FROM [pro_app].pago_cliente_mov_link WHERE IDLink = @IDLink;
+        INSERT INTO [pro_app].audit_log (Tabla, IDRegistro, Accion, UsuarioEmail, ValorAnteriorJSON, ValorNuevoJSON, Contexto)
+        VALUES ('pro_app.pago_cliente_mov_link', @IDLink, 'DELETE', @UsuarioEmail, @ValorAnteriorJSON, NULL,
                 CONCAT('Desvinculación de link ', @IDLink, ' (pago cliente)'));
         IF @IDPago IS NOT NULL
-          UPDATE [app].pago_cliente
-          SET FechaReal = (SELECT MAX(m.FechaMovimiento) FROM [app].pago_cliente_mov_link lk
-                           INNER JOIN dbo.Movimientos m ON m.IDMovimiento = lk.IDMovimiento WHERE lk.IDPago = @IDPago)
+          UPDATE [pro_app].pago_cliente
+          SET FechaReal = (SELECT MAX(m.FechaMovimiento) FROM [pro_app].pago_cliente_mov_link lk
+                           INNER JOIN pro_ventas.Movimientos m ON m.IDMovimiento = lk.IDMovimiento WHERE lk.IDPago = @IDPago)
           WHERE IDPago = @IDPago;
         COMMIT TRANSACTION;
       END TRY

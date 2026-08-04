@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  *
  *   POST /api/avance/obras/{codigo}/sprint  { accion: 'avanzar' | 'retroceder' }
  *
- * avanzar: pasa al siguiente sprint de obc.tipo_casa_sprints; bloquea si quedan
+ * avanzar: pasa al siguiente sprint de pro_obc.tipo_casa_sprints; bloquea si quedan
  *   sub-partidas críticas del sprint actual sin completar.
  * retroceder: vuelve al sprint anterior SOLO si no está cerrado o es "de espera"
  *   (sprints_catalogo.es_espera). Si está en el primer sprint, vuelve a
@@ -34,7 +34,7 @@ async function leerEstado(
     .request()
     .input('obra', sql.NVarChar(20), codigo)
     .query<ObraRow>(
-      'SELECT estado, sprint_actual, tipo_casa FROM obc.obra_estado WHERE obra_codigo = @obra',
+      'SELECT estado, sprint_actual, tipo_casa FROM pro_obc.obra_estado WHERE obra_codigo = @obra',
     );
   return r.recordset[0] ?? null;
 }
@@ -57,9 +57,9 @@ async function avanzar(
       SELECT
         SUM(CASE WHEN sp.es_critica = 1 THEN 1 ELSE 0 END) AS total,
         SUM(CASE WHEN sp.es_critica = 1 AND ISNULL(a.completada, 0) = 1 THEN 1 ELSE 0 END) AS completas
-      FROM obc.sub_partidas sp
-      JOIN obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = @tc
-      LEFT JOIN obc.avance_sub_partidas a
+      FROM pro_obc.sub_partidas sp
+      JOIN pro_obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = @tc
+      LEFT JOIN pro_obc.avance_sub_partidas a
         ON a.sub_partida_id = sp.id AND a.obra_codigo = @obra
       WHERE sp.sprint_numero = @sprint AND sp.activo = 1
     `);
@@ -80,8 +80,8 @@ async function avanzar(
     .input('sprint', sql.SmallInt, estado.sprint_actual)
     .query<{ siguiente: number }>(`
       SELECT TOP 1 sig.sprint_global AS siguiente
-      FROM obc.tipo_casa_sprints cur
-      JOIN obc.tipo_casa_sprints sig
+      FROM pro_obc.tipo_casa_sprints cur
+      JOIN pro_obc.tipo_casa_sprints sig
         ON sig.tipo_casa = cur.tipo_casa AND sig.orden = cur.orden + 1
       WHERE cur.tipo_casa = @tc AND cur.sprint_global = @sprint
     `);
@@ -99,10 +99,10 @@ async function avanzar(
     .input('sprint', sql.SmallInt, siguiente)
     .input('uid', sql.Int, uid)
     .query(`
-      UPDATE obc.obra_estado
+      UPDATE pro_obc.obra_estado
       SET sprint_actual = @sprint,
           avanzo_semana_id = (
-            SELECT TOP 1 id FROM obc.semanas_operativas
+            SELECT TOP 1 id FROM pro_obc.semanas_operativas
             WHERE estado = 'abierta' ORDER BY fecha_inicio DESC
           ),
           actualizado_en = SYSUTCDATETIME(),
@@ -134,14 +134,14 @@ async function retroceder(
     .input('sprint', sql.SmallInt, estado.sprint_actual)
     .query<{ anterior: number; es_espera: boolean; cerrado: number }>(`
       SELECT TOP 1 prv.sprint_global AS anterior, sc.es_espera,
-             (SELECT COUNT(*) FROM obc.sprints_cerrados x
+             (SELECT COUNT(*) FROM pro_obc.sprints_cerrados x
               WHERE x.sprint_numero = prv.sprint_global
                 AND x.obra_codigo COLLATE DATABASE_DEFAULT = @obra COLLATE DATABASE_DEFAULT
              ) AS cerrado
-      FROM obc.tipo_casa_sprints cur
-      JOIN obc.tipo_casa_sprints prv
+      FROM pro_obc.tipo_casa_sprints cur
+      JOIN pro_obc.tipo_casa_sprints prv
         ON prv.tipo_casa = cur.tipo_casa AND prv.orden = cur.orden - 1
-      JOIN obc.sprints_catalogo sc ON sc.numero_global = prv.sprint_global
+      JOIN pro_obc.sprints_catalogo sc ON sc.numero_global = prv.sprint_global
       WHERE cur.tipo_casa = @tc AND cur.sprint_global = @sprint
     `);
   const prev = prevQ.recordset[0];
@@ -153,7 +153,7 @@ async function retroceder(
       .request()
       .input('obra', sql.NVarChar(20), codigo)
       .query<{ n: number }>(
-        'SELECT COUNT(*) AS n FROM obc.avance_sub_partidas WHERE obra_codigo = @obra AND (pct_completado > 0 OR completada = 1)',
+        'SELECT COUNT(*) AS n FROM pro_obc.avance_sub_partidas WHERE obra_codigo = @obra AND (pct_completado > 0 OR completada = 1)',
       );
     if (Number(avQ.recordset[0]?.n ?? 0) > 0) {
       return NextResponse.json(
@@ -166,7 +166,7 @@ async function retroceder(
       .input('obra', sql.NVarChar(20), codigo)
       .input('uid', sql.Int, uid)
       .query(`
-        UPDATE obc.obra_estado
+        UPDATE pro_obc.obra_estado
         SET estado = 'pendiente', avanzo_semana_id = NULL,
             actualizado_en = SYSUTCDATETIME(), actualizado_por = @uid
         WHERE obra_codigo = @obra
@@ -193,7 +193,7 @@ async function retroceder(
     .input('sprint', sql.SmallInt, prev.anterior)
     .input('uid', sql.Int, uid)
     .query(`
-      UPDATE obc.obra_estado
+      UPDATE pro_obc.obra_estado
       SET sprint_actual = @sprint,
           avanzo_semana_id = NULL,
           actualizado_en = SYSUTCDATETIME(),

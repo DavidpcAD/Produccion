@@ -7,7 +7,7 @@ import type { FotoMuestra } from './tipos-deps';
  * Fotos de muestras de laboratorio.
  *
  * Portado de `api/src/lib/fotos-muestra.ts`. Los bytes viven en Azure Blob
- * Storage (container privado); SQL (lab.fotos_muestra) solo guarda la
+ * Storage (container privado); SQL (pro_lab.fotos_muestra) solo guarda la
  * referencia (`blob_nombre`) + metadata. Para mostrar la imagen se genera una
  * URL SAS de lectura temporal (User Delegation SAS, vía Managed Identity).
  *
@@ -157,7 +157,7 @@ async function validarEnsayoEnMuestra(
     .input('id', sql.BigInt, idEnsayo)
     .input('idm', sql.BigInt, idMuestra)
     .query<{ ok: number }>(
-      'SELECT COUNT(*) AS ok FROM lab.ensayos WHERE id = @id AND id_muestra = @idm',
+      'SELECT COUNT(*) AS ok FROM pro_lab.ensayos WHERE id = @id AND id_muestra = @idm',
     );
   if ((r.recordset[0]?.ok ?? 0) === 0) {
     throw new ErrorFotos(
@@ -179,7 +179,7 @@ export async function listarFotos(
     .query<FilaFoto>(`
       SELECT id, id_muestra, id_ensayo, blob_nombre, content_type, tamano_bytes,
              nombre_original, creado_en
-      FROM lab.fotos_muestra
+      FROM pro_lab.fotos_muestra
       WHERE id_muestra = @id_muestra
       ORDER BY creado_en DESC, id DESC
     `);
@@ -202,7 +202,7 @@ export async function crearFoto(
   const rM = await pool
     .request()
     .input('id', sql.BigInt, idMuestra)
-    .query<{ id: number }>('SELECT id FROM lab.muestras WHERE id = @id');
+    .query<{ id: number }>('SELECT id FROM pro_lab.muestras WHERE id = @id');
   if (!rM.recordset[0]) {
     throw new ErrorFotos(404, 'MUESTRA_NO_ENCONTRADA', `Muestra ${idMuestra} no existe.`);
   }
@@ -231,7 +231,7 @@ export async function crearFoto(
     .input('nombre_original', sql.NVarChar(200), args.nombreOriginal)
     .input('email', sql.NVarChar(200), args.actorEmail)
     .query<FilaFoto>(`
-      INSERT INTO lab.fotos_muestra
+      INSERT INTO pro_lab.fotos_muestra
         (id_muestra, id_ensayo, blob_nombre, content_type, tamano_bytes, nombre_original,
          creado_por_email)
       OUTPUT INSERTED.id, INSERTED.id_muestra, INSERTED.id_ensayo, INSERTED.blob_nombre,
@@ -255,7 +255,7 @@ export async function actualizarFotoEnsayo(
     .request()
     .input('id', sql.BigInt, idFoto)
     .query<{ id_muestra: number | string }>(
-      'SELECT id_muestra FROM lab.fotos_muestra WHERE id = @id',
+      'SELECT id_muestra FROM pro_lab.fotos_muestra WHERE id = @id',
     );
   const filaF = rF.recordset[0];
   if (!filaF) throw new ErrorFotos(404, 'FOTO_NO_ENCONTRADA', `Foto ${idFoto} no existe.`);
@@ -270,7 +270,7 @@ export async function actualizarFotoEnsayo(
     .input('id', sql.BigInt, idFoto)
     .input('id_ensayo', sql.BigInt, idEnsayo)
     .query<FilaFoto>(`
-      UPDATE lab.fotos_muestra
+      UPDATE pro_lab.fotos_muestra
       SET id_ensayo = @id_ensayo
       OUTPUT INSERTED.id, INSERTED.id_muestra, INSERTED.id_ensayo, INSERTED.blob_nombre,
              INSERTED.content_type, INSERTED.tamano_bytes, INSERTED.nombre_original,
@@ -287,7 +287,7 @@ export async function eliminarFoto(pool: sqlModule.ConnectionPool, id: number): 
   const r = await pool
     .request()
     .input('id', sql.BigInt, id)
-    .query<{ blob_nombre: string }>('SELECT blob_nombre FROM lab.fotos_muestra WHERE id = @id');
+    .query<{ blob_nombre: string }>('SELECT blob_nombre FROM pro_lab.fotos_muestra WHERE id = @id');
   const fila = r.recordset[0];
   if (!fila) throw new ErrorFotos(404, 'FOTO_NO_ENCONTRADA', `Foto ${id} no existe.`);
 
@@ -295,5 +295,5 @@ export async function eliminarFoto(pool: sqlModule.ConnectionPool, id: number): 
     .getContainerClient(CONTAINER)
     .getBlockBlobClient(fila.blob_nombre)
     .deleteIfExists();
-  await pool.request().input('id', sql.BigInt, id).query('DELETE FROM lab.fotos_muestra WHERE id = @id');
+  await pool.request().input('id', sql.BigInt, id).query('DELETE FROM pro_lab.fotos_muestra WHERE id = @id');
 }

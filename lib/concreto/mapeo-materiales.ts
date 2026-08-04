@@ -1,8 +1,8 @@
-// Mapping crudo CSV Blend → códigos BC de `hor.materiales`.
+// Mapping crudo CSV Blend → códigos BC de `pro_hor.materiales`.
 //
 // Portado de `api/src/lib/mapeo-materiales.ts` de la app original. Blend exporta
 // los nombres de áridos como texto libre corto en `arido_a_nombre` /
-// `arido_b_nombre`; esos textos NO matchean con `hor.materiales.nombre` ni con
+// `arido_b_nombre`; esos textos NO matchean con `pro_hor.materiales.nombre` ni con
 // `tipo`. Este módulo centraliza la traducción.
 //
 // Aditivos: las 3 columnas `aditivo1/2/3` son posicionales (no traen nombre).

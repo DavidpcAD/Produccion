@@ -6,7 +6,7 @@ import { sql } from '@/lib/db-adelantedb';
 // (exportCartera / exportFlujoProyectado / exportLiquidacionLote /
 // exportMovimientos). Cada función devuelve datos planos (JSON); el archivo
 // Excel se arma en el cliente con `xlsx` (patrón loadXLSX de compras/avance).
-// Sólo lecturas sobre vistas [app].* existentes; no muta nada.
+// Sólo lecturas sobre vistas [pro_app].* existentes; no muta nada.
 // =============================================================================
 
 function isoDate(v: Date | string | null): string | null {
@@ -70,7 +70,7 @@ export async function cartera(db: ConnectionPool, f: CarteraFiltro): Promise<Car
            FechaReserva, FechaFormalizacion, PrecioVenta_CRC, PrecioVentaContractual_CRC,
            MontoBanco_CRC, PagoCliente_CRC, PagadoReal_CRC, Pendiente_CRC,
            PorcentajeAvance, HitosCubiertos, TotalHitos, ProximoCodigoHito, ProximaFechaDesembolso, TieneSobrecobro
-    FROM [app].vw_dashboard_caso
+    FROM [pro_app].vw_dashboard_caso
     WHERE ${conds.join(' AND ')}
     ORDER BY EsReservado, AbrevBanco, AbreviaturaProyecto, CodigoLote;
   `);
@@ -126,14 +126,14 @@ export async function liquidacionLote(db: ConnectionPool, f: LiquidacionFiltro):
            CAST(lq.TieneOverride AS INT) AS TieneOverride, lq.MontoEntidad_CRC,
            cs.DetCaso AS CodigoCaso, LTRIM(RTRIM(cl.NombreCompleto)) AS Cliente, l.Lote AS CodigoLote,
            pry.AbreviaturaProyecto, b.Abreviatura AS AbrevBanco, tm.Abreviatura AS AbreviaturaTipo, tm.Categoria AS CategoriaTipo
-    FROM [app].vw_liquidacion_lote lq
-    INNER JOIN dbo.Movimientos m ON m.IDMovimiento = lq.IDMovimiento
-    LEFT JOIN dbo.Casos cs ON cs.IDCaso = lq.IDCaso
-    LEFT JOIN dbo.Clientes cl ON cl.IDCliente = cs.IDCliente
-    LEFT JOIN dbo.Lotes l ON l.IDLote = lq.IDLote
+    FROM [pro_app].vw_liquidacion_lote lq
+    INNER JOIN pro_ventas.Movimientos m ON m.IDMovimiento = lq.IDMovimiento
+    LEFT JOIN pro_ventas.Casos cs ON cs.IDCaso = lq.IDCaso
+    LEFT JOIN pro_ventas.Clientes cl ON cl.IDCliente = cs.IDCliente
+    LEFT JOIN pro_ventas.Lotes l ON l.IDLote = lq.IDLote
     LEFT JOIN dbo.Proyecto pry ON pry.IDProyecto = lq.IDProyecto
-    LEFT JOIN dbo.Bancos b ON b.IDBan = cs.IDBanco
-    LEFT JOIN dbo.TipMovi tm ON tm.IDTmov = m.IDTipmov
+    LEFT JOIN pro_ventas.Bancos b ON b.IDBan = cs.IDBanco
+    LEFT JOIN pro_ventas.TipMovi tm ON tm.IDTmov = m.IDTipmov
     WHERE ${conds.join(' AND ')}
     ORDER BY lq.FechaMovimiento, lq.IDMovimiento, lq.CodigoEntidad;
   `);
@@ -197,9 +197,9 @@ export async function movimientos(db: ConnectionPool, f: MovimientosFiltro): Pro
     request.input('q', sql.NVarChar(200), `%${f.q}%`);
   }
   let joinBanco = '';
-  if (f.idBanco) { joinBanco = 'INNER JOIN dbo.Casos cs2 ON cs2.IDCaso = vw.IDCaso AND cs2.IDBanco = @idBanco'; request.input('idBanco', sql.Int, f.idBanco); }
+  if (f.idBanco) { joinBanco = 'INNER JOIN pro_ventas.Casos cs2 ON cs2.IDCaso = vw.IDCaso AND cs2.IDBanco = @idBanco'; request.input('idBanco', sql.Int, f.idBanco); }
   let joinProyecto = '';
-  if (f.idProyecto) { joinProyecto = 'INNER JOIN dbo.Lotes lt2 ON lt2.IDLote = vw.IDLote AND lt2.IDProyecto = @idProyecto'; request.input('idProyecto', sql.Int, f.idProyecto); }
+  if (f.idProyecto) { joinProyecto = 'INNER JOIN pro_ventas.Lotes lt2 ON lt2.IDLote = vw.IDLote AND lt2.IDProyecto = @idProyecto'; request.input('idProyecto', sql.Int, f.idProyecto); }
 
   const r = await request.query<Record<string, unknown>>(`
     SELECT vw.IDMovimiento, vw.IDCaso, vw.CodigoCaso, vw.Cliente, vw.CodigoLote, vw.NombreBloque,
@@ -208,10 +208,10 @@ export async function movimientos(db: ConnectionPool, f: MovimientosFiltro): Pro
            vw.DetalleTransferencia, vw.MontoVinculado_CRC, vw.MontoSinVincular_CRC, vw.EstaVinculado,
            vw.NumHitosVinculados, vw.NumPagosClienteVinculados,
            bnk.Abreviatura AS AbrevBanco, pry.Nombre AS NombreProyecto, pry.AbreviaturaProyecto
-    FROM [app].vw_movimientos_caso vw
-    LEFT JOIN dbo.Casos csB ON csB.IDCaso = vw.IDCaso
-    LEFT JOIN dbo.Bancos bnk ON bnk.IDBan = csB.IDBanco
-    LEFT JOIN dbo.Lotes ltB ON ltB.IDLote = vw.IDLote
+    FROM [pro_app].vw_movimientos_caso vw
+    LEFT JOIN pro_ventas.Casos csB ON csB.IDCaso = vw.IDCaso
+    LEFT JOIN pro_ventas.Bancos bnk ON bnk.IDBan = csB.IDBanco
+    LEFT JOIN pro_ventas.Lotes ltB ON ltB.IDLote = vw.IDLote
     LEFT JOIN dbo.Proyecto pry ON pry.IDProyecto = ltB.IDProyecto
     ${joinBanco} ${joinProyecto}
     WHERE ${conds.join(' AND ')}
@@ -306,7 +306,7 @@ export async function flujoProyectado(db: ConnectionPool, f: FlujoFiltro): Promi
   if (f.idProyecto) { condsB.push('v.IDProyecto = @idProyecto'); reqB.input('idProyecto', sql.Int, f.idProyecto); }
   const hitos = await reqB.query<{ IDBan: number; AbrevBanco: string; FechaProyectada: Date; MontoHitoEsperado: number }>(`
     SELECT v.IDBan, v.AbrevBanco, v.FechaProyectada, v.MontoHitoEsperado
-    FROM [app].vw_proyeccion_desembolsos v WHERE ${condsB.join(' AND ')}
+    FROM [pro_app].vw_proyeccion_desembolsos v WHERE ${condsB.join(' AND ')}
     ORDER BY v.IDBan, v.FechaProyectada;
   `);
   const mapBancos = new Map<number, FilaFlujo>();
@@ -324,9 +324,9 @@ export async function flujoProyectado(db: ConnectionPool, f: FlujoFiltro): Promi
   if (f.idProyecto) { condsCP.push('l.IDProyecto = @idProyectoCP'); reqCP.input('idProyectoCP', sql.Int, f.idProyecto); }
   const hitosCP = await reqCP.query<{ IDCreditoPuente: number; AbrevBancoCP: string; FechaProyectada: Date; MontoHitoEsperado_CRC: number }>(`
     SELECT v.IDCreditoPuente, v.AbrevBancoCP, v.FechaProyectada, v.MontoHitoEsperado_CRC
-    FROM [app].vw_credito_puente_lote_hito v
-    INNER JOIN [app].credito_puente cp ON cp.IDCreditoPuente = v.IDCreditoPuente
-    INNER JOIN dbo.Lotes l ON l.IDLote = v.IDLote
+    FROM [pro_app].vw_credito_puente_lote_hito v
+    INNER JOIN [pro_app].credito_puente cp ON cp.IDCreditoPuente = v.IDCreditoPuente
+    INNER JOIN pro_ventas.Lotes l ON l.IDLote = v.IDLote
     WHERE ${condsCP.join(' AND ')} ORDER BY v.IDBancoCP, v.FechaProyectada;
   `);
   const cancel = await db.request().input('desde', sql.Date, f.desde).input('hasta', sql.Date, f.hasta)
@@ -334,9 +334,9 @@ export async function flujoProyectado(db: ConnectionPool, f: FlujoFiltro): Promi
       SELECT cpl.IDCreditoPuente, b.Abreviatura AS AbrevBancoCP,
              COALESCE(cpl.FechaConfirmacionCancelacion, cpl.FechaCancelacionAlBanco) AS FechaEgreso,
              COALESCE(cpl.MontoConfirmadoAlBanco_CRC, cpl.MontoCanceladoAlBanco_CRC) AS MontoEgreso_CRC
-      FROM [app].credito_puente_lote cpl
-      INNER JOIN [app].credito_puente cp ON cp.IDCreditoPuente = cpl.IDCreditoPuente
-      INNER JOIN dbo.Bancos b ON b.IDBan = cp.IDBan
+      FROM [pro_app].credito_puente_lote cpl
+      INNER JOIN [pro_app].credito_puente cp ON cp.IDCreditoPuente = cpl.IDCreditoPuente
+      INNER JOIN pro_ventas.Bancos b ON b.IDBan = cp.IDBan
       WHERE cpl.Estado IN ('CANCELACION_PROGRAMADA','CANCELACION_CONFIRMADA') AND cp.Estado = 'ACTIVO'
         AND COALESCE(cpl.FechaConfirmacionCancelacion, cpl.FechaCancelacionAlBanco) BETWEEN @desde AND @hasta;
     `);
@@ -362,9 +362,9 @@ export async function flujoProyectado(db: ConnectionPool, f: FlujoFiltro): Promi
   if (f.idBanco) { condsPC.push('c.IDBanco = @idBanco'); reqPC.input('idBanco', sql.Int, f.idBanco); }
   const pagos = await reqPC.query<{ FechaPlaneada: Date; MontoPlaneado_CRC: number }>(`
     SELECT pc.FechaPlaneada, pc.MontoPlaneado_CRC
-    FROM [app].pago_cliente pc
-    INNER JOIN dbo.Casos c ON c.IDCaso = pc.IDCaso
-    INNER JOIN dbo.Lotes l ON l.IDLote = c.IDLote
+    FROM [pro_app].pago_cliente pc
+    INNER JOIN pro_ventas.Casos c ON c.IDCaso = pc.IDCaso
+    INNER JOIN pro_ventas.Lotes l ON l.IDLote = c.IDLote
     WHERE ${condsPC.join(' AND ')};
   `);
   const cliente = mkFila('CLIENTE', 'Pagos cliente');
@@ -383,8 +383,8 @@ export async function flujoProyectado(db: ConnectionPool, f: FlujoFiltro): Promi
     const r = await req.query<{ FechaLote: Date; CodigoEntidad: string; Monto_CRC: number; DiferenciaBancoVsInterno_CRC: number }>(`
       SELECT vp.FechaProyectada AS FechaLote, d.CodigoEntidad, d.MontoEntidad_CRC AS Monto_CRC,
              ISNULL(vp.DiferenciaBancoVsInterno_CRC, 0) AS DiferenciaBancoVsInterno_CRC
-      FROM [app].vw_proyeccion_desembolsos vp
-      INNER JOIN [app].vw_distribucion_caso d ON d.IDCaso = vp.IDCaso
+      FROM [pro_app].vw_proyeccion_desembolsos vp
+      INNER JOIN [pro_app].vw_distribucion_caso d ON d.IDCaso = vp.IDCaso
       WHERE ${conds.join(' AND ')};
     `);
     for (const x of r.recordset) {
@@ -395,19 +395,19 @@ export async function flujoProyectado(db: ConnectionPool, f: FlujoFiltro): Promi
   {
     const req = db.request().input('desde', sql.Date, f.desde).input('hasta', sql.Date, f.hasta);
     const conds = ["pc.Concepto = 'LOTE'", 'pc.FechaPlaneada BETWEEN @desde AND @hasta',
-      `NOT EXISTS (SELECT 1 FROM [app].vw_proyeccion_desembolsos vp WHERE vp.IDCaso = pc.IDCaso AND vp.CodigoHito = 'LOTE')`];
+      `NOT EXISTS (SELECT 1 FROM [pro_app].vw_proyeccion_desembolsos vp WHERE vp.IDCaso = pc.IDCaso AND vp.CodigoHito = 'LOTE')`];
     if (f.idProyecto) { conds.push('l.IDProyecto = @idProyectoPC'); req.input('idProyectoPC', sql.Int, f.idProyecto); }
     if (f.idBanco) { conds.push('c.IDBanco = @idBancoPC'); req.input('idBancoPC', sql.Int, f.idBanco); }
     const r = await req.query<{ FechaLote: Date; CodigoEntidad: string; MontoOriginal_CRC: number; MontoPagoEfectivo_CRC: number; TotalDistribucion_CRC: number }>(`
       WITH PagosLOTE AS (
         SELECT pc.IDCaso, pc.FechaPlaneada, pc.MontoPlaneado_CRC AS MontoPagoEfectivo_CRC
-        FROM [app].pago_cliente pc
-        INNER JOIN dbo.Casos c ON c.IDCaso = pc.IDCaso
-        INNER JOIN dbo.Lotes l ON l.IDLote = c.IDLote
+        FROM [pro_app].pago_cliente pc
+        INNER JOIN pro_ventas.Casos c ON c.IDCaso = pc.IDCaso
+        INNER JOIN pro_ventas.Lotes l ON l.IDLote = c.IDLote
         WHERE ${conds.join(' AND ')})
       SELECT pl.FechaPlaneada AS FechaLote, d.CodigoEntidad, d.MontoEntidad_CRC AS MontoOriginal_CRC,
              pl.MontoPagoEfectivo_CRC, SUM(d.MontoEntidad_CRC) OVER (PARTITION BY pl.IDCaso) AS TotalDistribucion_CRC
-      FROM PagosLOTE pl INNER JOIN [app].vw_distribucion_caso d ON d.IDCaso = pl.IDCaso;
+      FROM PagosLOTE pl INNER JOIN [pro_app].vw_distribucion_caso d ON d.IDCaso = pl.IDCaso;
     `);
     for (const x of r.recordset) {
       const total = Number(x.TotalDistribucion_CRC ?? 0);

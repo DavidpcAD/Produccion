@@ -11,9 +11,9 @@ import { REPORTE_CACHE } from '@/lib/cache-headers';
 // Function `utilidades-resumen`. Todo se SUMA sobre el rango de meses.
 //
 // Depende de las vistas del schema `uti`:
-//   uti.v_resumen_mensual, uti.v_ingresos_utilidad_por_lote,
-//   uti.v_por_tipo_movimiento, uti.v_resumen_mensual_por_lote
-// que a su vez leen dbo.*/app.vw_utilidad_powerbi (ver docs/migracion-adelantedb.md).
+//   pro_uti.v_resumen_mensual, pro_uti.v_ingresos_utilidad_por_lote,
+//   pro_uti.v_por_tipo_movimiento, pro_uti.v_resumen_mensual_por_lote
+// que a su vez leen dbo.*/pro_app.vw_utilidad_powerbi (ver docs/migracion-adelantedb.md).
 
 const ECUACION_VACIA = {
   utilidad_ingresada: 0,
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
           SUM(credito_clientes)       AS credito_clientes,
           SUM(credito_colaboradores)  AS credito_colaboradores,
           SUM(compra_maquinaria)      AS compra_maquinaria
-        FROM uti.v_resumen_mensual
+        FROM pro_uti.v_resumen_mensual
         WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM
       `);
     const ecuRow = ecuRes.recordset[0];
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
         SELECT
           COALESCE(SUM(ingresos), 0)        AS ingreso_bruto,
           COALESCE(SUM(ingreso_neto_ad), 0) AS ingreso_neto_ad
-        FROM uti.v_ingresos_utilidad_por_lote
+        FROM pro_uti.v_ingresos_utilidad_por_lote
         WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM
       `);
     const ingRow = ingRes.recordset[0];
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
         tipo_movimiento,
         SUM(monto_total)          AS monto_total,
         SUM(cantidad_movimientos) AS cantidad_movimientos
-      FROM uti.v_por_tipo_movimiento
+      FROM pro_uti.v_por_tipo_movimiento
       WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${tiposClause}
       GROUP BY tipo_movimiento
       ORDER BY SUM(monto_total) DESC
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
     lotes.forEach((l, i) => devReq.input(`lote${i}`, sql.NVarChar(100), l));
     const devRes = await devReq.query(`
       SELECT lote, SUM(devolucion_utilidad) AS monto
-      FROM uti.v_resumen_mensual_por_lote
+      FROM pro_uti.v_resumen_mensual_por_lote
       WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
       GROUP BY lote
       HAVING SUM(devolucion_utilidad) <> 0
@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
     lotes.forEach((l, i) => movReq.input(`lote${i}`, sql.NVarChar(100), l));
     const movRes = await movReq.query(`
       SELECT lote, SUM(monto_total) AS monto
-      FROM uti.v_resumen_mensual_por_lote
+      FROM pro_uti.v_resumen_mensual_por_lote
       WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
       GROUP BY lote
       ORDER BY SUM(monto_total) DESC

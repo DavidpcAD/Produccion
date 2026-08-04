@@ -6,7 +6,7 @@ import { procesarIngesta } from '@/lib/concreto/ingesta';
 // POST /api/concreto/batches/ingestar — ingesta de un CSV de planta Blend.
 //
 // La planta NO se pasa por parámetro: se detecta del propio contenido del CSV
-// (columna Machine_SN → hor.plantas.serial) y se valida que el archivo sea de
+// (columna Machine_SN → pro_hor.plantas.serial) y se valida que el archivo sea de
 // UNA sola planta (regla single-plant del dominio).
 //
 // Acepta dos formatos de body:

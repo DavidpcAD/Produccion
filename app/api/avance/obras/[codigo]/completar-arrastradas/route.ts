@@ -24,7 +24,7 @@ export async function POST(
       .request()
       .input('obra', sql.NVarChar(20), codigo)
       .query<{ estado: string; sprint_actual: number; tipo_casa: TipoCasa | null }>(
-        'SELECT estado, sprint_actual, tipo_casa FROM obc.obra_estado WHERE obra_codigo = @obra',
+        'SELECT estado, sprint_actual, tipo_casa FROM pro_obc.obra_estado WHERE obra_codigo = @obra',
       );
     const estado = estadoRes.recordset[0];
     if (!estado || !estado.tipo_casa)
@@ -40,11 +40,11 @@ export async function POST(
       .input('tc', sql.VarChar(20), estado.tipo_casa)
       .input('uid', sql.Int, session.idCol || null)
       .query<{ accion: string }>(`
-        MERGE obc.avance_sub_partidas AS dst
+        MERGE pro_obc.avance_sub_partidas AS dst
         USING (
           SELECT sp.id AS sub_partida_id
-          FROM obc.sub_partidas sp
-          JOIN obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = @tc
+          FROM pro_obc.sub_partidas sp
+          JOIN pro_obc.sub_partida_tipos t ON t.sub_partida_id = sp.id AND t.tipo_casa = @tc
           WHERE sp.sprint_numero < @sprint AND sp.activo = 1
         ) AS src
           ON dst.obra_codigo = @obra AND dst.sub_partida_id = src.sub_partida_id
