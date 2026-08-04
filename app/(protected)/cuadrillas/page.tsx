@@ -104,6 +104,17 @@ function ObrasPicker({ obras, selected, onChange }: {
           <label className="text-sm font-bold text-ds-ink">Obras <span className="text-ds-red">*</span></label>
           <p className="text-xs text-ds-gray-400">Marcá en qué obras trabaja esta cuadrilla.</p>
         </div>
+        {filtered.length > 0 && (
+          <button type="button"
+            onClick={() => {
+              const allOn = filtered.every(o => sel.has(o.idObra));
+              if (allOn) onChange(selected.filter(id => !filtered.some(o => o.idObra === id)));
+              else onChange([...new Set([...selected, ...filtered.map(o => o.idObra)])]);
+            }}
+            className="text-[11px] font-semibold text-ds-gray-500 hover:text-ds-ink underline underline-offset-2 shrink-0">
+            {filtered.every(o => sel.has(o.idObra)) ? 'Quitar todas' : (term ? 'Seleccionar filtradas' : 'Seleccionar todas')}
+          </button>
+        )}
         {selected.length > 0 && (
           <span className="text-[11px] font-bold rounded-full px-2 py-0.5 shrink-0 bg-brand text-black">
             {selected.length} sel.
