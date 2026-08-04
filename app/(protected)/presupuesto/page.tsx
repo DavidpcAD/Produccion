@@ -152,6 +152,8 @@ export default function PresupuestoPage() {
   const [modalGuardar, setModalGuardar] = useState(false);
   const [nombrePlantilla, setNombrePlantilla] = useState('');
   const [resultado, setResultado] = useState<ResultadoBC | null>(null);
+  // Confirmación / vista previa antes de mandar a BC (no re-subir por error).
+  const [confirmarSubir, setConfirmarSubir] = useState<'general' | 'descompuesto' | null>(null);
   // Qué ya se subió a BC en esta obra, para reemplazar el botón por un estado
   // "hecho" y evitar re-subidas accidentales (una re-subida del mismo descompuesto
   // genera duplicados y BC responde "0 insertados, N errores").
@@ -251,13 +253,25 @@ export default function PresupuestoPage() {
     cargarPlantillas();
   }
 
-  // Editar el monto de una línea de la plantilla (queda en memoria; guardá para persistir).
+  // Editar el monto de una línea (Partida) de la plantilla. Los Capítulos
+  // (taskType 'Total') NO se editan: su monto es la suma de sus partidas hijas,
+  // así que se recalcula automáticamente. Queda en memoria; guardá para persistir.
   function editarMonto(tipo: string, idx: number, valor: string) {
     setPlantilla(p => {
       if (!p) return p;
       const arr = [...(p.porTipo[tipo] ?? [])];
+      if (arr[idx]?.taskType === 'Total') return p; // Capítulo: no editable
       arr[idx] = { ...arr[idx], lineAmount: Number(valor) || 0 };
-      return { ...p, porTipo: { ...p.porTipo, [tipo]: arr } };
+      // Recalcular cada Capítulo = suma de sus partidas (taskNo que empieza con "cap.").
+      const recomputed = arr.map(l => {
+        if (l.taskType !== 'Total') return l;
+        const prefix = `${l.taskNo}.`;
+        const suma = arr
+          .filter(x => x.taskType !== 'Total' && String(x.taskNo).startsWith(prefix))
+          .reduce((s, x) => s + (Number(x.lineAmount) || 0), 0);
+        return { ...l, lineAmount: suma };
+      });
+      return { ...p, porTipo: { ...p.porTipo, [tipo]: recomputed } };
     });
   }
 
@@ -387,12 +401,21 @@ export default function PresupuestoPage() {
                               <td className="py-1.5 px-3 truncate max-w-[360px]">{l.description}</td>
                               <td className="py-1 px-3">
                                 <div className="flex justify-end">
-                                  <div className="inline-flex items-center gap-1 rounded-ds border border-ds-gray-200 pl-2 w-40 focus-within:border-black">
-                                    <span className="text-ds-gray-400 text-xs shrink-0">₡</span>
-                                    <input type="number" step="0.01" value={Math.round((l.lineAmount ?? 0) * 100) / 100}
-                                      onChange={e => editarMonto(activa, i, e.target.value)}
-                                      className="w-full text-right px-1 py-1 text-sm bg-transparent focus:outline-none" />
-                                  </div>
+                                  {l.taskType === 'Total' ? (
+                                    // Capítulo: monto = suma de sus partidas, no editable.
+                                    <span title="Suma de las partidas (no editable)"
+                                      className="inline-flex items-center justify-end gap-1 w-40 px-2 py-1 text-sm font-semibold text-ds-ink">
+                                      <span className="text-ds-gray-400 text-xs shrink-0">₡</span>
+                                      {(Math.round((l.lineAmount ?? 0) * 100) / 100).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  ) : (
+                                    <div className="inline-flex items-center gap-1 rounded-ds border border-ds-gray-200 pl-2 w-40 focus-within:border-black">
+                                      <span className="text-ds-gray-400 text-xs shrink-0">₡</span>
+                                      <input type="number" step="0.01" value={Math.round((l.lineAmount ?? 0) * 100) / 100}
+                                        onChange={e => editarMonto(activa, i, e.target.value)}
+                                        className="w-full text-right px-1 py-1 text-sm bg-transparent focus:outline-none" />
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -450,12 +473,12 @@ export default function PresupuestoPage() {
           <div className="flex items-center gap-3 flex-wrap">
             <Button variant="secondary" onClick={() => setModalGuardar(true)} icon={<Icon name="check" size="sm" color="currentColor" />}>Guardar como plantilla</Button>
             {plantilla && (subido.general
-              ? <SubidoChip etiqueta="General" onRedo={() => subir('general')} redoing={subiendoQue === 'general'} />
-              : <Button onClick={() => subir('general')} loading={subiendoQue === 'general'} disabled={!obraId || subiendoQue === 'general'} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir General a BC</Button>
+              ? <SubidoChip etiqueta="General" onRedo={() => setConfirmarSubir('general')} redoing={subiendoQue === 'general'} />
+              : <Button onClick={() => setConfirmarSubir('general')} loading={subiendoQue === 'general'} disabled={!obraId || subiendoQue === 'general'} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir General a BC</Button>
             )}
             {descompuesto && (subido.descompuesto
-              ? <SubidoChip etiqueta="Descompuesto" onRedo={() => subir('descompuesto')} redoing={subiendoQue === 'descompuesto'} />
-              : <Button onClick={() => subir('descompuesto')} loading={subiendoQue === 'descompuesto'} disabled={!obraId || subiendoQue === 'descompuesto'} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir Descompuesto a BC</Button>
+              ? <SubidoChip etiqueta="Descompuesto" onRedo={() => setConfirmarSubir('descompuesto')} redoing={subiendoQue === 'descompuesto'} />
+              : <Button onClick={() => setConfirmarSubir('descompuesto')} loading={subiendoQue === 'descompuesto'} disabled={!obraId || subiendoQue === 'descompuesto'} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Subir Descompuesto a BC</Button>
             )}
           </div>
           {resultado && <DetalleBC r={resultado} />}
@@ -469,6 +492,65 @@ export default function PresupuestoPage() {
           <p className="text-body-sm text-ds-gray-500">Se guarda lo que tengas cargado (general y/o descompuesto) con este nombre, para reusarlo en cualquier obra.</p>
           <Input label="Nombre de la plantilla" value={nombrePlantilla} onChange={e => setNombrePlantilla(e.target.value)} placeholder="Ej. Casa tipo A — L15" maxLength={150} />
         </div>
+      </Modal>
+
+      {/* Modal: confirmación / vista previa ANTES de subir a BC */}
+      <Modal open={!!confirmarSubir} onClose={() => setConfirmarSubir(null)}
+        title={confirmarSubir === 'descompuesto' ? 'Revisá antes de subir el Descompuesto a BC' : 'Revisá antes de subir el General a BC'}
+        footer={<>
+          <Button variant="outline" onClick={() => setConfirmarSubir(null)}>Cancelar</Button>
+          <Button loading={!!subiendoQue} onClick={() => { const que = confirmarSubir; setConfirmarSubir(null); if (que) subir(que); }}
+            icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>Confirmar y subir a BC</Button>
+        </>}>
+        {(() => {
+          if (!confirmarSubir) return null;
+          const worksNo = obra?.numeroObra ?? '—';
+          if (confirmarSubir === 'general') {
+            const bloques = TIPO_SUBIBLES
+              .filter(t => (plantilla?.porTipo?.[t] ?? []).length > 0)
+              .map(t => {
+                const ls = plantilla!.porTipo[t] ?? [];
+                const total = ls.filter(l => l.taskType !== 'Total').reduce((s, l) => s + (Number(l.lineAmount) || 0), 0);
+                return { t, count: ls.length, total };
+              });
+            const todas = bloques.reduce((s, b) => s + b.count, 0);
+            return (
+              <div className="space-y-4">
+                <div className="rounded-ds bg-ds-gray-100 px-3 py-2 text-sm">
+                  <span className="text-ds-gray-500">Obra: </span>
+                  <span className="font-mono font-semibold text-ds-ink">{worksNo}</span>
+                  <span className="text-ds-gray-500"> · se sube el </span><span className="font-semibold text-ds-ink">General (versión)</span>
+                  <span className="text-ds-gray-500"> — {todas} líneas.</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {bloques.map(b => (
+                    <div key={b.t} className="rounded-ds-lg border border-ds-gray-200 p-3">
+                      <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[b.t] ?? b.t}</p>
+                      <p className="text-ds-ink font-bold text-sm">{crc.format(b.total)}</p>
+                      <p className="text-ds-gray-400 text-xs mt-0.5">{b.count} líneas</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-ds-gray-400">Solo Venta, Costo e Indirectos se envían a Business Central. Los Capítulos van como suma de sus partidas. Al confirmar se crea/actualiza la versión en BC.</p>
+              </div>
+            );
+          }
+          const nMat = descompuesto?.lineas?.length ?? 0;
+          return (
+            <div className="space-y-3">
+              <div className="rounded-ds bg-ds-gray-100 px-3 py-2 text-sm">
+                <span className="text-ds-gray-500">Obra: </span>
+                <span className="font-mono font-semibold text-ds-ink">{worksNo}</span>
+                <span className="text-ds-gray-500"> · se sube el </span><span className="font-semibold text-ds-ink">Descompuesto (materiales)</span>
+              </div>
+              <div className="rounded-ds-lg border border-ds-gray-200 p-3">
+                <p className="text-ds-gray-400 text-xs">Materiales a enviar</p>
+                <p className="text-ds-ink font-bold text-sub-sm">{nMat}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
+              </div>
+              <p className="text-xs text-ds-gray-400">El descompuesto se envía por separado del General. Ojo: volver a subir el mismo descompuesto puede duplicar materiales en BC.</p>
+            </div>
+          );
+        })()}
       </Modal>
     </PageShell>
   );
