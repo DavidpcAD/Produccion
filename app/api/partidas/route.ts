@@ -1,46 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, sql } from '@/lib/db';
+import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 
-// Catálogo de partidas y subpartidas de Business Central. Se usan para asignar
-// la tarea (partida/subpartida) de cada cuadrilla — es obligatorio por ley.
+export const dynamic = 'force-dynamic';
+
+// Catálogo ÚNICO de partidas y subpartidas = el núcleo de ObrasControl
+// (pro_obc.grupos_partida → partidas → sub_partidas + sub_partida_tipos), el
+// mismo que usa Avance. Antes esta pantalla leía dbo.Etapa/Partida/SubPartida
+// (catálogo duplicado); se unificó a pro_obc — mismos IDs, sin migrar datos.
+// Se exponen con alias a la forma que ya espera el frontend (idEtapa/idPartida/
+// idSubPartida/numSprint/esCritica) y se agregan tiposCasa[] y activo.
 export async function GET() {
   const session = await getSession();
   if (!session || session.nivelAdmin < 1) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const db = await getDb();
+  const db = await getAdelanteDb();
   const [etapas, partidas, subpartidas] = await Promise.all([
     db.request().query(`
       SELECT id AS idEtapa, codigo, nombre
-      FROM dbo.Etapa
-      WHERE activo = 1
-      ORDER BY codigo
+      FROM pro_obc.grupos_partida
+      ORDER BY orden, codigo
     `),
     db.request().query(`
-      SELECT idPartida, codigo, nombre, idEtapa
-      FROM dbo.Partida
-      WHERE esActivo = 1
-      ORDER BY codigo
+      SELECT id AS idPartida, codigo, nombre, grupo_id AS idEtapa, activo
+      FROM pro_obc.partidas
+      ORDER BY orden, codigo
     `),
     db.request().query(`
-      SELECT idSubPartida, codigo, nombre, idPartida, numSprint, esCritica, descripcion
-      FROM dbo.SubPartida
-      WHERE esActivo = 1
-      ORDER BY codigo
+      SELECT
+        sp.id AS idSubPartida, sp.codigo, sp.nombre, sp.partida_id AS idPartida,
+        sp.sprint_numero AS numSprint, sp.es_critica AS esCritica, sp.descripcion,
+        sp.activo,
+        STUFF((
+          SELECT ',' + t.tipo_casa
+          FROM pro_obc.sub_partida_tipos t
+          WHERE t.sub_partida_id = sp.id
+          ORDER BY t.tipo_casa
+          FOR XML PATH('')
+        ), 1, 1, '') AS tiposCasaStr
+      FROM pro_obc.sub_partidas sp
+      ORDER BY sp.codigo
     `),
   ]);
 
   return NextResponse.json({
     etapas: etapas.recordset,
     partidas: partidas.recordset,
-    subpartidas: subpartidas.recordset,
+    subpartidas: subpartidas.recordset.map((r: Record<string, unknown>) => ({
+      idSubPartida: r.idSubPartida,
+      codigo: r.codigo,
+      nombre: r.nombre,
+      idPartida: r.idPartida,
+      numSprint: r.numSprint,
+      esCritica: r.esCritica,
+      descripcion: r.descripcion,
+      activo: r.activo,
+      tiposCasa: String(r.tiposCasaStr ?? '').split(',').filter(Boolean),
+    })),
   });
 }
 
-// Crear una partida dentro de una etapa. Solo Super Admin (nivel 4).
+// Crear una partida dentro de una etapa/grupo. Solo Super Admin (nivel 4).
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 4) {
@@ -57,35 +80,33 @@ export async function POST(req: NextRequest) {
   if (!idEtapa) return NextResponse.json({ error: 'Elegí la etapa a la que pertenece' }, { status: 400 });
   if (!codigo) return NextResponse.json({ error: 'El código es requerido' }, { status: 400 });
   if (!nombre) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 });
-  if (codigo.length > 50) return NextResponse.json({ error: 'El código no puede superar 50 caracteres' }, { status: 400 });
+  if (codigo.length > 20) return NextResponse.json({ error: 'El código no puede superar 20 caracteres' }, { status: 400 });
   if (nombre.length > 100) return NextResponse.json({ error: 'El nombre no puede superar 100 caracteres' }, { status: 400 });
 
-  const db = await getDb();
+  const db = await getAdelanteDb();
   try {
-    // La etapa debe existir y estar activa.
     const e = await db.request()
       .input('idE', sql.Int, idEtapa)
-      .query('SELECT id FROM dbo.Etapa WHERE id = @idE AND activo = 1');
+      .query('SELECT id FROM pro_obc.grupos_partida WHERE id = @idE');
     if (e.recordset.length === 0) {
-      return NextResponse.json({ error: 'La etapa no existe o está inactiva' }, { status: 400 });
+      return NextResponse.json({ error: 'La etapa no existe' }, { status: 400 });
     }
 
-    // Evitar código duplicado (activo).
     const dup = await db.request()
-      .input('cod', sql.VarChar(50), codigo)
-      .query('SELECT 1 AS ok FROM dbo.Partida WHERE codigo = @cod AND esActivo = 1');
+      .input('cod', sql.VarChar(20), codigo)
+      .query('SELECT 1 AS ok FROM pro_obc.partidas WHERE codigo = @cod');
     if (dup.recordset.length > 0) {
-      return NextResponse.json({ error: `Ya existe una partida activa con el código "${codigo}"` }, { status: 409 });
+      return NextResponse.json({ error: `Ya existe una partida con el código "${codigo}"` }, { status: 409 });
     }
 
     const ins = await db.request()
-      .input('codigo', sql.VarChar(50), codigo)
+      .input('codigo', sql.VarChar(20), codigo)
       .input('nombre', sql.NVarChar(100), nombre)
       .input('idEtapa', sql.Int, idEtapa)
       .query(`
-        INSERT INTO dbo.Partida (codigo, nombre, idEtapa, esActivo, esPosting, fechaCreacion)
-        OUTPUT INSERTED.idPartida
-        VALUES (@codigo, @nombre, @idEtapa, 1, 0, SYSUTCDATETIME())
+        INSERT INTO pro_obc.partidas (codigo, nombre, grupo_id, activo)
+        OUTPUT INSERTED.id AS idPartida
+        VALUES (@codigo, @nombre, @idEtapa, 1)
       `);
     const idPartida = ins.recordset[0].idPartida;
 

@@ -20,11 +20,11 @@ export async function GET() {
              col.calcNombreCompleto AS encargado,
              ep.idSubPartida,
              sp.codigo AS subPartidaCodigo, sp.nombre AS subPartida,
-             sp.idPartida AS partidaId, pa.codigo AS partidaCodigo, pa.nombre AS partida
+             sp.partida_id AS partidaId, pa.codigo AS partidaCodigo, pa.nombre AS partida
       FROM dbo.EncargadoPartida ep
       JOIN dbo.Colaborador col ON col.idColaborador = ep.idColaborador
-      JOIN dbo.SubPartida sp   ON sp.idSubPartida = ep.idSubPartida
-      LEFT JOIN dbo.Partida pa ON pa.idPartida = sp.idPartida
+      JOIN pro_obc.sub_partidas sp ON sp.id = ep.idSubPartida
+      LEFT JOIN pro_obc.partidas pa ON pa.id = sp.partida_id
       ORDER BY pa.codigo, sp.codigo
     `);
     directos = res.recordset;
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         SELECT col.calcNombreCompleto AS encargado, sp.codigo AS subCodigo
         FROM dbo.EncargadoPartida ep
         JOIN dbo.Colaborador col ON col.idColaborador = ep.idColaborador
-        JOIN dbo.SubPartida sp   ON sp.idSubPartida = ep.idSubPartida
+        JOIN pro_obc.sub_partidas sp ON sp.id = ep.idSubPartida
         WHERE ep.idEncargadoPartida = @id
       `);
     const d = det.recordset[0];
@@ -131,7 +131,7 @@ export async function DELETE(req: NextRequest) {
         SELECT col.calcNombreCompleto AS encargado, sp.codigo AS subCodigo
         FROM dbo.EncargadoPartida ep
         JOIN dbo.Colaborador col ON col.idColaborador = ep.idColaborador
-        JOIN dbo.SubPartida sp   ON sp.idSubPartida = ep.idSubPartida
+        JOIN pro_obc.sub_partidas sp ON sp.id = ep.idSubPartida
         WHERE ep.idEncargadoPartida = @id
       `);
     const d = det.recordset[0];

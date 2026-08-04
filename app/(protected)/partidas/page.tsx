@@ -12,14 +12,17 @@ import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 
+const TIPOS_CASA = ['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea'] as const;
+
 interface Etapa { idEtapa: number; codigo: string; nombre: string }
-interface Partida { idPartida: number; codigo: string; nombre: string; idEtapa: number | null }
+interface Partida { idPartida: number; codigo: string; nombre: string; idEtapa: number | null; activo?: boolean }
 interface SubPartida {
   idSubPartida: number; codigo: string; nombre: string; idPartida: number;
   numSprint: number; esCritica: boolean; descripcion: string | null;
+  activo: boolean; tiposCasa: string[];
 }
 
-const EMPTY_SUB = { idEtapa: '', idPartida: '', codigo: '', nombre: '', numSprint: '1', esCritica: false, descripcion: '' };
+const EMPTY_SUB = { idEtapa: '', idPartida: '', codigo: '', nombre: '', numSprint: '1', esCritica: false, descripcion: '', activo: true, tiposCasa: [] as string[] };
 const EMPTY_PART = { idEtapa: '', codigo: '', nombre: '' };
 
 export default function PartidasPage() {
@@ -43,7 +46,8 @@ export default function PartidasPage() {
   const [subOpen, setSubOpen] = useState(false);
   const [subEditId, setSubEditId] = useState<number | null>(null);
   const [subForm, setSubForm] = useState({ ...EMPTY_SUB });
-  const setSub = (k: keyof typeof subForm, v: string | boolean) => setSubForm(p => ({ ...p, [k]: v }));
+  const setSub = (k: keyof typeof subForm, v: string | boolean | string[]) => setSubForm(p => ({ ...p, [k]: v }));
+  const toggleTipo = (tc: string) => setSubForm(p => ({ ...p, tiposCasa: p.tiposCasa.includes(tc) ? p.tiposCasa.filter(x => x !== tc) : [...p.tiposCasa, tc] }));
 
   // Modal partida (crear/editar)
   const [partOpen, setPartOpen] = useState(false);
@@ -92,6 +96,7 @@ export default function PartidasPage() {
       idEtapa: p?.idEtapa != null ? String(p.idEtapa) : '', idPartida: String(s.idPartida),
       codigo: s.codigo, nombre: s.nombre, numSprint: String(s.numSprint),
       esCritica: s.esCritica, descripcion: s.descripcion ?? '',
+      activo: s.activo ?? true, tiposCasa: s.tiposCasa ?? [],
     });
     setSubOpen(true);
   }
@@ -99,6 +104,7 @@ export default function PartidasPage() {
     if (!subForm.idPartida) { toast('Elegí la partida', 'warning'); return; }
     if (!subForm.codigo.trim()) { toast('El código es requerido', 'warning'); return; }
     if (!subForm.nombre.trim()) { toast('El nombre es requerido', 'warning'); return; }
+    if (subForm.tiposCasa.length === 0) { toast('Elegí al menos un tipo de casa', 'warning'); return; }
     setSaving(true);
     try {
       const editing = subEditId != null;
@@ -110,6 +116,7 @@ export default function PartidasPage() {
           codigo: subForm.codigo.trim(), nombre: subForm.nombre.trim(),
           numSprint: Number(subForm.numSprint) || 1, esCritica: subForm.esCritica,
           descripcion: subForm.descripcion.trim() || null,
+          tiposCasa: subForm.tiposCasa, activo: subForm.activo,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -311,11 +318,23 @@ export default function PartidasPage() {
                 ) : (
                   <ul className="divide-y divide-ds-gray-100 max-h-[62vh] overflow-y-auto no-scrollbar">
                     {selSubs.map(s => (
-                      <li key={s.idSubPartida} className="px-5 py-3 flex items-center gap-3 group">
-                        <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{s.codigo}</span>
-                        <span className="text-sm text-ds-ink truncate flex-1">{s.nombre}</span>
-                        {s.esCritica && <Badge variant="red">Crítica</Badge>}
-                        <span className="text-xs text-ds-gray-400 shrink-0">S{s.numSprint}</span>
+                      <li key={s.idSubPartida} className="px-5 py-3 flex items-start gap-3 group">
+                        <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 pt-0.5">{s.codigo}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={'text-sm truncate ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
+                            {s.esCritica && <Badge variant="red">Crítica</Badge>}
+                            {!s.activo && <Badge variant="gray">Inactiva</Badge>}
+                          </div>
+                          {s.tiposCasa.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {s.tiposCasa.map(tc => (
+                                <span key={tc} className="rounded bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-500">{tc}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs text-ds-gray-400 shrink-0 pt-0.5">S{s.numSprint}</span>
                         {puede && (
                           <button onClick={() => abrirEditarSub(s)} className="text-ds-gray-300 hover:text-ds-ink p-1 shrink-0 opacity-0 group-hover:opacity-100 transition" title="Editar subpartida">
                             <Icon name="edit" size="sm" color="currentColor" />
@@ -420,14 +439,33 @@ export default function PartidasPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Sprint (N°)" type="number" min={0} value={subForm.numSprint} onChange={e => setSub('numSprint', e.target.value)} />
-            <div className="flex items-end pb-3">
+            <div className="flex items-end gap-4 pb-3">
               <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
                 <input type="checkbox" checked={subForm.esCritica} onChange={e => setSub('esCritica', e.target.checked)} className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" />
                 Es crítica
               </label>
+              <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
+                <input type="checkbox" checked={subForm.activo} onChange={e => setSub('activo', e.target.checked)} className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" />
+                Activa
+              </label>
             </div>
           </div>
-          <Input label="Descripción (opcional)" value={subForm.descripcion} onChange={e => setSub('descripcion', e.target.value)} maxLength={50} />
+          {/* Tipos de casa a los que aplica la subpartida (mismo modelo que Avance). */}
+          <div>
+            <label className="block text-body-sm font-medium text-ds-ink mb-1.5">Tipos de casa <span className="text-ds-red">*</span></label>
+            <div className="flex flex-wrap gap-2">
+              {TIPOS_CASA.map(tc => {
+                const on = subForm.tiposCasa.includes(tc);
+                return (
+                  <button key={tc} type="button" onClick={() => toggleTipo(tc)}
+                    className={'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ' + (on ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-400 hover:border-ds-gray-400 hover:text-ds-ink')}>
+                    {tc}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <Input label="Descripción (opcional)" value={subForm.descripcion} onChange={e => setSub('descripcion', e.target.value)} maxLength={4000} />
         </div>
       </Modal>
     </PageShell>
