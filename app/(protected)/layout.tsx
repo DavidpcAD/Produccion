@@ -1,98 +1,85 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileNav } from '@/components/layout/MobileNav';
 import { useSession } from '@/hooks/useSession';
 import { getInitials } from '@/lib/permissions';
-import { Icon } from '@/components/ds/Icon/Icon';
-import { AdelanteMark } from '@/components/ds/AdelanteMark/AdelanteMark';
+
+const NAVPIN_KEY = 'adelante_oc_navpin';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  // Sidebar por hamburger: fija/expande (empuja el contenido) o se oculta y el
-  // contenido usa todo el ancho. El botón flotante (FAB) lo vuelve a abrir.
-  const [navOpen, setNavOpen] = useState(true);
+  // Binario, solo por botón: abierto (pinned, 264px) o cerrado (riel 72px). Persistido.
+  const [pinned, setPinned] = useState(false);
+  const [navOpen, setNavOpen] = useState(false); // drawer (móvil)
+  const [ready, setReady] = useState(false);     // evita animar al cargar
   const session = useSession();
   const pathname = usePathname();
 
   const nivelAdmin = session?.nivelAdmin ?? 0;
-  const nombre = session ? `${session.nombre}` : 'Cargando...';
+  const nombre = session ? `${session.nombre}` : 'Cargando…';
   const iniciales = session ? getInitials(nombre) : '?';
-  const nivelLabel =
+  const rol =
     nivelAdmin === 4 ? 'Super Admin' :
     nivelAdmin === 3 ? 'Admin TI' :
     nivelAdmin === 2 ? 'Jefe de Área' : 'Usuario';
 
-  const abrirMenu = () => {
-    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
-      setNavOpen(true);
-    } else {
-      setMobileOpen(true);
-    }
-  };
+  const isMobile = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches;
+  const closeNavOnMobile = () => { if (isMobile()) setNavOpen(false); };
+
+  // Hidratar el pin (el tema ya lo fijó el script no-flash del layout raíz).
+  useEffect(() => {
+    try { setPinned(localStorage.getItem(NAVPIN_KEY) === '1'); } catch { /* ignore */ }
+    setReady(true);
+  }, []);
+  useEffect(() => {
+    if (ready) try { localStorage.setItem(NAVPIN_KEY, pinned ? '1' : '0'); } catch { /* ignore */ }
+  }, [pinned, ready]);
+  // Cerrar el drawer al navegar (móvil).
+  useEffect(() => { if (isMobile()) setNavOpen(false); }, [pathname]);
+  // Escape cierra el drawer.
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
 
   return (
-    <div className="flex h-full min-h-screen bg-ds-bg">
-      {/* Sidebar desktop — el hamburger la fija/expande (260px) empujando el
-          contenido, o la colapsa a 0 (oculta) para dar todo el ancho. */}
-      <motion.div
-        className="hidden lg:block lg:shrink-0 overflow-hidden"
-        initial={false}
-        animate={{ width: navOpen ? 260 : 0 }}
-        transition={{ duration: 0.22, ease: 'easeOut' }}
-      >
-        <div className="h-full w-[260px]">
-          <Sidebar nivelAdmin={nivelAdmin} onClose={() => setNavOpen(false)} />
-        </div>
-      </motion.div>
+    <div className={`app-shell${pinned ? ' pinned' : ''}${navOpen ? ' nav-open' : ''}${ready ? ' is-ready' : ''} bg-ds-bg`}>
+      {/* Overlay del drawer (solo móvil) */}
+      {navOpen && <div className="app-nav-overlay" onClick={() => setNavOpen(false)} aria-hidden />}
 
-      {/* Sidebar móvil (drawer superpuesto) */}
-      <MobileNav
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
+      <Sidebar
         nivelAdmin={nivelAdmin}
+        nombre={nombre}
+        iniciales={iniciales}
+        rol={rol}
+        pinned={pinned}
+        navOpen={navOpen}
+        onTogglePinned={() => setPinned((p) => !p)}
+        onCloseDrawer={() => setNavOpen(false)}
+        onNavigate={closeNavOnMobile}
       />
 
-      {/* FAB de menú — abre el sidebar (desktop cuando está cerrado; móvil siempre).
-          Se oculta en desktop cuando el sidebar ya está abierto. */}
-      <button
-        onClick={abrirMenu}
-        aria-label="Abrir menú"
-        className={`fixed top-3 left-3 z-40 w-12 h-12 rounded-ds-lg bg-black text-brand shadow-ds-03 flex items-center justify-center active:scale-95 transition-transform ${navOpen ? 'lg:hidden' : ''}`}
-      >
-        <Icon name="menu" size="md" color="currentColor" />
-      </button>
+      {/* FAB hamburguesa (solo móvil, con el drawer cerrado) */}
+      {!navOpen && (
+        <button
+          type="button"
+          className="fab fab--menu"
+          onClick={() => setNavOpen(true)}
+          aria-label="Abrir menú"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+        </button>
+      )}
 
       {/* Contenido */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center gap-3 px-4 lg:px-6 h-14 lg:h-16 bg-ds-surface border-b border-ds-gray-200 shrink-0">
-          {/* Reserva el espacio del FAB a la izquierda cuando está visible. */}
-          <div className={`w-14 shrink-0 transition-all duration-200 ${navOpen ? 'lg:w-0' : 'lg:w-14'}`} />
-          <div className="lg:hidden flex items-center gap-2">
-            <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center text-brand">
-              <AdelanteMark className="w-4 h-auto" />
-            </div>
-            <span className="font-bold text-ds-ink text-sm">Adelante</span>
-          </div>
-
-          {/* Chip de usuario */}
-          <div className="ml-auto flex items-center gap-2.5 rounded-full bg-black text-white pl-1.5 pr-1.5 py-1.5 sm:pr-4 shadow-ds-01">
-            <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-black text-body-sm font-bold shrink-0">
-              {iniciales}
-            </div>
-            <div className="leading-tight min-w-0 hidden sm:block">
-              <p className="text-body-sm font-semibold truncate max-w-[180px]">{nombre}</p>
-              <p className="text-[11px] text-white/50 truncate">{nivelLabel}</p>
-            </div>
-          </div>
-        </header>
-
+      <div className="app-content min-w-0" id="contenido-principal">
         <AnimatePresence mode="wait" initial={false}>
           <motion.main
             key={pathname}
-            className="flex-1 overflow-auto"
+            className="h-full overflow-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

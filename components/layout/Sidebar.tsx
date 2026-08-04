@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import { SignOut } from '@phosphor-icons/react';
 import { Icon, IconName } from '@/components/ds/Icon/Icon';
 import { AdelanteMark } from '@/components/ds/AdelanteMark/AdelanteMark';
@@ -10,12 +10,25 @@ import { haptic } from '@/components/ds/haptic';
 import { springs } from '@/lib/springs';
 import { useConfirm } from '@/components/ui/Confirm';
 
+const THEME_KEY = 'adelante_oc_theme';
+
+const IconMoon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+  </svg>
+);
+const IconSun = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+  </svg>
+);
+
 interface NavItemDef {
   href: string;
   label: string;
   icon: IconName;
   minLevel?: number;
-  // Sección con submenú: al estar dentro de `section`, se despliegan `children`.
   section?: string;
   exact?: boolean;
   children?: { href: string; label: string; exact?: boolean }[];
@@ -23,8 +36,6 @@ interface NavItemDef {
 
 const navItems: NavItemDef[] = [
   { href: '/',          label: 'Dashboard',     icon: 'home',      minLevel: 1 },
-  // Colaboradores se administran ahora en Recursos Humanos (rh.adelante.cr).
-  // En Producción se asignan a la obra desde Cuadrillas.
   { href: '/proyectos', label: 'Proyectos',     icon: 'folder',    minLevel: 2 },
   { href: '/obras',     label: 'Obras',         icon: 'place',     minLevel: 2 },
   { href: '/cuadrillas',label: 'Cuadrillas',    icon: 'cuadrillas',minLevel: 2 },
@@ -95,78 +106,41 @@ const navItems: NavItemDef[] = [
   },
   { href: '/utilidades',label: 'Utilidades',    icon: 'calculator', minLevel: 2 },
   { href: '/reporte-h4',label: 'Reporte H4',    icon: 'reloj',     minLevel: 2 },
-  // Roles, Apps y Auditoría se administran ahora en Recursos Humanos (rh.adelante.cr).
 ];
-
-/** Item de navegación con la interacción del DS (halo + haptic + press). */
-function NavItem({
-  item, active, collapsed, onNavigate,
-}: { item: NavItemDef; active: boolean; collapsed: boolean; onNavigate?: () => void }) {
-  const [pressed, setPressed] = useState(false);
-  const cancelled = useRef(false);
-
-  return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      title={collapsed ? item.label : undefined}
-      aria-current={active ? 'page' : undefined}
-      className={`app-nav__item${active ? ' app-nav__item--active' : ''}${collapsed ? ' app-nav__item--collapsed' : ''}`}
-      style={{ position: 'relative', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        cancelled.current = false;
-        setPressed(true);
-        haptic.select();
-      }}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => { if (pressed) { cancelled.current = true; setPressed(false); } }}
-      onPointerCancel={() => { cancelled.current = true; setPressed(false); }}
-    >
-      <span className="app-nav__icon">
-        <Icon name={item.icon} size="md" color="currentColor" />
-      </span>
-      <AnimatePresence initial={false}>
-        {!collapsed && (
-          <motion.span
-            className="app-nav__label"
-            initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: 'auto' }}
-            exit={{ opacity: 0, width: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-          >
-            {item.label}
-          </motion.span>
-        )}
-      </AnimatePresence>
-      <span
-        aria-hidden
-        style={{
-          position: 'absolute', inset: -6, borderRadius: 999,
-          border: '6px solid rgba(255,255,255,0.16)', pointerEvents: 'none',
-          opacity: pressed ? 1 : 0,
-          transition: pressed ? 'opacity 80ms ease-out' : 'opacity 180ms ease-out 120ms',
-        }}
-      />
-    </Link>
-  );
-}
 
 interface SidebarProps {
   nivelAdmin: number;
-  onClose?: () => void;
-  /** Controlado desde el layout: riel (true) o expandido (false). El hover y la
-   *  animación de ancho los maneja el wrapper del layout, que EMPUJA el
-   *  contenido (no lo tapa). */
-  collapsed?: boolean;
+  nombre: string;
+  iniciales: string;
+  rol: string;
+  /** Abierto (pinned, desktop) — controla submenús. Los labels los muestra el CSS. */
+  pinned: boolean;
+  /** Drawer abierto (móvil). */
+  navOpen: boolean;
+  onTogglePinned: () => void;
+  onCloseDrawer: () => void;
+  /** Al navegar (cierra el drawer en móvil). */
+  onNavigate: () => void;
 }
 
-export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps) {
+export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, onTogglePinned, onCloseDrawer, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const confirm = useConfirm();
   const logoutRef = useRef<HTMLFormElement>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Salir con confirmación (diálogo del DS) antes del POST de logout.
+  useEffect(() => {
+    setTheme((document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light');
+  }, []);
+  function toggleTheme() {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
   const pedirSalir = async () => {
     const ok = await confirm({
       title: 'Cerrar sesión',
@@ -177,118 +151,116 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
     if (ok) logoutRef.current?.requestSubmit();
   };
 
-  const isActive = (href: string) => {
-    if (href === '/') return pathname === '/';
-    return pathname.startsWith(href);
-  };
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+  // Los submenús (y labels) están "expandidos" con pin (desktop) o con el drawer (móvil).
+  const expanded = pinned || navOpen;
 
   return (
-    <div
-      className="app-sidebar flex flex-col h-full w-full select-none overflow-hidden"
+    <nav
+      className={`app-nav no-scrollbar${navOpen ? ' is-open' : ''}`}
+      aria-label="Secciones"
+      role={navOpen ? 'dialog' : undefined}
+      aria-modal={navOpen ? true : undefined}
     >
-      {/* Logo + toggle (arriba). Se mantiene SIEMPRE en fila (solo se centra el logo
-          al colapsar): si se cambiara a flex-col, el texto que aún se está
-          desmontando se apila bajo el logo, agranda el alto del header y empuja los
-          íconos del nav hacia abajo hasta que termina la salida (el "salto" feo). */}
-      <div className={`shrink-0 px-4 py-5 flex items-center gap-3 border-b border-white/[0.06] ${collapsed ? 'justify-center' : ''}`}>
-        <div className="w-9 h-9 rounded-ds-lg bg-brand flex items-center justify-center shrink-0 shadow-ds-02 text-black">
-          <AdelanteMark className="w-5 h-auto" />
-        </div>
-        <AnimatePresence initial={false}>
-          {!collapsed && (
-            <motion.div
-              className="flex-1 min-w-0"
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-            >
-              <p className="text-white font-bold text-sm leading-tight whitespace-nowrap">Adelante</p>
-              <p className="text-white/50 text-xs whitespace-nowrap">Desarrollos</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {onClose && (
-          <button onClick={onClose} className="app-sidebar__toggle shrink-0 ml-auto" aria-label="Cerrar menú">
-            <Icon name="close" size="sm" color="currentColor" />
-          </button>
-        )}
-      </div>
-
-      {/* Nav */}
-      <nav className={`app-nav no-scrollbar flex-1 px-3 py-2 space-y-1 overflow-y-auto overflow-x-hidden${collapsed ? ' app-nav--collapsed' : ''}`}>
-        {navItems
-          .filter(item => !item.minLevel || nivelAdmin >= item.minLevel)
-          .map(item => {
-            const sectionActive = item.section ? pathname.startsWith(item.section) : isActive(item.href);
-            return (
-              <div key={item.href}>
-                <NavItem
-                  item={item}
-                  active={sectionActive}
-                  collapsed={collapsed}
-                  onNavigate={onClose}
-                />
-                {/* Submenú: al estar dentro de la sección (y con el sidebar expandido)
-                    se muestran los subitems, como una subcolumna. */}
-                {item.children && sectionActive && !collapsed && (
-                  <div className="mt-0.5 mb-1 ml-5 pl-3 border-l border-white/10 space-y-0.5">
-                    {item.children.map(child => {
-                      const childActive = child.exact
-                        ? pathname === child.href
-                        : (pathname === child.href || pathname.startsWith(child.href + '/'));
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={onClose}
-                          aria-current={childActive ? 'page' : undefined}
-                          className={`block px-3 py-1.5 rounded-ds text-sm transition-colors ${
-                            childActive ? 'text-brand font-semibold bg-brand/10' : 'text-white/55 hover:text-white hover:bg-ds-surface/[0.06]'
-                          }`}
-                        >
-                          {child.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-      </nav>
-
-      {/* Logout */}
-      <div className="app-sidebar__footer px-3 py-4 shrink-0 space-y-1">
-        <form ref={logoutRef} action="/api/auth/logout" method="POST" className="hidden" />
-        <motion.button
+      {/* Cabecera: hamburguesa (siempre) + marca (al abrir) + X (móvil) */}
+      <div className="app-nav__head">
+        <button
           type="button"
-          onClick={pedirSalir}
-          title="Cerrar sesión"
-          aria-label="Cerrar sesión"
-          className={`app-nav__item app-nav__item--logout w-full${collapsed ? ' app-nav__item--collapsed' : ''}`}
-          whileTap={{ scale: 0.97 }}
-          transition={springs.snappy}
+          className="app-nav__burger"
+          onClick={() => { onTogglePinned(); haptic.select(); }}
+          aria-label={pinned ? 'Encoger menú' : 'Expandir menú'}
+          title={pinned ? 'Encoger menú' : 'Expandir menú'}
+          aria-pressed={pinned}
         >
-          <span className="app-nav__icon">
-            <SignOut size={20} weight="bold" />
-          </span>
-          <AnimatePresence initial={false}>
-            {!collapsed && (
-              <motion.span
-                className="app-nav__label"
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-              >
-                Salir
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </motion.button>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+        </button>
+        <Link href="/" className="app-nav__brand" title="Adelante Desarrollos" onClick={onNavigate}>
+          <span className="topbar__logo"><AdelanteMark className="w-4 h-auto" /></span>
+          <span className="app-nav__brand-name">Adelante</span>
+        </Link>
+        <button type="button" className="app-nav__close" onClick={onCloseDrawer} aria-label="Cerrar menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
       </div>
-    </div>
+
+      {/* Rótulo de sección */}
+      <span className="app-nav__section app-nav__label">Menú</span>
+
+      {/* Ítems */}
+      {navItems
+        .filter((item) => !item.minLevel || nivelAdmin >= item.minLevel)
+        .map((item) => {
+          const sectionActive = item.section ? pathname.startsWith(item.section) : isActive(item.href);
+          return (
+            <div key={item.href}>
+              <Link
+                href={item.href}
+                onClick={onNavigate}
+                title={item.label}
+                aria-current={sectionActive ? 'page' : undefined}
+                className={`app-nav__item${sectionActive ? ' is-active' : ''}`}
+              >
+                <span className="app-nav__ic"><Icon name={item.icon} size="md" color="currentColor" /></span>
+                <span className="app-nav__label">{item.label}</span>
+              </Link>
+              {item.children && sectionActive && expanded && (
+                <div className="app-nav__sub">
+                  {item.children.map((child) => {
+                    const childActive = child.exact
+                      ? pathname === child.href
+                      : (pathname === child.href || pathname.startsWith(child.href + '/'));
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={onNavigate}
+                        aria-current={childActive ? 'page' : undefined}
+                        className={`app-nav__subitem${childActive ? ' is-active' : ''}`}
+                      >
+                        {child.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+      {/* Pie: tema + usuario + salir */}
+      <div className="app-nav__foot">
+        <form ref={logoutRef} action="/api/auth/logout" method="POST" className="hidden" />
+        <button
+          type="button"
+          className="app-nav__item app-nav__theme"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          aria-pressed={theme === 'dark'}
+        >
+          <span className="app-nav__ic">{theme === 'dark' ? <IconSun /> : <IconMoon />}</span>
+          <span className="app-nav__label">{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>
+          <span className={`app-nav__switch${theme === 'dark' ? ' is-on' : ''} app-nav__label`} aria-hidden><i /></span>
+        </button>
+
+        <div className="app-nav__user">
+          <span className="app-nav__avatar">{iniciales}</span>
+          <span className="app-nav__user-meta app-nav__label">
+            <span className="app-nav__user-name">{nombre}</span>
+            <span className="app-nav__user-role">{rol}</span>
+          </span>
+          <motion.button
+            type="button"
+            className="app-nav__logout app-nav__label"
+            title="Salir"
+            onClick={pedirSalir}
+            aria-label="Cerrar sesión"
+            whileTap={{ scale: 0.92 }}
+            transition={springs.snappy}
+          >
+            <SignOut size={18} weight="bold" />
+          </motion.button>
+        </div>
+      </div>
+    </nav>
   );
 }
