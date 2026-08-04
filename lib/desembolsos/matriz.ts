@@ -583,7 +583,7 @@ export async function listarDesembolsos(
       INNER JOIN [pro_app].credito_puente cp ON cp.IDCreditoPuente = cpl.IDCreditoPuente
       INNER JOIN pro_ventas.Bancos b            ON b.IDBan = cp.IDBan
       INNER JOIN pro_ventas.Lotes l             ON l.IDLote = cpl.IDLote
-      INNER JOIN dbo.Proyecto p          ON p.IDProyecto = l.IDProyecto
+      INNER JOIN pro_ventas.Proyecto p          ON p.IDProyecto = l.IDProyecto
       WHERE cpl.Estado IN ('CANCELACION_PROGRAMADA', 'CANCELACION_CONFIRMADA')
         AND COALESCE(cpl.FechaConfirmacionCancelacion, cpl.FechaCancelacionAlBanco) BETWEEN @desde AND @hasta
         AND cp.Estado = 'ACTIVO'

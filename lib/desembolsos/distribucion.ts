@@ -11,7 +11,7 @@ import { sql } from '@/lib/db-adelantedb';
  * sp_actualizar_distribucion_config, o edita la vigente in-place vía
  * sp_editar_distribucion_vigente.
  *
- * Tablas/vistas: dbo.Proyecto, [pro_app].catalogo_entidad_distribucion,
+ * Tablas/vistas: pro_ventas.Proyecto, [pro_app].catalogo_entidad_distribucion,
  * [pro_app].vw_historico_distribucion.
  */
 
@@ -203,7 +203,7 @@ export async function listarDistribucion(db: ConnectionPool): Promise<RespuestaD
       h.Notas AS NotasConfig,
       h.EntidadesJSON,
       h.FechaCreacion
-    FROM dbo.Proyecto p
+    FROM pro_ventas.Proyecto p
     OUTER APPLY (
       SELECT TOP 1 *
       FROM [pro_app].vw_historico_distribucion v
@@ -251,7 +251,7 @@ export async function distribucionPorProyecto(
     .request()
     .input('id', sql.Int, idProyecto)
     .query<{ AbreviaturaProyecto: string; Nombre: string }>(
-      'SELECT AbreviaturaProyecto, Nombre FROM dbo.Proyecto WHERE IDProyecto = @id',
+      'SELECT AbreviaturaProyecto, Nombre FROM pro_ventas.Proyecto WHERE IDProyecto = @id',
     );
   const proyecto = proyectoRs.recordset[0];
   if (!proyecto) return null;

@@ -22,7 +22,7 @@ export interface ProyectoOpcion { IDProyecto: number; AbreviaturaProyecto: strin
 
 export async function listarProyectos(db: ConnectionPool): Promise<ProyectoOpcion[]> {
   const r = await db.request().query<{ IDProyecto: number; AbreviaturaProyecto: string; Nombre: string }>(`
-    SELECT IDProyecto, AbreviaturaProyecto, Nombre FROM dbo.Proyecto ORDER BY AbreviaturaProyecto
+    SELECT IDProyecto, AbreviaturaProyecto, Nombre FROM pro_ventas.Proyecto ORDER BY AbreviaturaProyecto
   `);
   return r.recordset.map((p) => ({
     IDProyecto: Number(p.IDProyecto),
@@ -131,7 +131,7 @@ export async function liquidacionLote(db: ConnectionPool, f: LiquidacionFiltro):
     LEFT JOIN pro_ventas.Casos cs ON cs.IDCaso = lq.IDCaso
     LEFT JOIN pro_ventas.Clientes cl ON cl.IDCliente = cs.IDCliente
     LEFT JOIN pro_ventas.Lotes l ON l.IDLote = lq.IDLote
-    LEFT JOIN dbo.Proyecto pry ON pry.IDProyecto = lq.IDProyecto
+    LEFT JOIN pro_ventas.Proyecto pry ON pry.IDProyecto = lq.IDProyecto
     LEFT JOIN pro_ventas.Bancos b ON b.IDBan = cs.IDBanco
     LEFT JOIN pro_ventas.TipMovi tm ON tm.IDTmov = m.IDTipmov
     WHERE ${conds.join(' AND ')}
@@ -212,7 +212,7 @@ export async function movimientos(db: ConnectionPool, f: MovimientosFiltro): Pro
     LEFT JOIN pro_ventas.Casos csB ON csB.IDCaso = vw.IDCaso
     LEFT JOIN pro_ventas.Bancos bnk ON bnk.IDBan = csB.IDBanco
     LEFT JOIN pro_ventas.Lotes ltB ON ltB.IDLote = vw.IDLote
-    LEFT JOIN dbo.Proyecto pry ON pry.IDProyecto = ltB.IDProyecto
+    LEFT JOIN pro_ventas.Proyecto pry ON pry.IDProyecto = ltB.IDProyecto
     ${joinBanco} ${joinProyecto}
     WHERE ${conds.join(' AND ')}
     ORDER BY vw.FechaRealizado DESC, vw.IDMovimiento DESC;

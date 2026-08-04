@@ -9,7 +9,7 @@ import { sql } from '@/lib/db-adelantedb';
  *     vigente del banco (sp_migrar_caso_a_esquema_vigente).
  *
  * Tablas/vistas: [pro_app].vw_casos_activos, pro_ventas.Casos, pro_ventas.Clientes, pro_ventas.Lotes,
- * dbo.Proyecto, pro_ventas.Bancos.
+ * pro_ventas.Proyecto, pro_ventas.Bancos.
  */
 
 // --------------------------------------------------------------------- Tipos
@@ -179,7 +179,7 @@ export async function buscarCasos(
       FROM pro_ventas.Casos cs
       LEFT JOIN pro_ventas.Clientes cl ON cl.IDCliente = cs.IDCliente
       LEFT JOIN pro_ventas.Lotes l ON l.IDLote = cs.IDLote
-      LEFT JOIN dbo.Proyecto p ON p.IDProyecto = l.IDProyecto
+      LEFT JOIN pro_ventas.Proyecto p ON p.IDProyecto = l.IDProyecto
       LEFT JOIN pro_ventas.Bancos b ON b.IDBan = cs.IDBanco
       WHERE (cs.DetCaso LIKE @q
          OR cl.NombreCompleto LIKE @q

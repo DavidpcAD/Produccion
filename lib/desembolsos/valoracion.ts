@@ -77,7 +77,7 @@ export async function listarBancos(db: ConnectionPool): Promise<Banco[]> {
 export async function valoracionPorProyecto(db: ConnectionPool, idProyecto: number): Promise<RespuestaValoracion | null> {
   const proyectoRs = await db.request().input('id', sql.Int, idProyecto)
     .query<{ AbreviaturaProyecto: string; Nombre: string }>(
-      `SELECT AbreviaturaProyecto, Nombre FROM dbo.Proyecto WHERE IDProyecto = @id`);
+      `SELECT AbreviaturaProyecto, Nombre FROM pro_ventas.Proyecto WHERE IDProyecto = @id`);
   const proyecto = proyectoRs.recordset[0];
   if (!proyecto) return null;
 
@@ -204,7 +204,7 @@ export async function crearValoracion(db: ConnectionPool, i: CrearValoracionInpu
     .input('UsuarioEmail', sql.NVarChar(200), i.UsuarioEmail)
     .query<{ IDValoracionCreada: number; IDValoracionCerrada: number | null }>(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
-      IF NOT EXISTS (SELECT 1 FROM dbo.Proyecto WHERE IDProyecto = @IDProyecto)
+      IF NOT EXISTS (SELECT 1 FROM pro_ventas.Proyecto WHERE IDProyecto = @IDProyecto)
         THROW 51200, 'IDProyecto inválido o no existe.', 1;
       IF NOT EXISTS (SELECT 1 FROM pro_ventas.Bancos WHERE IDBan = @IDBan)
         THROW 51201, 'IDBan inválido o no existe.', 1;
@@ -278,7 +278,7 @@ export async function editarVigente(db: ConnectionPool, i: EditarVigenteInput): 
     .input('UsuarioEmail', sql.NVarChar(200), i.UsuarioEmail)
     .query<{ IDValoracionEditada: number }>(`
       SET NOCOUNT ON; SET XACT_ABORT ON;
-      IF NOT EXISTS (SELECT 1 FROM dbo.Proyecto WHERE IDProyecto = @IDProyecto)
+      IF NOT EXISTS (SELECT 1 FROM pro_ventas.Proyecto WHERE IDProyecto = @IDProyecto)
         THROW 51700, 'IDProyecto inválido o no existe.', 1;
       IF NOT EXISTS (SELECT 1 FROM pro_ventas.Bancos WHERE IDBan = @IDBan)
         THROW 51701, 'IDBan inválido o no existe.', 1;

@@ -21,7 +21,7 @@ import type { EstadoObra, EstadoVenta, TipoCasa } from '@/lib/avance/types';
  * avance_base_semanal, cierres_produccion, cierre_produccion_snapshots,
  * sub_partidas, sub_partida_tipos, sub_partida_pesos_sprint/_partida, obra_pesos,
  * partidas, tipo_casa_sprints, plan_semanal, sprints_cerrados, vw_obras. Además
- * pro_bi.fact_presupuesto (presupuesto/venta/indirecto) y dbo.V_CasosActivos (venta).
+ * pro_bi.fact_presupuesto (presupuesto/venta/indirecto) y pro_ventas.V_CasosActivos (venta).
  */
 
 // --------------------------------------------------------------------- Tipos
@@ -286,7 +286,7 @@ export async function calcularReporteSemanal(
   const esAbierta = semana.estado === 'abierta';
 
   // 3) Obras del reporte. Estado de venta AS-OF la semana reconstruido desde las
-  //    fechas del caso de venta vigente (dbo.V_CasosActivos).
+  //    fechas del caso de venta vigente (pro_ventas.V_CasosActivos).
   const ventaCase = `CASE
           WHEN cv.FechaEntrega IS NOT NULL AND cv.FechaEntrega <= @fechaFin THEN 'entregada'
           WHEN cv.FechaFormalizacion IS NOT NULL AND cv.FechaFormalizacion <= @fechaFin THEN 'formalizada'
@@ -297,7 +297,7 @@ export async function calcularReporteSemanal(
           SELECT IDBD, FechaFormalizacion, FechaEntrega, FechaCreacion FROM (
             SELECT IDBD, FechaFormalizacion, FechaEntrega, FechaCreacion,
                    ROW_NUMBER() OVER (PARTITION BY IDBD ORDER BY IDCaso DESC) rn
-            FROM dbo.V_CasosActivos WHERE IDBD IS NOT NULL
+            FROM pro_ventas.V_CasosActivos WHERE IDBD IS NOT NULL
           ) z WHERE rn = 1
         ) cv ON cv.IDBD COLLATE DATABASE_DEFAULT = ${obraKey} COLLATE DATABASE_DEFAULT`;
 

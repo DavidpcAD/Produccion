@@ -164,7 +164,7 @@ export async function listarEnRango(db: ConnectionPool, desde: string, hasta: st
       INNER JOIN pro_ventas.Casos cs ON cs.IDCaso = v.IDCaso
       LEFT JOIN pro_ventas.Clientes cl ON cl.IDCliente = cs.IDCliente
       LEFT JOIN pro_ventas.Lotes lt ON lt.IDLote = cs.IDLote
-      LEFT JOIN dbo.Proyecto p ON p.IDProyecto = lt.IDProyecto
+      LEFT JOIN pro_ventas.Proyecto p ON p.IDProyecto = lt.IDProyecto
       LEFT JOIN pro_ventas.Movimientos m ON m.IDMovimiento = v.IDMovimientoVinculado
       WHERE v.FechaPlaneada >= @desde AND v.FechaPlaneada <= @hasta
       ORDER BY v.FechaPlaneada, v.IDPago;

@@ -13,7 +13,7 @@ export type EstadoObra =
   | 'inactiva'
   | 'finalizada';
 
-/** Estado de venta de la casa (de dbo.V_CasosActivos). */
+/** Estado de venta de la casa (de pro_ventas.V_CasosActivos). */
 export type EstadoVenta = 'formalizada' | 'reservada' | 'disponible' | 'entregada';
 
 /** Estado de avance visual de una sub-partida. */
