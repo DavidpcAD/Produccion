@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -30,20 +30,33 @@ export default function AvancePage() {
   const [ventaFiltro, setVentaFiltro] = useState<EstadoVenta | null>(null);
   const [vista, setVista] = useState<Vista>('lista');
 
-  // Vista inicial desde ?vista= (para que «Kanban de avance» del sidebar abra
-  // directo). Sin useSearchParams para no forzar Suspense en el build.
+  // Filtros persistidos en la URL (vista, proyecto, búsqueda, venta) para que al
+  // entrar a una obra y volver (back) NO se pierda el filtro. También hace que
+  // «Kanban de avance» del sidebar abra directo con ?vista=kanban. Sin
+  // useSearchParams para no forzar Suspense en el build.
+  const hydrated = useRef(false);
   useEffect(() => {
-    const v = new URLSearchParams(window.location.search).get('vista');
-    if (v && (VISTAS as string[]).includes(v)) setVista(v as Vista);
+    const sp = new URLSearchParams(window.location.search);
+    const v = sp.get('vista'); if (v && (VISTAS as string[]).includes(v)) setVista(v as Vista);
+    const p = sp.get('proyecto'); if (p) setProyectoSel(p);
+    const q = sp.get('q'); if (q) setBusqueda(q);
+    const venta = sp.get('venta'); if (venta) setVentaFiltro(venta as EstadoVenta);
+    hydrated.current = true;
   }, []);
 
-  function changeVista(v: Vista) {
-    setVista(v);
+  // Escribir los filtros a la URL cuando cambian (después de hidratar).
+  useEffect(() => {
+    if (!hydrated.current) return;
     const url = new URL(window.location.href);
-    if (v === 'lista') url.searchParams.delete('vista');
-    else url.searchParams.set('vista', v);
+    const put = (k: string, val: string) => { if (val) url.searchParams.set(k, val); else url.searchParams.delete(k); };
+    put('vista', vista === 'lista' ? '' : vista);
+    put('proyecto', proyectoSel ?? '');
+    put('q', busqueda.trim());
+    put('venta', ventaFiltro ?? '');
     window.history.replaceState(null, '', url.toString());
-  }
+  }, [vista, proyectoSel, busqueda, ventaFiltro]);
+
+  const changeVista = (v: Vista) => setVista(v);
 
   useEffect(() => {
     fetch('/api/avance/proyectos')
