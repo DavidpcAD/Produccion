@@ -44,3 +44,7 @@ deploy-package/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Build artifact (no versionar)
+deploy-package.zip
+deploy-package/
