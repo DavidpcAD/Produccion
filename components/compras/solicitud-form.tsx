@@ -14,7 +14,7 @@ import { Combobox } from "@/components/compras/combobox";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
 
-interface DraftLine { key: string; articuloId: string; obraCodigo: string; obraNombre: string; variantCode: string; variantNombre: string; cantidad: string; }
+interface DraftLine { key: string; articuloId: string; obraCodigo: string; obraNombre: string; variantCode: string; variantNombre: string; cantidad: string; cantidadPlantilla?: number; }
 type Variante = { code: string; descripcion: string };
 
 // Personas que pueden solicitar material (rol Ingeniería).
@@ -337,6 +337,7 @@ export function SolicitudForm({
         obraNombre: o?.nombre ?? "",
         variantCode: "", variantNombre: "",
         cantidad: it.cantidad > 0 ? String(it.cantidad) : "",
+        cantidadPlantilla: it.cantidad > 0 ? it.cantidad : undefined,
       });
     }
     return { nuevas, sinMatch };
@@ -572,6 +573,27 @@ export function SolicitudForm({
     return rows.reduce((a, e) => a + e.cantidad, 0);
   }
 
+  // Sugerido para pedidos a bodega armados desde plantilla: cuánto conviene pedir =
+  // lo que pide la plantilla menos lo que ya hay en stock (nunca negativo). null si
+  // no hay referencia de plantilla o no llegó el stock de BC.
+  function sugeridoDeLinea(l: DraftLine): number | null {
+    const ref = l.cantidadPlantilla;
+    const st = stockDeLinea(l);
+    if (ref == null || typeof st !== "number") return null;
+    return Math.max(0, ref - st);
+  }
+  const mostrarSugerido = esStock && lineas.some((l) => l.cantidadPlantilla != null);
+  function aplicarSugerencias() {
+    let n = 0;
+    setLineas((ls) => ls.map((l) => {
+      const s = sugeridoDeLinea(l);
+      if (s == null) return l;
+      n++;
+      return { ...l, cantidad: String(s) };
+    }));
+    toast(n ? `Cantidades ajustadas a lo sugerido en ${n} línea(s) (plantilla − stock).` : "Sin sugerencias que aplicar (falta stock de BC).", n ? "success" : "info");
+  }
+
   return (
     <>
       {planContexto && (
@@ -740,6 +762,11 @@ export function SolicitudForm({
         )}
         </div>
 
+        {mostrarSugerido && (
+          <div className="row" style={{ justifyContent: "flex-end", marginTop: 10 }}>
+            <button type="button" className="link-btn" onClick={aplicarSugerencias}>Aplicar sugerencias a todas las cantidades</button>
+          </div>
+        )}
         <div className="ds-table-wrap mt-4" style={{ boxShadow: "none", border: "1.5px solid var(--ds-color-gray-100)" }}>
           <table className="ds-table">
             <thead>
@@ -748,6 +775,7 @@ export function SolicitudForm({
                 {esMaterial && <th style={{ width: 240 }}>Obra</th>}
                 <th style={{ width: 220 }}>Variante</th>
                 {esStock && <th className="ds-num" style={{ width: 110 }}>Stock BC</th>}
+                {mostrarSugerido && <th className="ds-num" style={{ width: 132 }}>Sugerido</th>}
                 <th className="ds-num" style={{ width: 110 }}>Cantidad</th><th style={{ width: 90 }}>Unidad</th><th style={{ width: 48 }}></th>
               </tr>
             </thead>
@@ -792,6 +820,19 @@ export function SolicitudForm({
                             : st === null
                               ? <span className="ds-muted" title="Sin conexión a Business Central">s/d</span>
                               : <span className={st > 0 ? "ds-strong" : "ds-muted"}>{st.toLocaleString("es-CR")}</span>}
+                        </td>
+                      );
+                    })()}
+                    {mostrarSugerido && (() => {
+                      const s = sugeridoDeLinea(l);
+                      return (
+                        <td className="ds-num">
+                          {s == null
+                            ? <span className="ds-muted" title="Sin referencia de plantilla o sin stock de BC">—</span>
+                            : <>
+                                <span className={s > 0 ? "ds-strong" : "ds-muted"} title={`Plantilla ${l.cantidadPlantilla} − stock actual`}>{s.toLocaleString("es-CR")}</span>
+                                {Number(l.cantidad) !== s && <button type="button" className="link-btn" style={{ marginLeft: 8 }} onClick={() => setLineCantidad(l.key, String(s))}>usar</button>}
+                              </>}
                         </td>
                       );
                     })()}
