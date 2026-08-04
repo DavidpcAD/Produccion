@@ -108,7 +108,7 @@ export default function ClasificacionesPage() {
               </div>
               {s.partidas.map(({ partida, items }) => (
                 <Card key={partida.id} style={{ padding: 0, overflow: "hidden" }}>
-                  <div className="row gap-3" style={{ alignItems: "center", padding: "10px 16px", borderBottom: "1.5px solid var(--ds-color-gray-100)", background: "color-mix(in srgb, var(--ds-color-green-100) 7%, #fff)" }}>
+                  <div className="row gap-3" style={{ alignItems: "center", padding: "10px 16px", borderBottom: "1.5px solid var(--ds-color-gray-100)", background: "color-mix(in srgb, var(--ds-color-green-100) 7%, var(--ds-tint-base))" }}>
                     <span className="ds-muted ds-body-sm" style={{ fontFamily: "monospace" }}>{partida.codigo}</span>
                     <span className="ds-strong">{partida.nombre}</span>
                     <span className="ds-muted ds-body-sm" style={{ marginLeft: "auto" }}>{items.length}</span>

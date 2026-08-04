@@ -96,7 +96,7 @@ export default function ProveeduriaLineasPedidasPage() {
 
       {/* Reporte imprimible (usa el filtro de estado) */}
       <div className="print-report">
-        <div style={{ fontFamily: '"Segoe UI",Roboto,system-ui,sans-serif', color: "var(--ds-color-black)", fontSize: 11 }}>
+        <div style={{ fontFamily: '"Segoe UI",Roboto,system-ui,sans-serif', color: "var(--ds-text)", fontSize: 11 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid var(--ds-color-black)", paddingBottom: 12 }}>
             <div style={{ fontWeight: 800, letterSpacing: 1, color: "var(--ds-color-green-200)", fontSize: 13, lineHeight: 1 }}>ADELANTE<br /><span style={{ fontSize: 8, letterSpacing: 3, color: "var(--ds-color-gray-400)" }}>DESARROLLOS</span></div>
             <div style={{ textAlign: "right" }}>

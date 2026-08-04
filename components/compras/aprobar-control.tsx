@@ -126,16 +126,16 @@ export function AprobarControl({ onApprove, onReject, approveLabel = 'Aprobar', 
                 initial={{ scale: 0.9, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 12 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-sm rounded-ds-lg bg-white shadow-ds-03 p-5 text-center select-none"
+                className="w-full max-w-sm rounded-ds-lg bg-ds-surface shadow-ds-03 p-5 text-center select-none"
               >
                 <p className="text-ds-gray-400 text-body-sm mb-1">Orden seleccionada</p>
-                <p className="text-black font-bold text-sub-sm leading-tight">{title ?? 'Orden'}</p>
+                <p className="text-ds-ink font-bold text-sub-sm leading-tight">{title ?? 'Orden'}</p>
                 <p className="text-ds-gray-400 text-body-sm mt-3">Arrastrá hasta una opción y soltá (o tocá):</p>
               </motion.div>
 
               <div className="flex items-stretch gap-4 w-full max-w-sm select-none" onClick={(e) => e.stopPropagation()}>
                 <button ref={rejectRef} type="button" onClick={() => { setOpen(false); onReject?.(); }} className={optBtn('reject')}>
-                  <span className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center"><Icon name="close" size="md" color="currentColor" /></span>
+                  <span className="w-11 h-11 rounded-full bg-ds-surface/20 flex items-center justify-center"><Icon name="close" size="md" color="currentColor" /></span>
                   {rejectLabel}
                 </button>
                 <button ref={approveRef} type="button" onClick={() => { setOpen(false); onApprove(); }} className={optBtn('approve')}>

@@ -68,6 +68,24 @@
   --st-done: var(--ds-color-green-200);
 }
 
+/* Tema oscuro dentro del scope de Compras: .oc-scope redefine sus propios
+   --ds-color-* localmente, así que los overrides de :root[data-theme=dark] no la
+   alcanzan. Re-aplicamos acá la superficie + rampa de grises invertida + sombras.
+   Blanco/negro y colores de marca (green/yellow/red) quedan literales. Los tokens
+   semánticos (--ds-surface/--ds-text/--ds-tint-base) NO los redefine .oc-scope, así
+   que ya llegan oscuros desde :root. */
+:root[data-theme="dark"] .oc-scope {
+  --ds-color-surface: #16181d;
+  --ds-color-gray-100: #2c313c;
+  --ds-color-gray-200: #3a4150;
+  --ds-color-gray-300: #6b7280;
+  --ds-color-gray-400: #9aa1ad;
+  --ds-color-gray-500: #c3c8d1;
+  --ds-shadow-01: 0 4px 8px #00000059;
+  --ds-shadow-02-soft: 0 0 6px #00000066;
+  --ds-shadow-03-big: 0 2px 4px #0000006b, 0 0 6px #0000006b;
+}
+
 .oc-scope * { box-sizing: border-box; }
 
 .oc-scope, .oc-scope {
@@ -76,7 +94,7 @@
   font-family: var(--ds-font-family);
   font-size: var(--ds-font-size-body-md);
   line-height: var(--ds-line-height-body-md);
-  color: var(--ds-color-black);
+  color: var(--ds-text);
   background: var(--ds-color-surface);
   -webkit-font-smoothing: antialiased;
 }
@@ -131,7 +149,7 @@
 /* Colores (DS: green / red / white / black / gray) */
 .oc-scope .ds-btn--green { background: var(--ds-color-green-100); color: var(--ds-color-black); }
 .oc-scope .ds-btn--red { background: var(--ds-color-red-100);   color: var(--ds-color-white); }
-.oc-scope .ds-btn--white { background: var(--ds-color-white);     color: var(--ds-color-black); }
+.oc-scope .ds-btn--white { background: var(--ds-surface);     color: var(--ds-text); }
 .oc-scope .ds-btn--black { background: var(--ds-color-black);     color: var(--ds-color-white); }
 .oc-scope .ds-btn--yellow { background: var(--ds-color-yellow);    color: var(--ds-color-black); }
 
@@ -143,12 +161,12 @@
 .oc-scope .ds-btn--yellow:active, .oc-scope .ds-btn--yellow.ds-btn--pressed { box-shadow: 0 0 0 8px var(--ds-color-green-200), var(--ds-shadow-03-big); }
 
 /* ghost = botón blanco del DS (secundario neutro) */
-.oc-scope .ds-btn--ghost { background: var(--ds-color-white); color: var(--ds-color-black); box-shadow: var(--ds-shadow-02-soft); }
+.oc-scope .ds-btn--ghost { background: var(--ds-surface); color: var(--ds-text); box-shadow: var(--ds-shadow-02-soft); }
 .oc-scope .ds-btn--ghost:active, .oc-scope .ds-btn--ghost.ds-btn--pressed { box-shadow: 0 0 0 8px var(--ds-color-surface), var(--ds-shadow-02-soft); }
 
 /* outline = baja énfasis (borde gris, sin sombra) — mantiene el press-ring del DS */
 .oc-scope .ds-btn--outline { background: transparent; color: var(--ds-color-gray-500); box-shadow: none; border: 1.5px solid var(--ds-color-gray-200); }
-.oc-scope .ds-btn--outline:hover { border-color: var(--ds-color-gray-400); color: var(--ds-color-black); }
+.oc-scope .ds-btn--outline:hover { border-color: var(--ds-color-gray-400); color: var(--ds-text); }
 .oc-scope .ds-btn--outline:active, .oc-scope .ds-btn--outline.ds-btn--pressed { box-shadow: 0 0 0 8px var(--ds-color-gray-100); }
 
 /* Tamaños (DS: sm = 44px, radius-xl, shadow-01) */
@@ -169,15 +187,15 @@
 .oc-scope .ds-form-field__label {
   font-size: var(--ds-font-size-label);
   line-height: var(--ds-line-height-label);
-  color: var(--ds-color-black);
+  color: var(--ds-text);
   font-weight: var(--ds-font-weight-semibold);
   padding-left: var(--ds-space-2);
 }
 .oc-scope .ds-form-field__input-wrap { position: relative; display: flex; align-items: center; }
 .oc-scope .ds-form-field__input, .oc-scope .ds-form-field__select, .oc-scope .ds-form-field textarea {
   width: 100%;
-  background: var(--ds-color-white);
-  color: var(--ds-color-black);
+  background: var(--ds-surface);
+  color: var(--ds-text);
   border: 2px solid transparent;
   border-radius: var(--ds-radius-xl);
   box-shadow: var(--ds-shadow-01);
@@ -192,7 +210,7 @@
 .oc-scope .ds-form-field__input::placeholder, .oc-scope .ds-form-field textarea::placeholder { color: var(--ds-color-gray-300); }
 /* Foco / activo (DS --active) — borde negro, sin sombra */
 .oc-scope .ds-form-field__input:focus, .oc-scope .ds-form-field__select:focus, .oc-scope .ds-form-field textarea:focus, .oc-scope .ds-form-field--active .ds-form-field__input {
-  border-color: var(--ds-color-black);
+  border-color: var(--ds-text);
   box-shadow: none;
 }
 /* Válido (DS --x) — borde verde */
@@ -215,7 +233,7 @@
      design-system.css, que se filtraba y dejaba las tarjetas de compras angostas
      en PC. Acá las tarjetas deben ocupar todo el ancho de su contenedor. */
   width: auto;
-  background: var(--ds-color-white);
+  background: var(--ds-surface);
   border-radius: var(--ds-radius-lg);
   /* border + shadow-01 para igualar a las tarjetas del resto del app. */
   border: 1px solid var(--ds-color-gray-200);
@@ -240,9 +258,9 @@
 }
 .oc-scope .ds-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .oc-scope .ds-badge--gray { background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); }
-.oc-scope .ds-badge--green { background: color-mix(in srgb, var(--ds-color-green-100) 22%, #fff); color: var(--ds-color-green-200); }
-.oc-scope .ds-badge--yellow { background: color-mix(in srgb, var(--ds-color-yellow) 26%, #fff); color: #8a7400; }
-.oc-scope .ds-badge--red { background: color-mix(in srgb, var(--ds-color-red-100) 22%, #fff); color: var(--ds-color-red-200); }
+.oc-scope .ds-badge--green { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
+.oc-scope .ds-badge--yellow { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
+.oc-scope .ds-badge--red { background: color-mix(in srgb, var(--ds-color-red-100) 22%, var(--ds-tint-base)); color: var(--ds-color-red-200); }
 .oc-scope .ds-badge--blueish { background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); }
 
 /* =====================  QUANTITY SELECTOR (ring)  ===================== */
@@ -291,7 +309,7 @@
 .oc-scope .ds-progress--compact .ds-progress__track { width: 70px; height: 8px; }
 
 /* =====================  TABLE  ===================== */
-.oc-scope .ds-table-wrap { width: 100%; overflow-x: auto; border-radius: var(--ds-radius-lg); background: var(--ds-color-white); box-shadow: var(--ds-shadow-01); }
+.oc-scope .ds-table-wrap { width: 100%; overflow-x: auto; border-radius: var(--ds-radius-lg); background: var(--ds-surface); box-shadow: var(--ds-shadow-01); }
 .oc-scope .ds-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--ds-font-size-label); }
 /* Encabezado oscuro redondeado — mismo estilo en TODAS las tablas (como el DataTable). */
 .oc-scope .ds-table thead th {
@@ -306,11 +324,11 @@
 .oc-scope .ds-table tbody tr:last-child td { border-bottom: 0; }
 .oc-scope .ds-table tbody tr.is-clickable { cursor: pointer; transition: background-color .12s ease; }
 .oc-scope .ds-table tbody tr.is-clickable:hover { background: var(--ds-color-gray-100); }
-.oc-scope .ds-table tbody tr.row-pending td { background: color-mix(in srgb, var(--ds-color-red-100) 8%, #fff); }
+.oc-scope .ds-table tbody tr.row-pending td { background: color-mix(in srgb, var(--ds-color-red-100) 8%, var(--ds-tint-base)); }
 /* Solicitudes en borrador (sin enviar): acento amarillo + tinte para que se noten */
-.oc-scope .ds-table tbody tr.row-borrador td { background: color-mix(in srgb, var(--ds-color-yellow) 10%, #fff); }
+.oc-scope .ds-table tbody tr.row-borrador td { background: color-mix(in srgb, var(--ds-color-yellow) 10%, var(--ds-tint-base)); }
 .oc-scope .ds-table tbody tr.row-borrador td:first-child { box-shadow: inset 3px 0 0 var(--ds-color-yellow); font-weight: var(--ds-font-weight-semibold); }
-.oc-scope .ds-table tbody tr.row-borrador.is-clickable:hover td { background: color-mix(in srgb, var(--ds-color-yellow) 18%, #fff); }
+.oc-scope .ds-table tbody tr.row-borrador.is-clickable:hover td { background: color-mix(in srgb, var(--ds-color-yellow) 18%, var(--ds-tint-base)); }
 .oc-scope .ds-card.row-borrador { box-shadow: inset 3px 0 0 var(--ds-color-yellow), var(--ds-shadow-01); }
 .oc-scope .ds-num { text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -368,10 +386,10 @@
 .oc-scope .combo__chev { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--ds-color-gray-400); pointer-events: none; display: inline-flex; transition: transform .15s ease; }
 .oc-scope .combo__chev.is-open { transform: translateY(-50%) rotate(180deg); }
 /* El menú va en un portal (position:fixed): NO lo recorta ningún overflow. */
-.oc-scope .combo__menu { z-index: 60; max-height: 300px; overflow-y: auto; background: #fff; border: 1.5px solid var(--ds-color-gray-200); border-radius: var(--ds-radius-lg); box-shadow: 0 10px 30px #0000002a; padding: 4px; }
-.oc-scope .combo__item { display: flex; align-items: center; min-height: 42px; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: var(--ds-font-size-label); color: var(--ds-color-black); }
-.oc-scope .combo__item:hover { background: color-mix(in srgb, var(--ds-color-green-100) 12%, #fff); }
-.oc-scope .combo__item.is-active { background: color-mix(in srgb, var(--ds-color-green-100) 26%, #fff); font-weight: var(--ds-font-weight-semibold); }
+.oc-scope .combo__menu { z-index: 60; max-height: 300px; overflow-y: auto; background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-200); border-radius: var(--ds-radius-lg); box-shadow: 0 10px 30px #0000002a; padding: 4px; }
+.oc-scope .combo__item { display: flex; align-items: center; min-height: 42px; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: var(--ds-font-size-label); color: var(--ds-text); }
+.oc-scope .combo__item:hover { background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-tint-base)); }
+.oc-scope .combo__item.is-active { background: color-mix(in srgb, var(--ds-color-green-100) 26%, var(--ds-tint-base)); font-weight: var(--ds-font-weight-semibold); }
 .oc-scope .combo__item small { color: var(--ds-color-gray-400); }
 /* Encabezado de grupo dentro del menú */
 .oc-scope .combo__group { padding: 10px 12px 5px; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ds-color-gray-400); }
@@ -381,20 +399,20 @@
 .oc-scope .combo__row-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .oc-scope .combo__row-main > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oc-scope .combo__tag { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
-.oc-scope .combo__tag--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, #fff); color: #8a7400; }
-.oc-scope .combo__tag--general { background: color-mix(in srgb, var(--ds-color-green-100) 22%, #fff); color: var(--ds-color-green-200); }
+.oc-scope .combo__tag--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
+.oc-scope .combo__tag--general { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
 .oc-scope .combo__empty { padding: 10px 12px; color: var(--ds-color-gray-400); font-size: var(--ds-font-size-body-sm); }
-.oc-scope .combo__more { padding: 7px 12px; color: var(--ds-color-gray-400); font-size: 11px; border-top: 1px solid var(--ds-color-gray-100); position: sticky; bottom: 0; background: #fff; }
+.oc-scope .combo__more { padding: 7px 12px; color: var(--ds-color-gray-400); font-size: 11px; border-top: 1px solid var(--ds-color-gray-100); position: sticky; bottom: 0; background: var(--ds-surface); }
 
 /* Caja del área de agregar materiales (obra + quick-add) */
-.oc-scope .qa-box { margin-top: 4px; padding: 14px; border: 1.5px solid var(--ds-color-gray-100); border-radius: 14px; background: var(--ds-color-white); }
+.oc-scope .qa-box { margin-top: 4px; padding: 14px; border: 1.5px solid var(--ds-color-gray-100); border-radius: 14px; background: var(--ds-surface); }
 @media (max-width: 640px) { .oc-scope .qa-row { grid-template-columns: 1fr; } }
 
 /* Detalle expandible de una factura (proveeduría) */
-.oc-scope .fac-det { margin: 2px 0 6px; background: var(--ds-color-white); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-01); overflow: hidden; }
+.oc-scope .fac-det { margin: 2px 0 6px; background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-01); overflow: hidden; }
 .oc-scope .fac-det__head { display: flex; justify-content: space-between; align-items: center; gap: var(--ds-space-3); padding: var(--ds-space-3) var(--ds-space-4); background: var(--ds-color-surface); border-bottom: 1px solid var(--ds-color-gray-100); }
 .oc-scope .fac-det__grid { display: grid; grid-template-columns: 1fr 96px 150px 150px; gap: var(--ds-space-3); align-items: center; padding: var(--ds-space-3) var(--ds-space-4); border-bottom: 1px solid var(--ds-color-gray-100); }
-.oc-scope .fac-det__colhead { color: var(--ds-color-gray-500); font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-body-sm); background: color-mix(in srgb, var(--ds-color-surface) 60%, #fff); }
+.oc-scope .fac-det__colhead { color: var(--ds-color-gray-500); font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-body-sm); background: color-mix(in srgb, var(--ds-color-surface) 60%, var(--ds-tint-base)); }
 .oc-scope .fac-det__num { text-align: right; font-variant-numeric: tabular-nums; }
 .oc-scope .fac-det__total { display: grid; grid-template-columns: 1fr 150px; gap: var(--ds-space-3); padding: var(--ds-space-3) var(--ds-space-4); background: var(--ds-color-surface); font-weight: var(--ds-font-weight-semibold); }
 
@@ -409,14 +427,14 @@
 /* ── Filtro por columna: botón + popover (buscador + checkboxes) ── */
 .oc-scope .dt-filter-btn {
   display: inline-flex; align-items: center; gap: 5px; width: 100%; justify-content: flex-start;
-  border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white);
+  border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-surface);
   border-radius: var(--ds-radius-md); padding: 5px 8px; cursor: pointer;
   font-family: inherit; font-size: var(--ds-font-size-label); color: var(--ds-color-gray-400);
   white-space: nowrap; transition: border-color .12s, color .12s, background .12s;
 }
 .oc-scope .dt-filter-btn:hover { border-color: var(--ds-color-green-100); color: var(--ds-color-black); }
 .oc-scope .dt-filter-btn__ico { display: inline-flex; color: currentColor; }
-.oc-scope .dt-filter-btn.is-active { border-color: var(--ds-color-green-200); color: var(--ds-color-black); background: color-mix(in srgb, var(--ds-color-green-100) 14%, #fff); font-weight: var(--ds-font-weight-semibold); }
+.oc-scope .dt-filter-btn.is-active { border-color: var(--ds-color-green-200); color: var(--ds-color-black); background: color-mix(in srgb, var(--ds-color-green-100) 14%, var(--ds-tint-base)); font-weight: var(--ds-font-weight-semibold); }
 .oc-scope .dt-filter-btn.is-open { border-color: var(--ds-color-green-200); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-color-green-100) 20%, transparent); }
 
 .oc-scope .dt-filter-scrim { position: fixed; inset: 0; z-index: 60; background: transparent; }
@@ -424,24 +442,24 @@
   position: fixed; z-index: 61; width: 300px; display: flex; flex-direction: column; gap: 8px;
 }
 .oc-scope .dt-filter-pop__search {
-  background: var(--ds-color-white); border-radius: 999px; box-shadow: var(--ds-shadow-02, 0 6px 20px rgba(0,0,0,.14));
+  background: var(--ds-surface); border-radius: 999px; box-shadow: var(--ds-shadow-02, 0 6px 20px rgba(0,0,0,.14));
   padding: 4px 6px;
 }
 .oc-scope .dt-filter-pop__search input {
   width: 100%; border: none; outline: none; background: transparent; font-family: inherit;
-  font-size: 14px; color: var(--ds-color-black); padding: 8px 12px;
+  font-size: 14px; color: var(--ds-text); padding: 8px 12px;
 }
 .oc-scope .dt-filter-pop__list {
-  background: var(--ds-color-white); border-radius: var(--ds-radius-xl, 18px);
+  background: var(--ds-surface); border-radius: var(--ds-radius-xl, 18px);
   box-shadow: var(--ds-shadow-02, 0 6px 20px rgba(0,0,0,.14)); padding: 6px 0;
   max-height: 300px; overflow-y: auto; display: flex; flex-direction: column;
 }
 .oc-scope .dt-filter-row {
   display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 16px;
   border: none; background: transparent; cursor: pointer; font: inherit; font-size: 14px;
-  color: var(--ds-color-black); text-align: left; transition: background .12s;
+  color: var(--ds-text); text-align: left; transition: background .12s;
 }
-.oc-scope .dt-filter-row:hover { background: color-mix(in srgb, var(--ds-color-green-100) 12%, #fff); }
+.oc-scope .dt-filter-row:hover { background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-tint-base)); }
 .oc-scope .dt-filter-row .dt-strong { font-weight: var(--ds-font-weight-semibold); }
 .oc-scope .dt-filter-empty { padding: 10px 16px; color: var(--ds-color-gray-400); font-size: 13px; }
 .oc-scope .dt-check {
@@ -449,7 +467,7 @@
   display: inline-flex; align-items: center; justify-content: center; color: var(--ds-color-white);
   font-size: 14px; font-weight: 700; transition: background .12s, border-color .12s;
 }
-.oc-scope .dt-check.is-checked { background: var(--ds-color-black); border-color: var(--ds-color-black); }
+.oc-scope .dt-check.is-checked { background: var(--ds-color-black); border-color: var(--ds-text); }
 
 /* Checkbox nativo estilo DS (form--overview): cuadrado redondeado, borde gris;
    marcado = negro con check blanco. Reutilizable en cualquier <input type=checkbox>. */
@@ -457,7 +475,7 @@
   appearance: none; -webkit-appearance: none;
   flex-shrink: 0; width: 22px; height: 22px; margin: 0;
   border-radius: 6px; border: 2px solid var(--ds-color-gray-300);
-  background: var(--ds-color-white); cursor: pointer;
+  background: var(--ds-surface); cursor: pointer;
   display: inline-grid; place-content: center;
   transition: background .12s, border-color .12s;
 }
@@ -466,7 +484,7 @@
   border-left: 2.5px solid var(--ds-color-white); border-bottom: 2.5px solid var(--ds-color-white);
   transform: rotate(-45deg) translateY(-1px); opacity: 0; transition: opacity .1s;
 }
-.oc-scope .ds-cbx:checked { background: var(--ds-color-black); border-color: var(--ds-color-black); }
+.oc-scope .ds-cbx:checked { background: var(--ds-color-black); border-color: var(--ds-text); }
 .oc-scope .ds-cbx:checked::after { opacity: 1; }
 .oc-scope .ds-cbx:hover:not(:disabled) { border-color: var(--ds-color-gray-400); }
 .oc-scope .ds-cbx:disabled { opacity: .45; cursor: not-allowed; }
@@ -474,15 +492,15 @@
 /* Filtro de fecha (rango): chips + inputs Desde/Hasta */
 .oc-scope .dt-date-quick { display: flex; gap: 6px; flex-wrap: wrap; }
 .oc-scope .dt-date-quick button {
-  flex: 1; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white);
+  flex: 1; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-surface);
   border-radius: 999px; padding: 6px 8px; font: inherit; font-size: 12px; font-weight: var(--ds-font-weight-semibold);
-  color: var(--ds-color-black); cursor: pointer; white-space: nowrap; transition: border-color .12s, background .12s;
+  color: var(--ds-text); cursor: pointer; white-space: nowrap; transition: border-color .12s, background .12s;
 }
-.oc-scope .dt-date-quick button:hover { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 12%, #fff); }
+.oc-scope .dt-date-quick button:hover { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-tint-base)); }
 .oc-scope .dt-date-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ds-color-gray-400); }
 .oc-scope .dt-date-field input {
   border: 1.5px solid var(--ds-color-gray-200); border-radius: var(--ds-radius-md); padding: 8px 10px;
-  font: inherit; font-size: 14px; color: var(--ds-color-black); outline: none;
+  font: inherit; font-size: 14px; color: var(--ds-text); outline: none;
 }
 .oc-scope .dt-date-field input:focus { border-color: var(--ds-color-green-100); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-color-green-100) 20%, transparent); }
 .oc-scope .dt-date-clear { border: 0; background: none; color: var(--ds-color-gray-500); font: inherit; font-size: 13px; font-weight: var(--ds-font-weight-semibold); cursor: pointer; padding: 4px; align-self: flex-start; }
@@ -521,30 +539,30 @@
 @media (prefers-reduced-motion: reduce) { .oc-scope .dt-exp-btn svg { transition: none; } }
 
 /* Botón Exportar del toolbar (a la derecha) + chips CSV/PDF del menú. */
-.oc-scope .dt-export-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 18px; border-radius: var(--ds-radius-xl); border: 0; background: var(--ds-color-white); color: var(--ds-color-black); font: inherit; font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); cursor: pointer; box-shadow: var(--ds-shadow-01); transition: box-shadow .12s ease, transform .06s ease; }
+.oc-scope .dt-export-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 18px; border-radius: var(--ds-radius-xl); border: 0; background: var(--ds-surface); color: var(--ds-text); font: inherit; font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); cursor: pointer; box-shadow: var(--ds-shadow-01); transition: box-shadow .12s ease, transform .06s ease; }
 .oc-scope .dt-export-btn svg { color: var(--ds-color-green-200); }
 .oc-scope .dt-export-btn:hover, .oc-scope .dt-export-btn.is-open { box-shadow: var(--ds-shadow-03-big); }
 .oc-scope .dt-export-btn:active { transform: translateY(1px); }
 .oc-scope .dt-export-ic { display: inline-grid; place-items: center; width: 42px; height: 24px; flex-shrink: 0; border-radius: 6px; background: var(--ds-color-black); color: var(--ds-color-white); font-size: 10px; font-weight: 700; letter-spacing: .5px; }
 /* Fila marcada para incluir en la orden (armador por línea). */
-.oc-scope .ds-table tr.dt-row-incluida > td { background: color-mix(in srgb, var(--ds-color-green-100) 12%, #fff); }
+.oc-scope .ds-table tr.dt-row-incluida > td { background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-tint-base)); }
 
 /* Date picker DS (componente DateField) — calendario propio y bonito. */
 .oc-scope .datefield { position: relative; }
-.oc-scope .datefield__input { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 48px; padding: 0 18px; border: 0; border-radius: var(--ds-radius-xl); background: var(--ds-color-white); box-shadow: var(--ds-shadow-01); font: inherit; font-size: var(--ds-font-size-body); color: var(--ds-color-black); cursor: pointer; text-align: left; transition: box-shadow .12s ease; }
+.oc-scope .datefield__input { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 48px; padding: 0 18px; border: 0; border-radius: var(--ds-radius-xl); background: var(--ds-surface); box-shadow: var(--ds-shadow-01); font: inherit; font-size: var(--ds-font-size-body); color: var(--ds-text); cursor: pointer; text-align: left; transition: box-shadow .12s ease; }
 .oc-scope .datefield__input:hover, .oc-scope .datefield__input.is-open { box-shadow: var(--ds-shadow-03-big); }
 .oc-scope .datefield__input svg { color: var(--ds-color-gray-400); flex-shrink: 0; }
 .oc-scope .datefield__ph { color: var(--ds-color-gray-400); }
-.oc-scope .datefield__pop { position: absolute; z-index: 40; top: calc(100% + 8px); left: 0; width: 300px; max-width: calc(100vw - 32px); background: var(--ds-color-white); border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-03-big); padding: 14px; }
+.oc-scope .datefield__pop { position: absolute; z-index: 40; top: calc(100% + 8px); left: 0; width: 300px; max-width: calc(100vw - 32px); background: var(--ds-surface); border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-03-big); padding: 14px; }
 .oc-scope .datefield__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .oc-scope .datefield__my { font-weight: var(--ds-font-weight-semibold); text-transform: capitalize; }
 .oc-scope .datefield__nav { display: flex; gap: 4px; }
-.oc-scope .datefield__nav button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--ds-color-surface); color: var(--ds-color-black); cursor: pointer; font-size: 20px; line-height: 1; display: grid; place-items: center; transition: background .12s; }
+.oc-scope .datefield__nav button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--ds-color-surface); color: var(--ds-text); cursor: pointer; font-size: 20px; line-height: 1; display: grid; place-items: center; transition: background .12s; }
 .oc-scope .datefield__nav button:hover { background: var(--ds-color-gray-100); }
 .oc-scope .datefield__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .oc-scope .datefield__dow { margin-bottom: 4px; }
 .oc-scope .datefield__dow span { text-align: center; font-size: 11px; font-weight: 600; color: var(--ds-color-gray-400); padding: 4px 0; }
-.oc-scope .datefield__day { aspect-ratio: 1; border: 0; background: none; border-radius: 50%; cursor: pointer; font: inherit; font-size: 13px; color: var(--ds-color-black); display: grid; place-items: center; transition: background .1s, color .1s; }
+.oc-scope .datefield__day { aspect-ratio: 1; border: 0; background: none; border-radius: 50%; cursor: pointer; font: inherit; font-size: 13px; color: var(--ds-text); display: grid; place-items: center; transition: background .1s, color .1s; }
 .oc-scope .datefield__day:hover:not(:disabled) { background: var(--ds-color-surface); }
 .oc-scope .datefield__day:disabled { color: var(--ds-color-gray-200); cursor: not-allowed; }
 .oc-scope .datefield__day.is-today { box-shadow: inset 0 0 0 1.5px var(--ds-color-green-200); font-weight: 700; }
@@ -559,7 +577,7 @@
 .oc-scope .dt-exp-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .4s cubic-bezier(.22, .61, .36, 1); }
 .oc-scope .dt-exp-wrap.is-open { grid-template-rows: 1fr; }
 .oc-scope .dt-exp-clip { overflow: hidden; }
-.oc-scope .dt-exp-body { padding: 10px 14px 14px 48px; background: color-mix(in srgb, var(--ds-color-surface) 55%, #fff); opacity: 0; transform: translateY(-8px); transition: opacity .32s ease .06s, transform .4s cubic-bezier(.22, .61, .36, 1) .06s; }
+.oc-scope .dt-exp-body { padding: 10px 14px 14px 48px; background: color-mix(in srgb, var(--ds-color-surface) 55%, var(--ds-tint-base)); opacity: 0; transform: translateY(-8px); transition: opacity .32s ease .06s, transform .4s cubic-bezier(.22, .61, .36, 1) .06s; }
 .oc-scope .dt-exp-wrap.is-open .dt-exp-body { opacity: 1; transform: none; }
 .oc-scope .dt-exp-row td { background: transparent; }
 @media (prefers-reduced-motion: reduce) { .oc-scope .dt-exp-wrap, .oc-scope .dt-exp-body { transition: none; } .oc-scope .dt-exp-body { opacity: 1; transform: none; } }
@@ -567,8 +585,8 @@
 /* NavigationControls del DS: pill blanco con chevron (prev/next de la tabla) */
 .oc-scope .ds-navctrl {
   display: grid; place-items: center; width: 52px; height: 44px;
-  border: 0; border-radius: var(--ds-radius-xl); background: var(--ds-color-white);
-  box-shadow: var(--ds-shadow-03-big); color: var(--ds-color-black); cursor: pointer;
+  border: 0; border-radius: var(--ds-radius-xl); background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-03-big); color: var(--ds-text); cursor: pointer;
   transition: box-shadow 120ms ease, background 120ms ease;
 }
 .oc-scope .ds-navctrl:not(:disabled):active { box-shadow: 0 0 0 8px var(--ds-color-surface), var(--ds-shadow-03-big); }
@@ -596,7 +614,7 @@
 .oc-scope .topbar {
   position: sticky; top: 0; z-index: 50;
   margin-left: 76px; /* queda al lado del riel oscuro (76px), no encima */
-  background: var(--ds-color-white); box-shadow: var(--ds-shadow-02-soft);
+  background: var(--ds-surface); box-shadow: var(--ds-shadow-02-soft);
   display: flex; align-items: center; gap: var(--ds-space-6);
   min-height: 64px; box-sizing: border-box;
   padding: var(--ds-space-3) var(--ds-space-6);
@@ -609,7 +627,7 @@
   color: var(--ds-color-gray-500); font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-label);
   transition: background-color .12s ease, color .12s ease;
 }
-.oc-scope .topbar__link:hover { background: var(--ds-color-gray-100); color: var(--ds-color-black); }
+.oc-scope .topbar__link:hover { background: var(--ds-color-gray-100); color: var(--ds-text); }
 .oc-scope .topbar__link.is-active { background: var(--ds-color-green-100); color: #000; }
 .oc-scope .topbar__spacer { flex: 1; }
 .oc-scope .topbar__user { display: flex; align-items: center; gap: var(--ds-space-3); }
@@ -640,7 +658,7 @@
 
 /* summary tiles */
 .oc-scope .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--ds-space-4); }
-.oc-scope .tile { background: #fff; border-radius: var(--ds-radius-lg); border: 1px solid var(--ds-color-gray-200); box-shadow: var(--ds-shadow-01); padding: var(--ds-space-5); display: flex; flex-direction: column; gap: 6px; }
+.oc-scope .tile { background: var(--ds-surface); border-radius: var(--ds-radius-lg); border: 1px solid var(--ds-color-gray-200); box-shadow: var(--ds-shadow-01); padding: var(--ds-space-5); display: flex; flex-direction: column; gap: 6px; }
 .oc-scope .tile__value { font-size: var(--ds-font-size-heading); line-height: 1.1; font-weight: var(--ds-font-weight-semibold); }
 .oc-scope .tile__label { color: var(--ds-color-gray-400); font-size: var(--ds-font-size-label); }
 .oc-scope .tile__accent { width: 36px; height: 4px; border-radius: 2px; background: var(--ds-color-green-100); }
@@ -658,11 +676,11 @@
 .oc-scope .login { min-height: 100vh; display: grid; place-items: center; padding: var(--ds-space-6);
   background: radial-gradient(1200px 600px at 70% -10%, color-mix(in srgb, var(--ds-color-green-100) 28%, transparent), transparent),
               var(--ds-color-surface); }
-.oc-scope .login__card { width: 100%; max-width: 520px; background: #fff; border-radius: var(--ds-radius-2xl); box-shadow: var(--ds-shadow-03-big); padding: var(--ds-space-10); }
+.oc-scope .login__card { width: 100%; max-width: 520px; background: var(--ds-surface); border-radius: var(--ds-radius-2xl); box-shadow: var(--ds-shadow-03-big); padding: var(--ds-space-10); }
 .oc-scope .role-grid { display: grid; grid-template-columns: 1fr; gap: var(--ds-space-3); }
 .oc-scope .role-option {
   display: flex; align-items: center; gap: var(--ds-space-4); width: 100%; text-align: left;
-  background: #fff; border: 2px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface); border: 2px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg);
   padding: var(--ds-space-4) var(--ds-space-5); cursor: pointer;
   transition: border-color .15s ease, transform .12s ease, box-shadow .15s ease;
 }
@@ -676,7 +694,7 @@
 .oc-scope .ds-truncate { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* sticky action bar (appears when there's a selection) */
-.oc-scope .action-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: #fff; box-shadow: 0 -4px 18px #0000001f; padding: var(--ds-space-3) var(--ds-space-6); animation: barUp .2s ease; transition: left .34s cubic-bezier(.34, 1.4, .5, 1); }
+.oc-scope .action-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: var(--ds-surface); box-shadow: 0 -4px 18px #0000001f; padding: var(--ds-space-3) var(--ds-space-6); animation: barUp .2s ease; transition: left .34s cubic-bezier(.34, 1.4, .5, 1); }
 /* No montar la barra de acciones sobre el sidebar: su borde izquierdo sigue el
    ancho del rail (288px expandido / 112px colapsado). Sin nav o en móvil = full. */
 /* El riel reserva 76px a la izquierda; la barra de acciones arranca ahí. */
@@ -691,7 +709,7 @@
 /* segmented control */
 .oc-scope .segmented { display: inline-flex; background: var(--ds-color-gray-100); border-radius: var(--ds-radius-xl); padding: 4px; gap: 4px; }
 .oc-scope .segmented__btn { padding: 8px 16px; border-radius: var(--ds-radius-lg); border: 0; background: transparent; font-family: inherit; font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-label); color: var(--ds-color-gray-500); cursor: pointer; transition: background-color .12s, color .12s; }
-.oc-scope .segmented__btn.is-active { background: #fff; color: #000; box-shadow: var(--ds-shadow-02-soft); }
+.oc-scope .segmented__btn.is-active { background: var(--ds-surface); color: #000; box-shadow: var(--ds-shadow-02-soft); }
 
 /* Filtros de estado como "chips" (pills con contador) — lenguaje visual distinto
    del toggle de vista, para que no se vean como una barra doble amontonada. */
@@ -699,11 +717,11 @@
 .oc-scope .filterbar__label { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); margin-right: var(--ds-space-1); }
 .oc-scope .filter-chip {
   display: inline-flex; align-items: center; gap: var(--ds-space-2); min-height: 38px; padding: 6px 14px;
-  border: 1.5px solid var(--ds-color-gray-200); border-radius: 999px; background: var(--ds-color-white);
+  border: 1.5px solid var(--ds-color-gray-200); border-radius: 999px; background: var(--ds-surface);
   color: var(--ds-color-gray-500); font-family: inherit; font-weight: var(--ds-font-weight-semibold);
   font-size: var(--ds-font-size-label); cursor: pointer; transition: border-color .12s, color .12s, background-color .12s;
 }
-.oc-scope .filter-chip:hover { border-color: var(--ds-color-gray-300); color: var(--ds-color-black); }
+.oc-scope .filter-chip:hover { border-color: var(--ds-color-gray-300); color: var(--ds-text); }
 .oc-scope .filter-chip.is-active { background: var(--ds-color-green-100); border-color: var(--ds-color-green-100); color: var(--ds-color-black); }
 .oc-scope .filter-chip__count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--ds-color-gray-500) 14%, transparent); font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: inherit; }
 .oc-scope .filter-chip.is-active .filter-chip__count { background: color-mix(in srgb, #000 16%, transparent); }
@@ -717,7 +735,7 @@
   white-space: nowrap; cursor: pointer; transition: background-color .12s ease, color .12s ease;
 }
 .oc-scope .topnav__item svg { flex-shrink: 0; }
-.oc-scope .topnav__item:hover { background: var(--ds-color-gray-100); color: var(--ds-color-black); }
+.oc-scope .topnav__item:hover { background: var(--ds-color-gray-100); color: var(--ds-text); }
 .oc-scope .topnav__item.is-active { background: var(--ds-color-green-100); color: var(--ds-color-black); }
 /* mismo alto para todas las pestañas (activa o no) */
 .oc-scope .topnav__item { min-height: 40px; }
@@ -725,8 +743,8 @@
 .oc-scope .topbar__salir { display: inline-flex; align-items: center; gap: 6px; width: auto; padding: var(--ds-space-2) var(--ds-space-3); color: var(--ds-color-gray-500); font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-label); }
 .oc-scope .topbar__salir:hover { background: var(--ds-color-gray-100); color: var(--ds-color-red-200); }
 /* Identidad: avatar DENTRO del pill "Nombre · Rol" */
-.oc-scope .topbar__identity { display: inline-flex; align-items: center; gap: var(--ds-space-2); height: 40px; padding: 0 var(--ds-space-4) 0 5px; border-radius: 999px; color: var(--ds-color-black); font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-label); white-space: nowrap; }
-.oc-scope .topbar__identity .topbar__avatar { width: 30px; height: 30px; background: var(--ds-color-white); color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); }
+.oc-scope .topbar__identity { display: inline-flex; align-items: center; gap: var(--ds-space-2); height: 40px; padding: 0 var(--ds-space-4) 0 5px; border-radius: 999px; color: var(--ds-text); font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-label); white-space: nowrap; }
+.oc-scope .topbar__identity .topbar__avatar { width: 30px; height: 30px; background: var(--ds-surface); color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); }
 .oc-scope .topbar__tabs { margin-left: var(--ds-space-4); }
 
 /* ── Layout: barra superior + RIEL lateral (hover-expand overlay) + contenido ── */
@@ -821,7 +839,7 @@
 /* columna derecha: encabezado fijo + tabla con scroll propio dentro del contenedor */
 .oc-scope .md-detail { height: 100%; display: flex; flex-direction: column; }
 .oc-scope .md-detail > .ds-table-wrap { flex: 1 1 auto; overflow: auto; }
-.oc-scope .md-item { text-align: left; background: #fff; border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); padding: var(--ds-space-3) var(--ds-space-4); cursor: pointer; transition: border-color .12s ease, box-shadow .12s ease; display: flex; flex-direction: column; gap: 2px; }
+.oc-scope .md-item { text-align: left; background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); padding: var(--ds-space-3) var(--ds-space-4); cursor: pointer; transition: border-color .12s ease, box-shadow .12s ease; display: flex; flex-direction: column; gap: 2px; }
 .oc-scope .md-item:hover { border-color: var(--ds-color-gray-300); }
 .oc-scope .md-item.is-active { border-color: var(--ds-color-green-100); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-color-green-100) 18%, transparent); }
 .oc-scope .md-item__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -833,7 +851,7 @@
 .oc-scope .empty { text-align: center; color: var(--ds-color-gray-400); padding: var(--ds-space-10); }
 .oc-scope .link-btn { background: none; border: 0; color: var(--ds-color-green-200); font-weight: 600; cursor: pointer; font-size: var(--ds-font-size-label); padding: 0; }
 .oc-scope .icon-btn { background: none; border: 0; cursor: pointer; padding: var(--ds-space-2); border-radius: var(--ds-radius-md); color: var(--ds-color-gray-400); display: inline-grid; place-items: center; }
-.oc-scope .icon-btn:hover { background: var(--ds-color-gray-100); color: var(--ds-color-black); }
+.oc-scope .icon-btn:hover { background: var(--ds-color-gray-100); color: var(--ds-text); }
 /* Botón "Quitar" (remover línea): más grande y en rojo del DS, bien visible. */
 .oc-scope .icon-btn--quitar { width: 36px; height: 36px; font-size: 22px; line-height: 1; color: var(--ds-color-red-200); border-radius: var(--ds-radius-md); }
 .oc-scope .icon-btn--quitar:hover { background: var(--ds-color-red-100); color: var(--ds-color-red-200); }
@@ -856,12 +874,12 @@
 .oc-scope .back-link::before {
   content: ""; flex-shrink: 0;
   width: 46px; height: 46px; border-radius: 50%;
-  background: var(--ds-color-white); box-shadow: var(--ds-shadow-01);
+  background: var(--ds-surface); box-shadow: var(--ds-shadow-01);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 18l-6-6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: center;
   transition: box-shadow .15s ease, transform .12s ease;
 }
-.oc-scope .back-link:hover { color: var(--ds-color-black); }
+.oc-scope .back-link:hover { color: var(--ds-text); }
 .oc-scope .back-link:hover::before { box-shadow: var(--ds-shadow-03-big); }
 .oc-scope .back-link:active::before { transform: scale(.94); }
 
@@ -871,7 +889,7 @@
   color: var(--ds-color-green-200); font-weight: var(--ds-font-weight-semibold);
   text-decoration: underline; text-underline-offset: 2px;
 }
-.oc-scope .linklike:hover { color: var(--ds-color-black); }
+.oc-scope .linklike:hover { color: var(--ds-text); }
 .oc-scope .back-link svg { flex-shrink: 0; }
 
 /* timeline / historial */
@@ -892,7 +910,7 @@
 
 /* modal */
 .oc-scope .modal-overlay { position: fixed; inset: 0; background: #0006; display: grid; place-items: center; z-index: 80; padding: var(--ds-space-6); animation: fade .15s ease; }
-.oc-scope .modal { width: 100%; max-width: 560px; background: #fff; border-radius: var(--ds-radius-2xl); box-shadow: var(--ds-shadow-03-big); padding: var(--ds-space-6); max-height: 88vh; overflow: auto; }
+.oc-scope .modal { width: 100%; max-width: 560px; background: var(--ds-surface); border-radius: var(--ds-radius-2xl); box-shadow: var(--ds-shadow-03-big); padding: var(--ds-space-6); max-height: 88vh; overflow: auto; }
 .oc-scope .modal--wide { max-width: 920px; }
 .oc-scope .modal--full { max-width: min(1200px, 96vw); max-height: 92vh; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
@@ -905,25 +923,25 @@
 }
 
 /* ---- Plantillas: panel, tarjetas y filtro mini ---- */
-.oc-scope .tpl-panel { border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); background: var(--ds-color-white); overflow: hidden; }
+.oc-scope .tpl-panel { border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); background: var(--ds-surface); overflow: hidden; }
 .oc-scope .tpl-panel__head {
   display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-2); flex-wrap: wrap;
   padding: 11px 14px; border-bottom: 1.5px solid var(--ds-color-gray-100);
-  background: color-mix(in srgb, var(--ds-color-gray-100) 35%, #fff);
+  background: color-mix(in srgb, var(--ds-color-gray-100) 35%, var(--ds-tint-base));
 }
 .oc-scope .tpl-panel__body { display: flex; flex-direction: column; gap: 12px; padding: 14px; }
 /* Disparador tipo select que abre el popup de plantillas */
-.oc-scope .tpl-pick { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 48px; padding: 0 16px; border: 1.5px solid var(--ds-color-gray-200); border-radius: var(--ds-radius-xl); background: var(--ds-color-white); font: inherit; font-size: var(--ds-font-size-body); color: var(--ds-color-black); cursor: pointer; text-align: left; transition: border-color .12s ease; }
+.oc-scope .tpl-pick { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 48px; padding: 0 16px; border: 1.5px solid var(--ds-color-gray-200); border-radius: var(--ds-radius-xl); background: var(--ds-surface); font: inherit; font-size: var(--ds-font-size-body); color: var(--ds-text); cursor: pointer; text-align: left; transition: border-color .12s ease; }
 .oc-scope .tpl-pick:hover { border-color: var(--ds-color-gray-300); }
 .oc-scope .tpl-pick > span:first-child { min-width: 0; }
 /* Fila de opción dentro del popup */
-.oc-scope .tpl-opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 11px 14px; border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); background: var(--ds-color-white); font: inherit; cursor: pointer; text-align: left; transition: background-color .12s ease, border-color .12s ease; }
-.oc-scope .tpl-opt:hover { background: color-mix(in srgb, var(--ds-color-green-100) 12%, #fff); border-color: var(--ds-color-green-100); }
+.oc-scope .tpl-opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 11px 14px; border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); background: var(--ds-surface); font: inherit; cursor: pointer; text-align: left; transition: background-color .12s ease, border-color .12s ease; }
+.oc-scope .tpl-opt:hover { background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-tint-base)); border-color: var(--ds-color-green-100); }
 .oc-scope .tpl-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 10px; }
 .oc-scope .tpl-card {
   position: relative; display: flex; flex-direction: column; gap: 3px;
   padding: 10px 32px 10px 16px;
-  border-radius: var(--ds-radius-md); border: 1.5px solid var(--ds-color-gray-100); background: #fff;
+  border-radius: var(--ds-radius-md); border: 1.5px solid var(--ds-color-gray-100); background: var(--ds-surface);
   cursor: pointer; text-align: left;
   transition: border-color .12s, background .12s, transform .08s, box-shadow .12s;
 }
@@ -931,9 +949,9 @@
 .oc-scope .tpl-card:hover { border-color: var(--ds-color-green-100); box-shadow: var(--ds-shadow-01); transform: translateY(-1px); }
 .oc-scope .tpl-card:hover::before { background: var(--ds-color-green-100); }
 .oc-scope .tpl-card:active { transform: translateY(0); }
-.oc-scope .tpl-card.is-active { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 12%, #fff); }
+.oc-scope .tpl-card.is-active { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-tint-base)); }
 .oc-scope .tpl-card.is-active::before { background: var(--ds-color-green-200); }
-.oc-scope .tpl-card__name { font-weight: var(--ds-font-weight-semibold); font-size: 13px; color: var(--ds-color-black); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oc-scope .tpl-card__name { font-weight: var(--ds-font-weight-semibold); font-size: 13px; color: var(--ds-text); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oc-scope .tpl-card__meta { font-size: 11px; color: var(--ds-color-gray-400); }
 .oc-scope .tpl-card__del {
   position: absolute; top: 6px; right: 6px; width: 20px; height: 20px;
@@ -941,36 +959,36 @@
   cursor: pointer; line-height: 1; font-size: 15px; display: grid; place-items: center;
   transition: background .12s, color .12s;
 }
-.oc-scope .tpl-card__del:hover { background: color-mix(in srgb, var(--ds-color-red-100) 16%, #fff); color: var(--ds-color-red-200); }
+.oc-scope .tpl-card__del:hover { background: color-mix(in srgb, var(--ds-color-red-100) 16%, var(--ds-tint-base)); color: var(--ds-color-red-200); }
 .oc-scope .seg-mini { display: inline-flex; border: 1.5px solid var(--ds-color-gray-100); border-radius: 8px; overflow: hidden; }
-.oc-scope .seg-mini button { border: none; background: #fff; padding: 4px 12px; font-size: 12px; cursor: pointer; color: var(--ds-color-gray-400); }
+.oc-scope .seg-mini button { border: none; background: var(--ds-surface); padding: 4px 12px; font-size: 12px; cursor: pointer; color: var(--ds-color-gray-400); }
 .oc-scope .seg-mini button.is-active { background: var(--ds-color-green-100); color: var(--ds-color-black); font-weight: 600; }
 
 /* ---- Notificaciones (campanita) ---- */
 .oc-scope .notif-bell { position: relative; border: none; background: transparent; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px 6px; border-radius: var(--ds-radius-md); color: var(--ds-color-gray-500); display: grid; place-items: center; transition: background-color .12s ease, color .12s ease; }
-.oc-scope .notif-bell:hover { background: var(--ds-color-gray-100); color: var(--ds-color-black); }
+.oc-scope .notif-bell:hover { background: var(--ds-color-gray-100); color: var(--ds-text); }
 .oc-scope .notif-bell__dot { position: absolute; top: -1px; right: -1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9px; background: var(--ds-color-red-200); color: var(--ds-color-white); font-size: 10px; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--ds-color-white); box-sizing: content-box; }
 .oc-scope .notif-overlay { position: fixed; inset: 0; z-index: 40; }
-.oc-scope .notif-panel { position: absolute; top: calc(100% + 10px); right: 0; z-index: 41; width: 360px; max-height: 440px; overflow-y: auto; background: var(--ds-color-white); border: 1px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-01), var(--ds-shadow-02-soft); overflow: hidden; }
-.oc-scope .notif-panel__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-space-3); padding: var(--ds-space-4) var(--ds-space-4) var(--ds-space-3); position: sticky; top: 0; background: var(--ds-color-white); border-bottom: 1px solid var(--ds-color-gray-100); }
-.oc-scope .notif-panel__title { font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-body-md); color: var(--ds-color-black); }
+.oc-scope .notif-panel { position: absolute; top: calc(100% + 10px); right: 0; z-index: 41; width: 360px; max-height: 440px; overflow-y: auto; background: var(--ds-surface); border: 1px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-01), var(--ds-shadow-02-soft); overflow: hidden; }
+.oc-scope .notif-panel__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-space-3); padding: var(--ds-space-4) var(--ds-space-4) var(--ds-space-3); position: sticky; top: 0; background: var(--ds-surface); border-bottom: 1px solid var(--ds-color-gray-100); }
+.oc-scope .notif-panel__title { font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-body-md); color: var(--ds-text); }
 .oc-scope .notif-panel__count { font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-green-200); }
 .oc-scope .notif-panel__mark { border: none; background: transparent; cursor: pointer; font: inherit; font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-green-200); padding: 4px 8px; border-radius: var(--ds-radius-md); transition: background-color .12s ease; }
-.oc-scope .notif-panel__mark:hover { background: color-mix(in srgb, var(--ds-color-green-100) 18%, #fff); }
+.oc-scope .notif-panel__mark:hover { background: color-mix(in srgb, var(--ds-color-green-100) 18%, var(--ds-tint-base)); }
 .oc-scope .notif-empty { display: flex; flex-direction: column; align-items: center; gap: var(--ds-space-3); padding: var(--ds-space-10) var(--ds-space-4); color: var(--ds-color-gray-400); font-size: var(--ds-font-size-label); }
 .oc-scope .notif-empty__icon { width: 44px; height: 44px; border-radius: 50%; background: var(--ds-color-surface); display: grid; place-items: center; color: var(--ds-color-gray-300); }
 .oc-scope .notif-list { padding: var(--ds-space-2); display: flex; flex-direction: column; gap: 2px; }
 .oc-scope .notif-item { display: flex; align-items: flex-start; gap: var(--ds-space-3); width: 100%; text-align: left; border: none; background: transparent; border-radius: var(--ds-radius-md); padding: var(--ds-space-3); cursor: pointer; transition: background-color .12s ease; }
 .oc-scope .notif-item:hover { background: var(--ds-color-surface); }
-.oc-scope .notif-item.is-unread { background: color-mix(in srgb, var(--ds-color-green-100) 9%, #fff); }
-.oc-scope .notif-item.is-unread:hover { background: color-mix(in srgb, var(--ds-color-green-100) 15%, #fff); }
+.oc-scope .notif-item.is-unread { background: color-mix(in srgb, var(--ds-color-green-100) 9%, var(--ds-tint-base)); }
+.oc-scope .notif-item.is-unread:hover { background: color-mix(in srgb, var(--ds-color-green-100) 15%, var(--ds-tint-base)); }
 .oc-scope .notif-item__icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; }
-.oc-scope .notif-item__icon--pedido { background: color-mix(in srgb, var(--ds-color-green-100) 22%, #fff); color: var(--ds-color-green-200); }
+.oc-scope .notif-item__icon--pedido { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
 .oc-scope .notif-item__icon--orden { background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); }
-.oc-scope .notif-item__icon--factura { background: color-mix(in srgb, var(--ds-color-yellow) 26%, #fff); color: var(--ds-color-black-100); }
-.oc-scope .notif-item__icon--devuelto { background: color-mix(in srgb, var(--ds-color-red-100) 22%, #fff); color: var(--ds-color-red-200); }
+.oc-scope .notif-item__icon--factura { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: var(--ds-color-black-100); }
+.oc-scope .notif-item__icon--devuelto { background: color-mix(in srgb, var(--ds-color-red-100) 22%, var(--ds-tint-base)); color: var(--ds-color-red-200); }
 .oc-scope .notif-item__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.oc-scope .notif-item__msg { font-size: var(--ds-font-size-label); color: var(--ds-color-black); line-height: 1.35; }
+.oc-scope .notif-item__msg { font-size: var(--ds-font-size-label); color: var(--ds-text); line-height: 1.35; }
 .oc-scope .notif-item.is-unread .notif-item__msg { font-weight: var(--ds-font-weight-semibold); }
 .oc-scope .notif-item__date { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
 .oc-scope .notif-item__dot { flex-shrink: 0; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--ds-color-green-100); }
@@ -988,7 +1006,7 @@
 .oc-scope .ord-grp {
   border: 1.5px solid var(--ds-color-gray-100);
   border-radius: var(--ds-radius-lg);
-  background: var(--ds-color-white);
+  background: var(--ds-surface);
   overflow: hidden;
   box-shadow: var(--ds-shadow-01);
 }
@@ -1000,13 +1018,13 @@
   width: 100%;
   padding: 14px 16px;
   border: 0;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--ds-color-gray-100) 24%, #fff), #fff);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ds-color-gray-100) 24%, var(--ds-tint-base)), var(--ds-tint-base));
   cursor: pointer;
   font: inherit;
   text-align: left;
   transition: background .12s;
 }
-.oc-scope .ord-grp-head:hover { background: color-mix(in srgb, var(--ds-color-green-100) 9%, #fff); }
+.oc-scope .ord-grp-head:hover { background: color-mix(in srgb, var(--ds-color-green-100) 9%, var(--ds-tint-base)); }
 .oc-scope .ord-grp-head__chev { flex-shrink: 0; transition: transform .18s ease; }
 .oc-scope .ord-grp-head__main { display: flex; flex-direction: column; min-width: 0; }
 .oc-scope .ord-grp-head__meta { margin-top: 2px; }
@@ -1030,7 +1048,7 @@
   position: relative;
   overflow: hidden;
   display: flex; flex-direction: column; gap: 4px;
-  border: 1.5px solid color-mix(in srgb, var(--ds-color-gray-100) 85%, #fff);
+  border: 1.5px solid color-mix(in srgb, var(--ds-color-gray-100) 85%, var(--ds-tint-base));
   font: inherit; width: 100%;
   transition: border-color .12s ease, box-shadow .15s ease, transform .06s ease;
 }
@@ -1039,9 +1057,9 @@
 .oc-scope button.ana-kpi:active { transform: translateY(1px); }
 .oc-scope .ana-kpi.is-selected {
   border-color: var(--ds-color-green-200);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-color-green-100) 55%, #fff), var(--ds-shadow-01);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-color-green-100) 55%, var(--ds-tint-base)), var(--ds-shadow-01);
 }
-.oc-scope .ana-kpi.is-selected::after { background: color-mix(in srgb, var(--ds-color-green-100) 26%, #fff); }
+.oc-scope .ana-kpi.is-selected::after { background: color-mix(in srgb, var(--ds-color-green-100) 26%, var(--ds-tint-base)); }
 .oc-scope .ana-kpi::after {
   content: "";
   position: absolute;
@@ -1050,7 +1068,7 @@
   width: 90px;
   height: 90px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--ds-color-green-100) 14%, #fff);
+  background: color-mix(in srgb, var(--ds-color-green-100) 14%, var(--ds-tint-base));
 }
 .oc-scope .ana-kpi__label { color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); z-index: 1; }
 .oc-scope .ana-kpi__value { font-size: 34px; line-height: 1.05; font-weight: var(--ds-font-weight-semibold); z-index: 1; }
@@ -1068,7 +1086,7 @@
   background: linear-gradient(180deg, var(--ds-color-green-100), var(--ds-color-green-200));
   border-radius: 4px 4px 0 0;
 }
-.oc-scope .ana-panel { border: 1.5px solid color-mix(in srgb, var(--ds-color-gray-100) 85%, #fff); }
+.oc-scope .ana-panel { border: 1.5px solid color-mix(in srgb, var(--ds-color-gray-100) 85%, var(--ds-tint-base)); }
 
 /* Dashboard: detalle principal (izq) + contexto (der) */
 .oc-scope .dash-cols { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: var(--ds-space-4); align-items: start; }
@@ -1095,7 +1113,7 @@
   border-radius: var(--ds-radius-md);
   background: linear-gradient(100deg,
     var(--ds-color-gray-100) 30%,
-    color-mix(in srgb, var(--ds-color-gray-100) 45%, #fff) 50%,
+    color-mix(in srgb, var(--ds-color-gray-100) 45%, var(--ds-tint-base)) 50%,
     var(--ds-color-gray-100) 70%);
   background-size: 300% 100%;
   animation: ds-shimmer 1.4s ease-in-out infinite;

@@ -71,7 +71,7 @@ export default function AprobacionPage() {
         </div>
 
         {porAprobar.length > 0 && (
-          <div className="row row--between wrap gap-3 mt-6" style={{ alignItems: "center", padding: "10px 14px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 8%, #fff)", border: "1.5px solid var(--ds-color-gray-100)" }}>
+          <div className="row row--between wrap gap-3 mt-6" style={{ alignItems: "center", padding: "10px 14px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 8%, var(--ds-tint-base))", border: "1.5px solid var(--ds-color-gray-100)" }}>
             <div className="row gap-4 wrap" style={{ alignItems: "center" }}>
               <label className="row gap-2" style={{ alignItems: "center", cursor: "pointer" }}>
                 <input type="checkbox" className="ds-cbx" checked={sel.size > 0 && sel.size === porAprobar.length}

@@ -153,22 +153,22 @@ export default function MatrizPage() {
               <table className="ds-table" style={{ tableLayout: "auto" }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 200, position: "sticky", left: 0, top: 0, color: "var(--ds-color-black)", background: "var(--ds-color-white)", zIndex: 3 }}>Obra</th>
+                    <th style={{ width: 200, position: "sticky", left: 0, top: 0, color: "var(--ds-text)", background: "var(--ds-surface)", zIndex: 3 }}>Obra</th>
                     {columnas.map((c) => { const par = partidaDeClas(c); return (
-                      <th key={c.id} style={{ width: 150, textAlign: "center", verticalAlign: "bottom", position: "sticky", top: 0, color: "var(--ds-color-black)", background: "var(--ds-color-white)", zIndex: 2 }}>
+                      <th key={c.id} style={{ width: 150, textAlign: "center", verticalAlign: "bottom", position: "sticky", top: 0, color: "var(--ds-text)", background: "var(--ds-surface)", zIndex: 2 }}>
                         {par && <div className="ds-body-sm ds-muted ds-truncate" title={par.nombre} style={{ fontWeight: 400, maxWidth: 150, margin: "0 auto" }}>{par.codigo ? `${par.codigo} · ` : ""}{par.nombre}</div>}
                         <div className="ds-strong ds-body-sm">{c.nombre}</div>
                       </th>
                     ); })}
                     {/* columna espaciadora: absorbe el ancho sobrante para que las celdas no se estiren */}
-                    <th aria-hidden style={{ width: "100%", position: "sticky", top: 0, color: "var(--ds-color-black)", background: "var(--ds-color-white)", zIndex: 2 }} />
+                    <th aria-hidden style={{ width: "100%", position: "sticky", top: 0, color: "var(--ds-text)", background: "var(--ds-surface)", zIndex: 2 }} />
                   </tr>
                 </thead>
                 <tbody>
                   {obrasVis.length === 0 && <tr><td colSpan={columnas.length + 2}><div className="empty">Ninguna obra coincide.</div></td></tr>}
                   {obrasVis.map((o) => (
                     <tr key={o.idObra}>
-                      <td style={{ position: "sticky", left: 0, background: "var(--ds-color-white)", zIndex: 1 }}>
+                      <td style={{ position: "sticky", left: 0, background: "var(--ds-surface)", zIndex: 1 }}>
                         <div className="ds-strong ds-body-sm">{o.numeroObra}</div>
                         {o.nombreMostrado && <div className="ds-muted ds-body-sm ds-truncate" style={{ maxWidth: 180 }} title={o.nombreMostrado}>{o.nombreMostrado}</div>}
                       </td>

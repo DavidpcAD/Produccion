@@ -240,7 +240,7 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, onClose, onSaved }: {
                 flex: 1, textAlign: "left", cursor: "pointer", padding: "10px 14px", borderRadius: 10,
                 display: "flex", flexDirection: "column", gap: 2,
                 border: `1.5px solid ${active ? "var(--ds-color-black)" : "var(--ds-color-gray-100)"}`,
-                background: active ? "var(--ds-color-black)" : "var(--ds-color-white)",
+                background: active ? "var(--ds-color-black)" : "var(--ds-surface)",
                 color: active ? "var(--ds-color-white)" : "inherit",
               }}>
               <span className="ds-strong">{titulo}</span>
