@@ -63,7 +63,7 @@ export default function ColadasPage() {
   const columns: ColumnDef<ColadaListadoItem, any>[] = [
     col.accessor('codigo_interno', {
       header: 'Código', meta: { label: 'Código' },
-      cell: ({ getValue }) => <span className="font-semibold text-black">#{getValue() as number}</span>,
+      cell: ({ getValue }) => <span className="font-semibold text-ds-ink">#{getValue() as number}</span>,
     }),
     col.accessor('estado', {
       header: 'Estado', meta: { label: 'Estado' },
@@ -82,7 +82,7 @@ export default function ColadasPage() {
         const o = row.original;
         return (
           <div className="min-w-0">
-            <p className="text-black truncate">{o.receta_blend_nombre}</p>
+            <p className="text-ds-ink truncate">{o.receta_blend_nombre}</p>
             {o.codigo_receta_bc && (
               <p className="text-xs text-ds-gray-400 truncate">{o.codigo_receta_bc}</p>
             )}
@@ -96,7 +96,7 @@ export default function ColadasPage() {
         const o = row.original;
         return (
           <div className="min-w-0">
-            <p className="text-black truncate">{o.destino_display || '—'}</p>
+            <p className="text-ds-ink truncate">{o.destino_display || '—'}</p>
             {o.obra_works_no && (
               <p className="text-xs text-ds-gray-400 truncate">
                 {o.obra_works_no}{o.obra_display_name ? ` · ${o.obra_display_name}` : ''}
@@ -162,7 +162,7 @@ export default function ColadasPage() {
       </div>
 
       {error && !loading && (
-        <div className="bg-white rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar las coladas.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>

@@ -150,12 +150,12 @@ export default function MatrizPage() {
           placeholder="Buscar caso, lote, cliente…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="h-10 flex-1 min-w-[220px] rounded-ds-xl border-2 border-transparent bg-white px-4 text-sm shadow-ds-01 focus:border-black focus:outline-none"
+          className="h-10 flex-1 min-w-[220px] rounded-ds-xl border-2 border-transparent bg-ds-surface px-4 text-sm shadow-ds-01 focus:border-black focus:outline-none"
         />
         {data && (
           <span className="text-sm text-ds-gray-500">
             {data.desde} → {data.hasta} · Total visible{' '}
-            <strong className="text-black">{formatCRC(totalVisible)}</strong>
+            <strong className="text-ds-ink">{formatCRC(totalVisible)}</strong>
           </span>
         )}
       </div>
@@ -171,7 +171,7 @@ export default function MatrizPage() {
       ) : data ? (
         <div className="space-y-6">
           {/* Encabezado de semanas + totales */}
-          <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+          <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-ds-gray-200 bg-ds-gray-100">
@@ -211,7 +211,7 @@ export default function MatrizPage() {
 
           {/* Backlog */}
           {data.backlog.length > 0 && (
-            <section className="rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+            <section className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
               <button
                 type="button"
                 onClick={() => setVerBacklog((v) => !v)}
@@ -272,7 +272,7 @@ function BancoSection({
   );
 
   return (
-    <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+    <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
       <div className="flex items-center gap-2 border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-2">
         {grupo.ColorBanco && (
           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: grupo.ColorBanco }} />
@@ -338,7 +338,7 @@ function CreditoPuenteSection({
   cancelaciones: CreditoPuenteCancelacion[];
 }) {
   return (
-    <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+    <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
       <div className="border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ds-gray-500">
         Crédito puente · {hitos.length} hitos · {cancelaciones.length} cancelaciones
       </div>

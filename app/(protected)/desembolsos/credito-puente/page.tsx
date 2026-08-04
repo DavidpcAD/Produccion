@@ -204,7 +204,7 @@ export default function CreditoPuentePage() {
                 <div className="flex justify-end gap-3">
                   <button
                     type="button"
-                    className="text-sm text-black hover:underline"
+                    className="text-sm text-ds-ink hover:underline"
                     onClick={(e) => {
                       e.stopPropagation();
                       abrirEditar(c);
@@ -601,7 +601,7 @@ function MovimientosPanel({ idCp }: { idCp: number }) {
                   <>
                     <button
                       type="button"
-                      className="text-sm text-black hover:underline"
+                      className="text-sm text-ds-ink hover:underline"
                       onClick={() => abrirEditar(m)}
                     >
                       Editar

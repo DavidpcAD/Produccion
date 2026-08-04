@@ -99,7 +99,7 @@ function AppRolePicker({
         ) : <span />}
         <span className="text-xs text-ds-gray-400 shrink-0">
           {totalSeleccionados > 0
-            ? <><span className="font-bold text-black">{totalSeleccionados}</span> {totalSeleccionados === 1 ? 'rol asignado' : 'roles asignados'}</>
+            ? <><span className="font-bold text-ds-ink">{totalSeleccionados}</span> {totalSeleccionados === 1 ? 'rol asignado' : 'roles asignados'}</>
             : 'Sin roles asignados'}
         </span>
       </div>
@@ -114,9 +114,9 @@ function AppRolePicker({
               className={`text-left rounded-ds-lg border p-3 transition-all hover:shadow-ds-02 ${total ? 'border-black bg-ds-gray-100/40' : 'border-ds-gray-200'} ${isOpen ? 'ring-2 ring-brand' : ''}`}>
               <div className="flex items-center gap-2 mb-1.5">
                 <div className={`w-8 h-8 rounded-ds flex items-center justify-center shrink-0 ${total ? 'bg-brand' : 'bg-ds-gray-100'}`}>
-                  <Icon name="list" size="sm" color="currentColor" className={total ? 'text-black' : 'text-ds-gray-400'} />
+                  <Icon name="list" size="sm" color="currentColor" className={total ? 'text-ds-ink' : 'text-ds-gray-400'} />
                 </div>
-                <p className="text-sm font-bold text-black truncate flex-1">{g.nombre}</p>
+                <p className="text-sm font-bold text-ds-ink truncate flex-1">{g.nombre}</p>
                 {total > 0 && <span className="text-[11px] font-bold text-black bg-brand rounded-full px-2 py-0.5 shrink-0">{total}</span>}
               </div>
               <p className="text-xs text-ds-gray-400 truncate">{total > 0 ? seleccionados.map(r => r.NombreRol).join(', ') : 'Ningún rol'}</p>
@@ -131,13 +131,13 @@ function AppRolePicker({
       {abierta && coords && createPortal(
         <div ref={panelRef}
           style={{ position: 'fixed', left: coords.left, width: coords.width, top: coords.openUp ? undefined : coords.top, bottom: coords.openUp ? coords.bottomAnchor : undefined }}
-          className="z-[100] rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-03 p-3.5 animate-fade-in">
+          className="z-[100] rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-03 p-3.5 animate-fade-in">
           <div className="flex items-center gap-2 mb-2.5">
             <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
               <Icon name="list" size="sm" color="currentColor" className="text-brand" />
             </div>
-            <p className="text-sm font-bold text-black flex-1 truncate">{abierta.nombre}</p>
-            <button type="button" onClick={() => setOpenApp(null)} aria-label="Cerrar" className="text-ds-gray-400 hover:text-black">
+            <p className="text-sm font-bold text-ds-ink flex-1 truncate">{abierta.nombre}</p>
+            <button type="button" onClick={() => setOpenApp(null)} aria-label="Cerrar" className="text-ds-gray-400 hover:text-ds-ink">
               <Icon name="close" size="sm" color="currentColor" />
             </button>
           </div>
@@ -150,9 +150,9 @@ function AppRolePicker({
                 return (
                   <button key={r.IDRol} type="button" onClick={() => onToggle(r.IDRol)}
                     className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-all ${
-                      on ? 'bg-brand border-brand text-black shadow-ds-01' : 'bg-white border-ds-gray-200 text-ds-gray-500 hover:border-black hover:text-black'
+                      on ? 'bg-brand border-brand text-black shadow-ds-01' : 'bg-ds-surface border-ds-gray-200 text-ds-gray-500 hover:border-black hover:text-black'
                     }`}>
-                    {on && <Icon name="check" size="sm" color="currentColor" className="text-black" />}
+                    {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
                     {r.NombreRol}
                   </button>
                 );
@@ -424,7 +424,7 @@ export function ColaboradorEditModal({
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-3 border-b border-ds-gray-100 pb-2">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h3 className="font-bold text-black text-sm shrink-0">Datos del colaborador</h3>
+                <h3 className="font-bold text-ds-ink text-sm shrink-0">Datos del colaborador</h3>
                 {idColaborador != null && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-ds-gray-100 px-2 h-6 text-[11px] font-semibold text-ds-gray-500 font-mono"
                     title="ID de colaborador (dbo.Colaborador.idColaborador)">
@@ -438,7 +438,7 @@ export function ColaboradorEditModal({
                   </span>
                 )}
               </div>
-              <label className="flex items-center gap-2 text-sm font-medium text-black cursor-pointer shrink-0">
+              <label className="flex items-center gap-2 text-sm font-medium text-ds-ink cursor-pointer shrink-0">
                 <input type="checkbox" checked={ef.activo} onChange={e => setEfField('activo', e.target.checked)} className="w-4 h-4 accent-brand" />
                 Activo
               </label>
@@ -453,7 +453,7 @@ export function ColaboradorEditModal({
               {/* Foto (la capta el reloj de marcaje). Ocupa el espacio libre a la
                   derecha, a lo alto de dos filas. */}
               <div className="sm:row-span-2">
-                <label className="block text-body-sm font-medium text-black mb-1.5">Foto</label>
+                <label className="block text-body-sm font-medium text-ds-ink mb-1.5">Foto</label>
                 <div className="w-full aspect-[3/4] max-h-[168px] rounded-ds border border-ds-gray-200 bg-ds-gray-100/60 overflow-hidden flex items-center justify-center">
                   {efFoto ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -491,7 +491,7 @@ export function ColaboradorEditModal({
 
           {/* Jornada y salario */}
           <section className="space-y-4">
-            <h3 className="font-bold text-black text-sm border-b border-ds-gray-100 pb-2">Jornada y salario</h3>
+            <h3 className="font-bold text-ds-ink text-sm border-b border-ds-gray-100 pb-2">Jornada y salario</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Input label="Salario mensual (₡)" type="number" value={ef.salarioMensual} onChange={e => setEfField('salarioMensual', e.target.value)} placeholder="0" />
               <TimeField label="Hora de entrada" value={ef.horaEntrada} onChange={v => setEfField('horaEntrada', v)} />
@@ -511,7 +511,7 @@ export function ColaboradorEditModal({
             <div className="flex items-center justify-between border-b border-ds-gray-100 pb-2">
               <div className="flex items-center gap-2">
                 <Icon name="rol" size="sm" className="text-ds-gray-400" />
-                <h3 className="font-bold text-black text-sm">Acceso al sistema</h3>
+                <h3 className="font-bold text-ds-ink text-sm">Acceso al sistema</h3>
               </div>
               {hasLogin && isSuperAdmin && (
                 <Button variant="danger" size="xs" loading={revocando} onClick={handleRevocar}
@@ -535,7 +535,7 @@ export function ColaboradorEditModal({
                       hint="La actual no se puede ver (está cifrada); escribí una nueva para cambiarla · mín. 8" />
                   </div>
                 ) : (
-                  <p className="text-body-sm text-ds-gray-400">Usuario de login: <span className="font-semibold text-black">@{username}</span>.</p>
+                  <p className="text-body-sm text-ds-gray-400">Usuario de login: <span className="font-semibold text-ds-ink">@{username}</span>.</p>
                 )}
                 <p className="text-body-sm text-ds-gray-400">Editá los roles por app. Podés quitar el acceso a una app con “Quitar acceso”.</p>
                 <AppRolePicker grupos={gruposApp} selectedRoles={selectedRoles} onToggle={toggleRol} resetKey={idColaborador}
@@ -543,10 +543,10 @@ export function ColaboradorEditModal({
                 <TiposSelector roles={roles} selectedRoles={selectedRoles} tiposByRol={tiposByRol} onChange={setTipoRol} />
               </>
             ) : !isSuperAdmin ? (
-              <p className="text-sm text-ds-gray-400 py-2">Este colaborador <span className="font-semibold text-black">no tiene usuario de login</span> (sin acceso a las aplicaciones). No tenés permiso para darle acceso.</p>
+              <p className="text-sm text-ds-gray-400 py-2">Este colaborador <span className="font-semibold text-ds-ink">no tiene usuario de login</span> (sin acceso a las aplicaciones). No tenés permiso para darle acceso.</p>
             ) : !crearAcceso ? (
               <div className="flex items-center justify-between gap-3 rounded-ds bg-ds-gray-100 p-3">
-                <p className="text-sm text-ds-gray-500">Este colaborador <span className="font-semibold text-black">no tiene acceso</span> a las aplicaciones.</p>
+                <p className="text-sm text-ds-gray-500">Este colaborador <span className="font-semibold text-ds-ink">no tiene acceso</span> a las aplicaciones.</p>
                 <Button variant="primary" size="xs" onClick={() => setCrearAcceso(true)}
                   icon={<Icon name="plus" size="sm" color="currentColor" />}>
                   Dar acceso
@@ -557,7 +557,7 @@ export function ColaboradorEditModal({
                 <div className="flex items-center justify-between">
                   <p className="text-body-sm text-ds-gray-400">Creá el usuario de login y elegí sus roles por app.</p>
                   <button type="button" onClick={() => setCrearAcceso(false)}
-                    className="text-xs font-semibold text-ds-gray-400 hover:text-black transition-colors">Cancelar acceso</button>
+                    className="text-xs font-semibold text-ds-gray-400 hover:text-ds-ink transition-colors">Cancelar acceso</button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input label="Usuario (username)" value={nuevoUsername}

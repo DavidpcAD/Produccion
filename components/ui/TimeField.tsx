@@ -54,7 +54,7 @@ export function TimeField({ label, value, onChange, disabled }: TimeFieldProps) 
 
   return (
     <div className="flex flex-col gap-1.5">
-      {label && <label htmlFor={inputId} className="text-sm font-medium text-black">{label}</label>}
+      {label && <label htmlFor={inputId} className="text-sm font-medium text-ds-ink">{label}</label>}
       <div className="relative">
         <input
           id={inputId}
@@ -65,7 +65,7 @@ export function TimeField({ label, value, onChange, disabled }: TimeFieldProps) 
           disabled={disabled}
           onChange={e => handleChange(e.target.value)}
           onBlur={handleBlur}
-          className="w-full h-12 rounded-ds-xl bg-white text-black placeholder-ds-gray-300 text-body-sm
+          className="w-full h-12 rounded-ds-xl bg-ds-surface text-ds-ink placeholder-ds-gray-300 text-body-sm
             font-normal tabular-nums border-2 border-transparent shadow-ds-01 pl-5 pr-11
             transition-all duration-150 focus:outline-none focus:border-black focus:shadow-none
             disabled:bg-ds-gray-100 disabled:text-ds-gray-400 disabled:cursor-not-allowed disabled:border-transparent disabled:shadow-none"

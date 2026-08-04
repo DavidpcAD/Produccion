@@ -24,7 +24,7 @@ function estadoLabel(id: number): string {
 }
 
 const th = 'px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500';
-const td = 'px-3 py-2 text-sm text-black';
+const td = 'px-3 py-2 text-sm text-ds-ink';
 
 export function EstadoCuentaModal({ idCaso, onClose }: { idCaso: number | null; onClose: () => void }) {
   const [data, setData] = useState<EstadoCuentaData | null>(null);
@@ -227,14 +227,14 @@ function Dato({ label, valor }: { label: string; valor: string }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-wider text-ds-gray-400">{label}</p>
-      <p className="text-black break-words">{valor}</p>
+      <p className="text-ds-ink break-words">{valor}</p>
     </div>
   );
 }
 
 function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-ds-lg border border-ds-gray-200 bg-white">
+    <section className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface">
       <div className="border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-ds-gray-500">
         {titulo}
       </div>
@@ -245,9 +245,9 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
 
 function FilaMonto({ label, monto, bold }: { label: string; monto: number; bold?: boolean }) {
   return (
-    <div className={`flex items-center justify-between py-1 ${bold ? 'font-semibold text-black' : 'text-ds-gray-500'}`}>
+    <div className={`flex items-center justify-between py-1 ${bold ? 'font-semibold text-ds-ink' : 'text-ds-gray-500'}`}>
       <span className="text-sm">{label}</span>
-      <span className="font-mono text-sm tabular-nums text-black">{formatCRC(monto)}</span>
+      <span className="font-mono text-sm tabular-nums text-ds-ink">{formatCRC(monto)}</span>
     </div>
   );
 }

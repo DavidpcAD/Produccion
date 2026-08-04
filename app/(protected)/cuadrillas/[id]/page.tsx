@@ -168,7 +168,7 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
           <Skeleton className="h-4 w-2/3" rounded="rounded-full" />
         </div>
       </div>
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
         <Skeleton className="h-4 w-1/3" rounded="rounded-full" />
         <Skeleton className="h-24 w-full" />
       </div>
@@ -183,13 +183,13 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
     <PageShell width="narrow">
       <PageHeader
         back={
-          <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black mt-1 shrink-0">
+          <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-ds-ink mt-1 shrink-0">
             <Icon name="chevron-left" size="md" color="currentColor" />
           </button>
         }
         title={
           <div className="min-w-0">
-            <h1 className="text-heading font-bold text-black">{cuadrilla.Nombre}</h1>
+            <h1 className="text-heading font-bold text-ds-ink">{cuadrilla.Nombre}</h1>
             <p className="text-ds-gray-400 text-body-sm">{cuadrilla.Proyecto} · Encargado: {cuadrilla.Encargado}</p>
             {(cuadrilla.SubPartidaCodigo || cuadrilla.TaskNoBC) && (
               <div className="mt-2 flex flex-wrap gap-2">
@@ -217,10 +217,10 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
       />
 
       {/* Capacity */}
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
         <div className="flex justify-between mb-2">
-          <span className="text-sm font-semibold text-black">Capacidad</span>
-          <span className="text-sm font-bold text-black">{activos.length} / {cuadrilla.Capacidad}</span>
+          <span className="text-sm font-semibold text-ds-ink">Capacidad</span>
+          <span className="text-sm font-bold text-ds-ink">{activos.length} / {cuadrilla.Capacidad}</span>
         </div>
         <div className="h-2 rounded-full bg-ds-gray-100 overflow-hidden">
           <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -229,14 +229,14 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
       </div>
 
       {/* Miembros */}
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-5 py-3 border-b border-ds-gray-200 bg-ds-gray-100">
-          <h2 className="font-bold text-black text-sm">Miembros activos</h2>
+          <h2 className="font-bold text-ds-ink text-sm">Miembros activos</h2>
         </div>
         {activos.length === 0 ? (
           <div className="p-12 text-center text-ds-gray-300">
             <Icon name="boleta" size="lg" color="currentColor" className="mx-auto mb-2" />
-            <p className="text-sm font-medium text-black">Sin miembros en esta cuadrilla</p>
+            <p className="text-sm font-medium text-ds-ink">Sin miembros en esta cuadrilla</p>
           </div>
         ) : (
           <div className="divide-y divide-ds-gray-100">
@@ -248,7 +248,7 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
                     {iniciales}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-black">{m.NombreCompleto}</p>
+                    <p className="text-sm font-semibold text-ds-ink">{m.NombreCompleto}</p>
                     <p className="text-xs text-ds-gray-400">{m.Cedula} · {m.Puesto || 'Sin puesto'}</p>
                   </div>
                   <span className="text-xs text-ds-gray-300 hidden sm:block shrink-0">

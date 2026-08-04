@@ -25,9 +25,9 @@ function fmtDiaCorto(iso: string): string {
 
 function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-white rounded-ds-lg shadow-ds-01 p-5 border border-ds-gray-200">
+    <div className="bg-ds-surface rounded-ds-lg shadow-ds-01 p-5 border border-ds-gray-200">
       <p className="text-ds-gray-400 text-body-sm leading-tight min-h-[2.4em]">{label}</p>
-      <p className="text-heading font-bold text-black mt-1 tabular-nums">{value}</p>
+      <p className="text-heading font-bold text-ds-ink mt-1 tabular-nums">{value}</p>
       {sub && <p className="text-ds-gray-400 text-xs mt-0.5">{sub}</p>}
     </div>
   );
@@ -110,8 +110,8 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-ds-lg shadow-ds-01 p-5 border border-ds-gray-200">
-        <h2 className="font-semibold text-black mb-4">m³ producidos por día</h2>
+      <div className="bg-ds-surface rounded-ds-lg shadow-ds-01 p-5 border border-ds-gray-200">
+        <h2 className="font-semibold text-ds-ink mb-4">m³ producidos por día</h2>
         {loading || !kpis ? (
           <Skeleton className="h-56 rounded-ds" />
         ) : kpis.m3_por_dia.every((d) => d.m3 === 0) ? (

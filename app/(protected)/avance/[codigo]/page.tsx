@@ -177,12 +177,12 @@ export default function AvanceCapturaPage() {
           <button
             type="button"
             onClick={() => router.push('/avance')}
-            className="mb-1 flex items-center gap-1 text-body-sm text-ds-gray-400 hover:text-black"
+            className="mb-1 flex items-center gap-1 text-body-sm text-ds-gray-400 hover:text-ds-ink"
           >
             <Icon name="back" size="sm" color="currentColor" /> Volver a obras
           </button>
         }
-        title={<h1 className="text-heading font-bold text-black font-mono">{codigo}</h1>}
+        title={<h1 className="text-heading font-bold text-ds-ink font-mono">{codigo}</h1>}
         subtitle={
           avance ? (
             <>
@@ -202,7 +202,7 @@ export default function AvanceCapturaPage() {
       {partidaFoco && (
         <div className="flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-body-sm">
           <span className="text-ds-gray-500">Mostrando solo la partida {partidaFoco}.</span>
-          <button type="button" onClick={() => router.push(`/avance/${encodeURIComponent(codigo)}`)} className="font-semibold text-black hover:underline">
+          <button type="button" onClick={() => router.push(`/avance/${encodeURIComponent(codigo)}`)} className="font-semibold text-ds-ink hover:underline">
             Ver todas
           </button>
         </div>
@@ -217,7 +217,7 @@ export default function AvanceCapturaPage() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar sub-partida…"
-          className="h-10 w-full rounded-ds border border-ds-gray-200 pl-9 pr-3 text-sm text-black focus:border-black focus:outline-none"
+          className="h-10 w-full rounded-ds border border-ds-gray-200 pl-9 pr-3 text-sm text-ds-ink focus:border-black focus:outline-none"
         />
       </div>
 
@@ -234,7 +234,7 @@ export default function AvanceCapturaPage() {
             const total = g.subs.length;
             const completas = g.subs.filter((s) => s.completada).length;
             return (
-              <section key={cod} className="rounded-ds border border-ds-gray-200 bg-white overflow-hidden">
+              <section key={cod} className="rounded-ds border border-ds-gray-200 bg-ds-surface overflow-hidden">
                 <button
                   type="button"
                   onClick={() => !forzarAbierto && togglePartida(cod)}
@@ -244,7 +244,7 @@ export default function AvanceCapturaPage() {
                     <span className="text-ds-gray-400">
                       <Icon name={abierta ? 'open' : 'arrow-right'} size="sm" color="currentColor" />
                     </span>
-                    <span className="font-semibold text-black">{cod}</span>
+                    <span className="font-semibold text-ds-ink">{cod}</span>
                     <span className="text-body-sm text-ds-gray-400">{g.nombre}</span>
                   </div>
                   <Badge variant={completas === total ? 'green' : 'gray'}>
@@ -263,7 +263,7 @@ export default function AvanceCapturaPage() {
                           <div className="flex-1 py-3 pr-4 space-y-2">
                             <div className="flex items-start justify-between gap-3 flex-wrap">
                               <div>
-                                <p className="flex items-center gap-2 text-sm font-medium text-black">
+                                <p className="flex items-center gap-2 text-sm font-medium text-ds-ink">
                                   {sp.codigo} · {sp.nombre}
                                   {sp.es_critica && <Badge variant="yellow">crítica</Badge>}
                                   {sp.arrastrada && <Badge variant="red">arrastrada</Badge>}
@@ -299,7 +299,7 @@ export default function AvanceCapturaPage() {
                                         ? 'border-black bg-black text-white'
                                         : bloqueado
                                           ? 'border-ds-gray-100 bg-ds-gray-100 text-ds-gray-300 cursor-not-allowed'
-                                          : 'border-ds-gray-200 bg-white text-ds-gray-500 hover:border-black'
+                                          : 'border-ds-gray-200 bg-ds-surface text-ds-gray-500 hover:border-black'
                                     }`}
                                   >
                                     {p}%
@@ -309,7 +309,7 @@ export default function AvanceCapturaPage() {
                               <button
                                 type="button"
                                 onClick={() => setNcDe(sp)}
-                                className="h-8 rounded-ds border border-ds-red/40 bg-white px-2.5 text-xs font-semibold text-ds-red-200 hover:bg-ds-red/10"
+                                className="h-8 rounded-ds border border-ds-red/40 bg-ds-surface px-2.5 text-xs font-semibold text-ds-red-200 hover:bg-ds-red/10"
                               >
                                 No cumplió
                               </button>
@@ -390,12 +390,12 @@ function NCDialog({
         </p>
         <Combobox label="Causa" value={causa} onChange={setCausa} options={opciones} placeholder="Seleccionar causa…" emptyText="Sin causas" />
         <div>
-          <label className="mb-1 block text-sm font-medium text-black">Nota (opcional)</label>
+          <label className="mb-1 block text-sm font-medium text-ds-ink">Nota (opcional)</label>
           <textarea
             value={nota}
             onChange={(e) => setNota(e.target.value)}
             rows={3}
-            className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 text-sm text-black focus:border-black focus:outline-none"
+            className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 text-sm text-ds-ink focus:border-black focus:outline-none"
             placeholder="Detalle de lo ocurrido…"
           />
         </div>

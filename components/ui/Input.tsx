@@ -21,14 +21,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const right = rightElement ?? (isPassword ? (
       <button type="button" tabIndex={-1} onClick={() => setReveal(r => !r)}
         aria-label={reveal ? 'Ocultar contraseña' : 'Ver contraseña'}
-        className="text-ds-gray-400 hover:text-black transition-colors">
+        className="text-ds-gray-400 hover:text-ds-ink transition-colors">
         {reveal ? <EyeSlash size={18} weight="bold" /> : <Eye size={18} weight="bold" />}
       </button>
     ) : null);
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-sm font-medium text-black">
+          <label htmlFor={inputId} className="text-sm font-medium text-ds-ink">
             {label}
             {props.required && <span className="text-ds-red ml-0.5">*</span>}
           </label>
@@ -44,7 +44,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             type={effectiveType}
             className={`
-              w-full h-12 rounded-ds-xl bg-white text-black placeholder-ds-gray-300
+              w-full h-12 rounded-ds-xl bg-ds-surface text-ds-ink placeholder-ds-gray-300
               text-body-sm transition-all duration-150 font-normal
               border-2 shadow-ds-01
               focus:outline-none focus:border-black focus:shadow-none
@@ -86,7 +86,7 @@ export function Select({ label, error, hint, options, placeholder, className = '
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label htmlFor={selectId} className="text-sm font-medium text-black">
+        <label htmlFor={selectId} className="text-sm font-medium text-ds-ink">
           {label}
           {props.required && <span className="text-ds-red ml-0.5">*</span>}
         </label>
@@ -94,7 +94,7 @@ export function Select({ label, error, hint, options, placeholder, className = '
       <select
         id={selectId}
         className={`
-          w-full h-12 rounded-ds-xl bg-white text-black text-body-sm px-5 transition-all duration-150 font-normal
+          w-full h-12 rounded-ds-xl bg-ds-surface text-ds-ink text-body-sm px-5 transition-all duration-150 font-normal
           border-2 shadow-ds-01
           focus:outline-none focus:border-black focus:shadow-none
           disabled:bg-ds-gray-100 disabled:cursor-not-allowed disabled:border-transparent disabled:shadow-none

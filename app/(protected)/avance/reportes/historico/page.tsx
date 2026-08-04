@@ -116,7 +116,7 @@ export default function ReporteHistoricoPage() {
           Sin datos para esta semana.
         </p>
       ) : (
-        <div className="overflow-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01" style={{ maxHeight: '75vh' }}>
+        <div className="overflow-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01" style={{ maxHeight: '75vh' }}>
           <table className="border-collapse text-xs">
             <thead className="sticky top-0 z-10">
               <tr>
@@ -140,7 +140,7 @@ export default function ReporteHistoricoPage() {
             <tbody>
               {subs.map((s) => (
                 <tr key={s.id} className="border-b border-ds-gray-100 last:border-0">
-                  <th className="sticky left-0 z-10 border-r border-ds-gray-200 bg-white px-2 py-1 text-left font-normal">
+                  <th className="sticky left-0 z-10 border-r border-ds-gray-200 bg-ds-surface px-2 py-1 text-left font-normal">
                     <span className="whitespace-nowrap">
                       {s.es_critica && <span className="mr-1 text-ds-red">●</span>}
                       <span className="font-mono text-[10px] text-ds-gray-400">S{s.sprint_numero}</span>{' '}

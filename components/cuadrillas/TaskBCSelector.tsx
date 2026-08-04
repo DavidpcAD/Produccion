@@ -70,7 +70,7 @@ export function TaskBCSelector({ partidas, subpartidas, value, onChange, require
       />
       {sub && (
         <p className="text-xs text-ds-gray-400">
-          Tarea BC: <span className="font-semibold text-black">{sub.codigo} · {sub.nombre}</span>
+          Tarea BC: <span className="font-semibold text-ds-ink">{sub.codigo} · {sub.nombre}</span>
         </p>
       )}
     </div>

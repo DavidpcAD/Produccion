@@ -93,7 +93,7 @@ export default function ConcretoUsuariosPage() {
   if (mounted && !esAdmin) {
     return (
       <PageShell>
-        <h1 className="text-heading font-bold text-black">Gestión de usuarios</h1>
+        <h1 className="text-heading font-bold text-ds-ink">Gestión de usuarios</h1>
         <p className="mt-4 text-ds-gray-400 text-body-sm">Necesitás permisos de administrador para ver esta página.</p>
       </PageShell>
     );
@@ -140,7 +140,7 @@ export default function ConcretoUsuariosPage() {
             <li key={u.oid} className="rounded-ds-lg border border-ds-gray-200 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="font-semibold text-black truncate">{u.nombre || '(sin nombre)'}</p>
+                  <p className="font-semibold text-ds-ink truncate">{u.nombre || '(sin nombre)'}</p>
                   <p className="text-sm text-ds-gray-400 truncate">{u.email || u.oid}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end">

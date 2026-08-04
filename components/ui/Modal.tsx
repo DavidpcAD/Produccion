@@ -42,17 +42,17 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             onClick={onClose}
           />
           <motion.div
-            className={`relative w-full ${sizes[size]} bg-white rounded-ds-lg shadow-ds-01 flex flex-col max-h-[90vh]`}
+            className={`relative w-full ${sizes[size]} bg-ds-surface rounded-ds-lg shadow-ds-01 flex flex-col max-h-[90vh]`}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
             transition={springs.expanding}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-ds-gray-100">
-              <h2 className="text-sub-sm font-bold text-black">{title}</h2>
+              <h2 className="text-sub-sm font-bold text-ds-ink">{title}</h2>
               <motion.button
                 onClick={onClose}
-                className="p-1.5 rounded-ds text-ds-gray-400 hover:text-black hover:bg-ds-gray-100 transition-colors"
+                className="p-1.5 rounded-ds text-ds-gray-400 hover:text-ds-ink hover:bg-ds-gray-100 transition-colors"
                 whileTap={{ scale: 0.9 }}
                 transition={springs.snappy}
               >

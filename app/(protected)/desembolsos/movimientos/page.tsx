@@ -33,7 +33,7 @@ const ESTADOS: { value: EstadoVinculacion; label: string }[] = [
 ];
 
 const th = 'px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500';
-const td = 'px-3 py-2 text-sm text-black';
+const td = 'px-3 py-2 text-sm text-ds-ink';
 
 export default function DesembolsosMovimientosPage() {
   const { toast } = useToast();
@@ -137,7 +137,7 @@ export default function DesembolsosMovimientosPage() {
       </div>
 
       {/* Tabla */}
-      <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+      <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
         <table className="w-full">
           <thead>
             <tr className="border-b border-ds-gray-200 bg-ds-gray-100">

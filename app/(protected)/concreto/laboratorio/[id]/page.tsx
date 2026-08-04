@@ -35,7 +35,7 @@ function Dato({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
       <p className="text-xs font-semibold text-ds-gray-400">{label}</p>
-      <p className="text-sm font-semibold text-black break-words">{value}</p>
+      <p className="text-sm font-semibold text-ds-ink break-words">{value}</p>
     </div>
   );
 }
@@ -195,7 +195,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
         }
         title={
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-heading font-bold text-black">Muestra #{data.numero_muestra}</h1>
+            <h1 className="text-heading font-bold text-ds-ink">Muestra #{data.numero_muestra}</h1>
             <Badge variant="gray">{data.actividad_nombre}</Badge>
           </div>
         }
@@ -219,7 +219,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
       />
 
       {/* Header */}
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
           <Dato label="Obra" value={data.obra_works_no ? `${data.obra_works_no}${data.obra_display_name ? ` · ${data.obra_display_name}` : ''}` : '—'} />
           <Dato label="Casa" value={data.id_casa || '—'} />
@@ -234,24 +234,24 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
         {data.notas && (
           <div className="mt-4 pt-4 border-t border-ds-gray-100">
             <p className="text-xs font-semibold text-ds-gray-400 mb-1">Notas</p>
-            <p className="text-sm text-black whitespace-pre-wrap">{data.notas}</p>
+            <p className="text-sm text-ds-ink whitespace-pre-wrap">{data.notas}</p>
           </div>
         )}
       </div>
 
       {/* Gráfico resistencia vs curva teórica */}
-      <section className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
-        <h2 className="font-bold text-black text-sm mb-3">Curva de resistencia</h2>
+      <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
+        <h2 className="font-bold text-ds-ink text-sm mb-3">Curva de resistencia</h2>
         <GraficoResistencia ensayos={ensayos} fcObjetivo={data.fc_objetivo} curva={curva} />
       </section>
 
       {/* Ensayos + mediciones */}
-      <section className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+      <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
             <Icon name="boleta" size="sm" color="currentColor" className="text-brand" />
           </div>
-          <h2 className="font-bold text-black text-sm">Ensayos ({ensayos.length})</h2>
+          <h2 className="font-bold text-ds-ink text-sm">Ensayos ({ensayos.length})</h2>
           <Button size="xs" variant="outline" className="ml-auto" onClick={() => setAgregarEnsayo(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
             Agregar ensayo
           </Button>
@@ -265,7 +265,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
               return (
                 <div key={e.id} className="px-5 py-3.5">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-bold text-black w-16">{e.edad_dias} días</span>
+                    <span className="text-sm font-bold text-ds-ink w-16">{e.edad_dias} días</span>
                     <span className="text-xs text-ds-gray-400">{fmtDia(e.fecha_prueba)}</span>
                     {e.resistencia_kg_cm2_promedio !== null ? (
                       <Badge variant={cumpl.variant} dot>
@@ -277,7 +277,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
                     <div className="ml-auto flex items-center gap-1.5">
                       <button
                         onClick={() => setEnsayoEdit(e)}
-                        className="text-ds-gray-400 hover:text-black p-1"
+                        className="text-ds-gray-400 hover:text-ds-ink p-1"
                         title="Editar ensayo"
                       >
                         <Icon name="edit" size="sm" color="currentColor" />
@@ -303,7 +303,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
                       >
                         <button
                           onClick={() => setMedEdit({ id: m.id, resistencia_mpa: m.resistencia_mpa, notas: m.notas })}
-                          className="hover:text-black"
+                          className="hover:text-ds-ink"
                           title="Editar probeta"
                         >
                           P{m.orden}: {m.resistencia_mpa.toFixed(1)} MPa ({(m.resistencia_mpa * FACTOR_MPA_A_KGCM2).toFixed(0)} kg/cm²)
@@ -469,7 +469,7 @@ function AgregarMedicion({ idEnsayo, siguienteOrden, onOk }: { idEnsayo: number;
         onChange={(e) => setMpa(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') guardar(); }}
         placeholder="+ MPa"
-        className="w-20 h-7 rounded-full border border-ds-gray-200 bg-white px-2.5 text-xs text-black placeholder-ds-gray-300 focus:outline-none focus:border-ds-gray-400"
+        className="w-20 h-7 rounded-full border border-ds-gray-200 bg-ds-surface px-2.5 text-xs text-ds-ink placeholder-ds-gray-300 focus:outline-none focus:border-ds-gray-400"
       />
       <button
         onClick={guardar}
@@ -562,12 +562,12 @@ function ModalEditarMuestra({ muestra, cerrar, onGuardado }: { muestra: MuestraD
         <Input label="Obra (works_no)" value={obra} onChange={(e) => setObra(e.target.value)} />
         <Input label="ID Casa / ubicación" value={casa} onChange={(e) => setCasa(e.target.value)} />
         <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium text-black">Notas</label>
+          <label className="text-sm font-medium text-ds-ink">Notas</label>
           <textarea
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
             rows={2}
-            className="w-full rounded-ds-xl border border-ds-gray-200 bg-white p-3 text-sm text-black placeholder-ds-gray-300 focus:outline-none focus:border-ds-gray-400"
+            className="w-full rounded-ds-xl border border-ds-gray-200 bg-ds-surface p-3 text-sm text-ds-ink placeholder-ds-gray-300 focus:outline-none focus:border-ds-gray-400"
           />
         </div>
       </div>
@@ -686,12 +686,12 @@ function ModalEditarEnsayo({ ensayo, cerrar, onGuardado }: { ensayo: EnsayoDetal
         <DatePicker label="Fecha de prueba" value={fechaPrueba} onChange={setFechaPrueba} />
         <Input label="Motivo del ajuste de fecha" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Opcional" />
         <div className="space-y-1.5">
-          <label className="text-sm font-medium text-black">Notas</label>
+          <label className="text-sm font-medium text-ds-ink">Notas</label>
           <textarea
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
             rows={2}
-            className="w-full rounded-ds-xl border border-ds-gray-200 bg-white p-3 text-sm text-black placeholder-ds-gray-300 focus:outline-none focus:border-ds-gray-400"
+            className="w-full rounded-ds-xl border border-ds-gray-200 bg-ds-surface p-3 text-sm text-ds-ink placeholder-ds-gray-300 focus:outline-none focus:border-ds-gray-400"
           />
         </div>
       </div>

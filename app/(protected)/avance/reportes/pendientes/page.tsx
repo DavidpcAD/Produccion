@@ -125,7 +125,7 @@ export default function ReportePendientesPage() {
           )}
 
           {grupos.map(([clave, lista]) => (
-            <section key={clave} className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+            <section key={clave} className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
               <div className="flex items-center justify-between border-b border-ds-gray-200 bg-ds-gray-50 px-3 py-1.5">
                 <span className="text-sm font-semibold">
                   {agrupar === 'sub' && lista[0]?.es_critica && <span className="mr-1 text-ds-red">●</span>}
@@ -189,9 +189,9 @@ export default function ReportePendientesPage() {
 
 function Kpi({ label, value, accent }: { label: string; value: number; accent?: 'red' }) {
   return (
-    <div className="rounded-ds border border-ds-gray-200 bg-white p-3 shadow-ds-01">
+    <div className="rounded-ds border border-ds-gray-200 bg-ds-surface p-3 shadow-ds-01">
       <p className="text-xs uppercase tracking-wider text-ds-gray-500">{label}</p>
-      <p className={`text-sub font-semibold tabular-nums ${accent === 'red' ? 'text-ds-red' : 'text-black'}`}>
+      <p className={`text-sub font-semibold tabular-nums ${accent === 'red' ? 'text-ds-red' : 'text-ds-ink'}`}>
         {value}
       </p>
     </div>

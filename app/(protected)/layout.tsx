@@ -67,14 +67,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
       {/* Contenido */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center gap-3 px-4 lg:px-6 h-14 lg:h-16 bg-white border-b border-ds-gray-200 shrink-0">
+        <header className="flex items-center gap-3 px-4 lg:px-6 h-14 lg:h-16 bg-ds-surface border-b border-ds-gray-200 shrink-0">
           {/* Reserva el espacio del FAB a la izquierda cuando está visible. */}
           <div className={`w-14 shrink-0 transition-all duration-200 ${navOpen ? 'lg:w-0' : 'lg:w-14'}`} />
           <div className="lg:hidden flex items-center gap-2">
             <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center text-brand">
               <AdelanteMark className="w-4 h-auto" />
             </div>
-            <span className="font-bold text-black text-sm">Adelante</span>
+            <span className="font-bold text-ds-ink text-sm">Adelante</span>
           </div>
 
           {/* Chip de usuario */}

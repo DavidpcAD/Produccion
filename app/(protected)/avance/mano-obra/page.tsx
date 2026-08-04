@@ -73,7 +73,7 @@ export default function ManoObraPage() {
             aria-selected={tab === t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black ${
-              tab === t ? 'border-black text-black' : 'border-transparent text-ds-gray-400 hover:text-black'
+              tab === t ? 'border-black text-ds-ink' : 'border-transparent text-ds-gray-400 hover:text-ds-ink'
             }`}
           >
             {t === 'nomina' ? 'Nómina' : t === 'horas' ? 'Horas por obra' : 'Subcontratos'}

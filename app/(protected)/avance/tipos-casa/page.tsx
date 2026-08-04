@@ -169,7 +169,7 @@ function EditarModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-ds bg-white p-6 shadow-lg"
+        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-ds bg-ds-surface p-6 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-sub-sm font-bold">Sprints de {tipo.tipo_casa}</h2>
@@ -189,7 +189,7 @@ function EditarModal({
                 className={`flex items-center gap-2 rounded-ds border px-2 py-1.5 text-left text-xs transition-colors ${
                   checked
                     ? 'border-black bg-ds-gray-100'
-                    : 'border-ds-gray-200 bg-white hover:bg-ds-gray-100'
+                    : 'border-ds-gray-200 bg-ds-surface hover:bg-ds-gray-100'
                 }`}
               >
                 <input type="checkbox" checked={checked} readOnly className="pointer-events-none" />

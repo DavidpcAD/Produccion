@@ -71,7 +71,7 @@ export default function BatchesPage() {
   const columns: ColumnDef<BatchDetallePlanta, any>[] = [
     col.accessor('record_no', {
       header: 'Record', meta: { label: 'Record' },
-      cell: ({ getValue }) => <span className="font-semibold text-black tabular-nums">#{getValue() as number}</span>,
+      cell: ({ getValue }) => <span className="font-semibold text-ds-ink tabular-nums">#{getValue() as number}</span>,
     }),
     col.accessor('fecha_inicio', {
       header: 'Fecha', meta: { label: 'Fecha' },
@@ -153,7 +153,7 @@ export default function BatchesPage() {
       </div>
 
       {error && !loading && (
-        <div className="bg-white rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar los batches.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>

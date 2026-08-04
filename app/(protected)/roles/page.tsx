@@ -6,11 +6,11 @@ import { Icon } from '@/components/ds/Icon/Icon';
 export default function RolesMovidoPage() {
   return (
     <div className="p-6 max-w-xl mx-auto animate-fade-in">
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-8 text-center">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-8 text-center">
         <div className="w-12 h-12 rounded-ds bg-black mx-auto flex items-center justify-center mb-4">
           <Icon name="rol" size="lg" color="currentColor" className="text-brand" />
         </div>
-        <h1 className="text-heading font-bold text-black">La gestión de roles se movió</h1>
+        <h1 className="text-heading font-bold text-ds-ink">La gestión de roles se movió</h1>
         <p className="text-ds-gray-400 mt-2 text-body">
           Los roles y sus tipos ahora se administran desde <b>Recursos Humanos</b>.
           Producción sigue usando los roles para permisos, pero ya no se editan acá.
@@ -22,7 +22,7 @@ export default function RolesMovidoPage() {
           </span>
         </a>
         <div className="mt-4">
-          <Link href="/" className="text-sm font-semibold text-ds-gray-400 hover:text-black">Volver al inicio</Link>
+          <Link href="/" className="text-sm font-semibold text-ds-gray-400 hover:text-ds-ink">Volver al inicio</Link>
         </div>
       </div>
     </div>

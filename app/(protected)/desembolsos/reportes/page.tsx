@@ -145,7 +145,7 @@ export default function ReportesDesembolsosPage() {
 
 function ReporteCard({ titulo, desc, loading, onClick }: { titulo: string; desc: string; loading: boolean; onClick: () => void }) {
   return (
-    <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-5 shadow-ds-01">
+    <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-5 shadow-ds-01">
       <h2 className="text-sub-sm font-semibold">{titulo}</h2>
       <p className="mt-1 mb-4 text-sm text-ds-gray-500">{desc}</p>
       <Button onClick={onClick} loading={loading}>Exportar a Excel</Button>

@@ -47,7 +47,7 @@ function Dato({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
       <p className="text-xs font-semibold text-ds-gray-400">{label}</p>
-      <p className="text-sm font-semibold text-black">{value}</p>
+      <p className="text-sm font-semibold text-ds-ink">{value}</p>
     </div>
   );
 }
@@ -243,7 +243,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
         }
         title={
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-heading font-bold text-black">Colada #{c.codigo_interno}</h1>
+            <h1 className="text-heading font-bold text-ds-ink">Colada #{c.codigo_interno}</h1>
             <Badge variant={estadoCfg.variant} dot>{estadoCfg.label}</Badge>
             {c.tuvo_alarma && <Badge variant="red" dot>{c.cantidad_alarmas_total} alarma(s)</Badge>}
           </div>
@@ -251,7 +251,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
       />
 
       {c.estado === 'anulada' && c.motivo_anulacion && (
-        <div className="rounded-ds-lg border border-ds-red/50 bg-ds-red/10 px-4 py-3 text-sm text-black flex items-start gap-2.5">
+        <div className="rounded-ds-lg border border-ds-red/50 bg-ds-red/10 px-4 py-3 text-sm text-ds-ink flex items-start gap-2.5">
           <Icon name="alert" size="sm" color="currentColor" className="text-ds-red mt-0.5 shrink-0" />
           <span><span className="font-semibold">Colada anulada:</span> {c.motivo_anulacion}</span>
         </div>
@@ -289,7 +289,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Header de la colada */}
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
           <Dato label="Planta" value={`${c.planta_nombre} · ${c.planta_serial}`} />
           <Dato label="Receta Blend" value={c.receta_blend_nombre} />
@@ -307,12 +307,12 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Batches */}
-      <section className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+      <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
             <Icon name="list" size="sm" color="currentColor" className="text-brand" />
           </div>
-          <h2 className="font-bold text-black text-sm">Batches ({data.batches.length})</h2>
+          <h2 className="font-bold text-ds-ink text-sm">Batches ({data.batches.length})</h2>
         </div>
         {data.batches.length === 0 ? (
           <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">Sin batches asociados</p>
@@ -333,7 +333,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
               <tbody className="divide-y divide-ds-gray-100">
                 {data.batches.map((b) => (
                   <tr key={b.id_batch} className={b.excluido ? 'opacity-50' : ''}>
-                    <td className="px-4 py-2.5 font-semibold text-black">{b.record_no}</td>
+                    <td className="px-4 py-2.5 font-semibold text-ds-ink">{b.record_no}</td>
                     <td className="px-4 py-2.5 text-ds-gray-500">{fmtFecha(b.fecha_inicio)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{num(b.m3_producidos, 3)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{num(b.ac_real, 3)}</td>
@@ -365,12 +365,12 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
       </section>
 
       {/* Cilindros (laboratorio de campo de la colada) */}
-      <section className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+      <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
             <Icon name="boleta" size="sm" color="currentColor" className="text-brand" />
           </div>
-          <h2 className="font-bold text-black text-sm">Cilindros ({data.cilindros.length})</h2>
+          <h2 className="font-bold text-ds-ink text-sm">Cilindros ({data.cilindros.length})</h2>
         </div>
         {data.cilindros.length === 0 ? (
           <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">Sin cilindros registrados</p>
@@ -391,7 +391,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
               <tbody className="divide-y divide-ds-gray-100">
                 {data.cilindros.map((cil) => (
                   <tr key={cil.id_cilindro}>
-                    <td className="px-4 py-2.5 font-semibold text-black">{cil.numero_serie}</td>
+                    <td className="px-4 py-2.5 font-semibold text-ds-ink">{cil.numero_serie}</td>
                     <td className="px-4 py-2.5 text-ds-gray-500">{fmtDia(cil.fecha_toma)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{num(cil.slump_cm)}</td>
                     <td className="px-4 py-2.5 text-ds-gray-500">{fmtDia(cil.fecha_ensayo_7d)}</td>
@@ -545,7 +545,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
                 {pedidoLineas.map((l, i) => (
                   <tr key={i}>
                     <td className="px-3 py-2 text-ds-gray-500">{l.codigo_recurso_bc ?? '—'}</td>
-                    <td className="px-3 py-2 text-black">{l.descripcion}</td>
+                    <td className="px-3 py-2 text-ds-ink">{l.descripcion}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{num(l.cantidad, 3)}</td>
                     <td className="px-3 py-2 text-ds-gray-500">{l.unidad}</td>
                   </tr>

@@ -23,7 +23,7 @@ export function SkeletonCards({ count = 6, className = 'grid grid-cols-1 sm:grid
   return (
     <div className={className} aria-hidden="true" role="status" aria-label="Cargando…">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="bg-white rounded-ds-lg border border-ds-gray-200 p-4 space-y-3">
+        <div key={i} className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Skeleton className="w-8 h-8 shrink-0" />
             <Skeleton className="h-4 flex-1" rounded="rounded-full" />

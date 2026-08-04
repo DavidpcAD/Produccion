@@ -71,16 +71,16 @@ function Campo({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 px-4 py-2.5">
       <dt className="text-ds-gray-400 font-medium shrink-0">{label}</dt>
-      <dd className="text-black font-semibold text-right min-w-0 break-words">{value || '—'}</dd>
+      <dd className="text-ds-ink font-semibold text-right min-w-0 break-words">{value || '—'}</dd>
     </div>
   );
 }
 
 function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+    <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
       <div className="px-4 py-3 bg-ds-gray-100 border-b border-ds-gray-200">
-        <h2 className="font-bold text-black text-sm">{titulo}</h2>
+        <h2 className="font-bold text-ds-ink text-sm">{titulo}</h2>
       </div>
       <dl className="divide-y divide-ds-gray-100 text-sm">{children}</dl>
     </div>
@@ -174,7 +174,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
     return (
       <div className="p-6 max-w-[1200px] mx-auto space-y-4">
         <Skeleton className="h-8 w-1/3" rounded="rounded-full" />
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 p-6 space-y-3">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-6 space-y-3">
           <Skeleton className="h-4 w-1/2" rounded="rounded-full" />
           <Skeleton className="h-4 w-2/3" rounded="rounded-full" />
         </div>
@@ -188,7 +188,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
         <Button variant="outline" size="sm" className="mb-4" onClick={() => router.push('/obras')} icon={<Icon name="chevron-left" size="sm" color="currentColor" />}>
           Volver a obras
         </Button>
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">
           No se encontró la obra.
         </div>
       </div>
@@ -230,13 +230,13 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
       <PageHeader
         back={
           <button onClick={() => router.push('/obras')} aria-label="Volver a obras"
-            className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black shrink-0 mt-1">
+            className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-ds-ink shrink-0 mt-1">
             <Icon name="chevron-left" size="sm" color="currentColor" />
           </button>
         }
         title={
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-heading font-bold text-black leading-none">{obra.numeroObra}</h1>
+            <h1 className="text-heading font-bold text-ds-ink leading-none">{obra.numeroObra}</h1>
             <EstadoObra estado={obra.estado} />
             {obra.esBC && <Badge variant="gray">BC</Badge>}
             {obra.esProcore && <Badge variant="gray">Procore</Badge>}
@@ -299,7 +299,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
       >
         <div className="space-y-4">
           <p className="text-body-sm text-ds-gray-500">
-            Bloquear se usa cuando la obra ya está <span className="font-semibold text-black">terminada y por entregar</span>.
+            Bloquear se usa cuando la obra ya está <span className="font-semibold text-ds-ink">terminada y por entregar</span>.
             {obra.esBC && ' Se registrará como actividad de postventa dentro de la obra Postventa que elijas.'}
           </p>
           {obra.esBC && (

@@ -125,7 +125,7 @@ export function MatrizAvance({ proyecto, semana = null }: Props) {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar obra…"
-            className="h-8 w-64 rounded-ds border border-ds-gray-200 pl-8 pr-2 text-sm text-black focus:border-black focus:outline-none"
+            className="h-8 w-64 rounded-ds border border-ds-gray-200 pl-8 pr-2 text-sm text-ds-ink focus:border-black focus:outline-none"
           />
         </div>
         <span className="text-body-sm text-ds-gray-400">
@@ -210,14 +210,14 @@ export function MatrizAvance({ proyecto, semana = null }: Props) {
                 className={`hover:bg-ds-gray-100/50 ${o.congelada ? 'opacity-50' : ''}`}
                 title={o.congelada ? `${o.codigo} — congelada (en espera por NC)` : undefined}
               >
-                <td className="sticky left-0 z-10 overflow-hidden border-b border-ds-gray-100 bg-white px-2 py-1">
+                <td className="sticky left-0 z-10 overflow-hidden border-b border-ds-gray-100 bg-ds-surface px-2 py-1">
                   <button
                     type="button"
                     onClick={() => irACaptura(o.codigo)}
                     className="flex items-center gap-1 text-left hover:underline"
                     title={`Abrir captura de ${o.codigo}`}
                   >
-                    <span className="truncate font-mono text-xs font-semibold text-black">{o.codigo}</span>
+                    <span className="truncate font-mono text-xs font-semibold text-ds-ink">{o.codigo}</span>
                     <BadgeVentaMini estado={o.estado_venta} />
                     {o.congelada && <span className="text-[9px] text-ds-gray-400">*</span>}
                   </button>
@@ -272,7 +272,7 @@ function FiltroChip({
       type="button"
       onClick={onClick}
       className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
-        activo ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-white text-ds-gray-400'
+        activo ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-400'
       }`}
     >
       {label}
@@ -287,7 +287,7 @@ function BadgeVentaMini({ estado }: { estado: EstadoVenta | null }) {
   return (
     <span
       title={`Venta: ${m.label}`}
-      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-ds-gray-200 bg-white text-[9px] font-bold text-ds-gray-500"
+      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-ds-gray-200 bg-ds-surface text-[9px] font-bold text-ds-gray-500"
     >
       {m.letra}
     </span>

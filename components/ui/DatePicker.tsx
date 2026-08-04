@@ -103,7 +103,7 @@ export function DatePicker({
   return (
     <div className="flex flex-col gap-1.5" ref={wrapRef}>
       {label && (
-        <label htmlFor={labelId} className="text-sm font-medium text-black">
+        <label htmlFor={labelId} className="text-sm font-medium text-ds-ink">
           {label}{required && <span className="text-ds-red ml-0.5">*</span>}
         </label>
       )}
@@ -112,14 +112,14 @@ export function DatePicker({
           type="button" id={labelId} ref={btnRef} disabled={disabled}
           onClick={() => !disabled && setOpen(o => !o)}
           className={`
-            w-full h-12 rounded-ds-xl bg-white text-body-sm pl-5 pr-11 text-left transition-all duration-150
+            w-full h-12 rounded-ds-xl bg-ds-surface text-body-sm pl-5 pr-11 text-left transition-all duration-150
             flex items-center border-2 shadow-ds-01
             focus:outline-none focus:border-black focus:shadow-none
             disabled:bg-ds-gray-100 disabled:cursor-not-allowed disabled:border-transparent disabled:shadow-none
             ${open ? 'border-black shadow-none' : error ? 'border-ds-red' : 'border-transparent'}
           `}
         >
-          {display ? <span className="text-black">{display}</span> : <span className="text-ds-gray-300">{placeholder}</span>}
+          {display ? <span className="text-ds-ink">{display}</span> : <span className="text-ds-gray-300">{placeholder}</span>}
           <CalendarBlank size={18} weight="bold" className="absolute right-4 top-1/2 -translate-y-1/2 text-ds-gray-400" />
         </button>
 
@@ -131,17 +131,17 @@ export function DatePicker({
               top: coords.openUp ? undefined : coords.top,
               bottom: coords.openUp ? coords.bottomAnchor : undefined,
             }}
-            className="z-[100] w-[300px] rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-03 p-3 animate-fade-in"
+            className="z-[100] w-[300px] rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-03 p-3 animate-fade-in"
           >
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-black capitalize">{monthLabel}</p>
+              <p className="text-sm font-bold text-ds-ink capitalize">{monthLabel}</p>
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => shift(-1)} aria-label="Mes anterior"
-                  className="p-1.5 rounded-ds text-ds-gray-400 hover:text-black hover:bg-ds-gray-100 transition-colors">
+                  className="p-1.5 rounded-ds text-ds-gray-400 hover:text-ds-ink hover:bg-ds-gray-100 transition-colors">
                   <CaretLeft size={16} weight="bold" />
                 </button>
                 <button type="button" onClick={() => shift(1)} aria-label="Mes siguiente"
-                  className="p-1.5 rounded-ds text-ds-gray-400 hover:text-black hover:bg-ds-gray-100 transition-colors">
+                  className="p-1.5 rounded-ds text-ds-gray-400 hover:text-ds-ink hover:bg-ds-gray-100 transition-colors">
                   <CaretRight size={16} weight="bold" />
                 </button>
               </div>
@@ -163,7 +163,7 @@ export function DatePicker({
                     className={`h-9 rounded-ds text-sm transition-colors flex items-center justify-center ${
                       sel ? 'bg-black text-white font-bold shadow-ds-02'
                         : tod ? 'bg-brand/25 text-black font-bold'
-                        : c.inMonth ? 'text-black font-medium hover:bg-ds-gray-100'
+                        : c.inMonth ? 'text-ds-ink font-medium hover:bg-ds-gray-100'
                         : 'text-ds-gray-300 hover:bg-ds-gray-100'
                     }`}
                   >
@@ -175,9 +175,9 @@ export function DatePicker({
 
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-ds-gray-100">
               <button type="button" onClick={() => { onChange(''); setOpen(false); }}
-                className="text-xs font-semibold text-ds-gray-400 hover:text-black transition-colors">Borrar</button>
+                className="text-xs font-semibold text-ds-gray-400 hover:text-ds-ink transition-colors">Borrar</button>
               <button type="button" onClick={() => { const t = new Date(); pick(t.getFullYear(), t.getMonth(), t.getDate()); }}
-                className="text-xs font-semibold text-black hover:underline">Hoy</button>
+                className="text-xs font-semibold text-ds-ink hover:underline">Hoy</button>
             </div>
           </div>,
           document.body,

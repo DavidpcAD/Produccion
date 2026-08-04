@@ -21,7 +21,7 @@ interface TableProps<T> {
 
 export function Table<T>({ columns, data, keyField, loading, emptyMessage = 'Sin resultados', onRowClick }: TableProps<T>) {
   return (
-    <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+    <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-ds-gray-100 border-b border-ds-gray-200">
@@ -67,7 +67,7 @@ export function Table<T>({ columns, data, keyField, loading, emptyMessage = 'Sin
                 whileHover={onRowClick ? { backgroundColor: 'var(--ds-color-gray-100)' } : undefined}
               >
                 {columns.map(col => (
-                  <td key={String(col.key)} className={`px-4 py-3 text-black ${col.className ?? ''}`}>
+                  <td key={String(col.key)} className={`px-4 py-3 text-ds-ink ${col.className ?? ''}`}>
                     {col.render ? col.render(row) : String((row as Record<string, unknown>)[String(col.key)] ?? '')}
                   </td>
                 ))}
@@ -117,7 +117,7 @@ export function Pagination({ page, totalPages, onPageChange, totalItems, pageSiz
               className={`w-8 h-8 text-sm rounded-ds border font-semibold transition-colors ${
                 p === page
                   ? 'bg-black text-white border-black'
-                  : 'border-ds-gray-200 hover:bg-ds-gray-100 text-black'
+                  : 'border-ds-gray-200 hover:bg-ds-gray-100 text-ds-ink'
               }`}
             >
               {p}

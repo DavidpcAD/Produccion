@@ -132,8 +132,8 @@ export default function ReporteM2Page() {
               />
             )}
             <span className="text-xs text-ds-gray-500">
-              Total semana <strong className="text-black">{fmt(m.total_semana)}</strong> m² ·
-              acumulado <strong className="text-black">{fmt(m.total_acumulado)}</strong> m² ·{' '}
+              Total semana <strong className="text-ds-ink">{fmt(m.total_semana)}</strong> m² ·
+              acumulado <strong className="text-ds-ink">{fmt(m.total_acumulado)}</strong> m² ·{' '}
               {m.cerrada ? 'foto del cierre' : 'estado vivo (semana abierta)'}
             </span>
           </div>
@@ -469,7 +469,7 @@ function MatrizPartida({
       </tr>
       {p.subs.map((s) => (
         <tr key={s.id}>
-          <td className="sticky left-0 z-10 truncate border-b border-ds-gray-200 bg-white px-2 py-1 text-xs">
+          <td className="sticky left-0 z-10 truncate border-b border-ds-gray-200 bg-ds-surface px-2 py-1 text-xs">
             <span className="font-mono text-[10px] text-ds-gray-500">{s.codigo}</span> {s.nombre}
           </td>
           {obras.map((o) => {

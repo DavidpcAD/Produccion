@@ -77,7 +77,7 @@ export function AvanceRapidoDialog({ sub, pending, onClose, onConfirmar }: Props
                       ? 'border-black bg-black text-white'
                       : bloqueado
                         ? 'cursor-not-allowed border-ds-gray-100 bg-ds-gray-100 text-ds-gray-300'
-                        : 'border-ds-gray-200 bg-white text-ds-gray-500 hover:border-black'
+                        : 'border-ds-gray-200 bg-ds-surface text-ds-gray-500 hover:border-black'
                   }`}
                 >
                   {v}%
@@ -98,7 +98,7 @@ export function AvanceRapidoDialog({ sub, pending, onClose, onConfirmar }: Props
           />
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-black">Valor exacto</label>
+            <label className="mb-1.5 block text-xs font-medium text-ds-ink">Valor exacto</label>
             <input
               type="number"
               min={0}
@@ -108,7 +108,7 @@ export function AvanceRapidoDialog({ sub, pending, onClose, onConfirmar }: Props
                 const n = Number(e.target.value);
                 if (!Number.isNaN(n)) setPct(Math.max(0, Math.min(100, n)));
               }}
-              className="h-10 w-full rounded-ds border border-ds-gray-200 px-3 text-sm text-black focus:border-black focus:outline-none"
+              className="h-10 w-full rounded-ds border border-ds-gray-200 px-3 text-sm text-ds-ink focus:border-black focus:outline-none"
             />
           </div>
 

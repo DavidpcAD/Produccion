@@ -46,7 +46,7 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
   return (
     <section className="space-y-4">
       <div className="border-b border-ds-gray-100 pb-2">
-        <h3 className="font-bold text-black text-sm">{titulo}</h3>
+        <h3 className="font-bold text-ds-ink text-sm">{titulo}</h3>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
     </section>
@@ -160,13 +160,13 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
 
         <section className="space-y-3">
           <div className="border-b border-ds-gray-100 pb-2">
-            <h3 className="font-bold text-black text-sm">Integraciones</h3>
+            <h3 className="font-bold text-ds-ink text-sm">Integraciones</h3>
           </div>
           <div className="flex flex-wrap gap-6">
-            <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
               <input type="checkbox" checked={!!form.esBC} onChange={e => set('esBC', e.target.checked)} className="w-4 h-4 accent-brand" /> Business Central
             </label>
-            <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
               <input type="checkbox" checked={!!form.esProcore} onChange={e => set('esProcore', e.target.checked)} className="w-4 h-4 accent-brand" /> Procore
             </label>
           </div>

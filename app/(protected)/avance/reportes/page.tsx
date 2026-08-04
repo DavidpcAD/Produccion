@@ -130,14 +130,14 @@ function periodo(iso: string): string {
 }
 
 const th = 'px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ds-gray-500';
-const td = 'px-3 py-2 text-sm text-black';
+const td = 'px-3 py-2 text-sm text-ds-ink';
 
 // --------------------------------------------------------- Resumen general
 
 function ResumenGeneral({ data, semanaSel }: { data: ResumenMes; semanaSel: number }) {
   const { filas, tot, dif_crono, dif_costo } = data;
   return (
-    <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+    <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
       <div className="border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ds-gray-500">
         Resumen del mes
       </div>
@@ -247,7 +247,7 @@ function ResumenGeneral({ data, semanaSel }: { data: ResumenMes; semanaSel: numb
 function ResumenFinanciero({ data, semanaSel }: { data: ResumenMes; semanaSel: number }) {
   const { filas, tot_fin } = data;
   return (
-    <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+    <section className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
       <div className="border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-ds-gray-500">
         Resumen del mes — Financiero (producción por semana)
       </div>

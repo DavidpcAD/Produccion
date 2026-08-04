@@ -57,13 +57,13 @@ function KpiCard({
   return (
     <div
       className={`rounded-ds-lg border p-4 shadow-ds-01 ${
-        destacado ? 'bg-black text-white border-black' : 'bg-white border-ds-gray-200'
+        destacado ? 'bg-black text-white border-black' : 'bg-ds-surface border-ds-gray-200'
       }`}
     >
       <p className={`text-xs uppercase tracking-wide ${destacado ? 'text-white/60' : 'text-ds-gray-400'}`}>
         {titulo}
       </p>
-      <p className={`mt-1 text-sub-sm font-bold ${destacado ? 'text-brand' : 'text-black'}`}>{formatCRC(monto)}</p>
+      <p className={`mt-1 text-sub-sm font-bold ${destacado ? 'text-brand' : 'text-ds-ink'}`}>{formatCRC(monto)}</p>
       {delta !== undefined && delta !== null && Number.isFinite(delta) && (
         <p className={`mt-0.5 text-xs ${delta >= 0 ? 'text-ds-green-ink' : 'text-ds-red'}`}>
           {delta >= 0 ? '▲' : '▼'} {formatPct(Math.abs(delta))} vs. período anterior
@@ -85,7 +85,7 @@ function BarrasHorizontales({ datos }: { datos: { nombre: string; monto: number 
           <div className="flex-1 h-5 bg-ds-gray-100 rounded-ds overflow-hidden">
             <div className="h-full bg-brand rounded-ds" style={{ width: `${(Math.abs(d.monto) / max) * 100}%` }} />
           </div>
-          <span className="w-24 shrink-0 text-right text-xs font-mono text-black">{abreviarCRC(d.monto)}</span>
+          <span className="w-24 shrink-0 text-right text-xs font-mono text-ds-ink">{abreviarCRC(d.monto)}</span>
         </div>
       ))}
     </div>
@@ -158,7 +158,7 @@ export default function UtilidadesPage() {
     colLoteMov.accessor('bloque', { header: 'Bloque', meta: { label: 'Bloque' } }),
     colLoteMov.accessor('lote', {
       header: 'Lote', meta: { label: 'Lote' },
-      cell: ({ getValue }) => <span className="font-semibold text-black">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="font-semibold text-ds-ink">{getValue() as string}</span>,
     }),
     colLoteMov.accessor('monto', {
       header: 'Monto', meta: { label: 'Monto', align: 'right', exportValue: (r) => r.monto },
@@ -169,7 +169,7 @@ export default function UtilidadesPage() {
   const columnasIngLote: ColumnDef<{ lote: string; ingresos: number; ingreso_neto_ad: number; utilidad: number }, any>[] = [
     colLoteIng.accessor('lote', {
       header: 'Lote', meta: { label: 'Lote' },
-      cell: ({ getValue }) => <span className="font-semibold text-black">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="font-semibold text-ds-ink">{getValue() as string}</span>,
     }),
     colLoteIng.accessor('ingresos', {
       header: 'Ingreso Bruto', meta: { label: 'Ingreso Bruto', align: 'right', exportValue: (r) => r.ingresos },
@@ -181,7 +181,7 @@ export default function UtilidadesPage() {
     }),
     colLoteIng.accessor('utilidad', {
       header: 'Utilidad', meta: { label: 'Utilidad', align: 'right', exportValue: (r) => r.utilidad },
-      cell: ({ getValue }) => <span className="font-mono font-semibold text-black">{formatCRC(Number(getValue()))}</span>,
+      cell: ({ getValue }) => <span className="font-mono font-semibold text-ds-ink">{formatCRC(Number(getValue()))}</span>,
     }),
   ];
 
@@ -226,7 +226,7 @@ export default function UtilidadesPage() {
             type="button"
             onClick={() => setTab(k)}
             className={`px-5 h-10 rounded-full text-sm font-semibold transition-all ${
-              tab === k ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-black'
+              tab === k ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-ds-ink'
             }`}
           >
             {lbl}
@@ -265,14 +265,14 @@ export default function UtilidadesPage() {
           </section>
 
           {/* Utilidad gastada (barras DS) */}
-          <section className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-4 space-y-3">
-            <h3 className="font-bold text-black text-sm">Utilidad gastada — componentes</h3>
+          <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-4 space-y-3">
+            <h3 className="font-bold text-ds-ink text-sm">Utilidad gastada — componentes</h3>
             <BarrasHorizontales datos={datosGastada} />
           </section>
 
           {/* Distribución por tipo */}
           <section className="space-y-2">
-            <h3 className="font-bold text-black text-sm">Distribución por tipo de movimiento</h3>
+            <h3 className="font-bold text-ds-ink text-sm">Distribución por tipo de movimiento</h3>
             <DataTable
               columns={columnasTipo}
               data={resumen?.distribucionPorTipo ?? []}
@@ -304,15 +304,15 @@ export default function UtilidadesPage() {
               destacado
               delta={ingresos ? delta(ingresos.kpisActual.utilidad, ingresos.kpisAnterior.utilidad) : null}
             />
-            <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01">
+            <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
               <p className="text-xs uppercase tracking-wide text-ds-gray-400">% Utilidad</p>
-              <p className="mt-1 text-sub-sm font-bold text-black">{formatPct(ingresos?.kpisActual.porcentaje ?? null)}</p>
+              <p className="mt-1 text-sub-sm font-bold text-ds-ink">{formatPct(ingresos?.kpisActual.porcentaje ?? null)}</p>
             </div>
           </section>
 
           {/* Ingresos y utilidad por lote */}
           <section className="space-y-2">
-            <h3 className="font-bold text-black text-sm">Ingresos y utilidad por lote</h3>
+            <h3 className="font-bold text-ds-ink text-sm">Ingresos y utilidad por lote</h3>
             <DataTable
               columns={columnasIngLote}
               data={ingresos?.porLote ?? []}
@@ -324,7 +324,7 @@ export default function UtilidadesPage() {
 
           {/* Movimientos por lote (del resumen) */}
           <section className="space-y-2">
-            <h3 className="font-bold text-black text-sm">Movimientos por lote</h3>
+            <h3 className="font-bold text-ds-ink text-sm">Movimientos por lote</h3>
             <DataTable
               columns={columnasMovLote}
               data={movLote}

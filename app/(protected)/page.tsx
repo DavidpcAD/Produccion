@@ -112,7 +112,7 @@ export default async function DashboardPage() {
     <PageShell className="space-y-6">
       {/* Welcome */}
       <div>
-        <h1 className="text-heading sm:text-4xl font-bold text-black tracking-tight">
+        <h1 className="text-heading sm:text-4xl font-bold text-ds-ink tracking-tight">
           Hola, {session?.nombre.split(' ')[0]}
         </h1>
         <p className="text-ds-gray-400 mt-1.5 text-body">Resumen de producción: obra, jornada (H4) y utilidades.</p>
@@ -122,15 +122,15 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map(card => (
           <Link key={card.label} href={card.href} className="group block">
-            <div className="bg-white rounded-ds-lg border border-ds-gray-200 p-5 shadow-ds-01 hover:shadow-ds-03 transition-all duration-200 hover:-translate-y-0.5">
+            <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-5 shadow-ds-01 hover:shadow-ds-03 transition-all duration-200 hover:-translate-y-0.5">
               <div className="flex items-start justify-between mb-4">
                 <div className={`w-10 h-10 rounded-ds ${card.accent} flex items-center justify-center shadow-ds-02`}>
                   <Icon name={card.icon} size="md" color="currentColor" className={card.accent === 'bg-brand' ? 'text-black' : 'text-white'} />
                 </div>
-                <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 group-hover:text-black transition-colors mt-1" />
+                <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 group-hover:text-ds-ink transition-colors mt-1" />
               </div>
-              <div className="text-heading sm:text-4xl font-bold text-black mb-1">{card.value}</div>
-              <div className="text-sm font-semibold text-black">{card.label}</div>
+              <div className="text-heading sm:text-4xl font-bold text-ds-ink mb-1">{card.value}</div>
+              <div className="text-sm font-semibold text-ds-ink">{card.label}</div>
               <div className="text-xs text-ds-gray-400 mt-0.5">{card.sub}</div>
             </div>
           </Link>
@@ -140,8 +140,8 @@ export default async function DashboardPage() {
       {/* Acciones rápidas + Obras en ejecución */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Acciones rápidas */}
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
-          <h2 className="font-bold text-black mb-4 text-sub-sm">Acciones rápidas</h2>
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
+          <h2 className="font-bold text-ds-ink mb-4 text-sub-sm">Acciones rápidas</h2>
           <div className="space-y-1">
             {quickActions
               .filter(a => (session?.nivelAdmin ?? 0) >= a.minLevel)
@@ -152,20 +152,20 @@ export default async function DashboardPage() {
                   className="flex items-center gap-3 px-3 py-2.5 rounded-ds hover:bg-ds-gray-100 transition-colors group"
                 >
                   <div className="w-7 h-7 rounded-ds bg-ds-gray-100 group-hover:bg-brand group-hover:shadow-ds-02 flex items-center justify-center transition-all shrink-0">
-                    <Icon name={icon} size="sm" color="currentColor" className="text-ds-gray-500 group-hover:text-black" />
+                    <Icon name={icon} size="sm" color="currentColor" className="text-ds-gray-500 group-hover:text-ds-ink" />
                   </div>
-                  <span className="text-sm font-semibold text-black">{label}</span>
-                  <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 group-hover:text-black ml-auto transition-colors" />
+                  <span className="text-sm font-semibold text-ds-ink">{label}</span>
+                  <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 group-hover:text-ds-ink ml-auto transition-colors" />
                 </Link>
               ))}
           </div>
         </div>
 
         {/* Obras en ejecución */}
-        <div className="lg:col-span-2 bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
+        <div className="lg:col-span-2 bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <h2 className="font-bold text-black text-sub-sm">Obras en ejecución</h2>
-            <Link href="/avance" className="ml-auto text-xs font-semibold text-ds-gray-400 hover:text-black transition-colors">Ver todas →</Link>
+            <h2 className="font-bold text-ds-ink text-sub-sm">Obras en ejecución</h2>
+            <Link href="/avance" className="ml-auto text-xs font-semibold text-ds-gray-400 hover:text-ds-ink transition-colors">Ver todas →</Link>
           </div>
           {stats.obrasList.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-ds-gray-300">

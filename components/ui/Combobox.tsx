@@ -32,7 +32,7 @@ interface ComboboxProps {
 }
 
 const weightClass: Record<ComboWeight, string> = {
-  bold: 'font-bold text-black',
+  bold: 'font-bold text-ds-ink',
   normal: 'font-normal text-ds-gray-500',
   light: 'font-light text-ds-gray-400',
 };
@@ -42,7 +42,7 @@ const norm = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
 function OptionLabel({ opt }: { opt: ComboOption }) {
-  if (!opt.parts?.length) return <span className="text-black">{opt.label}</span>;
+  if (!opt.parts?.length) return <span className="text-ds-ink">{opt.label}</span>;
   return (
     <span className="truncate">
       {opt.parts.map((p, i) => (
@@ -166,7 +166,7 @@ export function Combobox({
   return (
     <div className="flex flex-col gap-1.5" ref={wrapRef}>
       {label && (
-        <label htmlFor={labelId} className="text-sm font-medium text-black">
+        <label htmlFor={labelId} className="text-sm font-medium text-ds-ink">
           {label}{required && <span className="text-ds-red ml-0.5">*</span>}
         </label>
       )}
@@ -178,7 +178,7 @@ export function Combobox({
           disabled={disabled}
           onClick={() => !disabled && setOpen(o => !o)}
           className={`
-            w-full h-12 rounded-ds-xl bg-white text-body-sm pl-5 pr-10 text-left transition-all duration-150
+            w-full h-12 rounded-ds-xl bg-ds-surface text-body-sm pl-5 pr-10 text-left transition-all duration-150
             flex items-center border-2 shadow-ds-01
             focus:outline-none focus:border-black focus:shadow-none
             disabled:bg-ds-gray-100 disabled:cursor-not-allowed disabled:border-transparent disabled:shadow-none
@@ -187,7 +187,7 @@ export function Combobox({
         >
           {multiple
             ? (values.length
-                ? <span className="truncate text-black">{multiLabel}</span>
+                ? <span className="truncate text-ds-ink">{multiLabel}</span>
                 : <span className="text-ds-gray-300">{placeholder}</span>)
             : (selected
                 ? <OptionLabel opt={selected} />
@@ -208,7 +208,7 @@ export function Combobox({
               top: coords.openUp ? undefined : coords.top,
               bottom: coords.openUp ? coords.bottomAnchor : undefined,
             }}
-            className="z-[100] rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-03 overflow-hidden animate-fade-in"
+            className="z-[100] rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-03 overflow-hidden animate-fade-in"
           >
             <div className="flex items-center gap-2 px-3 py-2 border-b border-ds-gray-100">
               <MagnifyingGlass size={15} weight="bold" className="text-ds-gray-400 shrink-0" />
@@ -218,7 +218,7 @@ export function Combobox({
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Buscar…"
-                className="w-full text-body-sm text-black placeholder-ds-gray-300 focus:outline-none bg-transparent"
+                className="w-full text-body-sm text-ds-ink placeholder-ds-gray-300 focus:outline-none bg-transparent"
               />
             </div>
             <div ref={listRef} style={{ maxHeight: coords.maxH }} className="overflow-y-auto py-1">

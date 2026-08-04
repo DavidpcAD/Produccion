@@ -75,7 +75,7 @@ export default function LaboratorioPage() {
   const columns: ColumnDef<MuestraListadoItem, any>[] = [
     col.accessor('numero_muestra', {
       header: 'N° Muestra', meta: { label: 'N° Muestra' },
-      cell: ({ getValue }) => <span className="font-semibold text-black">#{getValue() as number}</span>,
+      cell: ({ getValue }) => <span className="font-semibold text-ds-ink">#{getValue() as number}</span>,
     }),
     col.accessor('actividad_nombre', {
       header: 'Actividad', meta: { label: 'Actividad' },
@@ -88,7 +88,7 @@ export default function LaboratorioPage() {
         if (!m.obra_works_no) return <span className="text-ds-gray-300">—</span>;
         return (
           <div className="min-w-0">
-            <p className="text-black truncate">{m.obra_works_no}</p>
+            <p className="text-ds-ink truncate">{m.obra_works_no}</p>
             {m.obra_display_name && <p className="text-xs text-ds-gray-400 truncate">{m.obra_display_name}</p>}
           </div>
         );
@@ -96,7 +96,7 @@ export default function LaboratorioPage() {
     }),
     col.accessor('tipo_concreto_display', {
       header: 'Tipo', meta: { label: 'Tipo' },
-      cell: ({ getValue }) => <span className="text-black">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="text-ds-ink">{getValue() as string}</span>,
     }),
     col.accessor('fc_objetivo', {
       header: "f'c", meta: { label: "f'c objetivo", align: 'right' },
@@ -165,7 +165,7 @@ export default function LaboratorioPage() {
       </div>
 
       {error && !loading && (
-        <div className="bg-white rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar las muestras.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
@@ -288,7 +288,7 @@ function ModalCrearMuestra({
         <DatePicker label="Fecha de colado *" value={fechaColado} onChange={setFechaColado} />
 
         <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium text-black">{"f'c objetivo (kg/cm²) *"}</label>
+          <label className="text-sm font-medium text-ds-ink">{"f'c objetivo (kg/cm²) *"}</label>
           <div className="flex flex-wrap items-center gap-1.5">
             {FC_COMUNES.map((f) => (
               <button
@@ -298,7 +298,7 @@ function ModalCrearMuestra({
                 className={`px-3 py-1.5 rounded-ds text-sm font-semibold border transition-colors ${
                   Number(fcObjetivo) === f
                     ? 'bg-black text-white border-black'
-                    : 'bg-white text-ds-gray-500 border-ds-gray-200 hover:border-ds-gray-300'
+                    : 'bg-ds-surface text-ds-gray-500 border-ds-gray-200 hover:border-ds-gray-300'
                 }`}
               >
                 {f}
@@ -335,7 +335,7 @@ function ModalCrearMuestra({
         <Input label="ID Casa / ubicación" value={casa} onChange={(e) => setCasa(e.target.value)} />
 
         <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium text-black">Edades a probar (días)</label>
+          <label className="text-sm font-medium text-ds-ink">Edades a probar (días)</label>
           <div className="flex flex-wrap gap-1.5">
             {EDADES.map((e) => (
               <button
@@ -345,7 +345,7 @@ function ModalCrearMuestra({
                 className={`px-3 py-1.5 rounded-ds text-sm font-semibold border transition-colors ${
                   edades.includes(e)
                     ? 'bg-brand text-black border-brand'
-                    : 'bg-white text-ds-gray-500 border-ds-gray-200 hover:border-ds-gray-300'
+                    : 'bg-ds-surface text-ds-gray-500 border-ds-gray-200 hover:border-ds-gray-300'
                 }`}
               >
                 {e}d
@@ -356,12 +356,12 @@ function ModalCrearMuestra({
         </div>
 
         <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium text-black">Notas</label>
+          <label className="text-sm font-medium text-ds-ink">Notas</label>
           <textarea
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
             rows={2}
-            className="w-full rounded-ds-xl border border-ds-gray-200 bg-white p-3 text-sm text-black placeholder-ds-gray-300 focus:outline-none focus:border-ds-gray-400"
+            className="w-full rounded-ds-xl border border-ds-gray-200 bg-ds-surface p-3 text-sm text-ds-ink placeholder-ds-gray-300 focus:outline-none focus:border-ds-gray-400"
             placeholder="Opcional"
           />
         </div>
@@ -472,7 +472,7 @@ function Resumen({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <p className="text-xs text-ds-gray-400">{label}</p>
-      <p className="text-sub-sm font-bold text-black tabular-nums">{value}</p>
+      <p className="text-sub-sm font-bold text-ds-ink tabular-nums">{value}</p>
     </div>
   );
 }

@@ -83,7 +83,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
   if (loading || !proyecto) return (
     <div className="p-6 max-w-[1200px] mx-auto">
       <Skeleton className="h-8 w-1/3 mb-4" rounded="rounded-full" />
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 p-6">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-6">
         <Skeleton className="h-4 w-1/2" rounded="rounded-full" />
       </div>
     </div>
@@ -101,13 +101,13 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
     <PageShell width="narrow">
       <PageHeader
         back={
-          <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-black mt-1 shrink-0">
+          <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-ds-ink mt-1 shrink-0">
             <Icon name="chevron-left" size="sm" color="currentColor" />
           </button>
         }
         title={
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-heading font-bold text-black">{proyecto.Nombre}</h1>
+            <h1 className="text-heading font-bold text-ds-ink">{proyecto.Nombre}</h1>
             <Badge variant="gray">{proyecto.CodigoBC}</Badge>
             <Badge variant="green">{proyecto.Estado}</Badge>
           </div>
@@ -126,17 +126,17 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
       />
 
       {Object.keys(byTask).length === 0 ? (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-300">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-300">
           <Icon name="boleta" size="lg" color="currentColor" className="mx-auto mb-3" />
-          <p className="font-semibold text-black">Sin personas asignadas</p>
+          <p className="font-semibold text-ds-ink">Sin personas asignadas</p>
           <p className="text-sm mt-1 text-ds-gray-400">Agrega colaboradores a este proyecto</p>
         </div>
       ) : (
         Object.entries(byTask).map(([taskNo, { desc, members }]) => (
-          <div key={taskNo} className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+          <div key={taskNo} className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
             <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-brand shrink-0" />
-              <span className="font-bold text-black text-sm">{taskNo !== 'Sin tarea' ? `Tarea ${taskNo}` : 'Sin tarea'}</span>
+              <span className="font-bold text-ds-ink text-sm">{taskNo !== 'Sin tarea' ? `Tarea ${taskNo}` : 'Sin tarea'}</span>
               <span className="text-ds-gray-400 text-sm flex-1 min-w-0 truncate">{desc}</span>
               <Badge variant="gray" className="ml-auto shrink-0">{members.length} personas</Badge>
             </div>
@@ -149,7 +149,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
                       {iniciales}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-black">{m.NombreCompleto}</p>
+                      <p className="text-sm font-semibold text-ds-ink">{m.NombreCompleto}</p>
                       <p className="text-xs text-ds-gray-400">{m.NombreRol}</p>
                     </div>
                     {m.FechaAsignacion && (

@@ -97,7 +97,7 @@ export default function CausasPage() {
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  className="text-sm font-medium text-black hover:underline"
+                  className="text-sm font-medium text-ds-ink hover:underline"
                   onClick={() => setEditar(c)}
                 >
                   Editar

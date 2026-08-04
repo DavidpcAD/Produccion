@@ -93,7 +93,7 @@ function SeccionBancos({
   return (
     <section className="mt-4">
       <div className="mb-1 text-[10px] uppercase tracking-wider text-ds-gray-400">{titulo}</div>
-      <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-gray-200 bg-white">
+      <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-gray-200 bg-ds-surface">
         {bancos.map((b) => {
           const e = b.EsquemaVigente;
           return (
@@ -111,7 +111,7 @@ function SeccionBancos({
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm tabular-nums">
                     {e.Hitos.map((h) => (
                       <span key={h.Codigo} className="text-ds-gray-500">
-                        <strong className="text-black">{h.Codigo}</strong> {h.Porcentaje}%
+                        <strong className="text-ds-ink">{h.Codigo}</strong> {h.Porcentaje}%
                         {h.EsMontoFijo ? ' (fijo)' : ''}
                       </span>
                     ))}
@@ -223,13 +223,13 @@ function PanelEsquema({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <aside className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-xl" onClick={(ev) => ev.stopPropagation()}>
+      <aside className="h-full w-full max-w-lg overflow-y-auto bg-ds-surface p-6 shadow-xl" onClick={(ev) => ev.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2 className="text-sub font-bold">{banco.AbrevBanco}</h2>
             <p className="text-xs text-ds-gray-400">{banco.NombreBanco}</p>
           </div>
-          <button onClick={onClose} className="text-sub leading-none text-ds-gray-400 hover:text-black">×</button>
+          <button onClick={onClose} className="text-sub leading-none text-ds-gray-400 hover:text-ds-ink">×</button>
         </div>
 
         {e && (
@@ -257,13 +257,13 @@ function PanelEsquema({
                 <div key={i} className="rounded-ds border border-ds-gray-200 p-2">
                   <div className="flex items-center gap-2">
                     <select value={f.IDHito} onChange={(ev) => setFila(i, { IDHito: Number(ev.target.value) })}
-                      className="h-9 flex-1 rounded-ds border-2 border-transparent bg-white px-2 text-sm shadow-ds-01 focus:border-black focus:outline-none">
+                      className="h-9 flex-1 rounded-ds border-2 border-transparent bg-ds-surface px-2 text-sm shadow-ds-01 focus:border-black focus:outline-none">
                       {hitos.map((h) => <option key={h.IDHito} value={h.IDHito}>{h.Codigo} — {h.Nombre}</option>)}
                     </select>
                     <input type="number" min={0} max={100} step="0.01" value={f.Porcentaje} placeholder="%"
                       disabled={f.EsMontoFijo}
                       onChange={(ev) => setFila(i, { Porcentaje: ev.target.value })}
-                      className="h-9 w-20 rounded-ds border-2 border-transparent bg-white px-2 text-right text-sm tabular-nums shadow-ds-01 focus:border-black focus:outline-none disabled:bg-ds-gray-100" />
+                      className="h-9 w-20 rounded-ds border-2 border-transparent bg-ds-surface px-2 text-right text-sm tabular-nums shadow-ds-01 focus:border-black focus:outline-none disabled:bg-ds-gray-100" />
                     <button type="button" onClick={() => quitar(i)} className="px-2 text-ds-gray-400 hover:text-ds-red" title="Quitar">×</button>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2 text-xs text-ds-gray-500">
@@ -288,7 +288,7 @@ function PanelEsquema({
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">Notas (opcional)</span>
             <textarea value={notas} onChange={(ev) => setNotas(ev.target.value)} rows={2} maxLength={500}
-              className="w-full rounded-ds-xl border-2 border-transparent bg-white px-4 py-2 text-sm shadow-ds-01 focus:border-black focus:outline-none" />
+              className="w-full rounded-ds-xl border-2 border-transparent bg-ds-surface px-4 py-2 text-sm shadow-ds-01 focus:border-black focus:outline-none" />
           </label>
         </div>
 

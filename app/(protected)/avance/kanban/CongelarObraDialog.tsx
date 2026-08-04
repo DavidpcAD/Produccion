@@ -59,7 +59,7 @@ export function CongelarObraDialog({ codigo, causas, pending, onClose, onConfirm
         </p>
 
         <div>
-          <label className="mb-2 block text-xs font-medium text-black">
+          <label className="mb-2 block text-xs font-medium text-ds-ink">
             Motivo del congelamiento
           </label>
           <div className="grid grid-cols-1 gap-2">
@@ -73,7 +73,7 @@ export function CongelarObraDialog({ codigo, causas, pending, onClose, onConfirm
                   className={`flex items-center gap-2 rounded-ds border px-3 py-2.5 text-left text-sm transition-colors ${
                     activa
                       ? 'border-amber-400 bg-amber-50 text-amber-900'
-                      : 'border-ds-gray-200 bg-white hover:bg-ds-gray-100/50'
+                      : 'border-ds-gray-200 bg-ds-surface hover:bg-ds-gray-100/50'
                   }`}
                 >
                   <span className="font-mono text-xs text-ds-gray-400">{c.codigo}</span>
@@ -91,13 +91,13 @@ export function CongelarObraDialog({ codigo, causas, pending, onClose, onConfirm
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-black">Nota (opcional)</label>
+          <label className="mb-1.5 block text-xs font-medium text-ds-ink">Nota (opcional)</label>
           <textarea
             rows={2}
             value={nota}
             onChange={(e) => setNota(e.target.value)}
             placeholder="Detalle del motivo…"
-            className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 text-sm text-black focus:border-black focus:outline-none"
+            className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 text-sm text-ds-ink focus:border-black focus:outline-none"
           />
         </div>
       </div>

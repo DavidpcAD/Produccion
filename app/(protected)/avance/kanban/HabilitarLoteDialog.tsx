@@ -72,13 +72,13 @@ export function HabilitarLoteDialog({ open, pending, onClose, onConfirmar }: Pro
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-black">Códigos de obra</label>
+          <label className="mb-1.5 block text-sm font-medium text-ds-ink">Códigos de obra</label>
           <textarea
             rows={5}
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder={'Uno por línea o separados por coma.\nEj: VN-C.08, VN-C.09, VN-D.01'}
-            className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 font-mono text-sm text-black focus:border-black focus:outline-none"
+            className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 font-mono text-sm text-ds-ink focus:border-black focus:outline-none"
           />
           <p className="mt-1 text-[11px] text-ds-gray-400">
             {codigos.length} código{codigos.length === 1 ? '' : 's'} detectado

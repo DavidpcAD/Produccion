@@ -36,7 +36,7 @@ export default function CatalogoHitosPage() {
         actions={<Button onClick={() => setEditando('nuevo')}>+ Nuevo hito</Button>}
       />
 
-      <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+      <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-ds-gray-100 border-b border-ds-gray-200">
@@ -143,7 +143,7 @@ function EditarModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-ds bg-white p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-ds bg-ds-surface p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-sub-sm font-bold">{esNuevo ? 'Nuevo hito' : `Editar ${hito!.Codigo}`}</h2>
         {!esNuevo && (
           <p className="mt-1 text-xs text-ds-gray-500">
@@ -161,13 +161,13 @@ function EditarModal({
           <Input label="Nombre completo" required value={nombre} maxLength={100}
             onChange={(e) => setNombre(e.target.value)} placeholder="Firma de casa, Muros colados…" />
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-black">Descripción (opcional)</span>
+            <span className="text-sm font-medium text-ds-ink">Descripción (opcional)</span>
             <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={3} maxLength={500}
-              className="w-full rounded-ds-xl border-2 border-transparent bg-white px-4 py-2 text-sm shadow-ds-01 focus:border-black focus:outline-none" />
+              className="w-full rounded-ds-xl border-2 border-transparent bg-ds-surface px-4 py-2 text-sm shadow-ds-01 focus:border-black focus:outline-none" />
           </label>
           <div className="flex items-end gap-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-black">Color</span>
+              <span className="text-sm font-medium text-ds-ink">Color</span>
               <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
                 className="h-12 w-20 cursor-pointer rounded-ds border-2 border-ds-gray-200" />
             </label>

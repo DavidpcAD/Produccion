@@ -101,10 +101,10 @@ export function ComentariosPanel({
   }
 
   return (
-    <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-4 space-y-4">
+    <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Icon name="edit" size="sm" color="currentColor" />
-        <h3 className="font-bold text-black text-sm">{titulo}</h3>
+        <h3 className="font-bold text-ds-ink text-sm">{titulo}</h3>
       </div>
 
       <div className="space-y-2">
@@ -114,7 +114,7 @@ export function ComentariosPanel({
           rows={3}
           maxLength={10000}
           placeholder="Agregar un comentario para este período…"
-          className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 text-sm text-black focus:outline-none focus:border-black resize-y"
+          className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 text-sm text-ds-ink focus:outline-none focus:border-black resize-y"
         />
         <div className="flex justify-end">
           <Button size="sm" loading={saving} onClick={guardar}>
@@ -132,7 +132,7 @@ export function ComentariosPanel({
           {propios.map((c) => (
             <li key={c.id_comentario} className="py-3 flex items-start gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-black whitespace-pre-wrap break-words">{c.contenido_markdown}</p>
+                <p className="text-sm text-ds-ink whitespace-pre-wrap break-words">{c.contenido_markdown}</p>
                 <div className="mt-1 flex items-center gap-2 text-xs text-ds-gray-400">
                   <span className="font-semibold text-ds-gray-500">{c.autor_nombre || 'Anónimo'}</span>
                   <Badge variant="gray">{c.autor_rol}</Badge>

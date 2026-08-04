@@ -37,7 +37,7 @@ function ChipEncargado({ nombre, onRemove, loading }: { nombre: string; onRemove
       <span>{nombre}</span>
       {onRemove && (
         <button type="button" onClick={onRemove} disabled={loading} aria-label="Quitar encargado" title="Quitar"
-          className="-mr-0.5 ml-0.5 w-5 h-5 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 disabled:opacity-50 leading-none text-sm">
+          className="-mr-0.5 ml-0.5 w-5 h-5 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-ds-surface/20 disabled:opacity-50 leading-none text-sm">
           ×
         </button>
       )}
@@ -101,7 +101,7 @@ function ObrasPicker({ obras, selected, onChange }: {
           <Icon name="place" size="sm" color="currentColor" className="text-brand" />
         </div>
         <div className="flex-1 min-w-0">
-          <label className="text-sm font-bold text-black">Obras <span className="text-ds-red">*</span></label>
+          <label className="text-sm font-bold text-ds-ink">Obras <span className="text-ds-red">*</span></label>
           <p className="text-xs text-ds-gray-400">Marcá en qué obras trabaja esta cuadrilla.</p>
         </div>
         {selected.length > 0 && (
@@ -125,7 +125,7 @@ function ObrasPicker({ obras, selected, onChange }: {
       )}
       <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar obra por número o nombre…"
         leftIcon={<Icon name="search" size="sm" color="currentColor" className="text-ds-gray-400" />} />
-      <div className="max-h-52 overflow-y-auto rounded-ds border border-ds-gray-200 divide-y divide-ds-gray-100 bg-white">
+      <div className="max-h-52 overflow-y-auto rounded-ds border border-ds-gray-200 divide-y divide-ds-gray-100 bg-ds-surface">
         {filtered.length === 0 ? (
           <p className="px-3 py-5 text-sm text-ds-gray-400 text-center">Sin obras</p>
         ) : filtered.slice(0, 300).map(o => {
@@ -133,10 +133,10 @@ function ObrasPicker({ obras, selected, onChange }: {
           return (
             <button key={o.idObra} type="button" onClick={() => toggle(o.idObra)}
               className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${on ? 'bg-brand/10' : 'hover:bg-ds-gray-100'}`}>
-              <span className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border-2 transition-colors ${on ? 'bg-brand border-brand' : 'border-ds-gray-300 bg-white'}`}>
-                {on && <Icon name="check" size="sm" color="currentColor" className="text-black" />}
+              <span className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border-2 transition-colors ${on ? 'bg-brand border-brand' : 'border-ds-gray-300 bg-ds-surface'}`}>
+                {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
               </span>
-              <span className="text-sm text-black font-semibold shrink-0 w-20">{o.numeroObra}</span>
+              <span className="text-sm text-ds-ink font-semibold shrink-0 w-20">{o.numeroObra}</span>
               <span className="text-xs text-ds-gray-400 truncate">{o.nombreMostrado ?? ''}</span>
             </button>
           );
@@ -170,7 +170,7 @@ function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas
           <Icon name="list" size="sm" color="currentColor" className="text-brand" />
         </div>
         <div className="flex-1 min-w-0">
-          <label className="text-sm font-bold text-black">Subpartidas <span className="text-ds-red">*</span></label>
+          <label className="text-sm font-bold text-ds-ink">Subpartidas <span className="text-ds-red">*</span></label>
           <p className="text-xs text-ds-gray-400">Marcá las que ejecuta. Podés filtrar por partida.</p>
         </div>
         {selected.length > 0 && (
@@ -185,7 +185,7 @@ function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas
             <span key={s.idSubPartida} className="inline-flex items-center gap-1 rounded-full bg-black text-white text-xs font-semibold pl-2.5 pr-1.5 py-1">
               {s.codigo}
               <button type="button" onClick={() => toggle(s.idSubPartida)} aria-label="Quitar" title="Quitar"
-                className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-white/20 leading-none">
+                className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-ds-surface/20 leading-none">
                 ×
               </button>
             </span>
@@ -201,7 +201,7 @@ function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas
         <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar subpartida…"
           leftIcon={<Icon name="search" size="sm" color="currentColor" className="text-ds-gray-400" />} />
       </div>
-      <div className="max-h-52 overflow-y-auto rounded-ds border border-ds-gray-200 divide-y divide-ds-gray-100 bg-white">
+      <div className="max-h-52 overflow-y-auto rounded-ds border border-ds-gray-200 divide-y divide-ds-gray-100 bg-ds-surface">
         {filtered.length === 0 ? (
           <p className="px-3 py-5 text-sm text-ds-gray-400 text-center">Sin subpartidas</p>
         ) : filtered.slice(0, 400).map(s => {
@@ -221,10 +221,10 @@ function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas
           return (
             <button key={s.idSubPartida} type="button" onClick={() => toggle(s.idSubPartida)}
               className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${on ? 'bg-brand/10' : 'hover:bg-ds-gray-100'}`}>
-              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${on ? 'bg-brand border-brand' : 'border-ds-gray-300 bg-white'}`}>
-                {on && <Icon name="check" size="sm" color="currentColor" className="text-black" />}
+              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${on ? 'bg-brand border-brand' : 'border-ds-gray-300 bg-ds-surface'}`}>
+                {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
               </span>
-              <span className="text-sm text-black font-semibold shrink-0 w-16">{s.codigo}</span>
+              <span className="text-sm text-ds-ink font-semibold shrink-0 w-16">{s.codigo}</span>
               <span className="text-xs text-ds-gray-400 truncate flex-1">{s.nombre}</span>
               {s.partidaCodigo && <span className="text-[10px] text-ds-gray-300 shrink-0">{s.partidaCodigo}</span>}
             </button>
@@ -595,7 +595,7 @@ export default function CuadrillasPage() {
           { val: 'encargados', label: 'Encargados por partida', icon: 'user' },
         ] as const).map(opt => (
           <button key={opt.val} onClick={() => setVista(opt.val)}
-            className={`inline-flex items-center gap-2 px-5 h-11 rounded-full text-sm font-semibold transition-all ${vista === opt.val ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-black'}`}>
+            className={`inline-flex items-center gap-2 px-5 h-11 rounded-full text-sm font-semibold transition-all ${vista === opt.val ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-ds-ink'}`}>
             <Icon name={opt.icon} size="sm" color="currentColor" />
             {opt.label}
           </button>
@@ -625,7 +625,7 @@ export default function CuadrillasPage() {
             {partidasView.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
                 <Icon name="user" size="lg" color="currentColor" className="mb-4" />
-                <p className="text-body font-semibold text-black">{q ? 'Sin resultados' : 'Sin partidas'}</p>
+                <p className="text-body font-semibold text-ds-ink">{q ? 'Sin resultados' : 'Sin partidas'}</p>
                 <p className="text-sm mt-1 text-ds-gray-400">{q ? 'Probá con otro término de búsqueda.' : 'No hay partidas activas en el catálogo.'}</p>
               </div>
             ) : partidasView.map(row => {
@@ -633,14 +633,14 @@ export default function CuadrillasPage() {
               const completa = row.total > 0 && row.conEnc === row.total;
               return (
                 <StaggerItem key={row.p.idPartida}>
-                <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+                <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
                   {/* Encabezado de la partida */}
                   <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2.5">
                     <button onClick={() => toggleExpand(row.p.idPartida)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
                       <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
                         <Icon name="list" size="sm" color="currentColor" className="text-brand" />
                       </div>
-                      <h2 className="font-bold text-black text-sm flex-1 min-w-0 truncate">{row.p.codigo} · {row.p.nombre}</h2>
+                      <h2 className="font-bold text-ds-ink text-sm flex-1 min-w-0 truncate">{row.p.codigo} · {row.p.nombre}</h2>
                       <Icon name="open" size="sm" color="currentColor" className={`text-ds-gray-400 shrink-0 transition-transform ${expanded ? '' : 'rotate-180'}`} />
                     </button>
                     <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 shrink-0 ${row.conEnc === 0 ? 'text-ds-gray-400 bg-ds-gray-200' : completa ? 'text-black bg-brand' : 'text-black bg-brand/40'}`}>
@@ -662,7 +662,7 @@ export default function CuadrillasPage() {
                       <div className="divide-y divide-ds-gray-100">
                         {row.subs.map(x => (
                           <div key={x.sub.idSubPartida} className="px-5 py-2.5 flex items-center gap-3">
-                            <span className="text-sm font-semibold text-black shrink-0 w-16">{x.sub.codigo}</span>
+                            <span className="text-sm font-semibold text-ds-ink shrink-0 w-16">{x.sub.codigo}</span>
                             <span className="text-xs text-ds-gray-400 truncate flex-1">{x.sub.nombre}</span>
                             {x.encargado ? (
                               <ChipEncargado nombre={x.encargado.encargado}
@@ -690,7 +690,7 @@ export default function CuadrillasPage() {
       ) : cuadrillasFiltradas.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
           <Icon name="cuadrillas" size="lg" color="currentColor" className="mb-4" />
-          <p className="text-body font-semibold text-black">{q ? 'Sin resultados' : 'Sin cuadrillas'}</p>
+          <p className="text-body font-semibold text-ds-ink">{q ? 'Sin resultados' : 'Sin cuadrillas'}</p>
           {isAdmin && !q && (
             <Button className="mt-4" onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>
               Crear primera cuadrilla
@@ -710,17 +710,17 @@ export default function CuadrillasPage() {
                 tabIndex={0}
                 onClick={() => openVerMiembros(c)}
                 onKeyDown={e => { if (e.key === 'Enter') openVerMiembros(c); }}
-                className="group bg-white rounded-ds border border-ds-gray-200 shadow-ds-01 p-4 flex flex-col cursor-pointer hover:border-black hover:shadow-ds-02 transition-all">
+                className="group bg-ds-surface rounded-ds border border-ds-gray-200 shadow-ds-01 p-4 flex flex-col cursor-pointer hover:border-black hover:shadow-ds-02 transition-all">
                 <div className="flex items-start justify-between mb-2 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-8 h-8 rounded-ds bg-black flex items-center justify-center shrink-0">
                       <Icon name="cuadrillas" size="sm" color="currentColor" className="text-brand" />
                     </div>
-                    <p className="font-bold text-black text-sm truncate">{c.Nombre}</p>
+                    <p className="font-bold text-ds-ink text-sm truncate">{c.Nombre}</p>
                   </div>
                   <Badge variant="green" dot>Activa</Badge>
                 </div>
-                <p className="text-xs font-semibold text-black mb-1 truncate" title={c.Proyecto || 'Sin proyecto'}>
+                <p className="text-xs font-semibold text-ds-ink mb-1 truncate" title={c.Proyecto || 'Sin proyecto'}>
                   <Icon name="folder" size="sm" color="currentColor" className="inline mr-1 text-ds-gray-300" />
                   {c.Proyecto || 'Sin proyecto'}
                 </p>
@@ -732,14 +732,14 @@ export default function CuadrillasPage() {
                 <div className="space-y-1.5 mt-auto">
                   <div className="flex justify-between text-xs">
                     <span className="text-ds-gray-400 font-medium">{c.TotalMiembros} / {c.Capacidad} miembros</span>
-                    <span className={`font-semibold ${pct > 80 ? 'text-ds-red' : pct > 60 ? 'text-ds-yellow' : 'text-black'}`}>{pct}%</span>
+                    <span className={`font-semibold ${pct > 80 ? 'text-ds-red' : pct > 60 ? 'text-ds-yellow' : 'text-ds-ink'}`}>{pct}%</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-ds-gray-100 overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />
                   </div>
                 </div>
                 <div className="flex items-center mt-3 pt-2">
-                  <span className="ml-auto text-xs font-semibold text-ds-gray-300 group-hover:text-black transition-colors">Ver →</span>
+                  <span className="ml-auto text-xs font-semibold text-ds-gray-300 group-hover:text-ds-ink transition-colors">Ver →</span>
                 </div>
               </motion.div>
             );
@@ -782,7 +782,7 @@ export default function CuadrillasPage() {
 
           {form.proyectos.length === 0 ? (
             <div className="rounded-ds-lg border border-dashed border-ds-gray-200 p-8 text-center">
-              <p className="text-sm text-ds-gray-400">Elegí uno o más <span className="font-semibold text-black">proyectos</span> para ver sus obras y subpartidas.</p>
+              <p className="text-sm text-ds-gray-400">Elegí uno o más <span className="font-semibold text-ds-ink">proyectos</span> para ver sus obras y subpartidas.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -797,7 +797,7 @@ export default function CuadrillasPage() {
                     const completo = nObras > 0 && nSubs > 0;
                     return (
                       <button key={pid} type="button" onClick={() => setActiveProy(pid)}
-                        className={`inline-flex items-center gap-2 px-4 h-9 rounded-full text-sm font-semibold transition-colors ${activa ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500 hover:text-black'}`}>
+                        className={`inline-flex items-center gap-2 px-4 h-9 rounded-full text-sm font-semibold transition-colors ${activa ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500 hover:text-ds-ink'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${completo ? 'bg-brand' : 'bg-ds-red'}`} />
                         {nom}
                       </button>
@@ -815,7 +815,7 @@ export default function CuadrillasPage() {
                       <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
                         <Icon name="folder" size="sm" color="currentColor" className="text-brand" />
                       </div>
-                      <h3 className="font-bold text-black text-sm">{nom}</h3>
+                      <h3 className="font-bold text-ds-ink text-sm">{nom}</h3>
                       <span className="text-xs text-ds-gray-400">· obras y subpartidas de este proyecto</span>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
@@ -928,7 +928,7 @@ export default function CuadrillasPage() {
               return (
                 <div className="flex flex-col items-center justify-center py-10 text-ds-gray-300">
                   <Icon name="user" size="lg" color="currentColor" className="mb-2" />
-                  <p className="text-sm font-semibold text-black">Sin miembros en esta cuadrilla</p>
+                  <p className="text-sm font-semibold text-ds-ink">Sin miembros en esta cuadrilla</p>
                   <p className="text-xs text-ds-gray-400 mt-1">Agregá el primero con “Agregar”.</p>
                 </div>
               );
@@ -957,9 +957,9 @@ export default function CuadrillasPage() {
                       const ini = (m.NombreCompleto || '?').split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('');
                       return (
                         <div key={m.IDCuadMiembro} className="flex items-center gap-3 px-4 py-2.5">
-                          <div className="w-9 h-9 rounded-ds bg-ds-gray-100 flex items-center justify-center text-black text-xs font-bold shrink-0">{ini}</div>
+                          <div className="w-9 h-9 rounded-ds bg-ds-gray-100 flex items-center justify-center text-ds-ink text-xs font-bold shrink-0">{ini}</div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-black truncate">{m.NombreCompleto}</p>
+                            <p className="text-sm font-semibold text-ds-ink truncate">{m.NombreCompleto}</p>
                             <p className="text-xs text-ds-gray-400 truncate">{m.Cedula} · {m.Puesto || 'Sin puesto'}</p>
                           </div>
                           {isAdmin && (
@@ -1013,7 +1013,7 @@ export default function CuadrillasPage() {
             <div className="space-y-4">
               <div className="rounded-ds bg-ds-gray-100 px-3 py-2 text-sm">
                 <span className="text-ds-gray-400">Partida: </span>
-                <span className="font-semibold text-black">{asignarPartida.label}</span>
+                <span className="font-semibold text-ds-ink">{asignarPartida.label}</span>
               </div>
               <div>
                 <Combobox label="Encargado (usuario)" value={asignarEnc} onChange={setAsignarEnc}
@@ -1027,15 +1027,15 @@ export default function CuadrillasPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-bold text-black">Subpartidas <span className="font-normal text-ds-gray-400">· marcá las que toma</span></label>
+                  <label className="text-sm font-bold text-ds-ink">Subpartidas <span className="font-normal text-ds-gray-400">· marcá las que toma</span></label>
                   {libres.length > 0 && (
                     <button type="button" onClick={() => setAsignarSubs(allLibres ? [] : libres.map(s => s.idSubPartida))}
-                      className="text-xs font-semibold text-black hover:text-ds-gray-400">
+                      className="text-xs font-semibold text-ds-ink hover:text-ds-gray-400">
                       {allLibres ? 'Quitar todas' : 'Marcar libres'}
                     </button>
                   )}
                 </div>
-                <div className="max-h-64 overflow-y-auto rounded-ds-lg border border-ds-gray-200 divide-y divide-ds-gray-100 bg-white">
+                <div className="max-h-64 overflow-y-auto rounded-ds-lg border border-ds-gray-200 divide-y divide-ds-gray-100 bg-ds-surface">
                   {subs.length === 0 ? (
                     <p className="px-3 py-5 text-sm text-ds-gray-400 text-center">Sin subpartidas</p>
                   ) : subs.map(s => {
@@ -1058,10 +1058,10 @@ export default function CuadrillasPage() {
                     return (
                       <button key={s.idSubPartida} type="button" onClick={() => toggle(s.idSubPartida)}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${on ? 'bg-brand/10' : 'hover:bg-ds-gray-100'}`}>
-                        <span className={`w-5 h-5 rounded-ds border-2 flex items-center justify-center shrink-0 transition-colors ${on ? 'bg-brand border-brand' : 'border-ds-gray-300 bg-white'}`}>
-                          {on && <Icon name="check" size="sm" color="currentColor" className="text-black" />}
+                        <span className={`w-5 h-5 rounded-ds border-2 flex items-center justify-center shrink-0 transition-colors ${on ? 'bg-brand border-brand' : 'border-ds-gray-300 bg-ds-surface'}`}>
+                          {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
                         </span>
-                        <span className="text-sm font-semibold text-black shrink-0 w-14">{s.codigo}</span>
+                        <span className="text-sm font-semibold text-ds-ink shrink-0 w-14">{s.codigo}</span>
                         <span className="text-xs text-ds-gray-400 truncate flex-1">{s.nombre}</span>
                       </button>
                     );

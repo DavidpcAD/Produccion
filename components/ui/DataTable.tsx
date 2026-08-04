@@ -64,21 +64,21 @@ function ColumnFilterPanel({ column, label }: { column: Column<unknown, unknown>
   }
 
   return (
-    <div className="absolute left-0 mt-2 w-64 rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-03 z-30 p-2 normal-case tracking-normal font-normal">
+    <div className="absolute left-0 mt-2 w-64 rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-03 z-30 p-2 normal-case tracking-normal font-normal">
       <input autoFocus value={q} onChange={e => setQ(e.target.value)}
         placeholder={`Buscar en ${label}…`}
-        className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 text-sm text-black focus:outline-none focus:border-black" />
+        className="w-full rounded-ds border border-ds-gray-200 px-3 py-2 text-sm text-ds-ink focus:outline-none focus:border-black" />
       <div className="mt-2 max-h-60 overflow-y-auto">
         <label className="flex items-center gap-2 px-2 py-1.5 rounded-ds hover:bg-ds-gray-100 cursor-pointer text-sm">
           <input type="checkbox" checked={selected.size === 0}
             onChange={() => column.setFilterValue(undefined)} className="w-4 h-4 accent-brand" />
-          <span className="font-semibold text-black">Todos</span>
+          <span className="font-semibold text-ds-ink">Todos</span>
         </label>
         {filtered.map(o => (
           <label key={o.value} className="flex items-center gap-2 px-2 py-1.5 rounded-ds hover:bg-ds-gray-100 cursor-pointer text-sm">
             <input type="checkbox" checked={selected.has(o.value)}
               onChange={() => toggle(o.value)} className="w-4 h-4 accent-brand shrink-0" />
-            <span className="text-black flex-1 min-w-0 break-words">{o.value}</span>
+            <span className="text-ds-ink flex-1 min-w-0 break-words">{o.value}</span>
             <span className="text-xs text-ds-gray-300 shrink-0">{o.count}</span>
           </label>
         ))}
@@ -221,15 +221,15 @@ export function DataTable<T>({
         {/* Columnas */}
         <div className="relative" ref={colsRef}>
           <button onClick={() => setColsOpen(o => !o)}
-            className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-white px-3.5 h-10 text-sm font-semibold text-black hover:bg-ds-gray-100 transition-colors">
+            className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3.5 h-10 text-sm font-semibold text-ds-ink hover:bg-ds-gray-100 transition-colors">
             <Icon name="options" size="sm" color="currentColor" /> Columnas
           </button>
           {colsOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-03 z-30 p-2 max-h-80 overflow-y-auto">
+            <div className="absolute right-0 mt-2 w-56 rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-03 z-30 p-2 max-h-80 overflow-y-auto">
               {table.getAllLeafColumns().filter(c => c.id !== 'acciones').map(c => (
                 <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-ds hover:bg-ds-gray-100 cursor-pointer text-sm">
                   <input type="checkbox" checked={c.getIsVisible()} onChange={c.getToggleVisibilityHandler()} className="w-4 h-4 accent-brand" />
-                  <span className="text-black">{(c.columnDef.meta?.label as string) || (typeof c.columnDef.header === 'string' ? c.columnDef.header : c.id)}</span>
+                  <span className="text-ds-ink">{(c.columnDef.meta?.label as string) || (typeof c.columnDef.header === 'string' ? c.columnDef.header : c.id)}</span>
                 </label>
               ))}
             </div>
@@ -239,21 +239,21 @@ export function DataTable<T>({
         {/* Exportar */}
         <div className="relative" ref={exportRef}>
           <button onClick={() => setExportOpen(o => !o)}
-            className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-white px-3.5 h-10 text-sm font-semibold text-black hover:bg-ds-gray-100 transition-colors">
+            className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3.5 h-10 text-sm font-semibold text-ds-ink hover:bg-ds-gray-100 transition-colors">
             <Icon name="arrow-right" size="sm" color="currentColor" className="rotate-90" /> Exportar
           </button>
           {exportOpen && (
-            <div className="absolute right-0 mt-2 w-64 rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-03 z-30 p-2">
+            <div className="absolute right-0 mt-2 w-64 rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-03 z-30 p-2">
               <p className="px-2 pt-1 pb-2 text-xs text-ds-gray-400">Descargar {totalFiltered} fila(s) filtradas</p>
               <button onClick={() => { exportCSV(); setExportOpen(false); }}
                 className="w-full flex items-center gap-3 px-2 py-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-left">
                 <span className="w-10 h-7 shrink-0 rounded-ds bg-black text-white text-[10px] font-bold flex items-center justify-center">CSV</span>
-                <span className="text-sm font-semibold text-black">Excel / CSV</span>
+                <span className="text-sm font-semibold text-ds-ink">Excel / CSV</span>
               </button>
               <button onClick={() => { exportPDF(); setExportOpen(false); }}
                 className="w-full flex items-center gap-3 px-2 py-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-left">
                 <span className="w-10 h-7 shrink-0 rounded-ds bg-black text-white text-[10px] font-bold flex items-center justify-center">PDF</span>
-                <span className="text-sm font-semibold text-black">Reporte PDF</span>
+                <span className="text-sm font-semibold text-ds-ink">Reporte PDF</span>
               </button>
             </div>
           )}
@@ -264,12 +264,12 @@ export function DataTable<T>({
         <div className="flex items-center gap-2 text-xs text-ds-gray-400">
           <span>{activeFilters} filtro(s) activo(s)</span>
           <button onClick={() => { setColumnFilters([]); setGlobalFilter(''); }}
-            className="font-semibold text-black hover:underline">Limpiar</button>
+            className="font-semibold text-ds-ink hover:underline">Limpiar</button>
         </div>
       )}
 
       {/* Tabla */}
-      <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+      <div className="overflow-x-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
         <table className="w-full text-sm">
           <thead>
             {table.getHeaderGroups().map(hg => (
@@ -339,7 +339,7 @@ export function DataTable<T>({
                   onClick={() => onRowClick?.(r.original)}
                   className={`border-b border-ds-gray-100 last:border-0 transition-colors ${onRowClick ? 'cursor-pointer hover:bg-ds-gray-100' : ''}`}>
                   {r.getVisibleCells().map(cell => (
-                    <td key={cell.id} className={`px-4 py-3 text-black ${alignCls(cell.column.columnDef.meta?.align)}`}>
+                    <td key={cell.id} className={`px-4 py-3 text-ds-ink ${alignCls(cell.column.columnDef.meta?.align)}`}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

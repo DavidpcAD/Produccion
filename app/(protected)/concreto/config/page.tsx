@@ -65,8 +65,8 @@ export default function ConfigConcretoPage() {
             className={
               'px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black ' +
               (tab === t.id
-                ? 'border-brand text-black'
-                : 'border-transparent text-ds-gray-400 hover:text-black')
+                ? 'border-brand text-ds-ink'
+                : 'border-transparent text-ds-gray-400 hover:text-ds-ink')
             }
           >
             {t.label}
@@ -194,18 +194,18 @@ function TabActividades({ puede }: { puede: boolean }) {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
           No hay actividades todavía.
         </div>
       ) : (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
           <ul className="divide-y divide-ds-gray-100">
             {items.map((a) => (
               <li key={a.id} className="px-5 py-3 flex items-center gap-3 group">
                 <span className="font-mono text-xs font-semibold text-ds-gray-400 shrink-0 w-8">
                   {a.orden}
                 </span>
-                <span className="text-sm text-black flex-1 truncate">{a.nombre}</span>
+                <span className="text-sm text-ds-ink flex-1 truncate">{a.nombre}</span>
                 <Badge variant={a.activo ? 'green' : 'gray'}>{a.activo ? 'Activa' : 'Inactiva'}</Badge>
                 {puede && (
                   <div className="flex items-center gap-2 shrink-0">
@@ -214,7 +214,7 @@ function TabActividades({ puede }: { puede: boolean }) {
                     </Button>
                     <button
                       onClick={() => abrirEditar(a)}
-                      className="text-ds-gray-300 hover:text-black p-1"
+                      className="text-ds-gray-300 hover:text-ds-ink p-1"
                       title="Editar actividad"
                     >
                       <Icon name="edit" size="sm" color="currentColor" />
@@ -355,11 +355,11 @@ function TabUmbrales({ puede }: { puede: boolean }) {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
           No hay umbrales configurados.
         </div>
       ) : (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
           <ul className="divide-y divide-ds-gray-100">
             {items.map((u) => (
               <li key={u.clave} className="px-5 py-3 flex items-center gap-3">
@@ -374,7 +374,7 @@ function TabUmbrales({ puede }: { puede: boolean }) {
                 <span className="text-sm text-ds-gray-500 shrink-0 hidden sm:block">
                   {COMPARADOR_LABEL[u.comparador]}
                 </span>
-                <span className="text-sm font-semibold text-black tabular-nums shrink-0 w-24 text-right">
+                <span className="text-sm font-semibold text-ds-ink tabular-nums shrink-0 w-24 text-right">
                   {u.umbral}
                   {u.unidad ? ` ${u.unidad}` : ''}
                 </span>
@@ -382,7 +382,7 @@ function TabUmbrales({ puede }: { puede: boolean }) {
                 {puede && (
                   <button
                     onClick={() => abrirEditar(u)}
-                    className="text-ds-gray-300 hover:text-black p-1 shrink-0"
+                    className="text-ds-gray-300 hover:text-ds-ink p-1 shrink-0"
                     title="Editar umbral"
                   >
                     <Icon name="edit" size="sm" color="currentColor" />
@@ -413,7 +413,7 @@ function TabUmbrales({ puede }: { puede: boolean }) {
           {editClave && (
             <div className="rounded-ds bg-ds-gray-100 px-4 py-2 text-sm">
               <span className="text-ds-gray-500">Clave: </span>
-              <span className="font-mono font-semibold text-black">{editClave}</span>
+              <span className="font-mono font-semibold text-ds-ink">{editClave}</span>
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -444,7 +444,7 @@ function TabUmbrales({ puede }: { puede: boolean }) {
             onChange={(e) => setForm((p) => ({ ...p, descripcion: e.target.value }))}
             maxLength={200}
           />
-          <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
             <input
               type="checkbox"
               checked={form.activo}
@@ -597,29 +597,29 @@ function TabDensidades({ puede }: { puede: boolean }) {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
           No hay densidades configuradas.
         </div>
       ) : (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
           <ul className="divide-y divide-ds-gray-100">
             {items.map((d) => (
               <li key={d.clave} className="px-5 py-3 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-black truncate">{d.nombre}</p>
+                  <p className="text-sm text-ds-ink truncate">{d.nombre}</p>
                   <p className="font-mono text-xs text-ds-gray-400 truncate">
                     {d.clave}
                     {d.codigo_bc ? ` · BC ${d.codigo_bc}` : ''}
                   </p>
                 </div>
-                <span className="text-sm font-semibold text-black tabular-nums shrink-0 text-right">
+                <span className="text-sm font-semibold text-ds-ink tabular-nums shrink-0 text-right">
                   {d.densidad} <span className="text-ds-gray-400 font-normal">{d.unidad}</span>
                 </span>
                 <Badge variant={d.activo ? 'green' : 'gray'}>{d.activo ? 'Activo' : 'Inactivo'}</Badge>
                 {puede && (
                   <button
                     onClick={() => abrirEditar(d)}
-                    className="text-ds-gray-300 hover:text-black p-1 shrink-0"
+                    className="text-ds-gray-300 hover:text-ds-ink p-1 shrink-0"
                     title="Editar densidad"
                   >
                     <Icon name="edit" size="sm" color="currentColor" />
@@ -694,7 +694,7 @@ function TabDensidades({ puede }: { puede: boolean }) {
             maxLength={500}
           />
           {editClave != null && (
-            <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
               <input
                 type="checkbox"
                 checked={form.activo}

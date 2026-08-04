@@ -38,7 +38,7 @@ function MetricBC({ label, value, accent }: { label: string; value: string; acce
   return (
     <div className="rounded-ds border border-ds-gray-100 p-2.5">
       <p className="text-ds-gray-400 text-xs">{label}</p>
-      <p className={'font-bold text-sm mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red' : 'text-black')}>{value}</p>
+      <p className={'font-bold text-sm mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red' : 'text-ds-ink')}>{value}</p>
     </div>
   );
 }
@@ -50,9 +50,9 @@ function SubidoChip({ etiqueta, onRedo, redoing }: { etiqueta: string; onRedo: (
   return (
     <div className="inline-flex items-center gap-2.5 rounded-ds-lg border border-brand/50 bg-brand-soft px-4 py-2.5">
       <Icon name="check" size="sm" color="currentColor" />
-      <span className="text-sm font-semibold text-black">{etiqueta} subido a BC</span>
+      <span className="text-sm font-semibold text-ds-ink">{etiqueta} subido a BC</span>
       <button type="button" onClick={onRedo} disabled={redoing}
-        className="text-xs font-semibold text-ds-gray-500 underline underline-offset-2 hover:text-black disabled:opacity-50">
+        className="text-xs font-semibold text-ds-gray-500 underline underline-offset-2 hover:text-ds-ink disabled:opacity-50">
         {redoing ? 'Subiendo…' : 'Volver a subir'}
       </button>
     </div>
@@ -67,19 +67,19 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
   const mensajeBC = [r.resultadoBC, r.resultadoDescompuestoBC].filter(Boolean).join(' · ');
   const resultadoVal = t?.result ?? 0;
   return (
-    <div className="rounded-ds-lg border border-brand/40 bg-white overflow-hidden">
+    <div className="rounded-ds-lg border border-brand/40 bg-ds-surface overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-brand-soft border-b border-brand/30">
         <div className="flex items-center gap-2 min-w-0">
           <Icon name="check" size="sm" color="currentColor" />
-          <span className="font-bold text-black text-sm truncate">{r.tipo === 'general' ? 'General' : 'Descompuesto'} subido a Business Central</span>
+          <span className="font-bold text-ds-ink text-sm truncate">{r.tipo === 'general' ? 'General' : 'Descompuesto'} subido a Business Central</span>
         </div>
-        <span className="text-xs text-ds-gray-500 shrink-0">Obra <span className="font-mono font-semibold text-black">{r.worksNo}</span></span>
+        <span className="text-xs text-ds-gray-500 shrink-0">Obra <span className="font-mono font-semibold text-ds-ink">{r.worksNo}</span></span>
       </div>
       <div className="p-4 space-y-3.5">
         {version && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-ds-gray-400 text-xs">Cód. versión</span>
-            <span className="text-sm font-bold text-black bg-ds-gray-100 rounded-full px-3 py-0.5">{version}</span>
+            <span className="text-sm font-bold text-ds-ink bg-ds-gray-100 rounded-full px-3 py-0.5">{version}</span>
             {r.version && <span className="text-ds-green-ink text-xs">· versión creada en esta subida</span>}
           </div>
         )}
@@ -92,9 +92,9 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
           </div>
         )}
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ds-gray-500">
-          {r.enviadas != null && <span>Líneas de versión enviadas: <strong className="text-black">{r.enviadas}</strong></span>}
-          {r.materiales != null && <span>Materiales del descompuesto: <strong className="text-black">{r.materiales}</strong></span>}
-          {r.descompuestoChunks != null && <span>Chunks: <strong className="text-black">{r.descompuestoChunks}</strong></span>}
+          {r.enviadas != null && <span>Líneas de versión enviadas: <strong className="text-ds-ink">{r.enviadas}</strong></span>}
+          {r.materiales != null && <span>Materiales del descompuesto: <strong className="text-ds-ink">{r.materiales}</strong></span>}
+          {r.descompuestoChunks != null && <span>Chunks: <strong className="text-ds-ink">{r.descompuestoChunks}</strong></span>}
         </div>
         {mensajeBC && (
           <div className="rounded-ds bg-ds-gray-100 px-3 py-2 text-xs font-mono text-ds-gray-600 break-words">
@@ -103,7 +103,7 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
         )}
         {r.obraCampos && Object.keys(r.obraCampos).length > 0 && (
           <details className="text-xs">
-            <summary className="cursor-pointer select-none text-ds-gray-500 hover:text-black">Ver todos los importes de la obra en BC</summary>
+            <summary className="cursor-pointer select-none text-ds-gray-500 hover:text-ds-ink">Ver todos los importes de la obra en BC</summary>
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
               {Object.entries(r.obraCampos).map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3 border-b border-ds-gray-100 py-0.5">
@@ -125,7 +125,7 @@ function StepHeader({ n, title, hint }: { n: number; title: string; hint?: strin
     <div className="flex items-start gap-3">
       <span className="w-7 h-7 rounded-full bg-black text-white text-sm font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
       <div className="min-w-0">
-        <h2 className="font-bold text-black leading-tight">{title}</h2>
+        <h2 className="font-bold text-ds-ink leading-tight">{title}</h2>
         {hint && <p className="text-ds-gray-400 text-xs mt-0.5">{hint}</p>}
       </div>
     </div>
@@ -262,7 +262,7 @@ export default function PresupuestoPage() {
   }
 
   if (mounted && session && !puede) {
-    return <div className="p-6 max-w-[1200px] mx-auto"><div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div></div>;
+    return <div className="p-6 max-w-[1200px] mx-auto"><div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div></div>;
   }
 
   const tipos = plantilla ? Object.keys(plantilla.porTipo).filter(t => (plantilla.porTipo[t] ?? []).length > 0) : [];
@@ -276,19 +276,19 @@ export default function PresupuestoPage() {
       />
 
       {/* Paso 1 — Obra + archivos */}
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
         <StepHeader n={1} title="Elegí la obra y cargá los Excel" hint="Podés cargar solo General, solo Descompuesto, o los dos." />
         <div className="sm:max-w-md">
           <Combobox
             label="Obra" required value={obraId} onChange={setObraId} placeholder="Seleccionar obra"
             options={obras.map(o => ({ value: String(o.idObra), label: o.nombreMostrado, parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombreMostrado, weight: 'light' as const }], search: `${o.numeroObra} ${o.nombreMostrado}` }))}
           />
-          {obra && <p className="text-ds-gray-400 text-xs mt-1">Obra en BC (worksNo): <span className="font-mono font-semibold text-black">{obra.numeroObra}</span></p>}
+          {obra && <p className="text-ds-gray-400 text-xs mt-1">Obra en BC (worksNo): <span className="font-mono font-semibold text-ds-ink">{obra.numeroObra}</span></p>}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">
             <div>
-              <span className="text-body-sm font-semibold text-black">Plantilla general</span>
+              <span className="text-body-sm font-semibold text-ds-ink">Plantilla general</span>
               <span className="block text-ds-gray-400 text-xs">Venta, Costo e Indirectos — esto arma la versión en BC.</span>
             </div>
             <input ref={plantillaFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
@@ -296,7 +296,7 @@ export default function PresupuestoPage() {
           </div>
           <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">
             <div>
-              <span className="text-body-sm font-semibold text-black">Descompuesto</span>
+              <span className="text-body-sm font-semibold text-ds-ink">Descompuesto</span>
               <span className="block text-ds-gray-400 text-xs">Materiales por tarea — se suben aparte a BC.</span>
             </div>
             <input ref={descFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
@@ -307,14 +307,14 @@ export default function PresupuestoPage() {
 
       {/* Plantillas guardadas (reutilizables) */}
       {plantillas.length > 0 && (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-2">
-          <h2 className="font-bold text-black">O empezá desde una plantilla guardada</h2>
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-2">
+          <h2 className="font-bold text-ds-ink">O empezá desde una plantilla guardada</h2>
           <p className="text-ds-gray-400 text-xs">En vez de cargar Excel, reutilizá una plantilla: se abre en la vista previa para editarla y subirla a la obra que elijas.</p>
           <div className="divide-y divide-ds-gray-100">
             {plantillas.map(pl => (
               <div key={pl.idPlantilla} className="py-2.5 flex items-center gap-3">
                 <span className={'text-xs px-2 py-0.5 rounded-full shrink-0 ' + (pl.tipo === 'general' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{pl.tipo === 'general' ? 'General' : 'Descompuesto'}</span>
-                <span className="text-sm text-black font-medium truncate flex-1">{pl.nombre}</span>
+                <span className="text-sm text-ds-ink font-medium truncate flex-1">{pl.nombre}</span>
                 <span className="text-ds-gray-400 text-xs shrink-0 hidden sm:block">{pl.archivo}</span>
                 <Button size="sm" variant="outline" onClick={() => usarPlantilla(pl.idPlantilla)}>Usar</Button>
                 <button onClick={() => borrarPlantilla(pl.idPlantilla)} className="text-ds-gray-300 hover:text-ds-red p-1" title="Borrar plantilla"><Icon name="delete" size="sm" color="currentColor" /></button>
@@ -331,7 +331,7 @@ export default function PresupuestoPage() {
           : vistaPreview === 'general' && plantilla ? 'general'
           : plantilla ? 'general' : 'descompuesto';
         return (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
           <StepHeader n={2} title="Revisá el presupuesto" hint="Alterná entre General y Descompuesto. Podés editar los montos antes de subir." />
           {/* Selector de vista */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -359,7 +359,7 @@ export default function PresupuestoPage() {
                   <button key={t} type="button" onClick={() => setTipoVista(t)}
                     className={'text-left rounded-ds-lg border p-3 transition ' + (tipoVista === t ? 'border-brand bg-brand-soft' : 'border-ds-gray-200 hover:bg-ds-gray-100')}>
                     <p className="text-ds-gray-400 text-xs">{TIPO_LABEL[t] ?? t}</p>
-                    <p className="text-black font-bold text-sub-sm">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
+                    <p className="text-ds-ink font-bold text-sub-sm">{(plantilla.porTipo[t] ?? []).length}<span className="text-ds-gray-400 text-xs font-normal"> líneas</span></p>
                   </button>
                 ))}
               </div>
@@ -368,7 +368,7 @@ export default function PresupuestoPage() {
                 const lineas = plantilla.porTipo[activa] ?? [];
                 return (
                   <div>
-                    <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-black">{TIPO_LABEL[activa] ?? activa}</strong> ({lineas.length} líneas)</p>
+                    <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-ds-ink">{TIPO_LABEL[activa] ?? activa}</strong> ({lineas.length} líneas)</p>
                     <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-200 rounded-ds-lg">
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 z-10">
@@ -409,7 +409,7 @@ export default function PresupuestoPage() {
           {/* Vista Descompuesto (materiales) */}
           {vistaActiva === 'descompuesto' && descompuesto && (
             <div>
-              <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-black">Descompuesto</strong> ({descompuesto.lineas.length} materiales)</p>
+              <p className="text-ds-gray-500 text-body-sm mb-1">Vista previa · <strong className="text-ds-ink">Descompuesto</strong> ({descompuesto.lineas.length} materiales)</p>
               <div className="overflow-x-auto max-h-[380px] overflow-y-auto no-scrollbar border border-ds-gray-200 rounded-ds-lg">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10">
@@ -440,7 +440,7 @@ export default function PresupuestoPage() {
 
       {/* Paso 3 — Guardar / Subir a Business Central */}
       {hayDatos && (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
           <StepHeader n={3} title="Guardá o subí a Business Central" hint="General (versión) y Descompuesto (materiales) se suben por separado — cada botón manda solo lo suyo." />
           {!obraId && (
             <div className="rounded-ds bg-brand-soft border border-brand/40 px-4 py-2.5 text-sm text-black">

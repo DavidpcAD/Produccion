@@ -138,7 +138,7 @@ export default function ImportacionesPage() {
     }),
     col.accessor('archivo_nombre', {
       header: 'Archivo', meta: { label: 'Archivo' },
-      cell: ({ getValue }) => <span className="font-mono text-xs text-black">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="font-mono text-xs text-ds-ink">{getValue() as string}</span>,
     }),
     col.accessor('estado', {
       header: 'Estado', meta: { label: 'Estado' },
@@ -149,7 +149,7 @@ export default function ImportacionesPage() {
     }),
     col.accessor('batches_nuevos', {
       header: 'Nuevos', meta: { label: 'Nuevos', align: 'right' },
-      cell: ({ getValue }) => <span className="tabular-nums font-semibold text-black">{getValue() as number}</span>,
+      cell: ({ getValue }) => <span className="tabular-nums font-semibold text-ds-ink">{getValue() as number}</span>,
     }),
     col.accessor('batches_duplicados', {
       header: 'Duplicados', meta: { label: 'Duplicados', align: 'right' },
@@ -198,7 +198,7 @@ export default function ImportacionesPage() {
             arrastrando ? 'border-brand bg-brand/5' : 'border-ds-gray-200 bg-ds-gray-50'
           }`}
         >
-          <p className="text-sm font-semibold text-black">Arrastrá un CSV o seleccionalo</p>
+          <p className="text-sm font-semibold text-ds-ink">Arrastrá un CSV o seleccionalo</p>
           <p className="text-xs text-ds-gray-400 text-center">
             Solo archivos .csv de la planta Blend, máximo 50 MB.
           </p>
@@ -212,7 +212,7 @@ export default function ImportacionesPage() {
           />
 
           {archivo && (
-            <p className="text-sm text-black text-center break-all">
+            <p className="text-sm text-ds-ink text-center break-all">
               Seleccionado: <span className="font-mono">{archivo.name}</span>{' '}
               <span className="text-ds-gray-400">({Math.round(archivo.size / 1024)} KB)</span>
             </p>
@@ -235,7 +235,7 @@ export default function ImportacionesPage() {
 
         {/* Resultado de la última ingesta */}
         <div className="rounded-ds-lg border border-ds-gray-200 p-5">
-          <h2 className="text-body font-semibold text-black mb-3">Resultado de la última ingesta</h2>
+          <h2 className="text-body font-semibold text-ds-ink mb-3">Resultado de la última ingesta</h2>
           {!resultado ? (
             <p className="text-sm text-ds-gray-400">Todavía no ejecutaste ninguna importación en esta sesión.</p>
           ) : (
@@ -282,7 +282,7 @@ export default function ImportacionesPage() {
       {/* Historial */}
       <div>
         <div className="flex items-baseline justify-between mb-2">
-          <h2 className="text-body font-semibold text-black">Historial de importaciones</h2>
+          <h2 className="text-body font-semibold text-ds-ink">Historial de importaciones</h2>
           <span className="text-xs text-ds-gray-400">{total} en total</span>
         </div>
         <DataTable
@@ -302,7 +302,7 @@ function Metric({ label, value, strong, danger }: { label: string; value: number
   return (
     <div className="rounded-ds bg-ds-gray-50 px-3 py-2">
       <p className="text-[11px] uppercase tracking-wide text-ds-gray-400">{label}</p>
-      <p className={`tabular-nums text-sub-sm ${danger ? 'text-ds-red' : strong ? 'text-black font-bold' : 'text-ds-gray-600'}`}>
+      <p className={`tabular-nums text-sub-sm ${danger ? 'text-ds-red' : strong ? 'text-ds-ink font-bold' : 'text-ds-gray-600'}`}>
         {value}
       </p>
     </div>

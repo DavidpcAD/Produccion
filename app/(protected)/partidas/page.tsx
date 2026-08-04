@@ -220,7 +220,7 @@ export default function PartidasPage() {
   if (mounted && session && !isSuperAdmin) {
     return (
       <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">
           No tenés acceso a esta sección.
         </div>
       </div>
@@ -243,7 +243,7 @@ export default function PartidasPage() {
           <Skeleton className="h-80 w-full" rounded="rounded-ds-lg" />
         </div>
       ) : partidas.length === 0 ? (
-        <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
           No hay partidas todavía.{puede && ' Creá la primera con “Nueva partida”.'}
         </div>
       ) : (
@@ -251,7 +251,7 @@ export default function PartidasPage() {
           {/* IZQUIERDA — lista de todas las partidas (seleccionable) */}
           <div className="space-y-3">
             <Input placeholder="Buscar partida o subpartida…" value={q} onChange={e => setQ(e.target.value)} />
-            <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+            <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
               {grupos.length === 0 ? (
                 <div className="p-6 text-center text-ds-gray-400 text-sm">Ningún resultado para “{q}”.</div>
               ) : (
@@ -260,7 +260,7 @@ export default function PartidasPage() {
                     <div key={etapa.idEtapa}>
                       <div className="flex items-center gap-2 px-3 py-2 bg-ds-gray-100 border-y border-ds-gray-200 sticky top-0 z-10">
                         <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono">{etapa.codigo}</span>
-                        <span className="font-bold text-black text-xs uppercase tracking-wide truncate flex-1">{etapa.nombre}</span>
+                        <span className="font-bold text-ds-ink text-xs uppercase tracking-wide truncate flex-1">{etapa.nombre}</span>
                         {puede && (
                           <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-400 hover:text-brand shrink-0" title="Nueva partida en esta etapa">
                             <Icon name="plus" size="sm" color="currentColor" />
@@ -274,7 +274,7 @@ export default function PartidasPage() {
                           <button key={partida.idPartida} onClick={() => setSelPartida(partida.idPartida)}
                             className={'w-full text-left px-3 py-2.5 flex items-center gap-2 border-l-2 transition ' + (active ? 'bg-brand-soft border-brand' : 'border-transparent hover:bg-ds-gray-100')}>
                             <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{partida.codigo}</span>
-                            <span className="text-sm text-black truncate flex-1">{partida.nombre}</span>
+                            <span className="text-sm text-ds-ink truncate flex-1">{partida.nombre}</span>
                             <span className="text-xs text-ds-gray-400 shrink-0">{total}</span>
                           </button>
                         );
@@ -287,7 +287,7 @@ export default function PartidasPage() {
           </div>
 
           {/* DERECHA — detalle de la partida seleccionada */}
-          <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden min-h-[300px]">
+          <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden min-h-[300px]">
             {!sel ? (
               <div className="p-12 text-center text-ds-gray-400 text-sm">Seleccioná una partida de la izquierda para ver y agregar sus subpartidas.</div>
             ) : (
@@ -295,7 +295,7 @@ export default function PartidasPage() {
                 <div className="px-5 py-4 border-b border-ds-gray-200 flex items-center gap-3 flex-wrap">
                   {selEtapa && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono shrink-0">{selEtapa.codigo}</span>}
                   <span className="font-mono text-sm font-semibold text-ds-gray-500 shrink-0">{sel.codigo}</span>
-                  <h2 className="font-bold text-black truncate flex-1 min-w-0">{sel.nombre}</h2>
+                  <h2 className="font-bold text-ds-ink truncate flex-1 min-w-0">{sel.nombre}</h2>
                   <span className="text-xs text-ds-gray-400 shrink-0">{selSubs.length} subpartidas</span>
                   {puede && (
                     <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
@@ -313,11 +313,11 @@ export default function PartidasPage() {
                     {selSubs.map(s => (
                       <li key={s.idSubPartida} className="px-5 py-3 flex items-center gap-3 group">
                         <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{s.codigo}</span>
-                        <span className="text-sm text-black truncate flex-1">{s.nombre}</span>
+                        <span className="text-sm text-ds-ink truncate flex-1">{s.nombre}</span>
                         {s.esCritica && <Badge variant="red">Crítica</Badge>}
                         <span className="text-xs text-ds-gray-400 shrink-0">S{s.numSprint}</span>
                         {puede && (
-                          <button onClick={() => abrirEditarSub(s)} className="text-ds-gray-300 hover:text-black p-1 shrink-0 opacity-0 group-hover:opacity-100 transition" title="Editar subpartida">
+                          <button onClick={() => abrirEditarSub(s)} className="text-ds-gray-300 hover:text-ds-ink p-1 shrink-0 opacity-0 group-hover:opacity-100 transition" title="Editar subpartida">
                             <Icon name="edit" size="sm" color="currentColor" />
                           </button>
                         )}
@@ -387,13 +387,13 @@ export default function PartidasPage() {
               <span className="text-ds-gray-500">Partida: </span>
               {(() => {
                 const p = partidas.find(x => String(x.idPartida) === subForm.idPartida);
-                return <span className="font-semibold text-black">{p ? `${p.codigo} — ${p.nombre}` : subForm.idPartida}</span>;
+                return <span className="font-semibold text-ds-ink">{p ? `${p.codigo} — ${p.nombre}` : subForm.idPartida}</span>;
               })()}
             </div>
           ) : (
             <>
               <p className="text-body-sm text-ds-gray-500">
-                La subpartida queda amarrada a una <span className="font-semibold text-black">partida</span> existente (y a su etapa).
+                La subpartida queda amarrada a una <span className="font-semibold text-ds-ink">partida</span> existente (y a su etapa).
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Combobox
@@ -421,7 +421,7 @@ export default function PartidasPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Sprint (N°)" type="number" min={0} value={subForm.numSprint} onChange={e => setSub('numSprint', e.target.value)} />
             <div className="flex items-end pb-3">
-              <label className="flex items-center gap-2 text-sm text-black cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
                 <input type="checkbox" checked={subForm.esCritica} onChange={e => setSub('esCritica', e.target.checked)} className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" />
                 Es crítica
               </label>

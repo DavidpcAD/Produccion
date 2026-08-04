@@ -7,12 +7,12 @@ export function Proximamente({
 }: { titulo: string; descripcion: string; icon?: IconName }) {
   return (
     <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
-      <h1 className="text-heading font-bold text-black">{titulo}</h1>
-      <div className="mt-8 flex flex-col items-center justify-center text-center gap-3 py-20 bg-white rounded-ds-lg border border-ds-gray-200">
+      <h1 className="text-heading font-bold text-ds-ink">{titulo}</h1>
+      <div className="mt-8 flex flex-col items-center justify-center text-center gap-3 py-20 bg-ds-surface rounded-ds-lg border border-ds-gray-200">
         <div className="w-14 h-14 rounded-full bg-ds-gray-100 flex items-center justify-center text-ds-gray-400">
           <Icon name={icon} size="lg" color="currentColor" />
         </div>
-        <p className="text-black font-semibold">En portado</p>
+        <p className="text-ds-ink font-semibold">En portado</p>
         <p className="text-ds-gray-400 text-body-sm max-w-md">{descripcion}</p>
       </div>
     </div>

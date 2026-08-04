@@ -21,9 +21,9 @@ const base =
 const variants: Record<Variant, string> = {
   primary:   'bg-brand text-black hover:bg-brand-200 focus-visible:ring-brand shadow-ds-03',
   secondary: 'bg-black text-white hover:bg-ds-gray-500 focus-visible:ring-black shadow-ds-03',
-  outline:   'border-2 border-black text-black bg-transparent hover:bg-black hover:text-white focus-visible:ring-black',
+  outline:   'border-2 border-black text-ds-ink bg-transparent hover:bg-black hover:text-white focus-visible:ring-black',
   danger:    'bg-ds-red text-white hover:bg-ds-red-200 focus-visible:ring-ds-red shadow-ds-03',
-  ghost:     'bg-transparent text-black hover:bg-ds-gray-100 focus-visible:ring-black',
+  ghost:     'bg-transparent text-ds-ink hover:bg-ds-gray-100 focus-visible:ring-black',
 };
 
 const sizes: Record<Size, string> = {

@@ -107,11 +107,11 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
   const hayMediciones = ensayos.some((e) => e.mediciones.length > 0);
 
   return (
-    <div className="min-h-screen bg-ds-gray-100 print:bg-white">
+    <div className="min-h-screen bg-ds-gray-100 print:bg-ds-surface">
       <style>{PRINT_CSS}</style>
 
       {/* Barra de acciones — no se imprime */}
-      <div className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-ds-gray-200 bg-white px-4 py-3 shadow-ds-01">
+      <div className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-ds-gray-200 bg-ds-surface px-4 py-3 shadow-ds-01">
         <Button variant="outline" size="sm" onClick={() => router.back()} icon={<Icon name="back" size="sm" color="currentColor" />}>
           Volver
         </Button>
@@ -124,7 +124,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
       </div>
 
       {/* Hoja del informe */}
-      <div className="informe-hoja mx-auto my-6 max-w-[820px] bg-white p-10 text-black shadow-ds-01 print:my-0 print:p-0 print:shadow-none">
+      <div className="informe-hoja mx-auto my-6 max-w-[820px] bg-ds-surface p-10 text-ds-ink shadow-ds-01 print:my-0 print:p-0 print:shadow-none">
         {/* Encabezado */}
         <header className="flex items-start justify-between border-b-2 border-black pb-4">
           <div>

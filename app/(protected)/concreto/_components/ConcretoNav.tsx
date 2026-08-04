@@ -31,7 +31,7 @@ export function ConcretoNav() {
             key={t.href}
             href={t.href}
             className={`inline-flex items-center gap-2 px-5 h-11 rounded-full text-sm font-semibold transition-all ${
-              active ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-black'
+              active ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-ds-ink'
             }`}
           >
             <Icon name={t.icon} size="sm" color="currentColor" />

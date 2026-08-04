@@ -303,7 +303,7 @@ export default function KanbanPage() {
           <button
             type="button"
             onClick={() => router.push('/avance')}
-            className="mb-1 flex items-center gap-1 text-body-sm text-ds-gray-400 hover:text-black"
+            className="mb-1 flex items-center gap-1 text-body-sm text-ds-gray-400 hover:text-ds-ink"
           >
             <ArrowLeft size={16} weight="bold" /> Volver a obras
           </button>
@@ -342,7 +342,7 @@ export default function KanbanPage() {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar obra…"
-            className="h-9 w-64 rounded-ds border border-ds-gray-200 pl-8 pr-2 text-sm text-black focus:border-black focus:outline-none"
+            className="h-9 w-64 rounded-ds border border-ds-gray-200 pl-8 pr-2 text-sm text-ds-ink focus:border-black focus:outline-none"
           />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -373,7 +373,7 @@ export default function KanbanPage() {
             <section key={col.numero} className="w-[320px] shrink-0">
               <header className="mb-2 flex items-center justify-between gap-2 rounded-ds bg-ds-gray-100 px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-black">{col.nombre}</span>
+                  <span className="text-sm font-bold text-ds-ink">{col.nombre}</span>
                   {col.es_espera && <Badge variant="yellow">espera</Badge>}
                 </div>
                 <span className="text-xs font-semibold tabular-nums text-ds-gray-400">
@@ -524,14 +524,14 @@ function ObraCard(p: CardProps) {
   ).length;
 
   return (
-    <div className={`rounded-ds border border-ds-gray-200 bg-white ${congelada ? 'opacity-70' : ''}`}>
+    <div className={`rounded-ds border border-ds-gray-200 bg-ds-surface ${congelada ? 'opacity-70' : ''}`}>
       <button
         type="button"
         onClick={p.onToggle}
         className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-ds-gray-100/40"
       >
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 font-mono text-sm font-semibold text-black">
+          <p className="flex items-center gap-1.5 font-mono text-sm font-semibold text-ds-ink">
             {o.codigo}
             <BadgeVenta estado={o.estado_venta} />
             {congelada && <Badge variant="gray">congelada</Badge>}
@@ -553,7 +553,7 @@ function ObraCard(p: CardProps) {
             <>
               <div className="flex items-center justify-between text-body-sm">
                 <span className="text-ds-gray-400">Avance del sprint</span>
-                <span className="font-semibold tabular-nums text-black">{p.avance.avance_sprint}%</span>
+                <span className="font-semibold tabular-nums text-ds-ink">{p.avance.avance_sprint}%</span>
               </div>
 
               {/* Acciones de sprint / estado */}
@@ -594,7 +594,7 @@ function ObraCard(p: CardProps) {
                   return (
                     <div key={sp.sub_partida_id} className="p-2 space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-xs font-medium text-black">
+                        <p className="text-xs font-medium text-ds-ink">
                           <span className="font-mono">{sp.codigo}</span> · {sp.nombre}
                           {sp.es_critica && <span className="ml-1 text-[10px] font-bold text-amber-600">crítica</span>}
                         </p>
@@ -629,7 +629,7 @@ function ObraCard(p: CardProps) {
                           type="button"
                           onClick={() => p.onPct(sp)}
                           title="Fijar %"
-                          className="flex h-7 w-7 items-center justify-center rounded-ds border border-ds-gray-200 text-ds-gray-500 hover:border-black hover:text-black"
+                          className="flex h-7 w-7 items-center justify-center rounded-ds border border-ds-gray-200 text-ds-gray-500 hover:border-black hover:text-ds-ink"
                         >
                           <Percent size={14} weight="bold" />
                         </button>
@@ -676,7 +676,7 @@ function Chip({ label, activo, onClick }: { label: string; activo: boolean; onCl
       className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
         activo
           ? 'border-black bg-black text-white'
-          : 'border-ds-gray-200 bg-white text-ds-gray-400 hover:border-ds-gray-400 hover:text-black'
+          : 'border-ds-gray-200 bg-ds-surface text-ds-gray-400 hover:border-ds-gray-400 hover:text-ds-ink'
       }`}
     >
       {label}
@@ -702,7 +702,7 @@ function FiltroChip({
       className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
         activo
           ? 'border-brand bg-brand/15 text-ds-green-ink'
-          : 'border-ds-gray-200 bg-white text-ds-gray-400 hover:border-ds-gray-400 hover:text-black'
+          : 'border-ds-gray-200 bg-ds-surface text-ds-gray-400 hover:border-ds-gray-400 hover:text-ds-ink'
       }`}
     >
       {label}
@@ -717,7 +717,7 @@ function BadgeVenta({ estado }: { estado: EstadoVenta | null }) {
   return (
     <span
       title={`Venta: ${m.label}`}
-      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-ds-gray-200 bg-white text-[10px] font-bold text-ds-gray-500"
+      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-ds-gray-200 bg-ds-surface text-[10px] font-bold text-ds-gray-500"
     >
       {m.letra}
     </span>

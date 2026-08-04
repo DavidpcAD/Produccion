@@ -52,7 +52,7 @@ export function PageHeader({
         {back}
         <div className="min-w-0">
           {typeof title === 'string' ? (
-            <h1 className="text-heading font-bold text-black">{title}</h1>
+            <h1 className="text-heading font-bold text-ds-ink">{title}</h1>
           ) : (
             title
           )}

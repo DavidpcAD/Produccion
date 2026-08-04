@@ -245,7 +245,7 @@ export function Sidebar({ nivelAdmin, onClose, collapsed = false }: SidebarProps
                           onClick={onClose}
                           aria-current={childActive ? 'page' : undefined}
                           className={`block px-3 py-1.5 rounded-ds text-sm transition-colors ${
-                            childActive ? 'text-brand font-semibold bg-brand/10' : 'text-white/55 hover:text-white hover:bg-white/[0.06]'
+                            childActive ? 'text-brand font-semibold bg-brand/10' : 'text-white/55 hover:text-white hover:bg-ds-surface/[0.06]'
                           }`}
                         >
                           {child.label}

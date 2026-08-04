@@ -128,12 +128,12 @@ export function MarcajeEstadoZonas({ idColaborador, canEdit = false }: { idColab
   if (!tieneZonas && !canEdit) return null;
 
   return (
-    <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-6">
+    <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-6">
       <div className="flex items-center gap-2 mb-4">
         <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
           <Icon name="user" size="sm" color="currentColor" className="text-brand" />
         </div>
-        <h2 className="font-bold text-black">Dispositivo de marcaje</h2>
+        <h2 className="font-bold text-ds-ink">Dispositivo de marcaje</h2>
         {canEdit && !editando && (
           <Button
             variant="outline" size="sm" className="ml-auto"
@@ -152,7 +152,7 @@ export function MarcajeEstadoZonas({ idColaborador, canEdit = false }: { idColab
             return (
               <div key={z.idZona} className="flex items-center gap-3 px-3 py-2.5 rounded-ds border border-ds-gray-200">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-black truncate">{z.zona}</p>
+                  <p className="text-sm font-semibold text-ds-ink truncate">{z.zona}</p>
                   <p className="text-xs text-ds-gray-400">
                     PIN {z.pin} · {m.hint}
                     {z.equiposCompatibles > 0 && ` (${z.equiposConCara}/${z.equiposCompatibles} relojes)`}

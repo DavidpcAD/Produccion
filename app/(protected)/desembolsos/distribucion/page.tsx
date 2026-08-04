@@ -45,7 +45,7 @@ export default function DistribucionPage() {
         subtitle="Reparto del precio interno del lote entre entidades. Las tarifas se versionan por fecha de vigencia — cada cambio crea una nueva vigencia o edita la vigente."
       />
 
-      <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-gray-200 bg-white">
+      <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-gray-200 bg-ds-surface">
         {cargando && <p className="px-3 py-6 text-center text-ds-gray-400">Cargando proyectos…</p>}
         {!cargando && proyectos.length === 0 && (
           <p className="px-3 py-6 text-center text-ds-gray-400">Sin proyectos con ventas activas.</p>
@@ -71,7 +71,7 @@ export default function DistribucionPage() {
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
                     {cfg.Entidades.map((e) => (
                       <span key={e.Codigo} className="tabular-nums text-ds-gray-500">
-                        <strong className="text-black">{e.Codigo}</strong> {e.Porcentaje}%
+                        <strong className="text-ds-ink">{e.Codigo}</strong> {e.Porcentaje}%
                       </span>
                     ))}
                   </div>
@@ -181,13 +181,13 @@ function PanelDistribucion({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <aside className="h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <aside className="h-full w-full max-w-md overflow-y-auto bg-ds-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2 className="text-sub font-bold">{proyecto.AbreviaturaProyecto}</h2>
             <p className="text-xs text-ds-gray-400">{proyecto.NombreProyecto}</p>
           </div>
-          <button onClick={onClose} className="text-sub leading-none text-ds-gray-400 hover:text-black">×</button>
+          <button onClick={onClose} className="text-sub leading-none text-ds-gray-400 hover:text-ds-ink">×</button>
         </div>
 
         {cfg && (
@@ -216,7 +216,7 @@ function PanelDistribucion({
                   <select
                     value={f.IDEntidad}
                     onChange={(e) => setFila(i, { IDEntidad: Number(e.target.value) })}
-                    className="h-10 flex-1 rounded-ds-xl border-2 border-transparent bg-white px-3 text-sm shadow-ds-01 focus:border-black focus:outline-none"
+                    className="h-10 flex-1 rounded-ds-xl border-2 border-transparent bg-ds-surface px-3 text-sm shadow-ds-01 focus:border-black focus:outline-none"
                   >
                     {entidades.map((e) => (
                       <option key={e.IDEntidad} value={e.IDEntidad}>{e.Codigo} — {e.Nombre}</option>
@@ -224,7 +224,7 @@ function PanelDistribucion({
                   </select>
                   <input type="number" min={0} max={100} step="0.01" value={f.Porcentaje}
                     onChange={(e) => setFila(i, { Porcentaje: e.target.value })} placeholder="%"
-                    className="h-10 w-24 rounded-ds-xl border-2 border-transparent bg-white px-3 text-right text-sm tabular-nums shadow-ds-01 focus:border-black focus:outline-none" />
+                    className="h-10 w-24 rounded-ds-xl border-2 border-transparent bg-ds-surface px-3 text-right text-sm tabular-nums shadow-ds-01 focus:border-black focus:outline-none" />
                   <button type="button" onClick={() => quitar(i)} className="px-2 text-ds-gray-400 hover:text-ds-red" title="Quitar">×</button>
                 </div>
               ))}
@@ -235,7 +235,7 @@ function PanelDistribucion({
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">Notas (opcional)</span>
             <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} maxLength={500}
-              className="w-full rounded-ds-xl border-2 border-transparent bg-white px-4 py-2 text-sm shadow-ds-01 focus:border-black focus:outline-none" />
+              className="w-full rounded-ds-xl border-2 border-transparent bg-ds-surface px-4 py-2 text-sm shadow-ds-01 focus:border-black focus:outline-none" />
           </label>
         </div>
 

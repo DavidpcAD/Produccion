@@ -178,7 +178,7 @@ export default function EsclerometroPage() {
       </div>
 
       {error && !loading && (
-        <div className="bg-white rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar los ensayos.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
@@ -345,7 +345,7 @@ function ModalNuevoEnsayo({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-black">
+          <span className="text-sm font-medium text-ds-ink">
             Elemento estructural <span className="text-ds-red">*</span>
           </span>
           <div className="flex flex-wrap gap-1.5">
@@ -392,14 +392,14 @@ function ModalNuevoEnsayo({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="notas" className="text-sm font-medium text-black">
+          <label htmlFor="notas" className="text-sm font-medium text-ds-ink">
             Notas (opcional)
           </label>
           <textarea
             id="notas"
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
-            className="min-h-[64px] w-full rounded-ds-xl border-2 border-transparent bg-white px-5 py-3 text-body-sm text-black shadow-ds-01 focus:border-black focus:shadow-none focus:outline-none"
+            className="min-h-[64px] w-full rounded-ds-xl border-2 border-transparent bg-ds-surface px-5 py-3 text-body-sm text-ds-ink shadow-ds-01 focus:border-black focus:shadow-none focus:outline-none"
             placeholder="Observaciones del ensayo…"
           />
         </div>

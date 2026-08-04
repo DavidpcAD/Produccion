@@ -115,7 +115,7 @@ export default function CuentasPage() {
       header: 'Usuario',
       meta: { label: 'Usuario', exportValue: c => `@${c.username}` },
       cell: ({ row }) => (
-        <span className="inline-flex items-center gap-2 font-semibold text-black">
+        <span className="inline-flex items-center gap-2 font-semibold text-ds-ink">
           <Icon name="rol" size="sm" color="var(--ds-color-gray-400)" />@{row.original.username}
         </span>
       ),
@@ -158,7 +158,7 @@ export default function CuentasPage() {
       header: '',
       cell: ({ row }) => (
         <div className="flex items-center gap-1 justify-end">
-          <button onClick={e => { e.stopPropagation(); openEdit(row.original); }} className="p-2 rounded-full text-ds-gray-400 hover:text-black hover:bg-ds-gray-100 transition-colors" title="Editar" aria-label="Editar">
+          <button onClick={e => { e.stopPropagation(); openEdit(row.original); }} className="p-2 rounded-full text-ds-gray-400 hover:text-ds-ink hover:bg-ds-gray-100 transition-colors" title="Editar" aria-label="Editar">
             <Icon name="edit" size="sm" color="currentColor" />
           </button>
           <button onClick={e => { e.stopPropagation(); handleDelete(row.original); }} className="p-2 rounded-full text-ds-gray-400 hover:text-ds-red-200 hover:bg-ds-gray-100 transition-colors" title="Eliminar" aria-label="Eliminar">
@@ -213,7 +213,7 @@ export default function CuentasPage() {
                   {initials(editCuenta.colaborador)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold text-black text-sm truncate">
+                  <p className="font-bold text-ds-ink text-sm truncate">
                     @{editCuenta.username}
                     <span className="text-ds-gray-400 font-normal"> · {editCuenta.colaborador}</span>
                   </p>
@@ -244,7 +244,7 @@ export default function CuentasPage() {
           <section className="space-y-4">
             <div className="flex items-center gap-2 border-b border-ds-gray-100 pb-2">
               <Icon name="user" size="sm" color="var(--ds-color-gray-400)" />
-              <h3 className="font-bold text-black text-sm">Datos de la cuenta</h3>
+              <h3 className="font-bold text-ds-ink text-sm">Datos de la cuenta</h3>
             </div>
             <Combobox
               label="Colaborador"
@@ -270,7 +270,7 @@ export default function CuentasPage() {
           <section className="space-y-4">
             <div className="flex items-center gap-2 border-b border-ds-gray-100 pb-2">
               <Icon name="rol" size="sm" color="var(--ds-color-gray-400)" />
-              <h3 className="font-bold text-black text-sm">{editId ? 'Cambiar contraseña' : 'Contraseña'}</h3>
+              <h3 className="font-bold text-ds-ink text-sm">{editId ? 'Cambiar contraseña' : 'Contraseña'}</h3>
             </div>
             <div className="flex items-end gap-2">
               <div className="flex-1">
@@ -298,7 +298,7 @@ export default function CuentasPage() {
 
           {editId && (
             <p className="text-xs text-ds-gray-400">
-              Los roles de este usuario se editan desde <span className="font-semibold text-black">Colaboradores</span>, en la sección “Acceso al sistema”.
+              Los roles de este usuario se editan desde <span className="font-semibold text-ds-ink">Colaboradores</span>, en la sección “Acceso al sistema”.
             </p>
           )}
         </div>

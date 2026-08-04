@@ -94,7 +94,7 @@ export default function AvancePage() {
         subtitle="Elegí la obra donde vas a registrar avance."
         actions={
           /* Toggle Lista / Matriz */
-          <div className="flex shrink-0 rounded-ds border border-ds-gray-200 bg-white p-0.5">
+          <div className="flex shrink-0 rounded-ds border border-ds-gray-200 bg-ds-surface p-0.5">
             <ToggleBtn label="Vista de lista" activo={vista === 'lista'} onClick={() => setVista('lista')} icon="list" />
             <ToggleBtn label="Vista de matriz" activo={vista === 'matriz'} onClick={() => setVista('matriz')} icon="options" />
           </div>
@@ -171,7 +171,7 @@ export default function AvancePage() {
                       key={o.codigo}
                       type="button"
                       onClick={() => router.push(`/avance/${encodeURIComponent(o.codigo)}`)}
-                      className={`flex items-center justify-between rounded-ds border border-ds-gray-200 bg-white p-3 text-left transition-transform hover:border-ds-gray-300 active:scale-[0.98] ${
+                      className={`flex items-center justify-between rounded-ds border border-ds-gray-200 bg-ds-surface p-3 text-left transition-transform hover:border-ds-gray-300 active:scale-[0.98] ${
                         o.estado === 'en_espera' ? 'opacity-60' : ''
                       }`}
                     >
@@ -180,7 +180,7 @@ export default function AvancePage() {
                           <Icon name="place" size="md" color="currentColor" />
                         </div>
                         <div>
-                          <p className="flex items-center gap-1.5 font-mono text-sm font-semibold text-black">
+                          <p className="flex items-center gap-1.5 font-mono text-sm font-semibold text-ds-ink">
                             {o.codigo}
                             <BadgeVentaMini estado={o.estado_venta} />
                             {o.estado === 'en_espera' && (
@@ -241,7 +241,7 @@ function ProyectoChip({ label, activo, onClick }: { label: string; activo: boole
       type="button"
       onClick={onClick}
       className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-        activo ? 'border-black bg-black text-white' : 'border-ds-gray-200 bg-white text-ds-gray-400 hover:border-ds-gray-400 hover:text-black'
+        activo ? 'border-black bg-black text-white' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-400 hover:border-ds-gray-400 hover:text-ds-ink'
       }`}
     >
       {label}
@@ -265,7 +265,7 @@ function FiltroChip({
       type="button"
       onClick={onClick}
       className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
-        activo ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-white text-ds-gray-400 hover:border-ds-gray-400 hover:text-black'
+        activo ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-400 hover:border-ds-gray-400 hover:text-black'
       }`}
     >
       {label}
@@ -280,7 +280,7 @@ function BadgeVentaMini({ estado }: { estado: EstadoVenta | null }) {
   return (
     <span
       title={`Venta: ${m.label}`}
-      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-ds-gray-200 bg-white text-[10px] font-bold text-ds-gray-500"
+      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-ds-gray-200 bg-ds-surface text-[10px] font-bold text-ds-gray-500"
     >
       {m.letra}
     </span>

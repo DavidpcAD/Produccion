@@ -11,9 +11,9 @@ const variants: Record<BadgeVariant, string> = {
   green:  'bg-transparent text-ds-green-ink border border-brand',
   red:    'bg-transparent text-ds-red-200 border border-ds-red',
   orange: 'bg-transparent text-ds-gray-500 border border-ds-gray-200',
-  blue:   'bg-white text-ds-gray-400 border border-ds-gray-200',
-  purple: 'bg-white text-ds-gray-400 border border-ds-gray-200',
-  gray:   'bg-white text-ds-gray-400 border border-ds-gray-200',
+  blue:   'bg-ds-surface text-ds-gray-400 border border-ds-gray-200',
+  purple: 'bg-ds-surface text-ds-gray-400 border border-ds-gray-200',
+  gray:   'bg-ds-surface text-ds-gray-400 border border-ds-gray-200',
   yellow: 'bg-transparent text-ds-yellow-ink border border-ds-yellow',
   black:  'bg-black text-white border border-black',
 };
@@ -26,7 +26,7 @@ const dotColors: Record<BadgeVariant, string> = {
   purple: 'bg-ds-gray-300',
   gray:   'bg-ds-gray-400',
   yellow: 'bg-ds-yellow',
-  black:  'bg-white',
+  black:  'bg-ds-surface',
 };
 
 export function Badge({ variant = 'gray', children, dot, className = '' }: BadgeProps) {

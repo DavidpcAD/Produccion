@@ -85,7 +85,7 @@ export default function SubPartidasPage() {
       />
 
       {/* Filtros */}
-      <div className="mb-5 grid grid-cols-1 gap-3 rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01 md:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01 md:grid-cols-4">
         <div className="md:col-span-2">
           <Input
             label="Buscar"
@@ -137,17 +137,17 @@ export default function SubPartidasPage() {
 
       {/* KPIs */}
       <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01">
+        <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
           <p className="text-xs font-semibold uppercase tracking-wide text-ds-gray-400">
             Total filtrado
           </p>
           <p className="text-heading font-bold tabular-nums">{kpis.total}</p>
         </div>
-        <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01">
+        <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
           <p className="text-xs font-semibold uppercase tracking-wide text-ds-gray-400">Críticas</p>
           <p className="text-heading font-bold tabular-nums">{kpis.criticas}</p>
         </div>
-        <div className="rounded-ds-lg border border-ds-gray-200 bg-white p-4 shadow-ds-01">
+        <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
           <p className="text-xs font-semibold uppercase tracking-wide text-ds-gray-400">
             Sprints distintos
           </p>
@@ -483,12 +483,12 @@ function SubPartidaModal({ partidas, editandoId, onClose, onGuardado }: ModalPro
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-black">Aplica a tipos de casa</p>
+            <p className="mb-2 text-sm font-medium text-ds-ink">Aplica a tipos de casa</p>
             <div className="grid grid-cols-2 gap-2">
               {TIPOS_CASA.map((tc) => (
                 <label
                   key={tc}
-                  className="flex cursor-pointer items-center gap-2 rounded-ds border border-ds-gray-200 bg-white px-3 py-2 text-sm hover:bg-ds-gray-100"
+                  className="flex cursor-pointer items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3 py-2 text-sm hover:bg-ds-gray-100"
                 >
                   <input
                     type="checkbox"

@@ -195,7 +195,7 @@ function Distribucion({ obras }: { obras: ManoObraFila[] }) {
       <th className={`${th} ${left ? 'text-left' : 'text-right'}`}>
         <button
           type="button"
-          className={`inline-flex w-full items-center gap-1 hover:text-black ${left ? 'justify-start' : 'justify-end'}`}
+          className={`inline-flex w-full items-center gap-1 hover:text-ds-ink ${left ? 'justify-start' : 'justify-end'}`}
           onClick={() =>
             setOrden((prev) =>
               prev.col === col
@@ -212,7 +212,7 @@ function Distribucion({ obras }: { obras: ManoObraFila[] }) {
   };
 
   return (
-    <section className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+    <section className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-ds-gray-500">
           Distribución por obra
@@ -296,7 +296,7 @@ function ResumenMesMO({ semanaId, venta }: { semanaId: number; venta: FiltroVent
   }, [abierto, semanaId, venta]);
 
   return (
-    <section className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-white shadow-ds-01">
+    <section className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
@@ -377,7 +377,7 @@ function ResumenMesMO({ semanaId, venta }: { semanaId: number; venta: FiltroVent
 // ----------------------------------------------------------------- Auxiliares
 
 const th = 'px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ds-gray-500';
-const td = 'px-3 py-2 text-sm text-black';
+const td = 'px-3 py-2 text-sm text-ds-ink';
 
 function periodo(iso: string): string {
   const [, m, d] = iso.slice(0, 10).split('-');
@@ -405,11 +405,11 @@ function Kpi({
   small?: boolean;
 }) {
   return (
-    <div className="rounded-ds border border-ds-gray-200 bg-white p-3 shadow-ds-01">
+    <div className="rounded-ds border border-ds-gray-200 bg-ds-surface p-3 shadow-ds-01">
       <p className="text-xs uppercase tracking-wider text-ds-gray-500">{label}</p>
       <p
         className={`font-semibold tabular-nums ${small ? 'text-sub-sm' : 'text-sub'} ${
-          accent === 'lime' ? 'text-brand-dark' : accent === 'red' ? 'text-ds-red' : 'text-black'
+          accent === 'lime' ? 'text-brand-dark' : accent === 'red' ? 'text-ds-red' : 'text-ds-ink'
         }`}
       >
         {value}
@@ -430,7 +430,7 @@ function BarrasGastoVsPresup({ gastada, presupuestada }: { gastada: number; pres
     </div>
   );
   return (
-    <div className="space-y-2 rounded-ds border border-ds-gray-200 bg-white p-3 shadow-ds-01">
+    <div className="space-y-2 rounded-ds border border-ds-gray-200 bg-ds-surface p-3 shadow-ds-01">
       <p className="text-xs font-semibold uppercase tracking-wider text-ds-gray-500">
         M.O. Gastada vs Presupuestada
       </p>

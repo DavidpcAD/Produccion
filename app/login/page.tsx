@@ -92,7 +92,7 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-ds-lg bg-brand flex items-center justify-center shadow-ds-02">
-              <Icon name="folder" size="lg" color="currentColor" className="text-black" />
+              <Icon name="folder" size="lg" color="currentColor" className="text-ds-ink" />
             </div>
             <div>
               <p className="text-white font-bold text-body leading-tight">Adelante</p>
@@ -112,7 +112,7 @@ export default function LoginPage() {
 
             <div className="flex flex-col gap-3">
               {features.map(({ icon, text }) => (
-                <div key={text} className="flex items-center gap-3 border border-white/10 bg-white/5 rounded-ds-lg px-4 py-3">
+                <div key={text} className="flex items-center gap-3 border border-white/10 bg-ds-surface/5 rounded-ds-lg px-4 py-3">
                   <div className="w-8 h-8 rounded-ds bg-brand/20 flex items-center justify-center shrink-0">
                     <Icon name={icon} size="sm" color="currentColor" className="text-brand" />
                   </div>
@@ -136,12 +136,12 @@ export default function LoginPage() {
             <div className="w-9 h-9 rounded-ds-lg bg-black flex items-center justify-center">
               <Icon name="folder" size="md" color="currentColor" className="text-brand" />
             </div>
-            <span className="font-bold text-black">Adelante Desarrollos</span>
+            <span className="font-bold text-ds-ink">Adelante Desarrollos</span>
           </div>
 
           <div className="animate-fade-in">
             <div className="mb-8">
-              <h2 className="text-heading font-bold text-black mb-1">Iniciar sesión</h2>
+              <h2 className="text-heading font-bold text-ds-ink mb-1">Iniciar sesión</h2>
               <p className="text-ds-gray-400 text-sm">Ingresa tu usuario y contraseña para continuar</p>
             </div>
 
@@ -165,7 +165,7 @@ export default function LoginPage() {
                 required
                 leftIcon={<Icon name="rol" size="md" color="currentColor" />}
                 rightElement={
-                  <button type="button" onClick={() => setShowPass(!showPass)} className="text-ds-gray-400 hover:text-black transition-colors">
+                  <button type="button" onClick={() => setShowPass(!showPass)} className="text-ds-gray-400 hover:text-ds-ink transition-colors">
                     {showPass ? <EyeSlash size={18} weight="bold" /> : <Eye size={18} weight="bold" />}
                   </button>
                 }

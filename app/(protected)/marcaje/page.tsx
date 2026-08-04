@@ -111,7 +111,7 @@ export default function MarcajePage() {
     <PageShell>
       <PageHeader title="Marcaje" subtitle="Agregá colaboradores al dispositivo de una zona. Al enrolarlos quedan dados de alta en todos los relojes; luego deben pasar la cara/huella por cualquiera y el sistema la replica." />
 
-      <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-6 space-y-4">
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Combobox label="Zona de marca" value={idZona} onChange={setIdZona}
             options={zonas.map(z => ({
@@ -122,8 +122,8 @@ export default function MarcajePage() {
             placeholder={zonas.length ? 'Seleccionar zona' : 'No hay zonas configuradas'} emptyText="Sin zonas" />
           {idZona && colabs && (
             <div className="flex items-end gap-4 text-sm">
-              <div><span className="font-bold text-black">{totalEnZona}</span> <span className="text-ds-gray-400">en el dispositivo</span></div>
-              <div><span className="font-bold text-black">{totalPend}</span> <span className="text-ds-gray-400">sin enrolar</span></div>
+              <div><span className="font-bold text-ds-ink">{totalEnZona}</span> <span className="text-ds-gray-400">en el dispositivo</span></div>
+              <div><span className="font-bold text-ds-ink">{totalPend}</span> <span className="text-ds-gray-400">sin enrolar</span></div>
             </div>
           )}
         </div>
@@ -137,7 +137,7 @@ export default function MarcajePage() {
                 <Input placeholder="Buscar por nombre, cédula, puesto…" value={q} onChange={e => setQ(e.target.value)} />
               </div>
               <button type="button" onClick={toggleAll} disabled={pendientes.length === 0}
-                className="text-sm font-semibold text-ds-gray-500 hover:text-black disabled:opacity-40 disabled:cursor-not-allowed">
+                className="text-sm font-semibold text-ds-gray-500 hover:text-ds-ink disabled:opacity-40 disabled:cursor-not-allowed">
                 {allSelected ? 'Quitar selección' : `Seleccionar pendientes (${pendientes.length})`}
               </button>
               <Button onClick={enrolar} loading={enrolando} disabled={sel.size === 0}
@@ -166,7 +166,7 @@ export default function MarcajePage() {
                           className="w-4 h-4 shrink-0 accent-black cursor-pointer" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-black truncate">{c.nombre}</p>
+                        <p className="text-sm font-semibold text-ds-ink truncate">{c.nombre}</p>
                         <p className="text-xs text-ds-gray-400 truncate">{c.cedula}{c.puesto ? ` · ${c.puesto}` : ''}</p>
                       </div>
                       {c.enZona

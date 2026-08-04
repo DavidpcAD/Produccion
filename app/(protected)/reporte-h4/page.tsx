@@ -124,7 +124,7 @@ export default function ReporteH4Page() {
         const partes = c.getValue().split(/ · | — /);
         return (
           <div className="min-w-0">
-            <p className="font-semibold text-black truncate">{partes[0]}</p>
+            <p className="font-semibold text-ds-ink truncate">{partes[0]}</p>
             {partes.length > 1 && (
               <p className="text-xs text-ds-gray-400 truncate">{partes.slice(1).join(' · ')}</p>
             )}
@@ -203,7 +203,7 @@ export default function ReporteH4Page() {
       {/* Anomalías pendientes */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-body font-bold text-black">Anomalías pendientes ({nAnom})</h2>
+          <h2 className="text-body font-bold text-ds-ink">Anomalías pendientes ({nAnom})</h2>
           <span className="text-xs text-ds-gray-400">Resolver antes de cerrar el día</span>
         </div>
         <DataTable
@@ -233,16 +233,16 @@ export default function ReporteH4Page() {
               <span className="text-xs text-ds-gray-400">{fmtHora(detalle.ocurridoUtc)}</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-black">{detalle.titulo}</p>
+              <p className="text-sm font-semibold text-ds-ink">{detalle.titulo}</p>
             </div>
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <dt className="text-xs text-ds-gray-400">Tipo</dt>
-                <dd className="text-black">{detalle.tipo}</dd>
+                <dd className="text-ds-ink">{detalle.tipo}</dd>
               </div>
               <div>
                 <dt className="text-xs text-ds-gray-400">Obra</dt>
-                <dd className="text-black">{detalle.code || '—'}</dd>
+                <dd className="text-ds-ink">{detalle.code || '—'}</dd>
               </div>
             </dl>
           </div>
@@ -255,9 +255,9 @@ export default function ReporteH4Page() {
 function Kpi({ label, value, sub, tone }: {
   label: string; value: React.ReactNode; sub?: string; tone?: 'warning' | 'critical';
 }) {
-  const valueColor = tone === 'critical' ? 'text-ds-red' : tone === 'warning' ? 'text-ds-yellow-ink' : 'text-black';
+  const valueColor = tone === 'critical' ? 'text-ds-red' : tone === 'warning' ? 'text-ds-yellow-ink' : 'text-ds-ink';
   return (
-    <div className="bg-white rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
+    <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
       <p className="text-xs font-bold tracking-wide text-ds-gray-500">{label}</p>
       <p className={`mt-2 text-4xl font-bold leading-none ${valueColor}`}>{value}</p>
       {sub && <p className="mt-2 text-xs text-ds-gray-400">{sub}</p>}

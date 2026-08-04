@@ -173,7 +173,7 @@ export default function ObrasPage() {
   const columns: ColumnDef<Obra, any>[] = [
     col.accessor('numeroObra', {
       header: 'N° Obra', meta: { label: 'N° Obra' },
-      cell: ({ getValue }) => <span className="font-semibold text-black">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="font-semibold text-ds-ink">{getValue() as string}</span>,
     }),
     col.accessor('nombreMostrado', {
       header: 'Nombre', meta: { label: 'Nombre' },
@@ -220,7 +220,7 @@ export default function ObrasPage() {
       id: 'acciones', header: '', meta: { label: 'Acciones' },
       cell: ({ row }) => { const o = row.original; return (
         <div className="flex items-center gap-2 justify-end">
-          <button onClick={e => { e.stopPropagation(); openEdit(o); }} className="text-ds-gray-400 hover:text-black" title="Editar"><Icon name="edit" size="sm" color="currentColor" /></button>
+          <button onClick={e => { e.stopPropagation(); openEdit(o); }} className="text-ds-gray-400 hover:text-ds-ink" title="Editar"><Icon name="edit" size="sm" color="currentColor" /></button>
         </div>
       ); },
     })] : []),
@@ -294,7 +294,7 @@ export default function ObrasPage() {
                 ${i < step ? 'bg-black text-white' : i === step ? 'bg-brand text-black' : 'bg-ds-gray-100 text-ds-gray-400'}`}>
                 {i < step ? <Icon name="check" size="sm" color="currentColor" /> : i + 1}
               </div>
-              <span className={`text-sm font-semibold ${i === step ? 'text-black' : 'text-ds-gray-400'}`}>{p}</span>
+              <span className={`text-sm font-semibold ${i === step ? 'text-ds-ink' : 'text-ds-gray-400'}`}>{p}</span>
               {i < PASOS.length - 1 && <div className="flex-1 h-px bg-ds-gray-200" />}
             </div>
           ))}
@@ -313,7 +313,7 @@ export default function ObrasPage() {
               <Input label="Nombre mostrado" value={String(form.nombreMostrado)} onChange={e => set('nombreMostrado', e.target.value)}
                 hint="Descripción principal del proyecto en BC" />
               <Input label="Descripción" value={String(form.descripcion)} onChange={e => set('descripcion', e.target.value)} />
-              <label className="flex items-center gap-2 text-sm font-medium text-black cursor-pointer pt-1">
+              <label className="flex items-center gap-2 text-sm font-medium text-ds-ink cursor-pointer pt-1">
                 <input type="checkbox" checked={crearEnBC} onChange={e => setCrearEnBC(e.target.checked)} className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" />
                 Crear también en Business Central
               </label>
@@ -329,7 +329,7 @@ export default function ObrasPage() {
               {renderDim('AC', 'Área de costo (AC)')}
               <div className="rounded-ds border border-ds-gray-200 px-4 py-3 text-sm">
                 <span className="text-ds-gray-400 font-medium">Centro de costo (CC): </span>
-                <span className="text-black font-semibold">{String(form.numeroObra) || '—'}</span>
+                <span className="text-ds-ink font-semibold">{String(form.numeroObra) || '—'}</span>
                 <span className="text-ds-gray-300"> · se crea automático con el N° de obra</span>
               </div>
 
@@ -363,7 +363,7 @@ export default function ObrasPage() {
                 ].map(([k, v]) => (
                   <div key={String(k)} className="flex justify-between px-4 py-2.5">
                     <dt className="text-ds-gray-400 font-medium">{k}</dt>
-                    <dd className="text-black font-semibold text-right">{String(v)}</dd>
+                    <dd className="text-ds-ink font-semibold text-right">{String(v)}</dd>
                   </div>
                 ))}
               </dl>
