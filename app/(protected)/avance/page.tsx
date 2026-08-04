@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { MatrizAvance } from './MatrizAvance';
+import { KanbanAvance } from './KanbanAvance';
 import { VENTA_META } from '@/lib/avance/venta';
 import type { EstadoVenta, ObraAvance, Proyecto } from '@/lib/avance/types';
 
-type Vista = 'lista' | 'matriz';
+type Vista = 'lista' | 'matriz' | 'kanban';
+const VISTAS: Vista[] = ['lista', 'matriz', 'kanban'];
 
 /**
  * Dashboard del módulo Avance. Chips de proyecto + toggle Lista/Matriz sobre las
@@ -27,6 +29,21 @@ export default function AvancePage() {
   const [busqueda, setBusqueda] = useState('');
   const [ventaFiltro, setVentaFiltro] = useState<EstadoVenta | null>(null);
   const [vista, setVista] = useState<Vista>('lista');
+
+  // Vista inicial desde ?vista= (para que «Kanban de avance» del sidebar abra
+  // directo). Sin useSearchParams para no forzar Suspense en el build.
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('vista');
+    if (v && (VISTAS as string[]).includes(v)) setVista(v as Vista);
+  }, []);
+
+  function changeVista(v: Vista) {
+    setVista(v);
+    const url = new URL(window.location.href);
+    if (v === 'lista') url.searchParams.delete('vista');
+    else url.searchParams.set('vista', v);
+    window.history.replaceState(null, '', url.toString());
+  }
 
   useEffect(() => {
     fetch('/api/avance/proyectos')
@@ -93,10 +110,11 @@ export default function AvancePage() {
         title="Avance de obra"
         subtitle="Elegí la obra donde vas a registrar avance."
         actions={
-          /* Toggle Lista / Matriz */
+          /* Toggle Lista / Matriz / Kanban */
           <div className="flex shrink-0 rounded-ds border border-ds-gray-200 bg-ds-surface p-0.5">
-            <ToggleBtn label="Vista de lista" activo={vista === 'lista'} onClick={() => setVista('lista')} icon="list" />
-            <ToggleBtn label="Vista de matriz" activo={vista === 'matriz'} onClick={() => setVista('matriz')} icon="options" />
+            <ToggleBtn label="Vista de lista" activo={vista === 'lista'} onClick={() => changeVista('lista')} icon="list" />
+            <ToggleBtn label="Vista de matriz" activo={vista === 'matriz'} onClick={() => changeVista('matriz')} icon="options" />
+            <ToggleBtn label="Vista kanban" activo={vista === 'kanban'} onClick={() => changeVista('kanban')} icon="kanban" />
           </div>
         }
       />
@@ -117,6 +135,8 @@ export default function AvancePage() {
       </div>
 
       {vista === 'matriz' && <MatrizAvance proyecto={proyectoActivo} />}
+
+      {vista === 'kanban' && <KanbanAvance proyecto={proyectoActivo} />}
 
       {vista === 'lista' && (
         <div className="space-y-4">

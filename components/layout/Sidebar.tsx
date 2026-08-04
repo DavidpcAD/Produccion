@@ -46,7 +46,7 @@ const navItems: NavItemDef[] = [
     section: '/avance',
     children: [
       { href: '/avance', label: 'Obras / Matriz', exact: true },
-      { href: '/avance/kanban', label: 'Kanban de avance' },
+      { href: '/avance?vista=kanban', label: 'Kanban de avance' },
       { href: '/avance/mano-obra', label: 'Mano de Obra' },
       { href: '/avance/reportes', label: 'Reportes' },
       { href: '/avance/reportes/mano-obra', label: 'Reporte M.O.' },
