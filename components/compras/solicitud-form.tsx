@@ -583,6 +583,10 @@ export function SolicitudForm({
     return Math.max(0, ref - st);
   }
   const mostrarSugerido = esStock && lineas.some((l) => l.cantidadPlantilla != null);
+  // La columna Variante solo aporta cuando algún ítem realmente tiene variantes en
+  // BC (p.ej. lotes). En pedidos de puro material (que no llevan variante) se ocultaba
+  // ruido: una columna llena de "—". Reaparece sola si alguna línea trae variantes.
+  const mostrarVariante = lineas.some((l) => { const v = varDeLinea(l); return !!v && v.variantes.length > 0; });
   function aplicarSugerencias() {
     let n = 0;
     setLineas((ls) => ls.map((l) => {
@@ -773,14 +777,14 @@ export function SolicitudForm({
               <tr>
                 <th style={{ width: 300 }}>{esRepuesto ? "Repuesto" : "Artículo"}</th>
                 {esMaterial && <th style={{ width: 240 }}>Obra</th>}
-                <th style={{ width: 220 }}>Variante</th>
+                {mostrarVariante && <th style={{ width: 220 }}>Variante</th>}
                 {esStock && <th className="ds-num" style={{ width: 110 }}>Stock BC</th>}
                 {mostrarSugerido && <th className="ds-num" style={{ width: 132 }}>Sugerido</th>}
                 <th className="ds-num" style={{ width: 110 }}>Cantidad</th><th style={{ width: 90 }}>Unidad</th><th style={{ width: 48 }}></th>
               </tr>
             </thead>
             <tbody>
-              {lineas.length === 0 && (<tr><td colSpan={esMaterial || esStock ? 6 : 5}><div className="empty" style={{ padding: "28px 0" }}>Todavía no agregaste {esRepuesto ? "repuestos" : "materiales"}.</div></td></tr>)}
+              {lineas.length === 0 && (<tr><td colSpan={4 + (esMaterial ? 1 : 0) + (esStock ? 1 : 0) + (mostrarVariante ? 1 : 0) + (mostrarSugerido ? 1 : 0)}><div className="empty" style={{ padding: "28px 0" }}>Todavía no agregaste {esRepuesto ? "repuestos" : "materiales"}.</div></td></tr>)}
               {lineas.map((l) => {
                 const a = catArticulos.find((x) => x.id === l.articuloId);
                 const obraId = catObras.find((o) => o.codigo === l.obraCodigo)?.id ?? "";
@@ -799,6 +803,7 @@ export function SolicitudForm({
                         )}
                       </td>
                     )}
+                    {mostrarVariante && (
                     <td style={{ minWidth: 200 }}>
                       {(() => {
                         const v = varDeLinea(l);
@@ -811,6 +816,7 @@ export function SolicitudForm({
                         );
                       })()}
                     </td>
+                    )}
                     {esStock && (() => {
                       const st = stockDeLinea(l);
                       return (
