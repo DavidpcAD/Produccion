@@ -19,7 +19,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className="h-full">
+    <html lang="es" className="h-full" suppressHydrationWarning>
+      <head>
+        {/* No-flash: aplica el tema guardado antes del paint. Default LIGHT hasta que
+            el dark mode esté completo en toda la app; entonces se reactiva el auto por
+            prefers-color-scheme. Por ahora solo dark si el usuario lo eligió (toggle). */}
+        <script dangerouslySetInnerHTML={{ __html:
+          `(function(){try{var t=localStorage.getItem('adelante_oc_theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`
+        }} />
+      </head>
       <body className={`${roboto.variable} ${roboto.className} h-full`}>
         <ToastProvider>
           <ConfirmProvider>

@@ -21,6 +21,13 @@
   --color-ds-yellow:    #F0C802;
   --color-ds-bg:        #F3F3F3;
 
+  /* Superficies semánticas de tema (claro por defecto; se remapean en dark).
+     Las utilidades Tailwind (bg-ds-surface, text-ds-ink) emiten var(--color-*),
+     así que el override en :root[data-theme=dark] las adapta solas. */
+  --color-ds-surface:   #ffffff;  /* tarjetas, inputs, popovers, topbar */
+  --color-ds-surface-2: #ffffff;
+  --color-ds-ink:       #000000;  /* texto primario */
+
   /* Tintes semánticos (badges suaves / superficies de estado) — tokenizados
      para no repetir hex sueltos por las pantallas. */
   --color-brand-soft:   #F6FBEA;  /* superficie brand muy clara (selección) */
@@ -74,6 +81,14 @@
   --ds-color-surface:   #f3f3f3;
   --ds-color-yellow:    #f0c802;
 
+  /* Capa semántica de superficie para CSS a mano (defaults = light exactos). */
+  --ds-bg:        var(--ds-color-surface);  /* fondo de página */
+  --ds-surface:   var(--ds-color-white);    /* tarjetas, inputs, popovers, topbar */
+  --ds-surface-2: #ffffff;
+  --ds-text:      var(--ds-color-black);    /* texto primario */
+  --ds-tint-base: #ffffff;                  /* base de los color-mix sutiles */
+  color-scheme: light;
+
   --ds-font-family:          var(--font-roboto), "Roboto", "Segoe UI", sans-serif;
   --ds-font-size-body-sm:    12px;
   --ds-font-size-label:      14px;
@@ -111,6 +126,56 @@
   --ds-shadow-03-big:  0 2px 4px rgba(0,0,0,0.16), 0 0 6px rgba(0,0,0,0.16);
 }
 
+/* ── Tema oscuro ──────────────────────────────────────────────────────────────
+   Remapea superficies + rampa de grises INVERTIDA (100 = relleno más oscuro …
+   500 = texto más claro), en AMBOS sistemas: los tokens Tailwind (--color-...) y
+   los del CSS a mano (--ds-...). Blanco y negro de marca quedan LITERALES
+   (--ds-color-white, --ds-color-black, white/black de Tailwind) para texto sobre
+   relleno de color, checkmarks y toasts. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* Capa semántica (CSS a mano) */
+  --ds-bg: #16181d;
+  --ds-surface: #212530;
+  --ds-surface-2: #262b36;
+  --ds-tint-base: #262b36;   /* los tintes se mezclan hacia el oscuro, no a blanco */
+  --ds-text: #e8eaed;
+  /* Runtime (CSS a mano): superficie + grises invertidos + sombras */
+  --ds-color-surface: #2a2f3a;
+  --ds-color-gray-100: #2c313c;
+  --ds-color-gray-200: #3a4150;
+  --ds-color-gray-300: #6b7280;
+  --ds-color-gray-400: #9aa1ad;
+  --ds-color-gray-500: #c3c8d1;
+  --ds-shadow-01: 0 4px 8px #00000059;
+  --ds-shadow-02-soft: 0 0 6px #00000066;
+  --ds-shadow-03-big: 0 2px 4px #0000006b, 0 0 6px #0000006b;
+  /* Espejo para utilidades Tailwind (--color-*) */
+  --color-ds-surface: #212530;
+  --color-ds-surface-2: #262b36;
+  --color-ds-ink: #e8eaed;
+  --color-ds-bg: #16181d;
+  --color-ds-gray-100: #2c313c;
+  --color-ds-gray-200: #3a4150;
+  --color-ds-gray-300: #6b7280;
+  --color-ds-gray-400: #9aa1ad;
+  --color-ds-gray-500: #c3c8d1;
+}
+
+/* Impresión: forzar tema claro aunque la app esté en dark. */
+@media print {
+  :root, :root[data-theme="dark"] {
+    color-scheme: light;
+    --ds-bg:#fff; --ds-surface:#fff; --ds-surface-2:#fff; --ds-text:#000; --ds-tint-base:#fff;
+    --ds-color-surface:#f3f3f3;
+    --ds-color-gray-100:#ebebeb; --ds-color-gray-200:#d9d9d9; --ds-color-gray-300:#aaafb6;
+    --ds-color-gray-400:#747b86; --ds-color-gray-500:#5d636c;
+    --color-ds-surface:#fff; --color-ds-surface-2:#fff; --color-ds-ink:#000; --color-ds-bg:#f3f3f3;
+    --color-ds-gray-100:#ebebeb; --color-ds-gray-200:#d9d9d9; --color-ds-gray-300:#aaafb6;
+    --color-ds-gray-400:#747b86; --color-ds-gray-500:#5d636c;
+  }
+}
+
 
 * { box-sizing: border-box; }
 
@@ -118,8 +183,8 @@ body {
   font-family: var(--font-family-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #F3F3F3;
-  color: #000000;
+  background-color: var(--ds-bg);
+  color: var(--ds-text);
 }
 
 /* Custom scrollbar */
