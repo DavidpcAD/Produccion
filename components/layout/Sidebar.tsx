@@ -156,19 +156,31 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
   // Los submenús (y labels) están "expandidos" con pin (desktop) o con el drawer (móvil).
   const expanded = pinned || navOpen;
 
-  // Sección con submenú desplegada. Arranca en la sección activa (igual que antes:
-  // el submenú de donde estás se ve abierto), pero el encabezado ahora funciona
-  // como acordeón: tocar Concreto abre su submenú, tocarlo de nuevo lo cierra
-  // (sin navegar a otro lado). Nada de esto aplica al riel colapsado (solo iconos).
+  // Secciones con submenú desplegadas. Cada encabezado funciona como acordeón
+  // INDEPENDIENTE: tocar Concreto abre su submenú y tocarlo de nuevo lo cierra,
+  // sin afectar a los demás — se pueden tener varios abiertos a la vez. Arranca
+  // con la sección activa abierta (el submenú de donde estás). Nada de esto
+  // aplica al riel colapsado (solo iconos).
   const activeSection = navItems.find((it) => it.section && pathname.startsWith(it.section))?.section ?? null;
-  const [openSection, setOpenSection] = useState<string | null>(activeSection);
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(activeSection ? [activeSection] : []),
+  );
   const lastSection = useRef<string | null>(activeSection);
+  // Al navegar a otra sección, abrí su submenú SIN cerrar los que el usuario
+  // dejó abiertos.
   useEffect(() => {
     if (activeSection !== lastSection.current) {
       lastSection.current = activeSection;
-      setOpenSection(activeSection);
+      if (activeSection) setOpenSections((prev) => new Set(prev).add(activeSection));
     }
   }, [activeSection]);
+  const toggleSection = (section: string) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
 
   return (
     <nav
@@ -215,16 +227,17 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
               <Link
                 href={item.href}
                 onClick={(e) => {
-                  // Encabezado con submenú = acordeón. Abierto → tocarlo lo cierra
-                  // (sin navegar). Cerrado → lo abre; y solo navega si es OTRA
+                  // Encabezado con submenú = acordeón independiente. Abierto →
+                  // tocarlo lo cierra (sin navegar), sin tocar los demás. Cerrado →
+                  // lo abre (deja los demás abiertos) y solo navega si es OTRA
                   // sección (si ya estás en esta, solo abre el submenú, no re-navega).
-                  if (item.children && expanded) {
-                    if (openSection === item.section) {
+                  if (item.children && expanded && item.section) {
+                    if (openSections.has(item.section)) {
                       e.preventDefault();
-                      setOpenSection(null);
+                      toggleSection(item.section);
                       return;
                     }
-                    setOpenSection(item.section ?? null);
+                    toggleSection(item.section);
                     if (activeSection === item.section) {
                       e.preventDefault();
                       return;
@@ -239,7 +252,7 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
                 <span className="app-nav__ic"><Icon name={item.icon} size="md" color="currentColor" /></span>
                 <span className="app-nav__label">{item.label}</span>
               </Link>
-              {item.children && openSection === item.section && expanded && (
+              {item.children && item.section && openSections.has(item.section) && expanded && (
                 <div className="app-nav__sub">
                   {item.children.map((child) => {
                     const childActive = child.exact
