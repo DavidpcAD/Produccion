@@ -49,17 +49,17 @@ export async function findUsuarioByLogin(login: string): Promise<UsuarioLogin | 
 }
 
 /** Roles (idRol + nombre) asignados a un Usuario vía dbo.UsuarioRol. */
-export async function getRolesDeUsuario(idUsuario: number): Promise<Array<{ idRol: number; nombre: string; tipo?: string }>> {
+export async function getRolesDeUsuario(idUsuario: number): Promise<Array<{ idRol: number; nombre: string; idApp?: number; tipo?: string }>> {
   const db = await getDb();
   const r = await db.request()
     .input('idUsuario', sql.Int, idUsuario)
     .query(`
-      SELECT r.idRol, r.nombre
+      SELECT r.idRol, r.nombre, r.idApp
       FROM dbo.UsuarioRol ur
       JOIN dbo.Rol r ON r.idRol = ur.idRol
       WHERE ur.idUsuario = @idUsuario
     `);
-  const roles = r.recordset.map((x: { idRol: number; nombre: string }) => ({ idRol: x.idRol, nombre: x.nombre }));
+  const roles = r.recordset.map((x: { idRol: number; nombre: string; idApp: number }) => ({ idRol: x.idRol, nombre: x.nombre, idApp: x.idApp }));
   // Tipo por rol (dbo.TipoRol) — distingue los roles homónimos de Producción
   // (Administracion/Ingenieria). La tabla puede no existir en dev (SBX): graceful.
   const ids = roles.map(x => x.idRol);

@@ -134,12 +134,18 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
  * → `null` significa "sin rol de Producción": el front usa el filtro por nivel
  *   de siempre (fallback seguro, no deja a nadie sin menú).
  */
+/** idApp de la app Producción en dbo.Rol. Solo estos roles definen el acceso. */
+export const PROD_APP_ID = 10;
+
 export function computeAllowedModules(
-  roles: Array<{ idRol: number; nombre?: string; tipo?: string }>,
+  roles: Array<{ idRol: number; nombre?: string; idApp?: number; tipo?: string }>,
 ): Modulo[] | null {
   const mods = new Set<Modulo>(['dashboard']);
   let known = false;
+  // Solo cuentan los roles de Producción (idApp 10). Los de otras apps (ej. un
+  // "Administrador" legacy) NO deben dar acceso aquí.
   for (const r of roles) {
+    if (r.idApp !== undefined && r.idApp !== PROD_APP_ID) continue;
     const m = modulosDeRol(r.nombre, r.tipo);
     if (m === undefined) continue;
     known = true;
@@ -156,6 +162,8 @@ export function getRouteModule(pathname: string): Modulo {
   // Catálogos que viven bajo /avance pero son del dominio de Partidas (Presupuesto).
   if (p.startsWith('/avance/tipos-casa') || p.startsWith('/avance/sprints') || p.startsWith('/avance/sub-partidas')) return 'presupuesto';
   if (p.startsWith('/obras') || p.startsWith('/proyectos') || p.startsWith('/partidas') || p.startsWith('/presupuesto')) return 'presupuesto';
+  // Aprobación OC es solo de Super Admin (no de los ingenieros).
+  if (p.startsWith('/compras/aprobacion')) return 'admin';
   if (p.startsWith('/avance') || p.startsWith('/cuadrillas') || p.startsWith('/encargados') || p.startsWith('/compras')) return 'ingenieria';
   if (p.startsWith('/concreto')) return 'concreto';
   if (p.startsWith('/desembolsos')) return 'desembolsos';
