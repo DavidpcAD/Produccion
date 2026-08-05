@@ -50,6 +50,19 @@ const fmtFecha = (v: string | null) => {
 };
 const fmtMonto = (v: number | null) =>
   v == null ? '—' : v.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtCRC = (v: number) =>
+  v.toLocaleString('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 });
+
+// Resumen de presupuesto de la obra en Business Central (lo que devuelve
+// /api/obras/[id]/presupuesto). cargado=false → aún no se ha presupuestado.
+interface PresupBC {
+  cargado: boolean;
+  version: string | null;
+  venta: number;
+  coste: number;
+  indirecto: number;
+  resultado: number;
+}
 
 // Chip de estado de la obra: relleno suave y en español (Abierta / Bloqueada).
 function EstadoObra({ estado }: { estado: string | null }) {
@@ -95,6 +108,8 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
   const confirm = useConfirm();
   const isAdmin = !!session && session.nivelAdmin >= 2;
   const [obra, setObra] = useState<Obra | null>(null);
+  const [presup, setPresup] = useState<PresupBC | null>(null);
+  const [presupLoading, setPresupLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [proyectos, setProyectos] = useState<{ IDProyecto: number; Nombre: string; CodigoBC: string }[]>([]);
@@ -119,6 +134,14 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
       .finally(() => setLoading(false));
     fetch('/api/proyectos').then(r => r.json()).then(d => setProyectos(d.data ?? [])).catch(() => {});
     fetch('/api/obras/postventas').then(r => r.json()).then(d => setPostventas(d.data ?? [])).catch(() => {});
+    // Presupuesto de la obra desde BC (venta/coste/indirecto/resultado). Aparte del
+    // fetch de la obra para no atrasar el detalle si BC tarda. (presupLoading arranca
+    // en true; el .finally lo baja — mismo patrón que el fetch de la obra.)
+    fetch(`/api/obras/${id}/presupuesto`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: PresupBC | null) => setPresup(d))
+      .catch(() => setPresup(null))
+      .finally(() => setPresupLoading(false));
   }, [id]);
 
   const estaBloqueada = (obra?.estado ?? '').toLowerCase() === 'blocked';
@@ -200,6 +223,29 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
       <Campo label="Nombre mostrado" value={obra.nombreMostrado} />
       <Campo label="Descripción" value={obra.descripcion} />
       <Campo label="Estado" value={obra.estado} />
+    </Seccion>,
+    <Seccion key="presup" titulo="Presupuesto (BC)">
+      {presupLoading ? (
+        <div className="px-4 py-3.5 text-ds-gray-400">Consultando Business Central…</div>
+      ) : presup?.cargado ? (
+        <>
+          <Campo label="Cód. versión" value={presup.version} />
+          <Campo label="Importe venta" value={fmtCRC(presup.venta)} />
+          <Campo label="Importe coste directo" value={fmtCRC(presup.coste)} />
+          <Campo label="Importe coste indirecto" value={fmtCRC(presup.indirecto)} />
+          <Campo label="Resultado" value={<span className={presup.resultado >= 0 ? 'text-ds-green-ink' : 'text-ds-red'}>{fmtCRC(presup.resultado)}</span>} />
+        </>
+      ) : (
+        <div className="px-4 py-4 flex flex-col items-start gap-2.5">
+          <span className="text-ds-gray-500">Sin presupuesto cargado en BC.</span>
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={() => router.push('/presupuesto')}
+              icon={<Icon name="boleta" size="sm" color="currentColor" />}>
+              Cargar presupuesto
+            </Button>
+          )}
+        </div>
+      )}
     </Seccion>,
     <Seccion key="dim" titulo="Dimensiones">
       <Campo label="Área de costo (AC)" value={obra.areaCosteo} />

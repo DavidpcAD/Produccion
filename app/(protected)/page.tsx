@@ -138,9 +138,11 @@ async function getStats(mods: string[]) {
     // atrasada, por eso se pregunta a BC directo. Con timeout para no colgar el panel.
     has('presupuesto') ? safe(async () => {
       const db = await getAdelanteDb();
-      const r = await db.request().query<{ codigo: string; sprint: number }>(`
-        SELECT obra_codigo AS codigo, sprint_actual AS sprint
-        FROM pro_obc.obra_estado WHERE estado IN ('en_ejecucion','en_espera') ORDER BY obra_codigo`);
+      const r = await db.request().query<{ codigo: string; sprint: number; idObra: number | null }>(`
+        SELECT oe.obra_codigo AS codigo, oe.sprint_actual AS sprint, o.idObra
+        FROM pro_obc.obra_estado oe
+        LEFT JOIN dbo.Obra o ON o.numeroObra = oe.obra_codigo
+        WHERE oe.estado IN ('en_ejecucion','en_espera') ORDER BY oe.obra_codigo`);
       const activas = r.recordset;
       if (!bcConstructionConfigured() || activas.length === 0) return [];
       const conVersion = await Promise.race([
@@ -148,8 +150,8 @@ async function getStats(mods: string[]) {
         new Promise<Set<string>>((_, rej) => setTimeout(() => rej(new Error('BC timeout')), 6000)),
       ]);
       return activas.filter((o) => !conVersion.has((o.codigo ?? '').trim()));
-    }, [] as Array<{ codigo: string; sprint: number }>)
-      : Promise.resolve([] as Array<{ codigo: string; sprint: number }>),
+    }, [] as Array<{ codigo: string; sprint: number; idObra: number | null }>)
+      : Promise.resolve([] as Array<{ codigo: string; sprint: number; idObra: number | null }>),
   ]);
 
   return { cuadrillas, obras, obrasList, h4, utilidadNeta, presupuesto, concreto, desembolsos, obrasSinPresup };
@@ -359,7 +361,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="space-y-2.5">
                 {stats.obrasSinPresup.map((o) => (
-                  <Link key={o.codigo} href="/presupuesto" className="flex items-center gap-3 px-2 -mx-2 py-1.5 rounded-ds hover:bg-ds-gray-100 transition-colors">
+                  <Link key={o.codigo} href={o.idObra ? `/obras/${o.idObra}` : '/presupuesto'} className="flex items-center gap-3 px-2 -mx-2 py-1.5 rounded-ds hover:bg-ds-gray-100 transition-colors">
                     <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.codigo}</span>
                     <span className="flex-1" />
                     <span className="text-xs px-2 py-0.5 rounded-full bg-brand-soft text-ds-ink shrink-0">Cargar presupuesto</span>
