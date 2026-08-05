@@ -155,6 +155,20 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
   // Los submenús (y labels) están "expandidos" con pin (desktop) o con el drawer (móvil).
   const expanded = pinned || navOpen;
 
+  // Sección con submenú desplegada. Arranca en la sección activa (igual que antes:
+  // el submenú de donde estás se ve abierto), pero el encabezado ahora funciona
+  // como acordeón: tocar Concreto abre su submenú, tocarlo de nuevo lo cierra
+  // (sin navegar a otro lado). Nada de esto aplica al riel colapsado (solo iconos).
+  const activeSection = navItems.find((it) => it.section && pathname.startsWith(it.section))?.section ?? null;
+  const [openSection, setOpenSection] = useState<string | null>(activeSection);
+  const lastSection = useRef<string | null>(activeSection);
+  useEffect(() => {
+    if (activeSection !== lastSection.current) {
+      lastSection.current = activeSection;
+      setOpenSection(activeSection);
+    }
+  }, [activeSection]);
+
   return (
     <nav
       className={`app-nav no-scrollbar${navOpen ? ' is-open' : ''}`}
@@ -195,7 +209,24 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
             <div key={item.href}>
               <Link
                 href={item.href}
-                onClick={onNavigate}
+                onClick={(e) => {
+                  // Encabezado con submenú = acordeón. Abierto → tocarlo lo cierra
+                  // (sin navegar). Cerrado → lo abre; y solo navega si es OTRA
+                  // sección (si ya estás en esta, solo abre el submenú, no re-navega).
+                  if (item.children && expanded) {
+                    if (openSection === item.section) {
+                      e.preventDefault();
+                      setOpenSection(null);
+                      return;
+                    }
+                    setOpenSection(item.section ?? null);
+                    if (activeSection === item.section) {
+                      e.preventDefault();
+                      return;
+                    }
+                  }
+                  onNavigate();
+                }}
                 title={item.label}
                 aria-current={sectionActive ? 'page' : undefined}
                 className={`app-nav__item${sectionActive ? ' is-active' : ''}`}
@@ -203,7 +234,7 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
                 <span className="app-nav__ic"><Icon name={item.icon} size="md" color="currentColor" /></span>
                 <span className="app-nav__label">{item.label}</span>
               </Link>
-              {item.children && sectionActive && expanded && (
+              {item.children && openSection === item.section && expanded && (
                 <div className="app-nav__sub">
                   {item.children.map((child) => {
                     const childActive = child.exact
