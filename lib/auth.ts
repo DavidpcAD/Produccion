@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { getRolesDeUsuario } from './users';
-import { computeNivelAdmin, computeAllowedModules } from './permissions';
+import { computeNivelAdmin, computeAllowedModules, rolLabelDeUsuario } from './permissions';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const COOKIE_NAME = 'adelante_session';
@@ -20,6 +20,9 @@ export interface JWTPayload {
   roles: number[];
   /** nombres de los roles, alineados por índice con `roles`. */
   roleNames?: string[];
+  /** Etiqueta del rol de Producción (nombre · tipo) para el pie del menú.
+   *  undefined = sin rol de Producción → el front usa la etiqueta por nivel. */
+  rolLabel?: string;
   /** Módulos de Producción habilitados (rol+tipo). undefined = sin rol de
    *  Producción → el front cae al filtro por nivel. Calculado en getSession. */
   modules?: string[];
@@ -56,6 +59,7 @@ export async function getSession(): Promise<JWTPayload | null> {
         ...payload,
         roles: roles.map(r => r.idRol),
         roleNames: roles.map(r => r.nombre ?? ''),
+        rolLabel: rolLabelDeUsuario(roles),
         modules: computeAllowedModules(roles) ?? undefined,
         nivelAdmin: computeNivelAdmin(roles),
       };

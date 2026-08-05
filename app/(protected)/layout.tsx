@@ -34,10 +34,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const nivelAdmin = session?.nivelAdmin ?? 0;
   const nombre = session ? `${session.nombre}` : 'Cargando…';
   const iniciales = session ? getInitials(nombre) : '?';
-  const rol =
+  // Rótulo real del rol de Producción (nombre · tipo, ej. "Ingenieria · Electrico",
+  // "Presupuestista · General"). Solo si el usuario no tiene rol de Producción se
+  // cae a la etiqueta por nivel de siempre (así nadie queda sin rótulo).
+  const rolPorNivel =
     nivelAdmin === 4 ? 'Super Admin' :
     nivelAdmin === 3 ? 'Admin TI' :
     nivelAdmin === 2 ? 'Jefe de Área' : 'Usuario';
+  const rol = session?.rolLabel || rolPorNivel;
 
   const isMobile = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches;
   const closeNavOnMobile = () => { if (isMobile()) setNavOpen(false); };

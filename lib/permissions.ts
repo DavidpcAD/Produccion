@@ -52,17 +52,30 @@ const ROLE_LEVEL_BY_NAME: Record<string, number> = {
   'facturador bodega': 1,
 };
 
-/** Calcula el nivelAdmin efectivo a partir de los roles del usuario. */
+// Nivel que exige cada módulo (la acción más alta que contiene). El nivel de un
+// rol de Producción se DERIVA de sus módulos, así no depende de calzar nombres.
+const MODULE_LEVEL: Record<string, number> = {
+  dashboard: 1, presupuesto: 4, ingenieria: 4, concreto: 4, desembolsos: 1, admin: 4,
+};
+
+/** Calcula el nivelAdmin efectivo a partir de los roles del usuario.
+ *  Para roles de Producción (idApp 10) el nivel se deriva de sus módulos
+ *  (rol+tipo); para los legacy de otras apps se usa el mapa por nombre/ID. */
 export function computeNivelAdmin(
-  roles: Array<{ idRol: number; nombre?: string }>,
+  roles: Array<{ idRol: number; nombre?: string; idApp?: number; tipo?: string }>,
 ): number {
   let max = 0;
   for (const r of roles) {
-    const byName = r.nombre ? ROLE_LEVEL_BY_NAME[r.nombre.trim().toLowerCase()] : undefined;
-    const byId = ROLE_LEVEL_BY_ID[r.idRol];
-    // El NOMBRE manda: con el nuevo set de roles los IDs 1–6 ya no coinciden con
-    // el mapa viejo, así que el nombre del rol es la fuente confiable del nivel.
-    const lvl = byName ?? byId ?? 1; // todo rol asignado da acceso básico (1)
+    let lvl: number;
+    if (r.idApp === undefined || r.idApp === PROD_APP_ID) {
+      const m = modulosDeRol(r.nombre, r.tipo);
+      if (m === '*') lvl = 4;
+      else if (m) lvl = Math.max(...m.map((mod) => MODULE_LEVEL[mod] ?? 1));
+      else lvl = r.nombre ? (ROLE_LEVEL_BY_NAME[r.nombre.trim().toLowerCase()] ?? ROLE_LEVEL_BY_ID[r.idRol] ?? 1) : 1;
+    } else {
+      // Rol de OTRA app: nivel legacy por nombre/ID (no lo eleva el modelo nuevo).
+      lvl = (r.nombre ? ROLE_LEVEL_BY_NAME[r.nombre.trim().toLowerCase()] : undefined) ?? ROLE_LEVEL_BY_ID[r.idRol] ?? 1;
+    }
     if (lvl > max) max = lvl;
   }
   return max;
@@ -153,6 +166,23 @@ export function computeAllowedModules(
     for (const x of m) mods.add(x);
   }
   return known ? [...mods] : null;
+}
+
+/** Etiqueta de rol para mostrar en el pie del menú: el rol de Producción
+ *  (idApp 10) con su tipo — "Ingenieria · Electrico", "Presupuestista · General".
+ *  Toma el primer rol de Producción con nombre; si no hay ninguno devuelve
+ *  undefined y el front cae a la etiqueta por nivel (no deja a nadie sin rótulo).
+ *  El tipo solo existe en producción (dbo.TipoRol); en dev muestra solo el nombre. */
+export function rolLabelDeUsuario(
+  roles: Array<{ nombre?: string; idApp?: number; tipo?: string }>,
+): string | undefined {
+  const prod = roles.find(
+    (r) => (r.idApp === undefined || r.idApp === PROD_APP_ID) && (r.nombre ?? '').trim(),
+  );
+  if (!prod) return undefined;
+  const nombre = (prod.nombre ?? '').trim();
+  const tipo = (prod.tipo ?? '').trim();
+  return tipo ? `${nombre} · ${tipo}` : nombre;
 }
 
 /** Módulo de Producción al que pertenece una ruta (para gatear páginas). */

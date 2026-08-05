@@ -1,6 +1,6 @@
 import { getDb, sql } from './db';
 import { JWTPayload } from './auth';
-import { computeNivelAdmin } from './permissions';
+import { computeNivelAdmin, rolLabelDeUsuario } from './permissions';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Acceso al modelo nuevo de AdelanteSBX (dbo):
@@ -48,34 +48,28 @@ export async function findUsuarioByLogin(login: string): Promise<UsuarioLogin | 
   };
 }
 
-/** Roles (idRol + nombre) asignados a un Usuario vía dbo.UsuarioRol. */
+/** Roles (idRol + nombre + tipo) asignados a un Usuario vía dbo.UsuarioRol.
+ *  El `tipo` sale de `dbo.Rol.tipo` — la VARIANTE del rol ("Super Admin",
+ *  "Electrico", "General"…) que distingue los roles homónimos de Producción
+ *  (Administracion ×3, Ingenieria ×3) y que muestra la pantalla de roles.
+ *  Ojo: NO confundir con `dbo.UsuarioRol.esTipo` ni el catálogo `dbo.TipoRol`
+ *  (opciones de asignación, hoy todas "Indefinido") — eso es otra cosa. */
 export async function getRolesDeUsuario(idUsuario: number): Promise<Array<{ idRol: number; nombre: string; idApp?: number; tipo?: string }>> {
   const db = await getDb();
   const r = await db.request()
     .input('idUsuario', sql.Int, idUsuario)
     .query(`
-      SELECT r.idRol, r.nombre, r.idApp
+      SELECT r.idRol, r.nombre, r.idApp, r.tipo
       FROM dbo.UsuarioRol ur
       JOIN dbo.Rol r ON r.idRol = ur.idRol
       WHERE ur.idUsuario = @idUsuario
     `);
-  const roles = r.recordset.map((x: { idRol: number; nombre: string; idApp: number }) => ({ idRol: x.idRol, nombre: x.nombre, idApp: x.idApp }));
-  // Tipo por rol (dbo.TipoRol) — distingue los roles homónimos de Producción
-  // (Administracion/Ingenieria). La tabla puede no existir en dev (SBX): graceful.
-  const ids = roles.map(x => x.idRol);
-  if (ids.length) {
-    try {
-      const t = await db.request().query(
-        `SELECT idRol, nombre FROM dbo.TipoRol WHERE esActivo = 1 AND idRol IN (${ids.join(',')})`,
-      );
-      const byRol = new Map<number, string>();
-      for (const row of t.recordset as Array<{ idRol: number; nombre: string }>) {
-        if (!byRol.has(row.idRol)) byRol.set(row.idRol, row.nombre);
-      }
-      return roles.map(x => ({ ...x, tipo: byRol.get(x.idRol) }));
-    } catch { /* dbo.TipoRol no existe (dev) — se sigue sin tipo */ }
-  }
-  return roles;
+  return r.recordset.map((x: { idRol: number; nombre: string; idApp: number; tipo: string | null }) => ({
+    idRol: x.idRol,
+    nombre: x.nombre,
+    idApp: x.idApp,
+    tipo: x.tipo?.trim() || undefined,
+  }));
 }
 
 /** Construye el payload del JWT (sesión) para un idUsuario del modelo nuevo. */
@@ -100,6 +94,8 @@ export async function buildSessionPayload(idUsuario: number): Promise<JWTPayload
     cedula: u.cedula ?? u.username,
     nombre: (u.nombre ?? u.username ?? '').trim(),
     roles: roles.map(r => r.idRol),
+    roleNames: roles.map(r => r.nombre ?? ''),
+    rolLabel: rolLabelDeUsuario(roles),
     nivelAdmin: computeNivelAdmin(roles),
   };
 }
