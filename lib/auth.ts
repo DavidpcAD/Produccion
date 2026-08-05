@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { getRolesDeUsuario } from './users';
-import { computeNivelAdmin } from './permissions';
+import { computeNivelAdmin, computeAllowedModules } from './permissions';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const COOKIE_NAME = 'adelante_session';
@@ -18,6 +18,11 @@ export interface JWTPayload {
   nombre: string;
   /** ids de dbo.Rol asignados (vía dbo.UsuarioRol). */
   roles: number[];
+  /** nombres de los roles, alineados por índice con `roles`. */
+  roleNames?: string[];
+  /** Módulos de Producción habilitados (rol+tipo). undefined = sin rol de
+   *  Producción → el front cae al filtro por nivel. Calculado en getSession. */
+  modules?: string[];
   nivelAdmin: number;
 }
 
@@ -47,7 +52,13 @@ export async function getSession(): Promise<JWTPayload | null> {
   if (payload.idUsuario && payload.idUsuario > 0) {
     try {
       const roles = await getRolesDeUsuario(payload.idUsuario);
-      return { ...payload, roles: roles.map(r => r.idRol), nivelAdmin: computeNivelAdmin(roles) };
+      return {
+        ...payload,
+        roles: roles.map(r => r.idRol),
+        roleNames: roles.map(r => r.nombre ?? ''),
+        modules: computeAllowedModules(roles) ?? undefined,
+        nivelAdmin: computeNivelAdmin(roles),
+      };
     } catch {
       return payload; // si la DB falla, se usa lo del token
     }

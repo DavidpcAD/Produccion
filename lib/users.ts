@@ -49,7 +49,7 @@ export async function findUsuarioByLogin(login: string): Promise<UsuarioLogin | 
 }
 
 /** Roles (idRol + nombre) asignados a un Usuario vía dbo.UsuarioRol. */
-export async function getRolesDeUsuario(idUsuario: number): Promise<Array<{ idRol: number; nombre: string }>> {
+export async function getRolesDeUsuario(idUsuario: number): Promise<Array<{ idRol: number; nombre: string; tipo?: string }>> {
   const db = await getDb();
   const r = await db.request()
     .input('idUsuario', sql.Int, idUsuario)
@@ -59,7 +59,23 @@ export async function getRolesDeUsuario(idUsuario: number): Promise<Array<{ idRo
       JOIN dbo.Rol r ON r.idRol = ur.idRol
       WHERE ur.idUsuario = @idUsuario
     `);
-  return r.recordset.map((x: { idRol: number; nombre: string }) => ({ idRol: x.idRol, nombre: x.nombre }));
+  const roles = r.recordset.map((x: { idRol: number; nombre: string }) => ({ idRol: x.idRol, nombre: x.nombre }));
+  // Tipo por rol (dbo.TipoRol) — distingue los roles homónimos de Producción
+  // (Administracion/Ingenieria). La tabla puede no existir en dev (SBX): graceful.
+  const ids = roles.map(x => x.idRol);
+  if (ids.length) {
+    try {
+      const t = await db.request().query(
+        `SELECT idRol, nombre FROM dbo.TipoRol WHERE esActivo = 1 AND idRol IN (${ids.join(',')})`,
+      );
+      const byRol = new Map<number, string>();
+      for (const row of t.recordset as Array<{ idRol: number; nombre: string }>) {
+        if (!byRol.has(row.idRol)) byRol.set(row.idRol, row.nombre);
+      }
+      return roles.map(x => ({ ...x, tipo: byRol.get(x.idRol) }));
+    } catch { /* dbo.TipoRol no existe (dev) — se sigue sin tipo */ }
+  }
+  return roles;
 }
 
 /** Construye el payload del JWT (sesión) para un idUsuario del modelo nuevo. */

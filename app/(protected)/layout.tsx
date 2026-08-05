@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSession } from '@/hooks/useSession';
-import { getInitials } from '@/lib/permissions';
+import { getInitials, getRouteModule } from '@/lib/permissions';
 
 const NAVPIN_KEY = 'adelante_oc_navpin';
 
@@ -15,6 +15,21 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [ready, setReady] = useState(false);     // evita animar al cargar
   const session = useSession();
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Módulos que habilita el rol de Producción del usuario (calculados en el
+  // servidor con rol+tipo). null = sin rol de Producción → se usa el filtro por
+  // nivel de siempre, no deja a nadie afuera.
+  const allowedModules = useMemo(
+    () => (session?.modules && session.modules.length ? session.modules : null),
+    [session],
+  );
+
+  // Guard de página: si el rol no habilita el módulo de la ruta actual, al Dashboard.
+  useEffect(() => {
+    if (!session || !allowedModules) return;
+    if (!allowedModules.includes(getRouteModule(pathname))) router.replace('/');
+  }, [session, allowedModules, pathname, router]);
 
   const nivelAdmin = session?.nivelAdmin ?? 0;
   const nombre = session ? `${session.nombre}` : 'Cargando…';
@@ -60,6 +75,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         onTogglePinned={() => setPinned((p) => !p)}
         onCloseDrawer={() => setNavOpen(false)}
         onNavigate={closeNavOnMobile}
+        allowedModules={allowedModules}
       />
 
       {/* FAB hamburguesa (solo móvil, con el drawer cerrado) */}

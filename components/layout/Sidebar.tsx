@@ -9,6 +9,7 @@ import { AdelanteMark } from '@/components/ds/AdelanteMark/AdelanteMark';
 import { haptic } from '@/components/ds/haptic';
 import { springs } from '@/lib/springs';
 import { useConfirm } from '@/components/ui/Confirm';
+import { getRouteModule } from '@/lib/permissions';
 
 const THEME_KEY = 'adelante_oc_theme';
 
@@ -118,9 +119,12 @@ interface SidebarProps {
   onCloseDrawer: () => void;
   /** Al navegar (cierra el drawer en móvil). */
   onNavigate: () => void;
+  /** Módulos que el rol de Producción habilita. null = sin rol de Producción
+   *  (se cae al filtro por nivel de siempre, no deja a nadie sin menú). */
+  allowedModules?: string[] | null;
 }
 
-export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, onTogglePinned, onCloseDrawer, onNavigate }: SidebarProps) {
+export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, onTogglePinned, onCloseDrawer, onNavigate, allowedModules }: SidebarProps) {
   const pathname = usePathname();
   const confirm = useConfirm();
   const logoutRef = useRef<HTMLFormElement>(null);
@@ -199,7 +203,11 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
 
       {/* Ítems */}
       {navItems
-        .filter((item) => !item.minLevel || nivelAdmin >= item.minLevel)
+        .filter((item) => {
+          // Con rol de Producción: filtrar por módulo. Sin él (null): por nivel.
+          if (allowedModules) return allowedModules.includes(getRouteModule(item.section ?? item.href));
+          return !item.minLevel || nivelAdmin >= item.minLevel;
+        })
         .map((item) => {
           const sectionActive = item.section ? pathname.startsWith(item.section) : isActive(item.href);
           return (
