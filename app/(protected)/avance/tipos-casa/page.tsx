@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { CatalogoTabs } from '@/components/layout/CatalogoTabs';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import type {
@@ -46,6 +47,8 @@ export default function TiposCasaPage() {
         title="Tipos de casa"
         subtitle="Qué sprints (de la secuencia global) participan en cada tipo de casa. El peso de referencia por sprint = 100% / total de sprints."
       />
+
+      <CatalogoTabs />
 
       <div className="overflow-x-auto rounded-ds border border-ds-gray-200">
         <table className="w-full text-sm">

@@ -11,6 +11,7 @@ import { useConfirm } from '@/components/ui/Confirm';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { CatalogoTabs } from '@/components/layout/CatalogoTabs';
 
 const TIPOS_CASA = ['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea'] as const;
 
@@ -243,6 +244,8 @@ export default function PartidasPage() {
           <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
         )}
       />
+
+      <CatalogoTabs />
 
       {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-5">

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { CatalogoTabs } from '@/components/layout/CatalogoTabs';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -44,6 +45,8 @@ export default function SprintsPage() {
         title="Sprints y semanas"
         subtitle="Gestión de semanas operativas (la que está abierta define el reporte) y del catálogo global de sprints."
       />
+
+      <CatalogoTabs />
 
       <SeccionSemanas />
       <SeccionSprints />
