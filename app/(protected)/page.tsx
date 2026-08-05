@@ -4,6 +4,7 @@ import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getCierreDia } from '@/lib/reporte-h4/queries';
 import { abreviarCRC } from '@/lib/utilidades/format';
 import { MODULOS_TODOS, type Modulo } from '@/lib/permissions';
+import { bcConstructionConfigured, getObrasConVersion } from '@/lib/bc-construction';
 import Link from 'next/link';
 import { Icon, type IconName } from '@/components/ds/Icon/Icon';
 import { PageShell } from '@/components/layout/Page';
@@ -27,13 +28,13 @@ async function getStats(mods: string[]) {
   const hasta = new Date(now.getFullYear(), now.getMonth() + 1, 1);        // 1° del mes siguiente (exclusivo)
 
   const needObrasEstado = has('admin') || has('ingenieria');
-  const needObrasList   = has('admin') || has('ingenieria') || has('presupuesto');
+  const needObrasList   = has('admin') || has('ingenieria');
   const needCuadrillas  = has('admin') || has('ingenieria');
   const needH4          = has('admin');
   const needUtilidad    = has('admin');
 
   const [
-    cuadrillas, obras, obrasList, h4, utilidadNeta, presupuesto, concreto, desembolsos,
+    cuadrillas, obras, obrasList, h4, utilidadNeta, presupuesto, concreto, desembolsos, obrasSinPresup,
   ] = await Promise.all([
     // Cuadrillas activas (AdelanteSBX)
     needCuadrillas ? safe(async () => {
@@ -131,9 +132,27 @@ async function getStats(mods: string[]) {
       return { pendienteCRC: row?.pend ?? 0, casasFormalizadas: row?.form ?? 0, casasReservadas: row?.res ?? 0 };
     }, { pendienteCRC: 0, casasFormalizadas: 0, casasReservadas: 0 })
       : Promise.resolve({ pendienteCRC: 0, casasFormalizadas: 0, casasReservadas: 0 }),
+    // ── Presupuesto: obras ACTIVAS sin presupuesto cargado (se consulta BC en vivo) ──
+    // Obras en ejecución/espera que aún NO tienen versión de presupuesto en Business
+    // Central → las que el presupuestista tiene que armar. La réplica BI puede estar
+    // atrasada, por eso se pregunta a BC directo. Con timeout para no colgar el panel.
+    has('presupuesto') ? safe(async () => {
+      const db = await getAdelanteDb();
+      const r = await db.request().query<{ codigo: string; sprint: number }>(`
+        SELECT obra_codigo AS codigo, sprint_actual AS sprint
+        FROM pro_obc.obra_estado WHERE estado IN ('en_ejecucion','en_espera') ORDER BY obra_codigo`);
+      const activas = r.recordset;
+      if (!bcConstructionConfigured() || activas.length === 0) return [];
+      const conVersion = await Promise.race([
+        getObrasConVersion(),
+        new Promise<Set<string>>((_, rej) => setTimeout(() => rej(new Error('BC timeout')), 6000)),
+      ]);
+      return activas.filter((o) => !conVersion.has((o.codigo ?? '').trim()));
+    }, [] as Array<{ codigo: string; sprint: number }>)
+      : Promise.resolve([] as Array<{ codigo: string; sprint: number }>),
   ]);
 
-  return { cuadrillas, obras, obrasList, h4, utilidadNeta, presupuesto, concreto, desembolsos };
+  return { cuadrillas, obras, obrasList, h4, utilidadNeta, presupuesto, concreto, desembolsos, obrasSinPresup };
 }
 
 type Card = { label: string; value: string | number; sub: string; icon: IconName; href: string; accent: string };
@@ -237,8 +256,12 @@ export default async function DashboardPage() {
     }
   }
 
-  // La lista de "Obras en ejecución" solo aplica a quien trabaja obra.
-  const showObrasList = has('admin') || has('ingenieria') || has('presupuesto');
+  // Panel derecho según el rol: obra (en ejecución) para admin/ingeniería; para el
+  // presupuestista, las obras activas que le faltan presupuestar. Los demás roles
+  // (concreto/desembolsos) no llevan panel derecho (las acciones ocupan el ancho).
+  const rightPanel: 'ejecucion' | 'sinPresup' | null =
+    has('admin') || has('ingenieria') ? 'ejecucion' :
+    has('presupuesto') ? 'sinPresup' : null;
 
   return (
     <PageShell className="space-y-6">
@@ -274,7 +297,7 @@ export default async function DashboardPage() {
       {/* Acciones rápidas + Obras en ejecución */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Acciones rápidas */}
-        <div className={showObrasList ? '' : 'lg:col-span-3'}>
+        <div className={rightPanel ? '' : 'lg:col-span-3'}>
           <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 h-full">
             <h2 className="font-bold text-ds-ink mb-4 text-sub-sm">Acciones rápidas</h2>
             <div className="space-y-1">
@@ -295,8 +318,8 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Obras en ejecución */}
-        {showObrasList && (
+        {/* Obras en ejecución (admin / ingeniería) */}
+        {rightPanel === 'ejecucion' && (
           <div className="lg:col-span-2 bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
             <div className="flex items-center gap-2 mb-4">
               <h2 className="font-bold text-ds-ink text-sub-sm">Obras en ejecución</h2>
@@ -314,6 +337,32 @@ export default async function DashboardPage() {
                     <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.codigo}</span>
                     <span className="flex-1" />
                     <span className="text-xs px-2 py-0.5 rounded-full bg-ds-gray-100 text-ds-gray-500 shrink-0">Sprint {o.sprint}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Obras sin presupuesto cargado (presupuestista) — activas que faltan por presupuestar (BC) */}
+        {rightPanel === 'sinPresup' && (
+          <div className="lg:col-span-2 bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="font-bold text-ds-ink text-sub-sm">Obras sin presupuesto</h2>
+              <span className="ml-auto text-xs font-semibold text-ds-gray-400">{stats.obrasSinPresup.length} activa{stats.obrasSinPresup.length === 1 ? '' : 's'}</span>
+            </div>
+            {stats.obrasSinPresup.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-ds-gray-300">
+                <Icon name="check" size="lg" color="currentColor" className="mb-2" />
+                <span className="text-sm">Todas las obras activas tienen presupuesto</span>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {stats.obrasSinPresup.map((o) => (
+                  <Link key={o.codigo} href="/presupuesto" className="flex items-center gap-3 px-2 -mx-2 py-1.5 rounded-ds hover:bg-ds-gray-100 transition-colors">
+                    <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.codigo}</span>
+                    <span className="flex-1" />
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-brand-soft text-ds-ink shrink-0">Cargar presupuesto</span>
                   </Link>
                 ))}
               </div>

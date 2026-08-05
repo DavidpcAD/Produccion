@@ -107,6 +107,19 @@ export async function getWork(worksNo: string): Promise<(WorkTotals & { no: stri
   return body?.value?.[0] ?? null;
 }
 
+// Conjunto de obras (worksNo) que YA tienen al menos una versión de presupuesto en
+// BC. Es el signal de "presupuesto cargado": una obra que NO está acá todavía no se
+// ha presupuestado. Una sola llamada (todas las versiones) en vez de una por obra.
+export async function getObrasConVersion(): Promise<Set<string>> {
+  const body = await req(`workVersions?$top=5000`, { method: 'GET' });
+  const set = new Set<string>();
+  for (const v of (body?.value ?? []) as Array<{ worksNo?: string }>) {
+    const no = String(v?.worksNo ?? '').trim();
+    if (no) set.add(no);
+  }
+  return set;
+}
+
 // Sube la versión de presupuesto (líneas venta/costo/indirecto) vía el singleton bulk,
 // y registra la versión. Devuelve la versión creada y los totales recalculados.
 export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[], _verBase?: string | null): Promise<{ versionCode: string; resultado: string; enviadas: number; totals: WorkTotals | null }> {

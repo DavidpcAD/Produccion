@@ -16,6 +16,10 @@ export interface JWTPayload {
   /** cédula o username con el que entró el usuario. */
   cedula: string;
   nombre: string;
+  /** username de login (dbo.Usuario.username) — id ESTABLE para atribuir autoría
+   *  (ej. filtrar "mis solicitudes" de Compras por creador). undefined en tokens
+   *  viejos y en usuarios de prueba. */
+  username?: string;
   /** ids de dbo.Rol asignados (vía dbo.UsuarioRol). */
   roles: number[];
   /** nombres de los roles, alineados por índice con `roles`. */

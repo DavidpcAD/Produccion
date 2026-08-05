@@ -92,6 +92,7 @@ export async function buildSessionPayload(idUsuario: number): Promise<JWTPayload
     idCol: u.idColaborador,
     idUsuario: u.idUsuario,
     cedula: u.cedula ?? u.username,
+    username: u.username ?? undefined,
     nombre: (u.nombre ?? u.username ?? '').trim(),
     roles: roles.map(r => r.idRol),
     roleNames: roles.map(r => r.nombre ?? ''),

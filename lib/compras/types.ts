@@ -107,7 +107,8 @@ export interface Pedido {
   obraNombre?: string;
   maquinaNo?: string;        // destino si repuesto
   maquinaNombre?: string;
-  solicitante: string;       // Laura
+  solicitante: string;       // Laura (nombre para mostrar)
+  creadoPorId?: string;      // id ESTABLE del creador (username de sesión); para "mis solicitudes". Histórico: puede traer un nombre.
   loteRef?: string;          // lote/unidad de Planificación desde el que se armó (para enlazar)
   fecha: string;             // ISO
   estado: PedidoEstado;

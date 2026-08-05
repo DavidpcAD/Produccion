@@ -93,7 +93,8 @@ function mapPedido(p: any, lineas: any[]): Pedido {
     tipoSolicitud: (p.tipoSolicitud ?? "material") as Pedido["tipoSolicitud"],
     obraCodigo: p.obra ?? undefined, obraNombre: p.proyecto ?? undefined,
     maquinaNo: p.maquinaNo ?? undefined, maquinaNombre: undefined,
-    solicitante: p.solicitante ?? "", fecha: (p.fechaCreacion?.toISOString?.() ?? "").slice(0, 10),
+    solicitante: p.solicitante ?? "", creadoPorId: p.creadoPor ?? undefined,
+    fecha: (p.fechaCreacion?.toISOString?.() ?? "").slice(0, 10),
     estado: (codigoDeId(p.idEstado) ?? "borrador") as Pedido["estado"],
     prioridad: (p.prioridad ?? "normal") as Pedido["prioridad"], notas: p.notaCreador ?? undefined,
     idClasificacion: p.idClasificacion ?? null,
@@ -109,6 +110,10 @@ export interface NewPedidoDB {
   tipoSolicitud: string; obra?: string; obraNombre?: string; maquinaNo?: string;
   idClasificacion?: number | null;
   solicitante: string; prioridad: string; notas?: string; usuario: string; rol: Role;
+  /** id ESTABLE del creador (username de sesión). Va a PedidoCompra.creadoPor para
+   *  poder filtrar "mis solicitudes". Si no viene, cae al nombre (`usuario`). El
+   *  movimiento sí conserva el nombre legible (`usuario`). */
+  creadoPorId?: string;
   lineas: { itemNo: string; descripcion: string; cantidad: number; unidad: string; almacen: string; variantCode?: string }[];
 }
 
@@ -134,7 +139,7 @@ export async function createPedido(input: NewPedidoDB): Promise<number> {
       .input("prioridad", sql.NVarChar(20), input.prioridad)
       .input("notaCreador", sql.NVarChar(500), input.notas ?? null)
       .input("idClasificacion", sql.Int, input.idClasificacion ?? null)
-      .input("creadoPor", sql.NVarChar(100), input.usuario)
+      .input("creadoPor", sql.NVarChar(100), input.creadoPorId ?? input.usuario)
       .query(`INSERT dbo.PedidoCompra (idEstado,pedidoNo,tipoSolicitud,obra,maquinaNo,proyecto,solicitante,prioridad,notaCreador,idClasificacion,esEliminada,fechaCreacion,creadoPor)
               OUTPUT INSERTED.idPedidoCompra
               VALUES (@idEstado,@pedidoNo,@tipoSolicitud,@obra,@maquinaNo,@proyecto,@solicitante,@prioridad,@notaCreador,@idClasificacion,0,getdate(),@creadoPor)`);

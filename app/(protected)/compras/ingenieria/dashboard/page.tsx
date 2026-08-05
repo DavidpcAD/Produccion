@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Card } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
+import { useSession } from "@/hooks/useSession";
 import { num, formatDate, destinoCodigo } from "@/lib/compras/helpers";
 import type { PedidoEstado } from "@/lib/compras/types";
 
@@ -64,8 +65,20 @@ function BarRow({ label, right, sub, value, max, i, rank }: { label: string; rig
 // Dashboard de Ingeniería (para quien pide material): KPIs y gráficos de sus
 // solicitudes. Todo con datos locales (instantáneo, sin consultar stock de BC).
 export default function DashboardPage() {
-  const { pedidos } = useStore();
+  const { pedidos: pedidosAll } = useStore();
+  const me = useSession();
   const router = useRouter();
+
+  // Ingeniería ve SOLO sus propias solicitudes: se atribuyen por id estable
+  // (username de sesión = creadoPorId); además se calza por nombre para los
+  // pedidos históricos. Mientras la sesión carga (me === null) no se muestra nada
+  // (evita filtrar de más). Proveeduría/Aprobación usan otras vistas sin filtrar.
+  const pedidos = useMemo(() => {
+    if (!me) return [];
+    return pedidosAll.filter((p) =>
+      (!!me.username && p.creadoPorId === me.username) || (!!me.nombre && p.solicitante === me.nombre),
+    );
+  }, [pedidosAll, me]);
 
   const kpi = useMemo(() => {
     const materiales = new Set<string>(), obras = new Set<string>();

@@ -8,15 +8,26 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, QtyRing, Tile } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
+import { useSession } from "@/hooks/useSession";
 import { formatDate, pedidoBadge, pedidoCompraBadge, pedidoOrdenadoPct, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 import type { Pedido } from "@/lib/compras/types";
 
 type Filtro = "todas" | "material" | "repuesto" | "aprobado";
 
 export default function IngenieriaPage() {
-  const { pedidos, ordenes } = useStore();
+  const { pedidos: pedidosAll, ordenes } = useStore();
+  const me = useSession();
   const router = useRouter();
   const [filtro, setFiltro] = useState<Filtro>("todas");
+
+  // Cada usuario ve SOLO sus solicitudes (id estable = username; calza por nombre
+  // para históricos). Mientras la sesión carga (me === null) no muestra nada.
+  const pedidos = useMemo(() => {
+    if (!me) return [];
+    return pedidosAll.filter((p) =>
+      (!!me.username && p.creadoPorId === me.username) || (!!me.nombre && p.solicitante === me.nombre),
+    );
+  }, [pedidosAll, me]);
   const listaRef = useRef<HTMLDivElement>(null);
 
   const entregadoPct = (p: Pedido) => {
