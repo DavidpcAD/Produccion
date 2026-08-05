@@ -141,6 +141,7 @@ export default function PresupuestoPage() {
 
   const [obras, setObras] = useState<Obra[]>([]);
   const [obraId, setObraId] = useState('');
+  const [areaProrr, setAreaPror] = useState('');   // m² que se manda al Job + obra al subir
   const [plantilla, setPlantilla] = useState<PlantillaParsed | null>(null);
   const [descompuesto, setDescompuesto] = useState<DescParsed | null>(null);
   const [leyendoQue, setLeyendoQue] = useState<'plantilla' | 'descompuesto' | null>(null);
@@ -164,7 +165,7 @@ export default function PresupuestoPage() {
   const obra = obras.find(o => String(o.idObra) === obraId);
 
   // Al cambiar de obra, lo subido/mostrado ya no aplica.
-  useEffect(() => { setSubido({}); setResultado(null); }, [obraId]);
+  useEffect(() => { setSubido({}); setResultado(null); setAreaPror(''); }, [obraId]);
 
   const load = useCallback(async () => {
     const o = await fetch('/api/obras?porPagina=1000').then(r => (r.ok ? r.json() : null)).catch(() => null);
@@ -199,12 +200,15 @@ export default function PresupuestoPage() {
     if (!obra) { toast('Elegí la obra', 'warning'); return; }
     if (que === 'general' && !plantilla) { toast('No hay plantilla (General) cargada', 'warning'); return; }
     if (que === 'descompuesto' && !descompuesto) { toast('No hay Descompuesto cargado', 'warning'); return; }
+    if (!areaProrr.trim() || Number.isNaN(Number(areaProrr)) || Number(areaProrr) <= 0) {
+      toast('Ingresá el área prorrateada (m²) antes de subir', 'warning'); return;
+    }
     setSubiendoQue(que); setResultado(null);
     try {
       const payload = que === 'general' ? { plantilla } : { descompuesto };
       const res = await fetch('/api/presupuesto', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ worksNo: obra.numeroObra, ...payload }),
+        body: JSON.stringify({ worksNo: obra.numeroObra, areaProrrateada: Number(areaProrr), ...payload }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast(data.error || 'No se pudo subir', 'error'); setResultado(null); return; }
@@ -298,6 +302,13 @@ export default function PresupuestoPage() {
             options={obras.map(o => ({ value: String(o.idObra), label: o.nombreMostrado, parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombreMostrado, weight: 'light' as const }], search: `${o.numeroObra} ${o.nombreMostrado}` }))}
           />
           {obra && <p className="text-ds-gray-400 text-xs mt-1">Obra en BC (worksNo): <span className="font-mono font-semibold text-ds-ink">{obra.numeroObra}</span></p>}
+        </div>
+        <div className="sm:max-w-md">
+          <Input
+            label="Área prorrateada (m²)" type="number" inputMode="decimal" min={0} step="0.01"
+            value={areaProrr} onChange={e => setAreaPror(e.target.value)} placeholder="Ej. 251.86" required
+          />
+          <p className="text-ds-gray-400 text-xs mt-1">Se guarda en el proyecto (Job) de BC y en la obra al subir el presupuesto.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">

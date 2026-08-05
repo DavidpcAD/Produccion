@@ -227,3 +227,43 @@ export async function createProject(obraNo: string): Promise<void> {
 export async function setObraBlocked(obraNo: string, blocked: boolean, postventaNo = ''): Promise<void> {
   await withConcurrencyRetry(() => odataAction('AdelanteObra_SetObraBlocked', { obraNo, blocked, postventaNo }));
 }
+
+/**
+ * Actualiza las TAREAS DEL PROYECTO (Job) desde la Obra — el botón "Actualizar
+ * tareas proyecto" de la GomJob Works Card (dirección Obra→Job). Se llama DESPUÉS
+ * de subir el presupuesto (workLineBulks/workVersions); sin esto las tareas del Job
+ * quedan en 0 (venta/coste/indirecto). Idempotente (upsert de tareas).
+ * Ojo: NO confundir con syncTasksToWorks del API construction, que va al revés.
+ */
+export async function actualizarTareasProyecto(obraNo: string): Promise<void> {
+  await withConcurrencyRetry(() => odataAction('AdelanteObra_UpdateProjectTasks', { obraNo }));
+}
+
+/**
+ * Setea el "Área prorrateada" (m²) en el Proyecto (Job) de BC. El campo vive en el
+ * Job (extensión, field 50300), expuesto en la API `jobs` — no en GomJob Works. Se
+ * busca el Job por N° y se hace PATCH. Lanza si el Job aún no existe en BC.
+ */
+export async function setAreaProrrateadaJob(obraNo: string, areaProrrateada: number): Promise<void> {
+  const token = await getBCToken();
+  const g = await fetch(`${BASE}/jobs?$filter=${encodeURIComponent(`no eq '${obraNo}'`)}&$top=1`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  });
+  const gd = (await g.json().catch(() => ({}))) as { value?: Array<{ id?: string; '@odata.etag'?: string }> };
+  const job = gd.value?.[0];
+  if (!job?.id) throw new Error(`El proyecto (Job) de la obra ${obraNo} no existe en BC`);
+  const p = await fetch(`${BASE}/jobs(${job.id})`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'If-Match': job['@odata.etag'] ?? '*',
+    },
+    cache: 'no-store',
+    body: JSON.stringify({ areaProrrateada }),
+  });
+  if (!p.ok) {
+    const d = (await p.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(d.error?.message ?? `BC ${p.status}`);
+  }
+}

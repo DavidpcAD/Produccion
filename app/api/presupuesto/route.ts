@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
+import { getDb, sql } from '@/lib/db';
 import { bcConstructionConfigured, subirVersionPresupuesto, subirDescompuesto, getWork, type BulkLine, type DecompLine } from '@/lib/bc-construction';
+import { actualizarTareasProyecto, setAreaProrrateadaJob } from '@/lib/bc-client';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +22,10 @@ export async function POST(req: NextRequest) {
   const verBase = body.verBase ? String(body.verBase) : null;
   const plantilla = body.plantilla as { porTipo?: Record<string, BulkLine[]> } | undefined;
   const descompuesto = body.descompuesto as { lineas?: DecompLine[] } | undefined;
+  // Área prorrateada (m²) que captura el presupuestista al subir; va al Job de BC y
+  // a la obra de la app. null = no vino (no se toca).
+  const areaRaw = body.areaProrrateada;
+  const areaProrrateada = areaRaw != null && areaRaw !== '' && !Number.isNaN(Number(areaRaw)) ? Number(areaRaw) : null;
 
   if (!worksNo) return NextResponse.json({ error: 'Falta la obra (worksNo)' }, { status: 400 });
 
@@ -70,7 +76,35 @@ export async function POST(req: NextRequest) {
         Object.entries(work as unknown as Record<string, unknown>).filter(([, v]) => typeof v === 'number')
       );
     }
-    await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length }, ip });
+    // Propagar al Proyecto (Job): crear/actualizar sus tareas desde la obra
+    // ("Actualizar tareas proyecto", Obra→Job). Sin esto el Job queda en 0. NO
+    // fatal: si falla, el presupuesto ya quedó en la obra (se avisa en la respuesta).
+    try {
+      await actualizarTareasProyecto(worksNo);
+      resultado.tareasProyecto = 'ok';
+    } catch (e) {
+      resultado.tareasProyectoError = e instanceof Error ? e.message : String(e);
+    }
+
+    // Área prorrateada (m²): al Job de BC y a la obra de la app (dbo.Obra), para que
+    // se vea en el proyecto y en el detalle de obra. Cada paso es no fatal.
+    if (areaProrrateada != null) {
+      try {
+        await setAreaProrrateadaJob(worksNo, areaProrrateada);
+        resultado.areaProrrateada = areaProrrateada;
+      } catch (e) {
+        resultado.areaProrrateadaError = e instanceof Error ? e.message : String(e);
+      }
+      try {
+        const db = await getDb();
+        await db.request()
+          .input('area', sql.Decimal(18, 2), areaProrrateada)
+          .input('no', sql.NVarChar(50), worksNo)
+          .query('UPDATE dbo.Obra SET areaProrrateadaM2 = @area WHERE numeroObra = @no');
+      } catch { /* no fatal: BC ya quedó con el área */ }
+    }
+
+    await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length, areaProrrateada, tareasProyecto: resultado.tareasProyecto ?? resultado.tareasProyectoError }, ip });
     return NextResponse.json({ ok: true, ...resultado });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
