@@ -71,7 +71,7 @@ export default function ReporteM2Page() {
     <PageShell>
       <PageHeader
         title="Reporte de m²"
-        subtitle="m² producidos por partida y sub-partida (semana + acumulado), con matriz por obra."
+        subtitle="m² de construcción producidos, desglosados por partida y sub-partida: lo de la semana elegida y el acumulado. Con la vista 'Matriz por obra' ves cuántos m² aportó cada obra. Sirve para medir el volumen físico de producción, no el dinero."
       />
 
       <div className="my-4 max-w-md">
@@ -97,25 +97,29 @@ export default function ReporteM2Page() {
       ) : (
         <>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Toggle
-              value={vista}
-              onChange={setVista}
-              opts={[
-                ['partida', 'Por Partida'],
-                ['matriz', 'Matriz por obra'],
-              ]}
-            />
-            {vista === 'matriz' && (
+            <span title="Por Partida: totales por partida/sub-partida. Matriz por obra: cuánto aportó cada obra.">
               <Toggle
-                value={metrica}
-                onChange={setMetrica}
+                value={vista}
+                onChange={setVista}
                 opts={[
-                  ['semana', 'Semana'],
-                  ['acumulado', 'Acumulado'],
+                  ['partida', 'Por Partida'],
+                  ['matriz', 'Matriz por obra'],
                 ]}
               />
+            </span>
+            {vista === 'matriz' && (
+              <span title="Semana: m² producidos solo en la semana elegida. Acumulado: total a la fecha.">
+                <Toggle
+                  value={metrica}
+                  onChange={setMetrica}
+                  opts={[
+                    ['semana', 'Semana'],
+                    ['acumulado', 'Acumulado'],
+                  ]}
+                />
+              </span>
             )}
-            <label className="flex cursor-pointer items-center gap-1.5 rounded-ds border border-ds-gray-200 px-2.5 py-1 text-xs">
+            <label className="flex cursor-pointer items-center gap-1.5 rounded-ds border border-ds-gray-200 px-2.5 py-1 text-xs" title="Oculta las filas sin m² producidos, para ver solo lo que se movió">
               <input
                 type="checkbox"
                 checked={soloAvance}
@@ -230,10 +234,10 @@ function M2PorPartida({ m, soloAvance }: { m: M2Reporte; soloAvance: boolean }) 
             <th className="sticky top-0 z-10 h-8 border-b border-ds-gray-200 bg-ds-gray-100 px-3 text-left text-xs font-medium text-ds-gray-500">
               Partida · Sub-partida · Obra
             </th>
-            <th className="sticky top-0 z-10 h-8 w-32 border-b border-l border-ds-gray-200 bg-ds-gray-100 px-3 text-right text-xs font-medium text-ds-gray-500">
+            <th className="sticky top-0 z-10 h-8 w-32 border-b border-l border-ds-gray-200 bg-ds-gray-100 px-3 text-right text-xs font-medium text-ds-gray-500" title="m² producidos solo en la semana elegida">
               m² Semana
             </th>
-            <th className="sticky top-0 z-10 h-8 w-32 border-b border-l border-ds-gray-200 bg-ds-gray-100 px-3 text-right text-xs font-medium text-ds-gray-500">
+            <th className="sticky top-0 z-10 h-8 w-32 border-b border-l border-ds-gray-200 bg-ds-gray-100 px-3 text-right text-xs font-medium text-ds-gray-500" title="m² producidos acumulados a la fecha (todas las semanas)">
               m² Acumulado
             </th>
           </tr>

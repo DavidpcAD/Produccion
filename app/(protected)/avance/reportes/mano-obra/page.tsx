@@ -75,7 +75,7 @@ export default function ReporteManoObraPage() {
     <PageShell>
       <PageHeader
         title="Reporte de Mano de Obra"
-        subtitle="Nómina repartida por horas + subcontratos vs. m² construidos de la semana. Costo M.O./m², eficiencia y sobrecosto."
+        subtitle="Reparte la nómina de la semana (por horas) más los subcontratos entre las obras, y lo compara contra los m² construidos. Muestra el costo de mano de obra por m², la eficiencia y el sobrecosto vs. lo presupuestado — para saber si la M.O. salió más cara o más barata de lo planeado."
       />
 
       <div className="my-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -116,41 +116,45 @@ export default function ReporteManoObraPage() {
           )}
 
           <Seccion titulo="Producción">
-            <Kpi label="m² Construidos Semana" value={fmt(calc.m2Sem)} accent="lime" />
-            <Kpi label="Costo teórico/m²" value={formatCRC(calc.teorico)} small />
+            <Kpi label="m² Construidos Semana" value={fmt(calc.m2Sem)} accent="lime" hint="m² construidos (producidos) en la semana elegida" />
+            <Kpi label="Costo teórico/m²" value={formatCRC(calc.teorico)} small hint="Costo de M.O. por m² que se presupuestó (la meta)" />
             <Kpi
               label="Eficiencia"
               value={calc.eficiencia > 0 ? `${calc.eficiencia.toFixed(0)}%` : '—'}
               accent={calc.eficiencia >= 100 ? 'lime' : 'red'}
+              hint="Teórico ÷ real × 100. ≥100% = la M.O. rindió mejor de lo presupuestado"
             />
           </Seccion>
 
           <Seccion titulo="Horas Hombre">
-            <Kpi label="HH Directas Semana" value={fmt(calc.hhDirectas)} />
+            <Kpi label="HH Directas Semana" value={fmt(calc.hhDirectas)} hint="Horas-hombre de nómina directa asignadas esta semana" />
             <Kpi
               label="HH Equiv. Subcontrato"
               value={calc.hhEquivSubc > 0 ? fmt(calc.hhEquivSubc) : '—'}
+              hint="Horas-hombre equivalentes aportadas por subcontratos"
             />
-            <Kpi label="Costo Prom HH c/Cargas" value={formatCRC(calc.costoPromHH)} small />
-            <Kpi label="HH/m² Sin Subcontrato" value={calc.hhM2Sin > 0 ? fmt2(calc.hhM2Sin) : '—'} />
-            <Kpi label="HH/m² Con Subcontrato" value={calc.hhM2Con > 0 ? fmt2(calc.hhM2Con) : '—'} />
-            <Kpi label="Costo M.O. por m²" value={formatCRC(calc.costoMOm2)} small />
+            <Kpi label="Costo Prom HH c/Cargas" value={formatCRC(calc.costoPromHH)} small hint="Costo promedio de la hora-hombre, incluidas cargas sociales" />
+            <Kpi label="HH/m² Sin Subcontrato" value={calc.hhM2Sin > 0 ? fmt2(calc.hhM2Sin) : '—'} hint="Horas-hombre por m² usando SOLO nómina directa" />
+            <Kpi label="HH/m² Con Subcontrato" value={calc.hhM2Con > 0 ? fmt2(calc.hhM2Con) : '—'} hint="Horas-hombre por m² incluyendo subcontratos" />
+            <Kpi label="Costo M.O. por m²" value={formatCRC(calc.costoMOm2)} small hint="Costo real de mano de obra por cada m² construido" />
           </Seccion>
 
           <Seccion titulo="Costos Mano de Obra">
-            <Kpi label="M.O. Directa Semana" value={formatCRC(calc.moDirecta)} small />
+            <Kpi label="M.O. Directa Semana" value={formatCRC(calc.moDirecta)} small hint="Gasto de nómina directa de la semana (₡)" />
             <Kpi
               label="M.O. Subcontrato"
               value={calc.moSubcontrato > 0 ? formatCRC(calc.moSubcontrato) : '—'}
               small
+              hint="Gasto de subcontratos de la semana (₡)"
             />
-            <Kpi label="M.O. Total Gastada" value={formatCRC(calc.moTotalGastada)} small accent="lime" />
-            <Kpi label="M.O. Presupuestada" value={formatCRC(calc.moPresupuestada)} small />
+            <Kpi label="M.O. Total Gastada" value={formatCRC(calc.moTotalGastada)} small accent="lime" hint="Directa + subcontrato (₡)" />
+            <Kpi label="M.O. Presupuestada" value={formatCRC(calc.moPresupuestada)} small hint="Costo teórico/m² × m² construidos = lo que debía costar" />
             <Kpi
               label="Sobrecosto M.O."
               value={formatCRC(calc.sobrecosto)}
               small
               accent={calc.sobrecosto > 0 ? 'red' : 'lime'}
+              hint="Gastada − presupuestada. Rojo = salió más cara de lo presupuestado"
             />
           </Seccion>
 
@@ -399,14 +403,16 @@ function Kpi({
   value,
   accent,
   small,
+  hint,
 }: {
   label: string;
   value: string;
   accent?: 'lime' | 'red';
   small?: boolean;
+  hint?: string;
 }) {
   return (
-    <div className="rounded-ds border border-ds-gray-200 bg-ds-surface p-3 shadow-ds-01">
+    <div className="rounded-ds border border-ds-gray-200 bg-ds-surface p-3 shadow-ds-01" title={hint} style={hint ? { cursor: 'help' } : undefined}>
       <p className="text-xs uppercase tracking-wider text-ds-gray-500">{label}</p>
       <p
         className={`font-semibold tabular-nums ${small ? 'text-sub-sm' : 'text-sub'} ${

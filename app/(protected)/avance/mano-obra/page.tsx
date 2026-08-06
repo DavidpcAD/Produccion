@@ -50,7 +50,7 @@ export default function ManoObraPage() {
     <PageShell>
       <PageHeader
         title="Mano de Obra"
-        subtitle="Captura de nómina directa, horas por obra y subcontratos por semana operativa."
+        subtitle="Acá se captura, por semana, la mano de obra: el monto de nómina directa, las horas trabajadas en cada obra y los subcontratos. Con eso el sistema reparte el costo de M.O. entre las obras y calcula el costo por m² (Reporte M.O.)."
       />
 
       {/* Selector de semana (compartido por los tres tabs) */}
@@ -72,6 +72,7 @@ export default function ManoObraPage() {
             type="button"
             role="tab"
             aria-selected={tab === t}
+            title={t === 'nomina' ? 'Monto total de nómina directa de la semana y costo teórico por m²' : t === 'horas' ? 'Cuántas horas trabajó el personal en cada obra (para repartir la nómina)' : 'Montos de subcontratos por obra de la semana'}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black ${
               tab === t ? 'border-black text-ds-ink' : 'border-transparent text-ds-gray-400 hover:text-ds-ink'
@@ -144,13 +145,16 @@ function TabNomina({ semanaId }: { semanaId: number }) {
 
   return (
     <div className="max-w-md space-y-4">
+      <p className="rounded-ds border border-ds-gray-100 bg-ds-gray-50 px-3 py-2 text-sm text-ds-gray-500">
+        Ingresá el <strong className="text-ds-ink">total</strong> de la planilla directa de la semana (sin subcontratos) y el <strong className="text-ds-ink">costo teórico por m²</strong> presupuestado. Con esto el sistema calcula el costo de M.O. por m² y el sobrecosto.
+      </p>
       <Input
         label="Monto nómina directa (₡)"
         type="number"
         min={0}
         value={monto}
         onChange={(e) => setMonto(e.target.value)}
-        hint={monto ? formatCRC(Number(monto)) : undefined}
+        hint={monto ? formatCRC(Number(monto)) : 'Total pagado en planilla directa esta semana'}
       />
       <Input
         label="Costo teórico por m² (₡)"
@@ -158,7 +162,7 @@ function TabNomina({ semanaId }: { semanaId: number }) {
         min={0}
         value={teorico}
         onChange={(e) => setTeorico(e.target.value)}
-        hint={teorico ? formatCRC(Number(teorico)) : undefined}
+        hint={teorico ? formatCRC(Number(teorico)) : 'Costo de M.O. por m² presupuestado (la meta)'}
       />
       <Input label="Notas (opcional)" value={notas} onChange={(e) => setNotas(e.target.value)} />
       <Button onClick={guardar} loading={guardando}>

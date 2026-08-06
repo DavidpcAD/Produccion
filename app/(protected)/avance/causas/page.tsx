@@ -53,7 +53,7 @@ export default function CausasPage() {
     <PageShell width="narrow">
       <PageHeader
         title="Causas"
-        subtitle="Motivos de no-cumplimiento (NC) e inactividad que el personal selecciona al registrar avances."
+        subtitle="Catálogo de motivos que el personal elige al registrar el avance en campo: por qué algo no se cumplió (NC) o por qué una cuadrilla estuvo inactiva. Estas causas alimentan los reportes (columna NC de Pendientes, etc.)."
         actions={<Button onClick={() => setEditar('nueva')}>+ Nueva causa</Button>}
       />
 
@@ -70,15 +70,15 @@ export default function CausasPage() {
             render: (c) => <span className="font-mono text-sm">{c.codigo}</span>,
           },
           { key: 'descripcion', header: 'Descripción' },
-          { key: 'aplica_nc', header: 'NC', render: (c) => (c.aplica_nc ? '✓' : '—') },
+          { key: 'aplica_nc', header: <span title="Se puede elegir como causa de NO-CUMPLIMIENTO (algo que debía hacerse y no se hizo)">NC</span>, render: (c) => (c.aplica_nc ? '✓' : '—') },
           {
             key: 'aplica_inactividad',
-            header: 'Inactividad',
+            header: <span title="Se puede elegir como causa de INACTIVIDAD de una cuadrilla (por qué no estuvo produciendo)">Inactividad</span>,
             render: (c) => (c.aplica_inactividad ? '✓' : '—'),
           },
           {
             key: 'activo',
-            header: 'Estado',
+            header: <span title="Activa = disponible para elegir en campo. Inactiva = oculta, ya no se ofrece.">Estado</span>,
             render: (c) =>
               c.activo ? (
                 <Badge variant="green" dot>

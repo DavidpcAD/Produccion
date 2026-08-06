@@ -5,7 +5,7 @@ import { springs } from '@/lib/springs';
 
 interface Column<T> {
   key: keyof T | string;
-  header: string;
+  header: React.ReactNode;
   render?: (row: T) => React.ReactNode;
   className?: string;
 }

@@ -65,7 +65,7 @@ export default function ReportePendientesPage() {
     <PageShell>
       <PageHeader
         title="Pendientes arrastrados"
-        subtitle="Sub-partidas de sprints ya pasados que las obras en construcción aún no completan."
+        subtitle="Trabajos (sub-partidas) que quedaron de sprints ya pasados y que las obras en construcción todavía no terminan — o sea, lo que se está arrastrando. Sirve para detectar atrasos: agrupá por obra o por sub-partida y filtrá por proyecto."
       />
 
       {error && (
@@ -111,11 +111,11 @@ export default function ReportePendientesPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            <Kpi label="Pendientes" value={kpis.pendientes} />
-            <Kpi label="Obras afectadas" value={kpis.obras} />
-            <Kpi label="Con NC" value={kpis.conNC} />
-            <Kpi label="Sin avance" value={kpis.sinAvance} accent={kpis.sinAvance > 0 ? 'red' : undefined} />
-            <Kpi label="≥3 sem." value={kpis.tresSem} accent={kpis.tresSem > 0 ? 'red' : undefined} />
+            <Kpi label="Pendientes" value={kpis.pendientes} hint="Total de trabajos (sub-partidas) arrastrados que faltan por completar" />
+            <Kpi label="Obras afectadas" value={kpis.obras} hint="Cuántas obras distintas tienen al menos un pendiente arrastrado" />
+            <Kpi label="Con NC" value={kpis.conNC} hint="Pendientes que tienen registrada una causa de no-cumplimiento (NC)" />
+            <Kpi label="Sin avance" value={kpis.sinAvance} accent={kpis.sinAvance > 0 ? 'red' : undefined} hint="Pendientes que siguen en 0% (no se ha tocado nada)" />
+            <Kpi label="≥3 sem." value={kpis.tresSem} accent={kpis.tresSem > 0 ? 'red' : undefined} hint="Pendientes arrastrados hace 3 semanas o más (los más críticos)" />
           </div>
 
           {grupos.length === 0 && (
@@ -140,10 +140,10 @@ export default function ReportePendientesPage() {
                       <th className="px-3 py-1.5 text-left">{agrupar === 'sub' ? 'Obra' : 'Sub-partida'}</th>
                       <th className="px-3 py-1.5 text-left">Tipo</th>
                       <th className="px-3 py-1.5 text-left">Proyecto</th>
-                      <th className="px-3 py-1.5 text-left">Sprint origen</th>
-                      <th className="px-3 py-1.5 text-right">% Avance</th>
-                      <th className="px-3 py-1.5 text-left">NC</th>
-                      <th className="px-3 py-1.5 text-right">Sem.</th>
+                      <th className="px-3 py-1.5 text-left" title="Sprint en el que originalmente debía hacerse este trabajo">Sprint origen</th>
+                      <th className="px-3 py-1.5 text-right" title="% de avance actual de la sub-partida (0% = sin empezar)">% Avance</th>
+                      <th className="px-3 py-1.5 text-left" title="Causa de no-cumplimiento registrada (por qué no se ha hecho)">NC</th>
+                      <th className="px-3 py-1.5 text-right" title="Semanas que lleva arrastrándose el pendiente">Sem.</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -187,9 +187,9 @@ export default function ReportePendientesPage() {
   );
 }
 
-function Kpi({ label, value, accent }: { label: string; value: number; accent?: 'red' }) {
+function Kpi({ label, value, accent, hint }: { label: string; value: number; accent?: 'red'; hint?: string }) {
   return (
-    <div className="rounded-ds border border-ds-gray-200 bg-ds-surface p-3 shadow-ds-01">
+    <div className="rounded-ds border border-ds-gray-200 bg-ds-surface p-3 shadow-ds-01" title={hint} style={hint ? { cursor: 'help' } : undefined}>
       <p className="text-xs uppercase tracking-wider text-ds-gray-500">{label}</p>
       <p className={`text-sub font-semibold tabular-nums ${accent === 'red' ? 'text-ds-red' : 'text-ds-ink'}`}>
         {value}

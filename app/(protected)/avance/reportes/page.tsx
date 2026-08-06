@@ -65,7 +65,7 @@ export default function ReportesPage() {
     <PageShell>
       <PageHeader
         title="Reportes de avance"
-        subtitle="Resumen del mes: cronograma, costo y producción económica por semana operativa."
+        subtitle="Compara, semana por semana del mes, el avance ESPERADO (meta del cronograma) contra el REAL (lo ejecutado), en cronograma y en costo, más la producción económica (directo, indirecto, venta y utilidad). Sirve para ver si el mes va adelantado o atrasado y cuánto."
       />
 
       <div className="my-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -96,10 +96,15 @@ export default function ReportesPage() {
         <p className="text-ds-gray-400">Calculando reporte…</p>
       ) : data ? (
         <div className="space-y-6">
-          <p className="text-sm text-ds-gray-500">
-            Mes <strong>{data.mes}</strong> · {data.filas.length} semana(s)
-            {cargando && ' · actualizando…'}
-          </p>
+          <div className="space-y-0.5">
+            <p className="text-sm text-ds-gray-500">
+              Mes <strong>{data.mes}</strong> · {data.filas.length} semana(s)
+              {cargando && ' · actualizando…'}
+            </p>
+            <p className="text-xs text-ds-gray-400">
+              En <span className="font-semibold text-ds-red">rojo</span>, el valor real quedó por debajo de lo esperado (atrasado). La fila <strong>Diferencia</strong> = real − esperado.
+            </p>
+          </div>
           <ResumenGeneral data={data} semanaSel={semanaId} />
           <ResumenFinanciero data={data} semanaSel={semanaId} />
         </div>
@@ -147,11 +152,11 @@ function ResumenGeneral({ data, semanaSel }: { data: ResumenMes; semanaSel: numb
           <tr className="border-b border-ds-gray-200 bg-ds-gray-100">
             <th className={`${th} text-left`}>Semana</th>
             <th className={`${th} text-left`}>Período</th>
-            <th className={`${th} text-right`}>Días Ef.</th>
-            <th className={`${th} text-right`}>Crono Esp.</th>
-            <th className={`${th} text-right`}>Crono Real</th>
-            <th className={`${th} text-right`}>Costo Esp.</th>
-            <th className={`${th} text-right`}>Costo Real</th>
+            <th className={`${th} text-right`} title="Días efectivos de trabajo de la semana (base del cálculo esperado)">Días Ef.</th>
+            <th className={`${th} text-right`} title="Cronograma ESPERADO: cuánto debía avanzar la semana según el plan">Crono Esp.</th>
+            <th className={`${th} text-right`} title="Cronograma REAL: cuánto se avanzó de verdad esa semana">Crono Real</th>
+            <th className={`${th} text-right`} title="Costo ESPERADO: costo que debía ejecutarse según el plan">Costo Esp.</th>
+            <th className={`${th} text-right`} title="Costo REAL: costo efectivamente ejecutado esa semana">Costo Real</th>
           </tr>
         </thead>
         <tbody>
@@ -257,10 +262,10 @@ function ResumenFinanciero({ data, semanaSel }: { data: ResumenMes; semanaSel: n
           <tr className="border-b border-ds-gray-200 bg-ds-gray-100">
             <th className={`${th} text-left`}>Semana</th>
             <th className={`${th} text-left`}>Período</th>
-            <th className={`${th} text-right`}>Directo</th>
-            <th className={`${th} text-right`}>Indirecto</th>
-            <th className={`${th} text-right`}>Venta</th>
-            <th className={`${th} text-right`}>Utilidad</th>
+            <th className={`${th} text-right`} title="Costo directo producido en la semana (₡)">Directo</th>
+            <th className={`${th} text-right`} title="Costo indirecto producido en la semana (₡)">Indirecto</th>
+            <th className={`${th} text-right`} title="Venta producida en la semana (₡)">Venta</th>
+            <th className={`${th} text-right`} title="Utilidad producida = venta − directo − indirecto (₡)">Utilidad</th>
           </tr>
         </thead>
         <tbody>
