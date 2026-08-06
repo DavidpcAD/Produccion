@@ -315,7 +315,7 @@ function FragmentoSub({
         </td>
         <td
           className="border-l border-ds-gray-100 px-3 py-1 text-right tabular-nums"
-          style={{ color: s.m2_semana > EPS ? '#1d4ed8' : undefined }}
+          style={{ color: s.m2_semana > EPS ? 'var(--color-ds-green-ink)' : undefined }}
         >
           {s.m2_semana > EPS ? fmt(s.m2_semana) : '—'}
         </td>
@@ -339,7 +339,7 @@ function FragmentoSub({
               </td>
               <td
                 className="border-l border-ds-gray-100 px-3 py-0.5 text-right tabular-nums"
-                style={{ color: c && c.s > EPS ? '#1d4ed8' : undefined }}
+                style={{ color: c && c.s > EPS ? 'var(--color-ds-green-ink)' : undefined }}
               >
                 {c && c.s > EPS ? fmt(c.s) : '—'}
               </td>
@@ -386,9 +386,9 @@ function M2Matriz({
   const totalW = 260 + obras.length * 64;
 
   function celdaStyle(val: number, tuvoSemana: boolean): { txt: string; style: CSSProperties } {
-    if (val <= EPS) return { txt: '·', style: { background: '#fafafa', color: '#d4d4d8' } };
-    const linea: CSSProperties = tuvoSemana ? { boxShadow: 'inset 3px 0 0 #2563eb' } : {};
-    return { txt: fmt(val), style: { background: 'rgba(59,130,246,0.08)', color: '#1e3a8a', ...linea } };
+    if (val <= EPS) return { txt: '·', style: { background: 'var(--ds-color-gray-100)', color: 'var(--ds-color-gray-300)' } };
+    const linea: CSSProperties = tuvoSemana ? { boxShadow: 'inset 3px 0 0 var(--color-brand-200)' } : {};
+    return { txt: fmt(val), style: { background: 'var(--color-brand-soft)', color: 'var(--color-ds-green-ink)', ...linea } };
   }
 
   if (obras.length === 0) {
@@ -421,7 +421,7 @@ function M2Matriz({
                 title={`${o.codigo} · ${o.tipo_casa ?? ''} · S${o.sprint_actual ?? '-'}`}
               >
                 <span className="block truncate font-mono text-[10px]">{o.codigo}</span>
-                <span className="block truncate text-[9px] font-normal" style={{ color: '#1d4ed8' }}>
+                <span className="block truncate text-[9px] font-normal" style={{ color: 'var(--color-ds-green-ink)' }}>
                   {fmt(metrica === 'semana' ? o.m2_semana : o.m2_acumulado)}
                 </span>
               </th>

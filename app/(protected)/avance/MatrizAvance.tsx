@@ -8,17 +8,17 @@ import type { EstadoVenta, MatrizAvance as MatrizAvanceData } from '@/lib/avance
 
 /** Heatmap del % de avance: brand (lime) suave → fuerte. 0% gris, "no aplica" casi blanco. */
 function estiloCelda(v: number | null): CSSProperties {
-  if (v === null) return { background: '#fafafa', color: '#d4d4d8' };
-  if (v <= 0) return { background: '#f4f4f5', color: '#a1a1aa' };
+  if (v === null) return { background: 'var(--ds-color-gray-100)', color: 'var(--ds-color-gray-300)' };
+  if (v <= 0) return { background: 'var(--ds-color-gray-100)', color: 'var(--ds-color-gray-400)' };
   const alpha = 0.12 + (Math.min(v, 100) / 100) * 0.88;
-  return { background: `rgba(173, 208, 16, ${alpha})`, color: '#18181b' };
+  return { background: `rgba(173, 208, 16, ${alpha})`, color: 'var(--ds-text)' };
 }
 
 /** Columnas resumen (Crono / Gen): heatmap gris oscuro para distinguirlas del lime. */
 function estiloResumen(v: number | null): CSSProperties {
-  if (v === null || v <= 0) return { background: '#f3f3f3', color: '#AAAFB6' };
+  if (v === null || v <= 0) return { background: 'var(--ds-color-gray-100)', color: 'var(--ds-color-gray-300)' };
   const alpha = 0.16 + (Math.min(v, 100) / 100) * 0.74;
-  return { background: `rgba(93, 99, 108, ${alpha})`, color: alpha > 0.55 ? '#fff' : '#18181b' };
+  return { background: `rgba(93, 99, 108, ${alpha})`, color: alpha > 0.55 ? '#fff' : 'var(--ds-text)' };
 }
 
 interface Props {
