@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Select } from '@/components/ui/Input';
+import { Combobox } from '@/components/ui/Combobox';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 import type { FiltroVenta, ResumenMes } from '@/lib/avance/reportes';
@@ -68,11 +69,11 @@ export default function ReportesPage() {
       />
 
       <div className="my-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Select
+        <Combobox
           label="Semana operativa"
-          value={semanaId ?? ''}
-          onChange={(e) => setSemanaId(Number(e.target.value) || null)}
-          options={semanas.map((s) => ({ value: Number(s.id), label: semanaLabel(s) }))}
+          value={String(semanaId ?? '')}
+          onChange={(v) => setSemanaId(Number(v) || null)}
+          options={semanas.map((s) => ({ value: String(s.id), label: semanaLabel(s) }))}
           placeholder={semanas.length ? 'Elegí una semana…' : 'Cargando…'}
         />
         <Select

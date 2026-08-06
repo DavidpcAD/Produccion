@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
-import { Select } from '@/components/ui/Input';
+import { Combobox } from '@/components/ui/Combobox';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 import type { HistoricoReporte } from '@/lib/avance/reporte-historico';
 
@@ -84,11 +84,11 @@ export default function ReporteHistoricoPage() {
 
       <div className="my-4 flex flex-wrap items-center gap-3">
         <div className="max-w-md flex-1">
-          <Select
+          <Combobox
             label="Semana operativa"
-            value={semanaId ?? ''}
-            onChange={(e) => setSemanaId(Number(e.target.value) || null)}
-            options={semanas.map((s) => ({ value: s.id, label: semLabel(s) }))}
+            value={String(semanaId ?? '')}
+            onChange={(v) => setSemanaId(Number(v) || null)}
+            options={semanas.map((s) => ({ value: String(s.id), label: semLabel(s) }))}
             placeholder={semanas.length ? 'Elegí una semana…' : 'Cargando…'}
           />
         </div>

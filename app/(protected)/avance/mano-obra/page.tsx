@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Input';
+import { Input } from '@/components/ui/Input';
+import { Combobox } from '@/components/ui/Combobox';
 import { Table } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/Toast';
 import { formatCRC } from '@/lib/utilidades/format';
@@ -54,11 +55,11 @@ export default function ManoObraPage() {
 
       {/* Selector de semana (compartido por los tres tabs) */}
       <div className="my-4 max-w-md">
-        <Select
+        <Combobox
           label="Semana operativa"
-          value={semanaId ?? ''}
-          onChange={(e) => setSemanaId(Number(e.target.value) || null)}
-          options={semanas.map((s) => ({ value: s.id, label: semanaLabel(s) }))}
+          value={String(semanaId ?? '')}
+          onChange={(v) => setSemanaId(Number(v) || null)}
+          options={semanas.map((s) => ({ value: String(s.id), label: semanaLabel(s) }))}
           placeholder={semanas.length ? 'Elegí una semana…' : 'Cargando…'}
         />
       </div>
