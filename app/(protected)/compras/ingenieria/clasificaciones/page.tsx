@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
-import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
+import { Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { IconEdit } from "@/components/compras/icons";
 
 type Etapa = { id: number; codigo: string; nombre: string };
@@ -97,37 +97,42 @@ export default function ClasificacionesPage() {
         </Card>
 
         {cargando && <div className="empty mt-6">Cargando…</div>}
-        <div className="mt-4" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <div className="clasif-groups mt-4">
           {!cargando && secciones.length === 0 && <div className="empty">No hay clasificaciones. Creá la primera con “+ Nueva clasificación”.</div>}
-          {secciones.map((s) => (
-            <section key={s.etapa.id} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div className="row gap-3" style={{ alignItems: "baseline" }}>
-                <span className="ds-subtitle">{s.etapa.nombre}</span>
-                <span className="ds-muted ds-body-sm" style={{ fontFamily: "monospace" }}>{s.etapa.codigo}</span>
-                <span className="ds-muted ds-body-sm" style={{ marginLeft: "auto" }}>{s.partidas.reduce((m, p) => m + p.items.length, 0)} clasificación(es)</span>
-              </div>
-              {s.partidas.map(({ partida, items }) => (
-                <Card key={partida.id} style={{ padding: 0, overflow: "hidden" }}>
-                  <div className="row gap-3" style={{ alignItems: "center", padding: "10px 16px", borderBottom: "1.5px solid var(--ds-color-gray-100)", background: "color-mix(in srgb, var(--ds-color-green-100) 7%, var(--ds-tint-base))" }}>
-                    <span className="ds-muted ds-body-sm" style={{ fontFamily: "monospace" }}>{partida.codigo}</span>
-                    <span className="ds-strong">{partida.nombre}</span>
-                    <span className="ds-muted ds-body-sm" style={{ marginLeft: "auto" }}>{items.length}</span>
-                  </div>
-                  <div>
-                    {items.map((c) => (
-                      <div key={c.id} className="row gap-3" style={{ alignItems: "center", padding: "10px 16px", borderTop: "1px solid var(--ds-color-gray-100)" }}>
-                        <span className="ds-muted">↳</span>
-                        <span className="ds-strong ds-body-sm">{c.nombre}</span>
-                        <button type="button" className="icon-btn" title="Editar clasificación" aria-label="Editar" style={{ marginLeft: "auto" }} onClick={() => setEditar(c)}>
-                          <IconEdit size={16} />
-                        </button>
+          {secciones.map((s) => {
+            const nEtapa = s.partidas.reduce((m, p) => m + p.items.length, 0);
+            return (
+              <section key={s.etapa.id} className="clasif-etapa">
+                <div className="clasif-etapa__head">
+                  <span className="clasif-etapa__code">{s.etapa.codigo}</span>
+                  <h2 className="clasif-etapa__name">{s.etapa.nombre}</h2>
+                  <span className="clasif-count clasif-count--wide">{nEtapa} clasif.</span>
+                </div>
+                <div className="clasif-etapa__body">
+                  {s.partidas.map(({ partida, items }) => (
+                    <div key={partida.id} className="clasif-partida">
+                      <div className="clasif-partida__head">
+                        <span className="clasif-partida__code">{partida.codigo}</span>
+                        <span className="clasif-partida__name">{partida.nombre}</span>
+                        <span className="clasif-count">{items.length}</span>
                       </div>
-                    ))}
-                  </div>
-                </Card>
-              ))}
-            </section>
-          ))}
+                      <ul className="clasif-list">
+                        {items.map((c) => (
+                          <li key={c.id} className="clasif-item">
+                            <span className="clasif-item__dot" aria-hidden />
+                            <span className="clasif-item__name">{c.nombre}</span>
+                            <button type="button" className="icon-btn clasif-item__edit" title="Editar clasificación" aria-label="Editar" onClick={() => setEditar(c)}>
+                              <IconEdit size={16} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
 
         {(modal || editar) && (

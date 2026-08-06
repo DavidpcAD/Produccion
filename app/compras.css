@@ -335,6 +335,54 @@
 .oc-scope .ds-table--center-num td.ds-num,
 .oc-scope .ds-table--center-num thead th.ds-num { text-align: center; }
 
+/* ─── Maestro de clasificaciones: jerarquía etapa → partida → clasificación ─── */
+.oc-scope .clasif-groups { display: flex; flex-direction: column; gap: 26px; }
+.oc-scope .clasif-etapa { display: flex; flex-direction: column; gap: 12px; }
+.oc-scope .clasif-etapa__head { display: flex; align-items: center; gap: 12px; }
+.oc-scope .clasif-etapa__name {
+  margin: 0; font-size: var(--ds-font-size-subtitle-lg); line-height: 1.1;
+  font-weight: 700; color: var(--ds-text); text-transform: uppercase; letter-spacing: .01em;
+}
+.oc-scope .clasif-etapa__code {
+  font-family: monospace; font-size: 12px; font-weight: 700; color: var(--ds-text);
+  background: color-mix(in srgb, var(--ds-color-green-200) 22%, var(--ds-tint-base));
+  border: 1px solid color-mix(in srgb, var(--ds-color-green-200) 45%, transparent);
+  padding: 3px 11px; border-radius: 999px; flex-shrink: 0;
+}
+/* Las partidas quedan "colgando" de la etapa con un acento a la izquierda. */
+.oc-scope .clasif-etapa__body {
+  display: flex; flex-direction: column; gap: 12px;
+  margin-left: 7px; padding-left: 16px;
+  border-left: 2px solid color-mix(in srgb, var(--ds-color-green-200) 50%, var(--ds-color-gray-200));
+}
+.oc-scope .clasif-partida {
+  border: 1.5px solid var(--ds-color-gray-200); border-radius: var(--ds-radius-lg);
+  overflow: hidden; background: var(--ds-surface);
+}
+.oc-scope .clasif-partida__head {
+  display: flex; align-items: center; gap: 10px; padding: 11px 16px;
+  background: color-mix(in srgb, var(--ds-color-green-100) 7%, var(--ds-tint-base));
+  border-bottom: 1.5px solid var(--ds-color-gray-100);
+}
+.oc-scope .clasif-partida__code {
+  font-family: monospace; font-size: 12px; font-weight: 600; color: var(--ds-color-gray-500);
+  background: var(--ds-color-gray-100); padding: 2px 8px; border-radius: 6px; flex-shrink: 0;
+}
+.oc-scope .clasif-partida__name { font-weight: var(--ds-font-weight-semibold); color: var(--ds-text); }
+.oc-scope .clasif-count {
+  margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 22px; padding: 0 9px; border-radius: 999px; white-space: nowrap;
+  font-size: 12px; font-weight: 700; color: var(--ds-color-gray-500); background: var(--ds-color-gray-100);
+}
+.oc-scope .clasif-list { list-style: none; margin: 0; padding: 0; }
+.oc-scope .clasif-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; transition: background .12s; }
+.oc-scope .clasif-item + .clasif-item { border-top: 1px solid var(--ds-color-gray-100); }
+.oc-scope .clasif-item:hover { background: color-mix(in srgb, var(--ds-color-gray-100) 55%, transparent); }
+.oc-scope .clasif-item__dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 999px; background: var(--ds-color-green-200); }
+.oc-scope .clasif-item__name { font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-text); }
+.oc-scope .clasif-item__edit { margin-left: auto; opacity: .5; transition: opacity .12s; }
+.oc-scope .clasif-item:hover .clasif-item__edit { opacity: 1; }
+
 /* Dropdown propio (componente Select): trigger + flecha grande + menú del sistema */
 .oc-scope .ds-select { width: 100%; }
 .oc-scope .ds-select__trigger {
