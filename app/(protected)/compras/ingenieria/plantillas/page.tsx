@@ -25,6 +25,8 @@ export default function PlantillasPage() {
   const [items, setItems] = useState<ItemBc[]>([]);
   const [buscar, setBuscar] = useState(""); const [fPartida, setFPartida] = useState("");
   const [fTipo, setFTipo] = useState<"todas" | TipoPlantilla>("todas");
+  // Por defecto cada quien ve SOLO las plantillas que creó; con el toggle puede ver todas.
+  const [soloMias, setSoloMias] = useState(true);
   const [editor, setEditor] = useState<Plantilla | "new" | null>(null);
   const [aBorrar, setABorrar] = useState<Plantilla | null>(null);
 
@@ -58,6 +60,7 @@ export default function PlantillasPage() {
   const visibles = useMemo(() => {
     const q = buscar.trim().toLowerCase();
     return plantillas.filter((pl) => {
+      if (soloMias && usuario && pl.creadoPor !== usuario) return false;
       if (fTipo !== "todas" && (fTipo === "bodega") !== esBodega(pl)) return false;
       const c = clasDe(pl.idClasificacion); const { partida } = ctxDeClas(c);
       if (fPartida && String(partida?.id) !== fPartida) return false;
@@ -72,7 +75,9 @@ export default function PlantillasPage() {
       if (ca !== cb) return ca.localeCompare(cb, "es", { numeric: true });
       return a.nombre.localeCompare(b.nombre, "es", { numeric: true });
     });
-  }, [plantillas, buscar, fPartida, fTipo, wbs]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [plantillas, buscar, fPartida, fTipo, wbs, soloMias, usuario]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const misPlantillas = useMemo(() => plantillas.filter((pl) => !usuario || pl.creadoPor === usuario).length, [plantillas, usuario]);
 
   async function borrar(pl: Plantilla) {
     try {
@@ -111,7 +116,19 @@ export default function PlantillasPage() {
               </Select>
             </Field>
           </div>
-          <div className="ds-body-sm ds-muted mt-2">{visibles.length} plantilla(s)</div>
+          <div className="row gap-3 mt-3" style={{ alignItems: "center" }}>
+            <div style={{ display: "inline-flex", background: "var(--ds-color-gray-100)", borderRadius: 999, padding: 3, gap: 2 }} role="group" aria-label="Filtrar plantillas por autor">
+              <button type="button" onClick={() => setSoloMias(true)} aria-pressed={soloMias} title="Solo las plantillas que vos creaste"
+                style={{ border: 0, cursor: "pointer", padding: "5px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, background: soloMias ? "var(--ds-surface)" : "transparent", color: soloMias ? "var(--ds-text)" : "var(--ds-color-gray-500)" }}>
+                Mías ({misPlantillas})
+              </button>
+              <button type="button" onClick={() => setSoloMias(false)} aria-pressed={!soloMias} title="Ver las plantillas de todos"
+                style={{ border: 0, cursor: "pointer", padding: "5px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, background: !soloMias ? "var(--ds-surface)" : "transparent", color: !soloMias ? "var(--ds-text)" : "var(--ds-color-gray-500)" }}>
+                Todas ({plantillas.length})
+              </button>
+            </div>
+            <span className="ds-body-sm ds-muted" style={{ marginLeft: "auto" }}>{visibles.length} plantilla(s)</span>
+          </div>
         </Card>
 
         <div className="mt-4" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>

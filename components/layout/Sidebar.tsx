@@ -46,10 +46,12 @@ const navItems: NavItemDef[] = [
     href: '/avance', label: 'Avance de obra', icon: 'completado', minLevel: 2,
     section: '/avance',
     children: [
-      { href: '/avance', label: 'Obras / Matriz', exact: true },
-      { href: '/avance?vista=kanban', label: 'Kanban de avance' },
+      // Una sola entrada: la página /avance ya trae el toggle Lista/Matriz/Kanban.
+      { href: '/avance', label: 'Obras', exact: true },
       { href: '/avance/mano-obra', label: 'Mano de Obra' },
-      { href: '/avance/reportes', label: 'Reportes' },
+      // `exact` para que estar en un sub-reporte (/avance/reportes/m2, …) NO marque
+      // también "Reportes" (antes se resaltaban los dos).
+      { href: '/avance/reportes', label: 'Reportes', exact: true },
       { href: '/avance/reportes/mano-obra', label: 'Reporte M.O.' },
       { href: '/avance/reportes/pendientes', label: 'Pendientes' },
       { href: '/avance/reportes/historico', label: 'Histórico' },
