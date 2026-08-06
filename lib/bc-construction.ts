@@ -120,6 +120,20 @@ export async function getObrasConVersion(): Promise<Set<string>> {
   return set;
 }
 
+// Setea el "Área prorrateada" (m²) en la OBRA (GomJob Works) de BC. Complementa
+// setAreaProrrateadaJob (que lo pone en el Job): así el área queda en Obra + Proyecto.
+// Busca el work por N° y hace PATCH con If-Match.
+export async function setAreaProrrateadaWork(worksNo: string, areaProrrateada: number): Promise<void> {
+  const g = await req(`works?$filter=${encodeURIComponent(`no eq '${worksNo}'`)}&$top=1`, { method: 'GET' });
+  const w = ((g?.value ?? []) as Array<{ id?: string; '@odata.etag'?: string }>)[0];
+  if (!w?.id) throw new Error(`La obra ${worksNo} no existe en BC (works)`);
+  await req(`works(${w.id})`, {
+    method: 'PATCH',
+    headers: { 'If-Match': w['@odata.etag'] ?? '*' },
+    body: JSON.stringify({ areaProrrateada }),
+  });
+}
+
 // Sube la versión de presupuesto (líneas venta/costo/indirecto) vía el singleton bulk,
 // y registra la versión. Devuelve la versión creada y los totales recalculados.
 export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[], _verBase?: string | null): Promise<{ versionCode: string; resultado: string; enviadas: number; totals: WorkTotals | null }> {

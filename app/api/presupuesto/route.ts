@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { getDb, sql } from '@/lib/db';
-import { bcConstructionConfigured, subirVersionPresupuesto, subirDescompuesto, getWork, type BulkLine, type DecompLine } from '@/lib/bc-construction';
+import { bcConstructionConfigured, subirVersionPresupuesto, subirDescompuesto, getWork, setAreaProrrateadaWork, type BulkLine, type DecompLine } from '@/lib/bc-construction';
 import { actualizarTareasProyecto, setAreaProrrateadaJob } from '@/lib/bc-client';
 
 export const runtime = 'nodejs';
@@ -86,15 +86,15 @@ export async function POST(req: NextRequest) {
       resultado.tareasProyectoError = e instanceof Error ? e.message : String(e);
     }
 
-    // Área prorrateada (m²): al Job de BC y a la obra de la app (dbo.Obra), para que
-    // se vea en el proyecto y en el detalle de obra. Cada paso es no fatal.
+    // Área prorrateada (m²): al Proyecto (Job) y a la Obra (works) de BC —para que
+    // se vea en los dos— y a la obra de la app (dbo.Obra) para el detalle. Cada
+    // destino es independiente y no fatal (un fallo no tumba la carga ni los otros).
     if (areaProrrateada != null) {
-      try {
-        await setAreaProrrateadaJob(worksNo, areaProrrateada);
-        resultado.areaProrrateada = areaProrrateada;
-      } catch (e) {
-        resultado.areaProrrateadaError = e instanceof Error ? e.message : String(e);
-      }
+      resultado.areaProrrateada = areaProrrateada;
+      try { await setAreaProrrateadaJob(worksNo, areaProrrateada); }
+      catch (e) { resultado.areaJobError = e instanceof Error ? e.message : String(e); }
+      try { await setAreaProrrateadaWork(worksNo, areaProrrateada); }
+      catch (e) { resultado.areaObraError = e instanceof Error ? e.message : String(e); }
       try {
         const db = await getDb();
         await db.request()

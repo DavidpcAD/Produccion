@@ -331,6 +331,9 @@
 .oc-scope .ds-table tbody tr.row-borrador.is-clickable:hover td { background: color-mix(in srgb, var(--ds-color-yellow) 18%, var(--ds-tint-base)); }
 .oc-scope .ds-card.row-borrador { box-shadow: inset 3px 0 0 var(--ds-color-yellow), var(--ds-shadow-01); }
 .oc-scope .ds-num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Tabla con columnas numéricas centradas (ej. detalle de pedido: Solicitado/En orden/Recibido/Por recibir). */
+.oc-scope .ds-table--center-num td.ds-num,
+.oc-scope .ds-table--center-num thead th.ds-num { text-align: center; }
 
 /* Dropdown propio (componente Select): trigger + flecha grande + menú del sistema */
 .oc-scope .ds-select { width: 100%; }

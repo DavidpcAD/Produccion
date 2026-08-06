@@ -72,7 +72,7 @@ export default function PedidoDetallePage() {
 
         <Card className="mt-4" style={{ padding: 0, overflow: "hidden" }}>
           <div className="ds-table-wrap" style={{ boxShadow: "none" }}>
-            <table className="ds-table">
+            <table className="ds-table ds-table--center-num">
               <thead>
                 <tr>
                   <th>Artículo</th><th>Almacén</th><th className="ds-num">Solicitado</th>
