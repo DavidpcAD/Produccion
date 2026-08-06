@@ -755,6 +755,7 @@ export function SolicitudForm({
           <div className="qa-field">
             <label>Cantidad{qaArticulo ? ` (${qaArticulo.unidad})` : ""}</label>
             <input ref={cantRef} className="ds-form-field__input" type="number" min={0} value={qaCantidad} placeholder="0"
+              style={{ textAlign: "center" }}
               onChange={(e) => setQaCantidad(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") agregar(); }} />
           </div>
           <Button onClick={agregar} disabled={!puedeAgregar} style={{ gap: "10px" }}><IconPlus size={20} /> Agregar</Button>
@@ -845,7 +846,7 @@ export function SolicitudForm({
                     <td className="ds-num">
                       <input className="ds-form-field__input" type="number" min={0} value={l.cantidad}
                         onChange={(e) => setLineCantidad(l.key, e.target.value)}
-                        style={{ width: 90, textAlign: "right", padding: "6px 10px" }} />
+                        style={{ width: 90, textAlign: "center", padding: "6px 10px" }} />
                     </td>
                     <td className="ds-muted">{a?.unidad ?? "—"}</td>
                     <td><button className="icon-btn icon-btn--quitar" onClick={() => removeLine(l.key)} aria-label="Quitar" title="Quitar"><IconTrash size={18} /></button></td>

@@ -105,7 +105,10 @@ export function AppShell({ role, children }: { role: Role; children: React.React
   useEffect(() => {
     if (!hydrated) return;
     if (current !== role) setRole(role);
-    if (!usuario && baseSession?.nombre) setUsuario(baseSession.nombre);
+    // El usuario del store debe reflejar SIEMPRE al de la sesión actual, no un valor
+    // viejo cacheado en localStorage de otro login (si no, los pedidos/movimientos
+    // salen atribuidos a la persona anterior — p.ej. "creado por" equivocado).
+    if (baseSession?.nombre && usuario !== baseSession.nombre) setUsuario(baseSession.nombre);
   }, [current, role, hydrated, setRole, usuario, setUsuario, baseSession]);
 
   if (!hydrated || current !== role) {
