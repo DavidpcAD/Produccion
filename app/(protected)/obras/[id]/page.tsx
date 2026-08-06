@@ -50,8 +50,9 @@ const fmtFecha = (v: string | null) => {
 };
 const fmtMonto = (v: number | null) =>
   v == null ? '—' : v.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// 2 decimales EXACTOS como BC (no redondear a colones enteros).
 const fmtCRC = (v: number) =>
-  v.toLocaleString('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 });
+  v.toLocaleString('es-CR', { style: 'currency', currency: 'CRC', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // Resumen de presupuesto de la obra en Business Central (lo que devuelve
 // /api/obras/[id]/presupuesto). cargado=false → aún no se ha presupuestado.

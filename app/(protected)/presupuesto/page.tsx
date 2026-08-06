@@ -28,7 +28,8 @@ interface ResultadoBC {
   resultadoDescompuestoBC?: string;
 }
 
-const crc = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 });
+// 2 decimales EXACTOS como BC (no redondear a colones enteros).
+const crc = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const TIPO_LABEL: Record<string, string> = { Sales: 'Venta', Cost: 'Costo directo', 'Indirect Cost': 'Indirectos', Production: 'Producción' };
 // Solo estos 3 se suben a BC (Producción es base de avance, va aparte — no se muestra).
 const TIPO_SUBIBLES = ['Sales', 'Cost', 'Indirect Cost'];
