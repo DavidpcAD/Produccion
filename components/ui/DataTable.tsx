@@ -44,6 +44,20 @@ const facetedFilter: FilterFn<any> = (row, columnId, filterValue) => {
   return filterValue.includes(v == null ? '' : String(v));
 };
 
+// Normaliza para comparar sin tildes ni mayúsculas.
+const normTxt = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+// Búsqueda global robusta: compara el valor (string O número) de la columna
+// contra el término, sin tildes. Reemplaza a 'includesString' de tanstack, cuyo
+// "qué columnas son buscables" depende del TIPO de la primera fila (si el primer
+// valor es null la columna deja de buscarse — rompía buscar por obra en muestras).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const globalTextFilter: FilterFn<any> = (row, columnId, filterValue) => {
+  const v = row.getValue(columnId);
+  if (v == null) return false;
+  return normTxt(String(v)).includes(normTxt(String(filterValue)));
+};
+
 // Panel de filtro por columna: buscador + "Todos" + lista de valores con checkbox.
 function ColumnFilterPanel({ column, label }: { column: Column<unknown, unknown>; label: string }) {
   const [q, setQ] = useState('');
@@ -127,7 +141,10 @@ export function DataTable<T>({
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    globalFilterFn: 'includesString',
+    globalFilterFn: globalTextFilter,
+    // Cualquier columna con accessor participa en la búsqueda global (no depende
+    // del tipo del primer valor, que antes excluía columnas con primer valor null).
+    getColumnCanGlobalFilter: (col) => !!col.accessorFn,
     defaultColumn: { filterFn: facetedFilter },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
