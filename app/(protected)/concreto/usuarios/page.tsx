@@ -100,7 +100,7 @@ export default function ConcretoUsuariosPage() {
   }
 
   return (
-    <PageShell width="full" className="max-w-4xl">
+    <PageShell width="narrow">
       <PageHeader
         title="Gestión de roles — Concreto"
         subtitle="Asigná o quitá roles de la app (Admin, Operador, Laboratorio, Ingeniería) a usuarios del tenant."
