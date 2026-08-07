@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Select } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
-import type { FiltroVenta, ResumenMes } from '@/lib/avance/reportes';
+import type { FiltroVenta, ResumenMes, ReporteSemanal, ReporteObra, ReporteTotales } from '@/lib/avance/reportes';
 
 /**
  * Reportes de avance — Resumen del Mes (general + financiero). Portado de
@@ -30,6 +30,8 @@ export default function ReportesPage() {
   const [semanaId, setSemanaId] = useState<number | null>(null);
   const [venta, setVenta] = useState<FiltroVenta>('todas');
   const [data, setData] = useState<ResumenMes | null>(null);
+  // Reporte semanal completo (KPIs + detalle por obra) — de /api/avance/reportes.
+  const [reporte, setReporte] = useState<ReporteSemanal | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +58,15 @@ export default function ReportesPage() {
       .then((d) => setData(d.data as ResumenMes))
       .catch((e) => setError(e instanceof Error ? e.message : 'Error al cargar el reporte.'))
       .finally(() => setCargando(false));
+  }, [semanaId, venta]);
+
+  // Reporte semanal completo (KPIs + detalle por obra) de la semana elegida.
+  useEffect(() => {
+    if (!semanaId) return;
+    fetch(`/api/avance/reportes?semana=${semanaId}&venta=${venta}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => setReporte(d.data as ReporteSemanal))
+      .catch(() => setReporte(null));
   }, [semanaId, venta]);
 
   const semanaLabel = (s: SemanaOperativa) =>
@@ -105,8 +116,10 @@ export default function ReportesPage() {
               En <span className="font-semibold text-ds-red">rojo</span>, el valor real quedó por debajo de lo esperado (atrasado). La fila <strong>Diferencia</strong> = real − esperado.
             </p>
           </div>
+          {reporte && <KpisProduccion t={reporte.totales} />}
           <ResumenGeneral data={data} semanaSel={semanaId} />
           <ResumenFinanciero data={data} semanaSel={semanaId} />
+          {reporte && reporte.obras.length > 0 && <DetallePorObra obras={reporte.obras} />}
         </div>
       ) : null}
     </PageShell>
@@ -325,6 +338,123 @@ function ResumenFinanciero({ data, semanaSel }: { data: ResumenMes; semanaSel: n
           </tr>
         </tfoot>
       </table>
+    </section>
+  );
+}
+
+// ------------------------------------------------------------ KPIs (B2)
+
+function fmtM2(n: number): string {
+  return `${n.toLocaleString('es-CR', { maximumFractionDigits: 0 })} m²`;
+}
+
+function Kpi({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: 'pos' | 'neg' }) {
+  return (
+    <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-ds-gray-400">{label}</p>
+      <p className={'text-sub-sm font-bold mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red' : 'text-ds-ink')}>{value}</p>
+      {sub && <p className="text-xs text-ds-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+function KpisProduccion({ t }: { t: ReporteTotales }) {
+  const difCrono = t.crono_real_prom - t.crono_esperado_prom;
+  const difCosto = t.costo_real_prom - t.costo_esperado_prom;
+  return (
+    <section className="space-y-2">
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-ds-gray-500">Indicadores de la semana</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Kpi label="Obras en construcción" value={String(t.construccion)} sub={`${t.trabajando} con trabajo · ${t.en_espera} en espera`} />
+        <Kpi label="Área construida" value={fmtM2(t.area_construida)} sub={`de ${fmtM2(t.area_total)} · faltan ${fmtM2(t.area_por_construir)}`} />
+        <Kpi label="Avance cronograma" value={pct(t.crono_real_prom)} sub={`esperado ${pct(t.crono_esperado_prom)}`} accent={difCrono < 0 ? 'neg' : 'pos'} />
+        <Kpi label="Avance costo" value={pct(t.costo_real_prom)} sub={`esperado ${pct(t.costo_esperado_prom)}`} accent={difCosto < 0 ? 'neg' : 'pos'} />
+        <Kpi label="m² esta semana" value={fmtM2(t.m2_semana)} sub={`esperado ${fmtM2(t.m2_esperado)}`} />
+        <Kpi label="Producido acumulado" value={fmtMonto(t.monto_acumulado)} sub={`de ${fmtMonto(t.presupuesto_total)} · falta ${fmtMonto(t.faltante)}`} />
+        <Kpi label="Venta acumulada" value={fmtMonto(t.venta_acumulada)} />
+        <Kpi label="Utilidad acumulada" value={fmtMonto(t.utilidad_acumulada)} accent={t.utilidad_acumulada >= 0 ? 'pos' : 'neg'} />
+      </div>
+    </section>
+  );
+}
+
+// --------------------------------------------- Detalle por obra (B3 + B4)
+
+function DetallePorObra({ obras }: { obras: ReporteObra[] }) {
+  const [modo, setModo] = useState<'semana' | 'acumulado'>('acumulado');
+  const [q, setQ] = useState('');
+  const acum = modo === 'acumulado';
+  const lista = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const arr = [...obras].sort((a, b) => a.codigo.localeCompare(b.codigo, 'es', { numeric: true }));
+    return term ? arr.filter((o) => o.codigo.toLowerCase().includes(term) || (o.tipo_casa ?? '').toLowerCase().includes(term)) : arr;
+  }, [obras, q]);
+
+  const g = (o: ReporteObra) => ({
+    crono: acum ? o.crono_acumulado : o.crono_semana,
+    costo: acum ? o.costo_acumulado : o.costo_semana,
+    m2: acum ? o.m2_acumulado : o.m2_semana,
+    directo: acum ? o.monto_acumulado : o.monto_semana,
+    indirecto: acum ? o.indirecto_acumulado : o.indirecto_semana,
+    venta: acum ? o.venta_acumulada : o.venta_semana,
+    utilidad: acum ? o.utilidad_acumulada : o.utilidad_semana,
+  });
+
+  return (
+    <section className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
+      <div className="flex flex-wrap items-center gap-3 border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-ds-gray-500">Detalle por obra</span>
+        <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
+          {(['semana', 'acumulado'] as const).map((m) => (
+            <button key={m} onClick={() => setModo(m)}
+              className={'px-3 py-1 rounded-ds text-xs font-semibold capitalize transition ' + (modo === m ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
+              {m}
+            </button>
+          ))}
+        </div>
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar obra…"
+          className="ml-auto h-8 w-48 rounded-ds border border-ds-gray-200 px-3 text-sm focus:border-black focus:outline-none" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-ds-gray-200 bg-ds-gray-50">
+              <th className={`${th} text-left`}>Obra</th>
+              <th className={`${th} text-left`}>Tipo</th>
+              <th className={`${th} text-right`}>Sprint</th>
+              <th className={`${th} text-right`} title="Avance de cronograma">Crono</th>
+              <th className={`${th} text-right`} title="Avance de costo">Costo</th>
+              <th className={`${th} text-right`}>m²</th>
+              <th className={`${th} text-right`} title="Costo directo producido (₡)">Directo</th>
+              <th className={`${th} text-right`} title="Costo indirecto (₡)">Indirecto</th>
+              <th className={`${th} text-right`} title="Venta producida (₡)">Venta</th>
+              <th className={`${th} text-right`} title="Utilidad = venta − directo − indirecto (₡)">Utilidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((o) => {
+              const v = g(o);
+              return (
+                <tr key={o.codigo} className="border-b border-ds-gray-100 last:border-0">
+                  <td className={`${td} font-mono text-xs font-semibold`}>{o.codigo}</td>
+                  <td className={`${td} text-xs text-ds-gray-500`}>{o.tipo_casa ?? '—'}</td>
+                  <td className={`${td} text-right text-xs tabular-nums text-ds-gray-500`}>{o.sprint_actual ?? '—'}/{o.total_sprints}</td>
+                  <td className={`${td} text-right font-mono tabular-nums`}>{pct(v.crono)}</td>
+                  <td className={`${td} text-right font-mono tabular-nums`}>{pct(v.costo)}</td>
+                  <td className={`${td} text-right tabular-nums`}>{v.m2.toLocaleString('es-CR', { maximumFractionDigits: 0 })}</td>
+                  <td className={`${td} text-right font-mono tabular-nums`}>{fmtMonto(v.directo)}</td>
+                  <td className={`${td} text-right font-mono tabular-nums`}>{fmtMonto(v.indirecto)}</td>
+                  <td className={`${td} text-right font-mono tabular-nums`}>{fmtMonto(v.venta)}</td>
+                  <td className={`${td} text-right font-mono tabular-nums font-semibold ${v.utilidad >= 0 ? 'text-brand-dark' : 'text-ds-red'}`}>{fmtMonto(v.utilidad)}</td>
+                </tr>
+              );
+            })}
+            {lista.length === 0 && (
+              <tr><td colSpan={10} className="px-3 py-6 text-center text-sm text-ds-gray-400">Sin obras.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
