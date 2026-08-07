@@ -137,7 +137,12 @@ export default function PesosPage() {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { toast(d.error || 'No se pudieron guardar los pesos', 'error'); return; }
-      toast(`Pesos guardados (${d.guardados ?? cambios.length}).`, 'success');
+      const incompletas: string[] = d.incompletas ?? [];
+      if (incompletas.length > 0) {
+        toast(`Pesos guardados, pero ${incompletas.length} columna(s) no suman 100%: ${incompletas.slice(0, 4).join(' · ')}${incompletas.length > 4 ? ' …' : ''}`, 'warning');
+      } else {
+        toast(`Pesos guardados (${d.guardados ?? cambios.length}).`, 'success');
+      }
       setDirty(false);
     } finally { setSaving(false); }
   }

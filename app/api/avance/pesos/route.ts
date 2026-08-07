@@ -134,7 +134,10 @@ export async function PUT(req: NextRequest) {
       scopeMap.set(r.id, ambito === 'sprint' ? r.sprint_numero : r.partida_id);
     }
 
-    // Validación: cada columna (scope, tipoCasa) debe sumar 100% (± 0.5).
+    // Regla de negocio: cada columna (scope × tipo de casa) debería sumar 100%.
+    // NO es bloqueante: el catálogo puede tener columnas incompletas (0% en sprints
+    // sin pesos aún), y bloquear impediría corregirlas. Se guarda igual y se
+    // devuelven las columnas fuera de 100% como aviso.
     const sumas = new Map<string, number>();
     for (const c of celdas) {
       const scope = scopeMap.get(c.subPartidaId);
@@ -142,18 +145,12 @@ export async function PUT(req: NextRequest) {
       const k = `${scope}|${c.tipoCasa}`;
       sumas.set(k, (sumas.get(k) ?? 0) + c.peso);
     }
-    const malas: string[] = [];
+    const incompletas: string[] = [];
     for (const [k, suma] of sumas) {
       if (Math.abs(suma - 100) > 0.5) {
         const [scope, tc] = k.split('|');
-        malas.push(`${ambito === 'sprint' ? 'Sprint' : 'Partida'} ${scope} · ${tc} = ${suma.toFixed(2)}%`);
+        incompletas.push(`${ambito === 'sprint' ? 'Sprint' : 'Partida'} ${scope} · ${tc} = ${suma.toFixed(2)}%`);
       }
-    }
-    if (malas.length > 0) {
-      return NextResponse.json(
-        { error: `Cada columna debe sumar 100%. Revisá: ${malas.slice(0, 8).join(' · ')}${malas.length > 8 ? ' …' : ''}` },
-        { status: 400 },
-      );
     }
 
     // Bulk upsert con OPENJSON (el scope se re-deriva de la sub-partida en SQL).
@@ -181,7 +178,7 @@ export async function PUT(req: NextRequest) {
           VALUES (src.subPartidaId, src.scope_val, src.tipoCasa, src.peso);
       `);
 
-    return NextResponse.json({ ok: true, guardados: celdas.length });
+    return NextResponse.json({ ok: true, guardados: celdas.length, incompletas });
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
   }
