@@ -198,8 +198,13 @@ export default function PesosPage() {
         <div className="space-y-3">
           {grupos.map(g => {
             const abierto = !colapsados.has(g.id);
-            const totales = tipos.map(t => ({ tc: t.codigo, total: totalColumna(g.filas, t.codigo) }));
-            const todoOk = totales.every(x => Math.abs(x.total - 100) <= TOL);
+            // Una columna (tipo de casa) solo "juega" si al menos una sub-partida del
+            // grupo aplica a ese tipo. Las que no aplican quedan exentas del 100%.
+            const cols = tipos.map(t => {
+              const aplica = g.filas.some(f => f.aplica.includes(t.codigo));
+              return { tc: t.codigo, aplica, total: totalColumna(g.filas, t.codigo) };
+            });
+            const todoOk = cols.filter(c => c.aplica).every(c => Math.abs(c.total - 100) <= TOL);
             return (
               <section key={g.id} className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
                 <button type="button" onClick={() => toggleGrupo(g.id)}
@@ -208,11 +213,12 @@ export default function PesosPage() {
                   <span className="font-bold text-ds-ink">{g.titulo}</span>
                   <span className="text-body-sm text-ds-gray-400 truncate">{g.subtitulo}</span>
                   <span className="ml-auto flex items-center gap-1.5 flex-wrap justify-end">
-                    {totales.map(x => (
+                    {cols.map(x => (
                       <span key={x.tc}
                         className={'text-[11px] font-mono font-semibold rounded-full px-2 py-0.5 ' +
-                          (Math.abs(x.total - 100) <= TOL ? 'bg-brand/20 text-ds-green-ink' : 'bg-ds-red/10 text-ds-red')}>
-                        {x.tc}: {x.total.toFixed(1)}%
+                          (!x.aplica ? 'bg-ds-gray-100 text-ds-gray-400'
+                            : Math.abs(x.total - 100) <= TOL ? 'bg-brand/20 text-ds-green-ink' : 'bg-ds-red/10 text-ds-red')}>
+                        {x.tc}: {x.aplica ? `${x.total.toFixed(1)}%` : 'N/A'}
                       </span>
                     ))}
                     <Icon name={todoOk ? 'completado' : 'alert'} size="sm" color="currentColor" />
@@ -258,12 +264,12 @@ export default function PesosPage() {
                         {/* Fila de totales */}
                         <tr className="border-t-2 border-ds-gray-200 bg-ds-gray-100/40">
                           <td className="px-3 py-2 font-bold text-ds-ink text-xs uppercase" colSpan={ambito === 'partida' ? 3 : 2}>Total</td>
-                          {tipos.map(t => {
-                            const total = totalColumna(g.filas, t.codigo);
-                            const ok = Math.abs(total - 100) <= TOL;
+                          {cols.map(c => {
+                            if (!c.aplica) return <td key={c.tc} className="px-2 py-2 text-center text-xs text-ds-gray-300">—</td>;
+                            const ok = Math.abs(c.total - 100) <= TOL;
                             return (
-                              <td key={t.codigo} className={'px-2 py-2 text-center text-xs font-bold tabular-nums ' + (ok ? 'text-ds-green-ink' : 'text-ds-red')}>
-                                {total.toFixed(2)}%
+                              <td key={c.tc} className={'px-2 py-2 text-center text-xs font-bold tabular-nums ' + (ok ? 'text-ds-green-ink' : 'text-ds-red')}>
+                                {c.total.toFixed(2)}%
                               </td>
                             );
                           })}
