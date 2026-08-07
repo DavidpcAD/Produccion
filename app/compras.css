@@ -436,8 +436,10 @@
 .oc-scope .combo .ds-form-field__input.combo__input { padding-left: 42px; padding-right: 40px; }
 .oc-scope .combo__chev { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--ds-color-gray-400); pointer-events: none; display: inline-flex; transition: transform .15s ease; }
 .oc-scope .combo__chev.is-open { transform: translateY(-50%) rotate(180deg); }
-/* El menú va en un portal (position:fixed): NO lo recorta ningún overflow. */
-.oc-scope .combo__menu { z-index: 60; max-height: 300px; overflow-y: auto; background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-200); border-radius: var(--ds-radius-lg); box-shadow: 0 10px 30px #0000002a; padding: 4px; }
+/* El menú va en un portal (position:fixed): NO lo recorta ningún overflow.
+   z-index 90: por ENCIMA del .modal-overlay (80) para que el dropdown (ej.
+   Variante al armar un pedido) no quede detrás del modal; por debajo del toast (100). */
+.oc-scope .combo__menu { z-index: 90; max-height: 300px; overflow-y: auto; background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-200); border-radius: var(--ds-radius-lg); box-shadow: 0 10px 30px #0000002a; padding: 4px; }
 .oc-scope .combo__item { display: flex; align-items: center; min-height: 42px; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: var(--ds-font-size-label); color: var(--ds-text); }
 .oc-scope .combo__item:hover { background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-tint-base)); }
 .oc-scope .combo__item.is-active { background: color-mix(in srgb, var(--ds-color-green-100) 26%, var(--ds-tint-base)); font-weight: var(--ds-font-weight-semibold); }
