@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { CatalogoTabs } from '@/components/layout/CatalogoTabs';
 import { Button } from '@/components/ui/Button';
@@ -28,6 +28,44 @@ function sumarDias(fecha: string, dias: number): string {
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   d.setUTCDate(d.getUTCDate() + dias);
   return d.toISOString().slice(0, 10);
+}
+
+const RE_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Próximo jueves (YYYY-MM-DD) desde hoy; si hoy es jueves, hoy. */
+function proximoJueves(): string {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const add = (4 - d.getUTCDay() + 7) % 7; // 4 = jueves
+  d.setUTCDate(d.getUTCDate() + add);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Valores por defecto de la próxima semana operativa (Jueves → Miércoles). La
+ * semana operativa de Adelante corre de jueves a miércoles y se numera de forma
+ * secuencial, así que el default se calcula a partir de la ÚLTIMA semana
+ * registrada (fin + 1 día = jueves; nº + 1). Si no hay semanas, cae al próximo
+ * jueves con nº ISO.
+ */
+function defaultsSemana(
+  semanas: { fecha_fin: string; numero_semana: number; anio: number }[],
+): { inicio: string; fin: string; anio: string; numero: string } {
+  const ref = semanas[0]; // la API devuelve ORDER BY fecha_inicio DESC → la más reciente
+  let inicio: string;
+  let numero: number | '';
+  let anio: number;
+  if (ref && RE_FECHA.test(ref.fecha_fin)) {
+    inicio = sumarDias(ref.fecha_fin, 1); // jueves siguiente al miércoles de cierre
+    anio = Number(inicio.slice(0, 4));
+    numero = anio !== ref.anio ? 1 : ref.numero_semana + 1; // reinicia al cambiar de año
+  } else {
+    inicio = proximoJueves();
+    const iso = isoSemana(inicio);
+    anio = iso?.anio ?? Number(inicio.slice(0, 4));
+    numero = iso?.numero ?? '';
+  }
+  return { inicio, fin: sumarDias(inicio, 6), anio: String(anio), numero: String(numero) };
 }
 
 /**
@@ -81,22 +119,46 @@ function SeccionSemanas() {
 
   const abierta = semanas.find((s) => s.estado === 'abierta') ?? null;
 
-  // Al elegir la fecha de inicio, autocompleta fin (+6), año y nº de semana ISO.
+  // Prefill de la próxima semana (Jueves → Miércoles + año + nº) una vez cargadas
+  // las semanas, si el formulario está vacío. Se recalcula al recargar si el
+  // usuario no tocó nada (p. ej. tras abrir/cerrar una semana).
+  const prellenado = useRef(false);
+  useEffect(() => {
+    if (cargando || prellenado.current) return;
+    if (!inicio) {
+      const d = defaultsSemana(semanas);
+      setInicio(d.inicio);
+      setFin(d.fin);
+      setAnio(d.anio);
+      setNumero(d.numero);
+    }
+    prellenado.current = true;
+  }, [cargando, semanas, inicio]);
+
+  // Al cambiar la fecha de inicio, autocompleta fin (+6) y año; conserva el nº
+  // secuencial ya prellenado (solo lo deriva por ISO si estuviera vacío).
   function onInicio(v: string) {
     setInicio(v);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    if (RE_FECHA.test(v)) {
       setFin(sumarDias(v, 6));
-      const iso = isoSemana(v);
-      if (iso) {
-        setAnio(String(iso.anio));
-        setNumero(String(iso.numero));
+      setAnio(String(Number(v.slice(0, 4))));
+      if (!numero) {
+        const iso = isoSemana(v);
+        if (iso) setNumero(String(iso.numero));
       }
     }
   }
 
   async function abrir() {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fin)) {
+    if (abierta) {
+      return toast('Ya hay una semana abierta. Cerrala (en Programación) antes de abrir otra.', 'error');
+    }
+    if (!RE_FECHA.test(inicio) || !RE_FECHA.test(fin)) {
       return toast('Indicá fecha de inicio y fin (YYYY-MM-DD).', 'error');
+    }
+    const nd = Number(dias);
+    if (!Number.isInteger(nd) || nd < 1 || nd > 7) {
+      return toast('Días efectivos debe ser un entero entre 1 y 7.', 'error');
     }
     setGuardando(true);
     try {
@@ -120,6 +182,7 @@ function SeccionSemanas() {
       setNumero('');
       setDias('5');
       setDesc('');
+      prellenado.current = false; // que el prefill recalcule la próxima semana
       recargar();
     } catch (e) {
       toast(`No se pudo abrir: ${e instanceof Error ? e.message : e}`, 'error');
@@ -158,8 +221,9 @@ function SeccionSemanas() {
     <section className="mb-8">
       <h2 className="mb-1 text-sub-sm font-bold">Semanas operativas</h2>
       <p className="mb-4 text-sm text-ds-gray-500">
-        Solo una semana puede estar <strong>abierta</strong> a la vez. Abrir una fija la línea base
-        (foto del avance) para medir el logrado de la semana desde ahí.
+        La semana corre de <strong>jueves a miércoles</strong>. Solo una puede estar{' '}
+        <strong>abierta</strong> a la vez: hay que cerrar la anterior (desde Programación) antes de
+        abrir otra. Abrir una fija la línea base (foto del avance) para medir el logrado desde ahí.
       </p>
 
       {/* Abrir nueva semana */}
@@ -173,7 +237,7 @@ function SeccionSemanas() {
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Input
-            label="Fecha inicio (lunes)"
+            label="Fecha inicio (jueves)"
             type="date"
             value={inicio}
             onChange={(e) => onInicio(e.target.value)}
