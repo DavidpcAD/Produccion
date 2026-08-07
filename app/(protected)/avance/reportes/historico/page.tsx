@@ -147,7 +147,7 @@ export default function ReporteHistoricoPage() {
           <span className="inline-flex items-center gap-1.5" title="En proceso, entre 1% y 99%"><span style={{ width: 14, height: 14, borderRadius: 4, background: CELDA.avance }} aria-hidden />En avance</span>
           <span className="inline-flex items-center gap-1.5" title="Aplica a la obra pero aún sin avance (0%)"><span style={{ width: 14, height: 14, borderRadius: 4, background: CELDA.pendiente, border: '1px solid var(--ds-color-gray-200)' }} aria-hidden />Pendiente (0%)</span>
           <span className="inline-flex items-center gap-1.5" title="No aplica a esa obra o sin dato"><span style={{ width: 14, height: 14, borderRadius: 4, border: '1px solid var(--ds-color-gray-200)' }} aria-hidden />No aplica</span>
-          <span className="inline-flex items-center gap-1.5" title="Sub-partida que avanzó justo en la semana elegida"><span style={{ width: 14, height: 14, borderRadius: 4, background: CELDA.completo, outline: '2px solid var(--color-brand, #add010)', outlineOffset: 1 }} aria-hidden />Avanzó esta semana</span>
+          <span className="inline-flex items-center gap-1.5" title="Sub-partida que avanzó justo en la semana elegida"><span style={{ width: 14, height: 14, borderRadius: 4, background: CELDA.completo, outline: '2px solid var(--color-brand)', outlineOffset: 1 }} aria-hidden />Avanzó esta semana</span>
         </div>
       )}
 
@@ -174,8 +174,8 @@ export default function ReporteHistoricoPage() {
 
 // Color de celda = % de avance. Distingue 0% (aplica sin avance) de "no aplica".
 const CELDA = {
-  completo: 'var(--color-brand, #add010)',
-  avance: 'color-mix(in srgb, var(--color-brand, #add010) 35%, #fff)',
+  completo: 'var(--color-brand)',
+  avance: 'color-mix(in srgb, var(--color-brand) 35%, #fff)',
   pendiente: 'color-mix(in srgb, var(--ds-color-gray-400) 20%, transparent)',
 };
 function colorPct(pct: number | null): string {
@@ -270,7 +270,7 @@ function GrupoFilas({
             const marc = avanzo(o.codigo, s.id);
             return (
               <td key={o.codigo} className="border-l border-ds-gray-100 px-1 py-1 text-center tabular-nums"
-                style={{ background: colorPct(pct), outline: marc ? '2px solid var(--color-brand, #add010)' : undefined, outlineOffset: -2 }}
+                style={{ background: colorPct(pct), outline: marc ? '2px solid var(--color-brand)' : undefined, outlineOffset: -2 }}
                 title={`${o.codigo} · ${s.codigo}: ${pct == null ? 's/d' : Math.round(pct) + '%'}`}>
                 {pct == null ? '' : Math.round(pct)}
               </td>
