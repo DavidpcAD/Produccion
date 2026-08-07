@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { ActividadLab, MuestraListadoItem } from '@/lib/concreto/tipos';
+import { evaluarMuestraCumplimiento, CUMPLIMIENTO_META } from '@/lib/concreto/evaluacion-resistencia';
 import {
   CATEGORIAS_CONCRETO,
   PLANTAS_LAB,
@@ -129,6 +130,16 @@ export default function LaboratorioPage() {
             ))}
           </div>
         );
+      },
+    }),
+    // Cumplimiento (peor ensayo vs curva teórica × F'C). Accessor = etiqueta →
+    // se puede buscar/filtrar; la celda pinta el badge de color.
+    col.accessor((m) => CUMPLIMIENTO_META[evaluarMuestraCumplimiento(m.ensayos, m.fc_objetivo)].label, {
+      id: 'cumplimiento', header: 'Cumplimiento', meta: { label: 'Cumplimiento' },
+      cell: ({ row }) => {
+        const ev = evaluarMuestraCumplimiento(row.original.ensayos, row.original.fc_objetivo);
+        const meta = CUMPLIMIENTO_META[ev];
+        return <Badge variant={meta.variant}>{meta.label}</Badge>;
       },
     }),
   ];
