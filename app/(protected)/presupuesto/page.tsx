@@ -9,7 +9,11 @@ import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 
-interface Obra { idObra: number; numeroObra: string; nombreMostrado: string }
+interface Obra { idObra: number; numeroObra: string; nombreMostrado: string; areaProrrateadaM2?: number | null }
+// Resumen del presupuesto ya cargado en BC para la obra elegida (misma forma que
+// /api/obras/[id]/presupuesto). Sirve para avisar que la obra YA tiene presupuesto
+// y con qué versión (REESTUDIO…), antes de subir otro.
+interface PresupExistente { cargado: boolean; version: string | null; venta: number; coste: number; indirecto: number; resultado: number }
 interface Linea { taskNo: string; taskType?: string; description: string; lineAmount?: number; unitCost?: number; no?: string }
 interface PlantillaParsed { archivo: string; porTipo: Record<string, Linea[]>; totales: Record<string, number>; hojas: string[] }
 interface DescParsed { archivo: string; hoja: string | null; lineas: Linea[] }
@@ -163,16 +167,51 @@ export default function PresupuestoPage() {
   const plantillaFile = useRef<HTMLInputElement>(null);
   const descFile = useRef<HTMLInputElement>(null);
 
+  // Presupuesto ya cargado en BC para la obra elegida (aviso "ya tiene REESTUDIO…").
+  const [presupExistente, setPresupExistente] = useState<PresupExistente | null>(null);
+  const [presupExistenteLoading, setPresupExistenteLoading] = useState(false);
+
   const obra = obras.find(o => String(o.idObra) === obraId);
 
-  // Al cambiar de obra, lo subido/mostrado ya no aplica.
-  useEffect(() => { setSubido({}); setResultado(null); setAreaPror(''); }, [obraId]);
+  // Al cambiar de obra: resetea lo subido y precarga el área prorrateada que ya
+  // tenga la obra (si existe), para no re-teclearla.
+  useEffect(() => {
+    setSubido({}); setResultado(null);
+    const sel = obras.find(o => String(o.idObra) === obraId);
+    setAreaPror(sel?.areaProrrateadaM2 != null ? String(sel.areaProrrateadaM2) : '');
+  }, [obraId, obras]);
+
+  // Al elegir obra, consultar si ya tiene presupuesto vigente en BC (y su versión).
+  useEffect(() => {
+    if (!obraId) { setPresupExistente(null); return; }
+    let cancel = false;
+    setPresupExistenteLoading(true);
+    setPresupExistente(null);
+    fetch(`/api/obras/${obraId}/presupuesto`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: PresupExistente | null) => { if (!cancel) setPresupExistente(d); })
+      .catch(() => { if (!cancel) setPresupExistente(null); })
+      .finally(() => { if (!cancel) setPresupExistenteLoading(false); });
+    return () => { cancel = true; };
+  }, [obraId]);
 
   const load = useCallback(async () => {
     const o = await fetch('/api/obras?porPagina=1000').then(r => (r.ok ? r.json() : null)).catch(() => null);
     if (o) setObras(o.data ?? []);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // Preselección de obra vía ?obra=<idObra> (ej. al venir de "Cargar presupuesto"
+  // del detalle de la obra). Solo aplica una vez, cuando ya cargaron las obras.
+  const preseleccionado = useRef(false);
+  useEffect(() => {
+    if (preseleccionado.current || obras.length === 0) return;
+    const pedido = new URLSearchParams(window.location.search).get('obra');
+    if (pedido && obras.some(o => String(o.idObra) === pedido)) {
+      setObraId(pedido);
+      preseleccionado.current = true;
+    }
+  }, [obras]);
 
   // Lee UN archivo a la vez (General o Descompuesto) sin borrar lo otro que ya esté
   // cargado. El endpoint /parse auto-detecta el tipo por contenido, así que aplicamos
@@ -311,6 +350,34 @@ export default function PresupuestoPage() {
           />
           <p className="text-ds-gray-400 text-xs mt-1">Se guarda en el proyecto (Job) de BC y en la obra al subir el presupuesto.</p>
         </div>
+
+        {/* Aviso: la obra YA tiene presupuesto vigente en BC (versión + montos). */}
+        {obraId && presupExistenteLoading && (
+          <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-gray-100 px-4 py-2.5 text-sm text-ds-gray-500">
+            Consultando si la obra ya tiene presupuesto en Business Central…
+          </div>
+        )}
+        {obraId && !presupExistenteLoading && presupExistente?.cargado && (
+          <div className="rounded-ds-lg border border-amber-300 bg-amber-50 px-4 py-3 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Icon name="boleta" size="sm" color="currentColor" />
+              <span className="text-sm font-semibold text-ds-ink">Esta obra ya tiene presupuesto en BC</span>
+              {presupExistente.version && (
+                <span className="text-xs font-bold text-ds-ink bg-white/70 border border-amber-300 rounded-full px-2.5 py-0.5">
+                  {presupExistente.version}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <MetricBC label="Venta" value={crc.format(presupExistente.venta)} />
+              <MetricBC label="Coste directo" value={crc.format(presupExistente.coste)} />
+              <MetricBC label="Coste indirecto" value={crc.format(presupExistente.indirecto)} />
+              <MetricBC label="Resultado" value={crc.format(presupExistente.resultado)} accent={presupExistente.resultado >= 0 ? 'pos' : 'neg'} />
+            </div>
+            <p className="text-xs text-amber-700">Subir un nuevo General crea otra versión (REESTUDIO+1). El descompuesto se agrega — ojo con duplicar materiales.</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">
             <div>

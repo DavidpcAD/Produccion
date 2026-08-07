@@ -240,7 +240,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
         <div className="px-4 py-4 flex flex-col items-start gap-2.5">
           <span className="text-ds-gray-500">Sin presupuesto cargado en BC.</span>
           {isAdmin && (
-            <Button size="sm" variant="outline" onClick={() => router.push('/presupuesto')}
+            <Button size="sm" variant="outline" onClick={() => router.push(`/presupuesto?obra=${obra.idObra}`)}
               icon={<Icon name="boleta" size="sm" color="currentColor" />}>
               Cargar presupuesto
             </Button>
