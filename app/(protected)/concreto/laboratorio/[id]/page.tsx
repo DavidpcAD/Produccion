@@ -427,7 +427,7 @@ function GraficoResistencia({
       <div className="flex items-center gap-4 mt-1 text-xs text-ds-gray-400 pl-12">
         <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 h-0.5 bg-[#94A3B8]" /> Teórica (ASTM C-150)</span>
         <span className="inline-flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-brand" /> Real</span>
-        <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 border-t border-dashed border-red-500" /> {`F'C objetivo`}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 border-t border-dashed border-ds-red" /> {`F'C objetivo`}</span>
       </div>
     </div>
   );

@@ -230,7 +230,7 @@ function SeccionSemanas() {
       <div className="mb-6 rounded-ds border border-ds-gray-200 p-4">
         <h3 className="mb-3 text-sm font-semibold">Abrir nueva semana</h3>
         {abierta && (
-          <p className="mb-3 rounded-ds bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <p className="mb-3 rounded-ds bg-ds-yellow/10 px-3 py-2 text-xs text-ds-yellow-ink">
             Hay una semana abierta (Semana {abierta.numero_semana}/{abierta.anio}). Debe cerrarse
             antes de abrir otra.
           </p>
@@ -447,7 +447,7 @@ function SeccionSprints() {
               sprints.map((s) => (
                 <tr
                   key={s.numero_global}
-                  className={`border-t border-ds-gray-100 ${s.es_espera ? 'bg-violet-50' : ''}`}
+                  className={`border-t border-ds-gray-100 ${s.es_espera ? 'bg-ds-yellow/10' : ''}`}
                 >
                   <td className="px-3 py-2 text-center font-mono font-semibold tabular-nums">
                     {s.numero_global}
@@ -464,7 +464,7 @@ function SeccionSprints() {
                       checked={s.es_espera}
                       disabled={guardando === s.numero_global}
                       onChange={(e) => toggleEspera(s, e.target.checked)}
-                      className="h-4 w-4 accent-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+                      className="h-4 w-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
                     />
                   </td>
                 </tr>

@@ -598,7 +598,7 @@ function ObraCard(p: CardProps) {
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-xs font-medium text-ds-ink">
                               <span className="font-mono">{sp.codigo}</span> · {sp.nombre}
-                              {sp.es_critica && <span className="ml-1 text-[10px] font-bold text-amber-600">crítica</span>}
+                              {sp.es_critica && <span className="ml-1 text-[10px] font-bold text-ds-yellow-ink">crítica</span>}
                             </p>
                             <span
                               className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${

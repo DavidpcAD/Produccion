@@ -72,7 +72,7 @@ export function CongelarObraDialog({ codigo, causas, pending, onClose, onConfirm
                   onClick={() => setCausaSel(c.codigo)}
                   className={`flex items-center gap-2 rounded-ds border px-3 py-2.5 text-left text-sm transition-colors ${
                     activa
-                      ? 'border-amber-400 bg-amber-50 text-amber-900'
+                      ? 'border-ds-yellow/50 bg-ds-yellow/10 text-ds-yellow-ink'
                       : 'border-ds-gray-200 bg-ds-surface hover:bg-ds-gray-100/50'
                   }`}
                 >

@@ -358,12 +358,12 @@ export default function PresupuestoPage() {
           </div>
         )}
         {obraId && !presupExistenteLoading && presupExistente?.cargado && (
-          <div className="rounded-ds-lg border border-amber-300 bg-amber-50 px-4 py-3 space-y-2">
+          <div className="rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow/10 px-4 py-3 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Icon name="boleta" size="sm" color="currentColor" />
               <span className="text-sm font-semibold text-ds-ink">Esta obra ya tiene presupuesto en BC</span>
               {presupExistente.version && (
-                <span className="text-xs font-bold text-ds-ink bg-white/70 border border-amber-300 rounded-full px-2.5 py-0.5">
+                <span className="text-xs font-bold text-ds-ink bg-white/70 border border-ds-yellow/50 rounded-full px-2.5 py-0.5">
                   {presupExistente.version}
                 </span>
               )}
@@ -374,7 +374,7 @@ export default function PresupuestoPage() {
               <MetricBC label="Coste indirecto" value={crc.format(presupExistente.indirecto)} />
               <MetricBC label="Resultado" value={crc.format(presupExistente.resultado)} accent={presupExistente.resultado >= 0 ? 'pos' : 'neg'} />
             </div>
-            <p className="text-xs text-amber-700">Subir un nuevo General crea otra versión (REESTUDIO+1). El descompuesto se agrega — ojo con duplicar materiales.</p>
+            <p className="text-xs text-ds-yellow-ink">Subir un nuevo General crea otra versión (REESTUDIO+1). El descompuesto se agrega — ojo con duplicar materiales.</p>
           </div>
         )}
 

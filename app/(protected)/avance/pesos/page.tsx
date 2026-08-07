@@ -188,7 +188,7 @@ export default function PesosPage() {
       </div>
 
       {dirty && (
-        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-ds px-3 py-1.5 w-fit">
+        <p className="text-xs text-ds-yellow-ink bg-ds-yellow/10 border border-ds-yellow/40 rounded-ds px-3 py-1.5 w-fit">
           Hay cambios sin guardar.
         </p>
       )}
