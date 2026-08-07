@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
@@ -17,6 +17,8 @@ interface Proyecto {
   TotalPersonas: number;
   FechaInicio: string;
   FechaFinEstimada: string;
+  Activo: boolean;
+  EsProductivo: boolean;
 }
 
 export default function ProyectosPage() {
@@ -24,21 +26,41 @@ export default function ProyectosPage() {
   const { toast } = useToast();
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
+  // Filtro: por defecto solo activos; "Todos" incluye inactivos.
+  const [verTodos, setVerTodos] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/proyectos')
+  const load = useCallback((incluirInactivos: boolean) => {
+    setLoading(true);
+    fetch(`/api/proyectos${incluirInactivos ? '?incluirInactivos=1' : ''}`)
       .then(r => r.json())
       .then(d => setProyectos(d.data ?? []))
       .catch(() => toast('Error cargando proyectos', 'error'))
       .finally(() => setLoading(false));
   }, [toast]);
 
+  useEffect(() => { load(verTodos); }, [load, verTodos]);
+
   const estadoVariant = (e: string): 'green' | 'gray' =>
     e === 'Activo' || e === 'Open' ? 'green' : 'gray';
 
+  const activosCount = proyectos.filter(p => p.Activo).length;
+
   return (
     <PageShell>
-      <PageHeader title="Proyectos" subtitle={`${proyectos.length} proyectos activos`} />
+      <PageHeader
+        title="Proyectos"
+        subtitle={`${activosCount} proyectos activos${verTodos && proyectos.length > activosCount ? ` · ${proyectos.length - activosCount} inactivos` : ''}`}
+        actions={
+          <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
+            {([['Activos', false], ['Todos', true]] as const).map(([label, val]) => (
+              <button key={label} onClick={() => setVerTodos(val)}
+                className={'px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (verTodos === val ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
+                {label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -63,13 +85,17 @@ export default function ProyectosPage() {
               key={p.IDProyecto}
               variants={listItem}
               onClick={() => router.push(`/proyectos/${p.IDProyecto}`)}
-              className="group bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 text-left hover:border-black hover:shadow-ds-03 transition-all duration-200 hover:-translate-y-0.5"
+              className={'group bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 text-left hover:border-black hover:shadow-ds-03 transition-all duration-200 hover:-translate-y-0.5 ' + (p.Activo ? '' : 'opacity-60')}
             >
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start justify-between mb-3 gap-2">
                 <div className="w-10 h-10 rounded-ds bg-black flex items-center justify-center shrink-0 shadow-ds-02">
                   <Icon name="folder" size="md" color="currentColor" className="text-brand" />
                 </div>
-                {p.Estado && <Badge variant={estadoVariant(p.Estado)}>{p.Estado}</Badge>}
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  {p.EsProductivo && <Badge variant="green">Producción</Badge>}
+                  {!p.Activo && <Badge variant="red">Inactivo</Badge>}
+                  {p.Estado && <Badge variant={estadoVariant(p.Estado)}>{p.Estado}</Badge>}
+                </div>
               </div>
               <h3 className="font-bold text-ds-ink mb-1 line-clamp-2 text-sm">{p.Nombre}</h3>
               <p className="text-xs text-ds-gray-400 mb-4 font-mono">{p.CodigoBC}</p>

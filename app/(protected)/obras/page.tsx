@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +24,7 @@ interface Obra {
   proyectoPadre: string | null;
   idProyecto: number | null;
   proyectoNombre: string | null;
+  proyectoProductivo: boolean | null;
   gerenteProyecto: string | null;
   idEncargado: string | null;
   ubicacion: string | null;
@@ -76,6 +77,14 @@ export default function ObrasPage() {
   const [grupoOpts, setGrupoOpts] = useState<ComboOption[]>(GRUPOS_INVENTARIO.map(g => ({ value: g, label: g })));
 
   const isAdmin = !!session && session.nivelAdmin >= 2;
+
+  // Filtro por proyecto productivo (pertenece a Producción). Se filtra en cliente
+  // sobre las obras ya cargadas (la lista trae proyectoProductivo por obra).
+  const [filtroProd, setFiltroProd] = useState<'todas' | 'produccion'>('todas');
+  const obrasVisibles = useMemo(
+    () => (filtroProd === 'produccion' ? obras.filter(o => o.proyectoProductivo) : obras),
+    [obras, filtroProd],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -259,12 +268,24 @@ export default function ObrasPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Obras" subtitle={`${obras.length} obras`}
-        actions={isAdmin ? <Button onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva obra</Button> : undefined} />
+      <PageHeader title="Obras" subtitle={`${obrasVisibles.length} obras${filtroProd === 'produccion' ? ' de Producción' : ''}`}
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
+              {([['Todas', 'todas'], ['Producción', 'produccion']] as const).map(([label, val]) => (
+                <button key={val} onClick={() => setFiltroProd(val)}
+                  className={'px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (filtroProd === val ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {isAdmin && <Button onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva obra</Button>}
+          </div>
+        } />
 
       <DataTable
         columns={columns}
-        data={obras}
+        data={obrasVisibles}
         loading={loading}
         onRowClick={o => router.push(`/obras/${o.idObra}`)}
         searchPlaceholder="Buscar por número, nombre o centro de costo…"

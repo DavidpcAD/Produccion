@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     .query(`
       SELECT o.idObra, o.numeroObra, o.nombreMostrado, o.descripcion, o.centroCosto,
              o.areaCosteo, o.proyectoPadre, o.idProyecto, pr.nombre AS proyectoNombre,
+             pr.esProductivo AS proyectoProductivo,
              o.gerenteProyecto, o.idEncargado, o.ubicacion,
              o.estado, o.fechaInicio, o.fechaFin, o.areaProrrateadaM2,
              o.precioNormalMaquinaria, o.precioConcretoMaquinaria, o.origenPrincipal,

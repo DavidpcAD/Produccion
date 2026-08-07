@@ -23,7 +23,7 @@ interface Asignacion {
   Activo: boolean;
   FechaAsignacion: string;
 }
-interface Proyecto { IDProyecto: number; CodigoBC: string; Nombre: string; Estado: string; asignaciones: Asignacion[]; }
+interface Proyecto { IDProyecto: number; CodigoBC: string; Nombre: string; Estado: string; Activo: boolean; EsProductivo: boolean; asignaciones: Asignacion[]; }
 interface Colaborador { IDCol: number; NombreCompleto: string; Cedula: string; }
 
 export default function ProyectoDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -80,6 +80,21 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
     await load();
   }
 
+  const [patching, setPatching] = useState(false);
+  // Marca/inactiva el proyecto (esProductivo / activo) y refresca.
+  async function patchProyecto(campos: { esProductivo?: boolean; activo?: boolean }, okMsg: string) {
+    setPatching(true);
+    try {
+      const res = await fetch(`/api/proyectos/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(campos),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(data.error || 'No se pudo actualizar el proyecto', 'error'); return; }
+      toast(okMsg, 'success');
+      await load();
+    } finally { setPatching(false); }
+  }
+
   if (loading || !proyecto) return (
     <div className="p-6 max-w-[1200px] mx-auto">
       <Skeleton className="h-8 w-1/3 mb-4" rounded="rounded-full" />
@@ -109,7 +124,8 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-heading font-bold text-ds-ink">{proyecto.Nombre}</h1>
             <Badge variant="gray">{proyecto.CodigoBC}</Badge>
-            <Badge variant="green">{proyecto.Estado}</Badge>
+            {proyecto.EsProductivo && <Badge variant="green">Producción</Badge>}
+            {!proyecto.Activo && <Badge variant="red">Inactivo</Badge>}
           </div>
         }
         subtitle={
@@ -119,9 +135,21 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
           </span>
         }
         actions={session && session.nivelAdmin >= 2 && (
-          <Button onClick={() => setModalOpen(true)} icon={<Icon name="user" size="sm" color="currentColor" />}>
-            Asignar persona
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" loading={patching}
+              onClick={() => patchProyecto({ esProductivo: !proyecto.EsProductivo }, proyecto.EsProductivo ? 'Proyecto ya no es de Producción' : 'Proyecto marcado como de Producción')}
+              icon={<Icon name={proyecto.EsProductivo ? 'remove' : 'check'} size="sm" color="currentColor" />}>
+              {proyecto.EsProductivo ? 'Quitar de Producción' : 'Marcar Producción'}
+            </Button>
+            <Button variant={proyecto.Activo ? 'danger' : 'primary'} loading={patching}
+              onClick={() => patchProyecto({ activo: !proyecto.Activo }, proyecto.Activo ? 'Proyecto inactivado' : 'Proyecto activado')}
+              icon={<Icon name={proyecto.Activo ? 'remove' : 'check'} size="sm" color="currentColor" />}>
+              {proyecto.Activo ? 'Inactivar' : 'Activar'}
+            </Button>
+            <Button onClick={() => setModalOpen(true)} icon={<Icon name="user" size="sm" color="currentColor" />}>
+              Asignar persona
+            </Button>
+          </div>
         )}
       />
 
