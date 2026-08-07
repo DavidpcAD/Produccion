@@ -181,7 +181,7 @@ export default function LoginPage() {
             {devUsers.length > 0 && (
               <div className="mt-8 pt-6 border-t border-dashed border-ds-gray-200">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-ds bg-amber-100 text-amber-700 text-xs font-bold uppercase tracking-wide">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-ds bg-ds-yellow/15 text-ds-yellow-ink text-xs font-bold uppercase tracking-wide">
                     <Wrench size={12} weight="bold" /> Dev
                   </span>
                   <span className="text-xs text-ds-gray-400">Acceso rápido sin contraseña (AdelanteSBX)</span>
