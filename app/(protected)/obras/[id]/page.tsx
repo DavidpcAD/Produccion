@@ -65,6 +65,15 @@ interface PresupBC {
   resultado: number;
 }
 
+// Detalle del presupuesto por partida/grupo (pro_bi.fact_presupuesto).
+interface PresupDetalle {
+  cargado: boolean;
+  version: string | null;
+  total: number;
+  grupos: { nombre: string; monto: number; peso: number }[];
+  partidas: { codigo: string; nombre: string; grupo: string; monto: number; peso: number }[];
+}
+
 // Chip de estado de la obra: relleno suave y en español (Abierta / Bloqueada).
 function EstadoObra({ estado }: { estado: string | null }) {
   if (!estado) return null;
@@ -111,6 +120,10 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
   const [obra, setObra] = useState<Obra | null>(null);
   const [presup, setPresup] = useState<PresupBC | null>(null);
   const [presupLoading, setPresupLoading] = useState(true);
+  // Detalle del presupuesto por partida (modal, carga bajo demanda).
+  const [detalle, setDetalle] = useState<PresupDetalle | null>(null);
+  const [detalleOpen, setDetalleOpen] = useState(false);
+  const [detalleLoading, setDetalleLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [proyectos, setProyectos] = useState<{ IDProyecto: number; Nombre: string; CodigoBC: string }[]>([]);
@@ -144,6 +157,20 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
       .catch(() => setPresup(null))
       .finally(() => setPresupLoading(false));
   }, [id]);
+
+  async function verDetallePresup() {
+    setDetalleOpen(true);
+    if (detalle) return;
+    setDetalleLoading(true);
+    try {
+      const d = await fetch(`/api/obras/${id}/presupuesto-detalle`).then(r => (r.ok ? r.json() : null));
+      setDetalle(d);
+    } catch {
+      setDetalle(null);
+    } finally {
+      setDetalleLoading(false);
+    }
+  }
 
   const estaBloqueada = (obra?.estado ?? '').toLowerCase() === 'blocked';
 
@@ -235,6 +262,11 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
           <Campo label="Importe coste directo" value={fmtCRC(presup.coste)} />
           <Campo label="Importe coste indirecto" value={fmtCRC(presup.indirecto)} />
           <Campo label="Resultado" value={<span className={presup.resultado >= 0 ? 'text-ds-green-ink' : 'text-ds-red'}>{fmtCRC(presup.resultado)}</span>} />
+          <div className="px-4 py-3">
+            <Button size="sm" variant="outline" onClick={verDetallePresup} icon={<Icon name="boleta" size="sm" color="currentColor" />}>
+              Ver detalle por partida
+            </Button>
+          </div>
         </>
       ) : (
         <div className="px-4 py-4 flex flex-col items-start gap-2.5">
@@ -328,6 +360,78 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
         proyectos={proyectos}
         onSaved={load}
       />
+
+      {/* Modal: detalle del presupuesto por partida (pro_bi.fact_presupuesto) */}
+      <Modal
+        open={detalleOpen}
+        onClose={() => setDetalleOpen(false)}
+        title={`Detalle del presupuesto${detalle?.version ? ` · ${detalle.version}` : ''}`}
+        size="lg"
+        footer={<Button variant="outline" onClick={() => setDetalleOpen(false)}>Cerrar</Button>}
+      >
+        {detalleLoading ? (
+          <div className="py-10 text-center text-ds-gray-400">Consultando el presupuesto…</div>
+        ) : detalle?.cargado ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between rounded-ds bg-ds-gray-100 px-4 py-3">
+              <span className="text-sm text-ds-gray-500">Total presupuestado (costo directo)</span>
+              <span className="font-bold text-ds-ink">{fmtCRC(detalle.total)}</span>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-bold text-ds-ink">Resumen por grupos</h3>
+              <div className="overflow-hidden rounded-ds border border-ds-gray-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-ds-gray-100/60 text-left">
+                    <tr>
+                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ds-gray-500">Grupo</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-ds-gray-500">Total</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-ds-gray-500">Peso %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detalle.grupos.map((g) => (
+                      <tr key={g.nombre} className="border-t border-ds-gray-100">
+                        <td className="px-3 py-1.5 text-ds-ink">{g.nombre}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">{fmtCRC(g.monto)}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums text-ds-gray-500">{g.peso.toFixed(2)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-bold text-ds-ink">Detalle de partidas</h3>
+              <div className="overflow-hidden rounded-ds border border-ds-gray-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-ds-gray-100/60 text-left">
+                    <tr>
+                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ds-gray-500">Código</th>
+                      <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ds-gray-500">Partida</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-ds-gray-500">Importe</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-ds-gray-500">Peso %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detalle.partidas.map((p) => (
+                      <tr key={p.codigo} className="border-t border-ds-gray-100">
+                        <td className="px-3 py-1.5 font-mono text-xs text-ds-gray-500">{p.codigo}</td>
+                        <td className="px-3 py-1.5 text-ds-ink">{p.nombre}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">{fmtCRC(p.monto)}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums text-ds-gray-500">{p.peso.toFixed(2)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="py-10 text-center text-ds-gray-400">No hay detalle de presupuesto para esta obra.</div>
+        )}
+      </Modal>
 
       {/* Modal: bloquear obra (elegir Postventa) */}
       <Modal
