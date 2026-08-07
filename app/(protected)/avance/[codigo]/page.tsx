@@ -221,6 +221,18 @@ export default function AvanceCapturaPage() {
         />
       </div>
 
+      {!loading && !error && avance && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-ds-gray-500">
+          <span className="font-semibold text-ds-gray-400 uppercase tracking-wide">Marca:</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-3.5 w-1 rounded-sm bg-ds-ink" /> Programado en el sprint {sprintActual}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-3.5 w-1 rounded-sm bg-ds-red" /> Atrasado (arrastrada)
+          </span>
+        </div>
+      )}
+
       {loading && <Skeleton className="h-64 w-full" />}
 
       {error && !loading && (
@@ -257,8 +269,21 @@ export default function AvanceCapturaPage() {
                     {g.subs.map((sp) => {
                       const est = estadoDe(sp);
                       const s = ESTILO[est];
+                      // Marca de programación (además del stripe de estado):
+                      //  · roja  = atrasada (arrastrada de un sprint anterior sin completar)
+                      //  · negra = programada en el sprint actual de la obra
+                      const marca = sp.arrastrada && !sp.completada
+                        ? 'border-l-4 border-ds-red'
+                        : sp.sprint_numero === sprintActual
+                          ? 'border-l-4 border-ds-ink'
+                          : 'border-l-4 border-transparent';
+                      const marcaTitulo = sp.arrastrada && !sp.completada
+                        ? 'Atrasada (arrastrada de un sprint anterior)'
+                        : sp.sprint_numero === sprintActual
+                          ? `Programada en el sprint ${sprintActual}`
+                          : undefined;
                       return (
-                        <div key={sp.sub_partida_id} className="flex items-stretch gap-3">
+                        <div key={sp.sub_partida_id} className={`flex items-stretch gap-3 ${marca}`} title={marcaTitulo}>
                           <div className={`w-1 shrink-0 ${s.stripe}`} />
                           <div className="flex-1 py-3 pr-4 space-y-2">
                             <div className="flex items-start justify-between gap-3 flex-wrap">
