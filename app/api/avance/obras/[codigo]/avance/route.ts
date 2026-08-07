@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { obtenerPesosEfectivos, congelarScopeSiHaceFalta } from '@/lib/avance/pesos';
+import { resolverUsuarioAppId } from '@/lib/avance/usuario-app';
 import type { AvanceSprint, AvanceSubPartida, TipoCasa } from '@/lib/avance/types';
 
 /**
@@ -221,6 +222,10 @@ export async function PUT(
       }
     }
 
+    // Autor del avance: id de usuarios_app enlazado a la sesión (o NULL). NO se
+    // usa session.idCol directo porque es idColaborador y viola FK_avance_usuario.
+    const uid = await resolverUsuarioAppId(db, session);
+
     const tx = new sql.Transaction(db);
     await tx.begin();
     try {
@@ -238,7 +243,7 @@ export async function PUT(
         .input('nota', sql.NVarChar(sql.MAX), ncNota)
         .input('tocaPct', sql.Bit, tocaPct)
         .input('tocaNc', sql.Bit, tocaNc)
-        .input('uid', sql.Int, session.idCol || null)
+        .input('uid', sql.Int, uid)
         .query(`
           MERGE pro_obc.avance_sub_partidas AS dst
           USING (SELECT @obra AS obra_codigo, @sub AS sub_partida_id) AS src

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
+import { resolverUsuarioAppId } from '@/lib/avance/usuario-app';
 import type { TipoCasa } from '@/lib/avance/types';
 import type { IniciarLoteResultado } from '@/lib/avance/campo';
 
@@ -51,11 +52,12 @@ export async function POST(req: NextRequest) {
     const sprint = Number.isInteger(sprintRaw) && sprintRaw >= 1 && sprintRaw <= 50 ? sprintRaw : 1;
 
     const db = await getAdelanteDb();
+    const uid = await resolverUsuarioAppId(db, session);
     const request = db
       .request()
       .input('codigos', sql.NVarChar(sql.MAX), JSON.stringify(codigos))
       .input('sprint', sql.SmallInt, sprint)
-      .input('uid', sql.Int, session.idCol || null);
+      .input('uid', sql.Int, uid);
     if (!esAuto) request.input('tc', sql.VarChar(20), tipoCasa);
 
     const tcExpr = esAuto ? 'o.tipo_casa' : '@tc';

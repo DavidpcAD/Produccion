@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
+import { resolverUsuarioAppId } from '@/lib/avance/usuario-app';
 import type { TipoCasa } from '@/lib/avance/types';
 import type { SprintResultado } from '@/lib/avance/campo';
 
@@ -235,7 +236,9 @@ export async function POST(
       );
     }
 
-    const uid = session.idCol || null;
+    // actualizado_por → usuarios_app.id (o NULL). No session.idCol: es idColaborador
+    // y viola FK_obra_estado_usuario.
+    const uid = await resolverUsuarioAppId(db, session);
     return accion === 'avanzar'
       ? await avanzar(db, codigo, estado, uid)
       : await retroceder(db, codigo, estado, uid);

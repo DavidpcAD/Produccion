@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
+import { resolverUsuarioAppId } from '@/lib/avance/usuario-app';
 import type { TipoCasa } from '@/lib/avance/types';
 
 /**
@@ -33,12 +34,16 @@ export async function POST(
         { status: 400 },
       );
 
+    // Autor: id de usuarios_app enlazado a la sesión (o NULL) — evita violar
+    // FK_avance_usuario al usar session.idCol (idColaborador) directamente.
+    const uid = await resolverUsuarioAppId(db, session);
+
     const r = await db
       .request()
       .input('obra', sql.NVarChar(20), codigo)
       .input('sprint', sql.SmallInt, estado.sprint_actual)
       .input('tc', sql.VarChar(20), estado.tipo_casa)
-      .input('uid', sql.Int, session.idCol || null)
+      .input('uid', sql.Int, uid)
       .query<{ accion: string }>(`
         MERGE pro_obc.avance_sub_partidas AS dst
         USING (

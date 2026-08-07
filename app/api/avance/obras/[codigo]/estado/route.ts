@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
+import { resolverUsuarioAppId } from '@/lib/avance/usuario-app';
 import type { EstadoObra, TipoCasa } from '@/lib/avance/types';
 import type { EstadoResultado } from '@/lib/avance/campo';
 
@@ -93,12 +94,13 @@ export async function POST(
       }
     }
 
+    const uid = await resolverUsuarioAppId(db, session);
     await db
       .request()
       .input('obra', sql.NVarChar(20), codigo)
       .input('estado', sql.VarChar(20), nuevoEstado)
       .input('motivo', sql.NVarChar(200), motivo)
-      .input('uid', sql.Int, session.idCol || null)
+      .input('uid', sql.Int, uid)
       .query(`
         UPDATE pro_obc.obra_estado
         SET estado = @estado,
