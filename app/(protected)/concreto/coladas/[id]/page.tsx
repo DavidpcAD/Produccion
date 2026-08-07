@@ -18,11 +18,15 @@ import type { Obra } from '@/lib/concreto/tipos-workflow';
 
 // Línea del Pedido de Ensamblado BC (preview). El endpoint pedido-bc lo
 // implementa otro agente; definimos el tipo local para no acoplarnos.
+// Línea de la previa del pedido de ensamblado (forma real del endpoint pedido-bc).
 interface LineaPedidoBc {
-  descripcion: string;
-  cantidad: number;
-  unidad: string;
-  codigo_recurso_bc?: string;
+  codigo_bc: string;
+  descripcion_bc: string;
+  um_bc: string;
+  cantidad_total_consumida: number;
+  ratio_por_m3?: number | null;
+  cantidad_total_teorica?: number | null;
+  desviacion_pct?: number | null;
 }
 
 function fmtFecha(iso: string | null): string {
@@ -79,6 +83,12 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
   const [modalPedidoBc, setModalPedidoBc] = useState(false);
   const [pedidoLineas, setPedidoLineas] = useState<LineaPedidoBc[] | null>(null);
   const [pedidoCargando, setPedidoCargando] = useState(false);
+  // Sección "Líneas de pedido BC" (siempre visible): previa de las líneas del
+  // pedido de ensamblado (GET no llama a BC). Si la colada ya tiene pedido o algo
+  // falla, se guarda un mensaje en su lugar.
+  const [lineasBC, setLineasBC] = useState<LineaPedidoBc[] | null>(null);
+  const [lineasBCMsg, setLineasBCMsg] = useState<string | null>(null);
+  const [lineasBCCargando, setLineasBCCargando] = useState(true);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -90,6 +100,24 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
   }, [id, toast]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  // Previa de las líneas del pedido de ensamblado (para la sección siempre visible).
+  useEffect(() => {
+    let cancel = false;
+    setLineasBCCargando(true);
+    setLineasBC(null);
+    setLineasBCMsg(null);
+    fetch(`/api/concreto/coladas/${id}/pedido-bc`)
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (cancel) return;
+        if (r.ok) setLineasBC((d.lineas as LineaPedidoBc[]) ?? []);
+        else setLineasBCMsg(d?.error || 'No se pudo obtener la previa del pedido.');
+      })
+      .catch(() => { if (!cancel) setLineasBCMsg('No se pudo obtener la previa del pedido.'); })
+      .finally(() => { if (!cancel) setLineasBCCargando(false); });
+    return () => { cancel = true; };
+  }, [id]);
 
   // Ejecuta una acción POST. Todos los endpoints devuelven el detalle
   // actualizado → lo seteamos directo (sin recargar).
@@ -406,6 +434,49 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
         )}
       </section>
 
+      {/* Líneas de pedido BC (previa de ensamblado) */}
+      <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+        <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
+            <Icon name="boleta" size="sm" color="currentColor" className="text-brand" />
+          </div>
+          <h2 className="font-bold text-ds-ink text-sm">Líneas de pedido BC{lineasBC ? ` (${lineasBC.length})` : ''}</h2>
+          {c.numero_pedido_ensamblado_bc && (
+            <Badge variant="green" dot>Pedido {c.numero_pedido_ensamblado_bc}</Badge>
+          )}
+        </div>
+        {lineasBCCargando ? (
+          <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">Consultando líneas del pedido…</p>
+        ) : lineasBC && lineasBC.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-ds-gray-400 border-b border-ds-gray-100">
+                  <th className="px-4 py-2.5">Recurso BC</th>
+                  <th className="px-4 py-2.5">Descripción</th>
+                  <th className="px-4 py-2.5 text-right">Cantidad</th>
+                  <th className="px-4 py-2.5">Unidad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ds-gray-100">
+                {lineasBC.map((l, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-2.5 font-mono text-xs text-ds-gray-500">{l.codigo_bc ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-ds-ink">{l.descripcion_bc}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{num(l.cantidad_total_consumida, 3)}</td>
+                    <td className="px-4 py-2.5 text-ds-gray-500">{l.um_bc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : lineasBCMsg ? (
+          <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">{lineasBCMsg}</p>
+        ) : (
+          <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">Sin líneas de pedido para esta colada.</p>
+        )}
+      </section>
+
       {/* ─── Modal: Marcar digitada ─── */}
       <Modal
         open={modalDigitar}
@@ -544,10 +615,10 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
               <tbody className="divide-y divide-ds-gray-100">
                 {pedidoLineas.map((l, i) => (
                   <tr key={i}>
-                    <td className="px-3 py-2 text-ds-gray-500">{l.codigo_recurso_bc ?? '—'}</td>
-                    <td className="px-3 py-2 text-ds-ink">{l.descripcion}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{num(l.cantidad, 3)}</td>
-                    <td className="px-3 py-2 text-ds-gray-500">{l.unidad}</td>
+                    <td className="px-3 py-2 text-ds-gray-500">{l.codigo_bc ?? '—'}</td>
+                    <td className="px-3 py-2 text-ds-ink">{l.descripcion_bc}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{num(l.cantidad_total_consumida, 3)}</td>
+                    <td className="px-3 py-2 text-ds-gray-500">{l.um_bc}</td>
                   </tr>
                 ))}
               </tbody>
