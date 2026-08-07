@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Combobox } from '@/components/ui/Combobox';
+import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { useToast } from '@/components/ui/Toast';
+import { Icon } from '@/components/ds/Icon/Icon';
 
 /** Campos editables de una obra (los que consume el modal). Ambas pantallas
  *  (lista y detalle) pasan un objeto que cumple esta forma. */
@@ -53,6 +54,11 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
   );
 }
 
+/** Valores de dimensión (AC/CC) de BC → opciones de Combobox. */
+function toDimOpts(vals: { code: string; name: string }[]): ComboOption[] {
+  return (vals ?? []).map(v => ({ value: v.code, label: v.name ? `${v.code} — ${v.name}` : v.code, search: v.name }));
+}
+
 /** Editor único de obra: modal compartido por la lista (/obras) y el detalle
  *  (/obras/[id]) para que ambos usen exactamente el mismo formulario. */
 export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraEditModalProps) {
@@ -61,9 +67,20 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
   const [form, setForm] = useState<Record<string, string | boolean>>({});
   const set = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
+  // Valores de dimensión traídos de BC (Área de costeo / Centro de costo). Si BC
+  // no responde, quedan vacíos y los campos degradan a texto libre.
+  const [dimAC, setDimAC] = useState<ComboOption[]>([]);
+  const [dimCC, setDimCC] = useState<ComboOption[]>([]);
+  const [dimLoading, setDimLoading] = useState(false);
+
+  // Paso de confirmación: al guardar una obra que existe en BC, se pregunta si
+  // los cambios también deben reflejarse en Business Central.
+  const [confirmBC, setConfirmBC] = useState(false);
+
   useEffect(() => {
     if (!open || !obra) return;
     const d = (v: string | null) => (v ? v.split('T')[0] : ''); // fecha sin conversión de zona
+    setConfirmBC(false);
     setForm({
       numeroObra: obra.numeroObra ?? '',
       nombreMostrado: obra.nombreMostrado ?? '',
@@ -84,7 +101,30 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
     });
   }, [open, obra]);
 
-  async function handleGuardar() {
+  // Al abrir el modal, traer los valores permitidos de AC/CC desde BC (una vez).
+  useEffect(() => {
+    if (!open) return;
+    let cancel = false;
+    setDimLoading(true);
+    Promise.all([
+      fetch('/api/bc/dimensions?code=AC').then(r => r.json()).catch(() => ({ values: [] })),
+      fetch('/api/bc/dimensions?code=CC').then(r => r.json()).catch(() => ({ values: [] })),
+    ]).then(([ac, cc]) => {
+      if (cancel) return;
+      setDimAC(toDimOpts(ac.values));
+      setDimCC(toDimOpts(cc.values));
+    }).finally(() => { if (!cancel) setDimLoading(false); });
+    return () => { cancel = true; };
+  }, [open]);
+
+  // Opciones de un campo de dimensión: las de BC + el valor actual si no está en
+  // la lista (obras heredadas con un código que BC ya no ofrece), para no perderlo.
+  function opcionesDim(base: ComboOption[], actual: string): ComboOption[] {
+    if (!actual || base.some(o => o.value === actual)) return base;
+    return [{ value: actual, label: `${actual} (actual)` }, ...base];
+  }
+
+  async function guardar(actualizarBC: boolean) {
     if (!obra) return;
     if (!form.numeroObra) { toast('El número de obra es requerido', 'warning'); return; }
     setSaving(true);
@@ -92,16 +132,31 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
       const res = await fetch(`/api/obras/${obra.idObra}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, actualizarBC }),
       });
       const e = await res.json().catch(() => ({}));
       if (!res.ok) { toast(e.error || 'Error guardando la obra', 'error'); return; }
-      toast('Obra actualizada', 'success');
+      if (actualizarBC && e.bcSync === false) {
+        toast(`Obra actualizada en el sistema, pero BC falló: ${e.bcError ?? 'sin detalle'}`, 'warning');
+      } else if (actualizarBC && e.bcSync) {
+        toast('Obra actualizada (sistema + Business Central)', 'success');
+      } else {
+        toast('Obra actualizada', 'success');
+      }
       onClose();
       onSaved();
     } finally {
       setSaving(false);
     }
+  }
+
+  // "Guardar cambios": si la obra existe en BC, pasa por el paso de confirmación
+  // (¿reflejar también en BC?). Si no, guarda directo.
+  function handleGuardar() {
+    if (!obra) return;
+    if (!form.numeroObra) { toast('El número de obra es requerido', 'warning'); return; }
+    if (obra.esBC) { setConfirmBC(true); return; }
+    guardar(false);
   }
 
   const proyectoOptions = proyectos.map(p => ({
@@ -114,6 +169,23 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
     search: p.CodigoBC ?? '',
   }));
 
+  // Render de un campo de dimensión (AC/CC): Combobox si BC dio valores, si no
+  // texto libre. Mantiene el valor actual aunque BC no lo ofrezca.
+  function renderDim(key: 'areaCosteo' | 'centroCosto', label: string, base: ComboOption[]) {
+    const actual = String(form[key] ?? '');
+    const opts = opcionesDim(base, actual);
+    if (opts.length > 0) {
+      return (
+        <Combobox label={label} value={actual} onChange={v => set(key, v)} options={opts}
+          placeholder="Seleccionar valor…" emptyText="Sin valores" />
+      );
+    }
+    return (
+      <Input label={label} value={actual} onChange={e => set(key, e.target.value)}
+        hint={dimLoading ? 'Cargando valores de BC…' : 'BC sin conexión: código manual'} />
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -121,15 +193,48 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
       title={`Editar obra ${obra?.numeroObra ?? ''}`}
       size="lg"
       footer={
-        <>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button loading={saving} onClick={handleGuardar}>Guardar cambios</Button>
-        </>
+        confirmBC ? (
+          <>
+            <Button variant="outline" onClick={() => setConfirmBC(false)}>Atrás</Button>
+            <Button variant="secondary" loading={saving} onClick={() => guardar(false)}>Solo en el sistema</Button>
+            <Button loading={saving} onClick={() => guardar(true)} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>
+              Guardar y actualizar en BC
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button loading={saving} onClick={handleGuardar}>Guardar cambios</Button>
+          </>
+        )
       }
     >
+      {confirmBC ? (
+        // Paso de confirmación de sincronización con Business Central.
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-ds-lg border border-brand/40 bg-brand-soft px-4 py-3">
+            <Icon name="boleta" size="sm" color="currentColor" />
+            <div className="text-sm">
+              <p className="font-semibold text-ds-ink">Esta obra existe en Business Central.</p>
+              <p className="text-ds-gray-500 mt-0.5">¿Querés que los cambios también se actualicen en BC?</p>
+            </div>
+          </div>
+          <ul className="text-sm text-ds-gray-500 space-y-1.5">
+            <li className="flex items-start gap-2">
+              <Icon name="check" size="sm" color="currentColor" />
+              <span>Se envía a BC el <strong className="text-ds-ink">área prorrateada</strong> (obra y proyecto/Job).</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-ds-gray-300 mt-0.5">·</span>
+              <span>Nombre, descripción y dimensiones se guardan en el sistema. Venta y costos se manejan desde <strong className="text-ds-ink">Presupuesto</strong>.</span>
+            </li>
+          </ul>
+        </div>
+      ) : (
       <div className="space-y-6">
         <Seccion titulo="General">
-          <Input label="Número de obra" value={String(form.numeroObra ?? '')} onChange={e => set('numeroObra', e.target.value)} required />
+          <Input label="Número de obra" value={String(form.numeroObra ?? '')} disabled
+            hint="Llave del registro (BC + avances) — no editable" />
           <Input label="Estado" placeholder="Open / Blocked…" value={String(form.estado ?? '')} onChange={e => set('estado', e.target.value)} />
           <div className="sm:col-span-2">
             <Input label="Nombre mostrado" value={String(form.nombreMostrado ?? '')} onChange={e => set('nombreMostrado', e.target.value)} />
@@ -140,11 +245,12 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
         </Seccion>
 
         <Seccion titulo="Dimensiones y proyecto">
-          <Input label="Área de costeo (AC)" value={String(form.areaCosteo ?? '')} onChange={e => set('areaCosteo', e.target.value)} />
-          <Input label="Centro de costo (CC)" value={String(form.centroCosto ?? '')} onChange={e => set('centroCosto', e.target.value)} />
+          {renderDim('areaCosteo', 'Área de costeo (AC)', dimAC)}
+          {renderDim('centroCosto', 'Centro de costo (CC)', dimCC)}
           <Combobox label="Proyecto" value={String(form.idProyecto ?? '')} onChange={v => set('idProyecto', v)}
             placeholder="Seleccionar proyecto" options={proyectoOptions} />
-          <Input label="Origen principal" value={String(form.origenPrincipal ?? '')} onChange={e => set('origenPrincipal', e.target.value)} />
+          <Input label="Origen principal" value={String(form.origenPrincipal ?? '')} disabled
+            hint="Fuente de datos del registro (definido por la importación) — no editable" />
           <Input label="Gerente de proyecto" value={String(form.gerenteProyecto ?? '')} onChange={e => set('gerenteProyecto', e.target.value)} />
           <Input label="Encargado" value={String(form.idEncargado ?? '')} onChange={e => set('idEncargado', e.target.value)} />
           <div className="sm:col-span-2">
@@ -172,6 +278,7 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
           </div>
         </section>
       </div>
+      )}
     </Modal>
   );
 }

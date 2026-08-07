@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { bindObra } from '@/lib/obras';
+import { bcConfigured, setAreaProrrateadaJob } from '@/lib/bc-client';
+import { bcConstructionConfigured, setAreaProrrateadaWork } from '@/lib/bc-construction';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -37,24 +39,52 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const db = await getDb();
   try {
+    // El número de obra es la LLAVE del registro (BC, avances, presupuesto): no se
+    // actualiza aquí aunque venga en el body (el campo llega deshabilitado desde el
+    // editor). origenPrincipal es un campo de sistema (importación) y tampoco se toca.
     await bindObra(db.request(), body)
       .input('id', sql.BigInt, id)
       .input('modificadoPor', sql.NVarChar, session.cedula ?? 'control-usuarios')
       .query(`
         UPDATE dbo.Obra SET
-          numeroObra = @numeroObra, nombreMostrado = @nombreMostrado, descripcion = @descripcion,
+          nombreMostrado = @nombreMostrado, descripcion = @descripcion,
           centroCosto = @centroCosto, areaCosteo = @areaCosteo, proyectoPadre = @proyectoPadre,
           idProyecto = @idProyecto,
           areaProrrateadaM2 = @areaProrrateadaM2, gerenteProyecto = @gerenteProyecto,
           idEncargado = @idEncargado, ubicacion = @ubicacion, estado = @estado,
           fechaInicio = @fechaInicio, fechaFin = @fechaFin,
           precioNormalMaquinaria = @precioNormalMaquinaria,
-          precioConcretoMaquinaria = @precioConcretoMaquinaria, origenPrincipal = @origenPrincipal,
+          precioConcretoMaquinaria = @precioConcretoMaquinaria,
           esBC = @esBC, esProcore = @esProcore,
           fechaModificacion = SYSUTCDATETIME(), modificadoPor = @modificadoPor
         WHERE idObra = @id
       `);
-    return NextResponse.json({ ok: true });
+
+    // Sincronización opcional con Business Central (pedida explícitamente desde el
+    // editor). Hoy BC solo acepta actualizar el área prorrateada de la obra/Job; el
+    // resto se guarda en el sistema. No es fatal: si BC falla, la obra ya quedó guardada.
+    let bcSync: boolean | undefined;
+    let bcError: string | undefined;
+    if (body.actualizarBC) {
+      const worksNo = String(body.numeroObra).trim();
+      const area = body.areaProrrateadaM2 != null && body.areaProrrateadaM2 !== ''
+        ? Number(body.areaProrrateadaM2) : null;
+      try {
+        if (area != null && !Number.isNaN(area) && area > 0) {
+          if (bcConstructionConfigured()) await setAreaProrrateadaWork(worksNo, area);
+          if (bcConfigured()) await setAreaProrrateadaJob(worksNo, area);
+          bcSync = true;
+        } else {
+          bcSync = false;
+          bcError = 'Sin área prorrateada para enviar a BC';
+        }
+      } catch (e) {
+        bcSync = false;
+        bcError = e instanceof Error ? e.message : String(e);
+        console.error('/api/obras/[id] PATCH BC sync error:', e);
+      }
+    }
+    return NextResponse.json({ ok: true, bcSync, bcError });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('/api/obras/[id] PATCH error:', err);

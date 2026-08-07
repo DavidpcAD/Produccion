@@ -197,6 +197,10 @@ export default function ObrasPage() {
         );
       },
     }),
+    col.accessor('areaCosteo', {
+      header: 'Área de costeo', meta: { label: 'Área de costeo' },
+      cell: ({ getValue }) => (getValue() as string) || <span className="text-ds-gray-300">—</span>,
+    }),
     col.accessor('centroCosto', {
       header: 'Centro de costo', meta: { label: 'Centro de costo' },
       cell: ({ getValue }) => (getValue() as string) || '—',
