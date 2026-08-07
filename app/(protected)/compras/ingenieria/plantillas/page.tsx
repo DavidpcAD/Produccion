@@ -320,7 +320,7 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
             {itemsCargando ? (
               <div className="ds-body-sm ds-muted" style={{ marginTop: 4 }}>Cargando materiales de Business Central…</div>
             ) : itemsError ? (
-              <div className="ds-body-sm" style={{ marginTop: 4, color: "var(--ds-color-red, #c0392b)" }}>
+              <div className="ds-body-sm" style={{ marginTop: 4, color: "var(--ds-color-red-200)" }}>
                 No se pudieron cargar los materiales de BC (puede estar lento).{" "}
                 <button type="button" onClick={onReintentarItems} style={{ textDecoration: "underline", fontWeight: 600 }}>Reintentar</button>
               </div>

@@ -184,13 +184,13 @@ function GraficoM3PorDia({ dias }: { dias: M3PorDia[] }) {
           {/* Grid + eje Y */}
           {yTicks.map((t, i) => (
             <g key={i}>
-              <line x1={padL} y1={t.y} x2={W - padR} y2={t.y} stroke="var(--ds-color-gray-200, #e5e7eb)" strokeWidth={1} />
-              <text x={padL - 6} y={t.y + 3} textAnchor="end" fontSize={10} fill="var(--ds-color-gray-400, #9aa1ad)">{fmtNum(t.v, 0)}</text>
+              <line x1={padL} y1={t.y} x2={W - padR} y2={t.y} stroke="var(--ds-color-gray-200)" strokeWidth={1} />
+              <text x={padL - 6} y={t.y + 3} textAnchor="end" fontSize={10} fill="var(--ds-color-gray-400)">{fmtNum(t.v, 0)}</text>
             </g>
           ))}
           {/* Eje X (fechas cada stepX) */}
           {dias.map((d, i) => (i % stepX === 0 ? (
-            <text key={d.fecha} x={xAt(i)} y={H - 10} textAnchor="middle" fontSize={9} fill="var(--ds-color-gray-400, #9aa1ad)">
+            <text key={d.fecha} x={xAt(i)} y={H - 10} textAnchor="middle" fontSize={9} fill="var(--ds-color-gray-400)">
               {fmtDiaCorto(d.fecha)}
             </text>
           ) : null))}
@@ -200,9 +200,9 @@ function GraficoM3PorDia({ dias }: { dias: M3PorDia[] }) {
               stroke={COLORES_PLANTA[ki % COLORES_PLANTA.length]} strokeWidth={1.5} strokeLinejoin="round" opacity={0.9} />
           ))}
           {/* Línea total (negra, gruesa) + puntos con tooltip */}
-          <path d={pathFor((d) => d.m3)} fill="none" stroke="var(--ds-text, #111)" strokeWidth={2.5} strokeLinejoin="round" />
+          <path d={pathFor((d) => d.m3)} fill="none" stroke="var(--ds-text)" strokeWidth={2.5} strokeLinejoin="round" />
           {dias.map((d, i) => (
-            <circle key={d.fecha} cx={xAt(i)} cy={yAt(d.m3)} r={2.5} fill="var(--ds-text, #111)">
+            <circle key={d.fecha} cx={xAt(i)} cy={yAt(d.m3)} r={2.5} fill="var(--ds-text)">
               <title>{`${fmtDiaCorto(d.fecha)}: ${fmtNum(d.m3, 2)} m³ (total)`}</title>
             </circle>
           ))}
@@ -210,7 +210,7 @@ function GraficoM3PorDia({ dias }: { dias: M3PorDia[] }) {
       </div>
       {/* Leyenda */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-        <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 rounded" style={{ background: 'var(--ds-text, #111)', height: 3 }} /><span className="font-semibold text-ds-ink">Total</span></span>
+        <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 rounded" style={{ background: 'var(--ds-text)', height: 3 }} /><span className="font-semibold text-ds-ink">Total</span></span>
         {plantaKeys.map((k, ki) => (
           <span key={k} className="inline-flex items-center gap-1.5">
             <span className="inline-block h-0.5 w-4 rounded" style={{ background: COLORES_PLANTA[ki % COLORES_PLANTA.length], height: 3 }} />
