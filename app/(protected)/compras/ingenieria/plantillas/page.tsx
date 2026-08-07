@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
@@ -23,6 +23,11 @@ export default function PlantillasPage() {
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
   const [wbs, setWbs] = useState<Wbs>({ etapas: [], partidas: [], subpartidas: [], clasificaciones: [] });
   const [items, setItems] = useState<ItemBc[]>([]);
+  // Estado de la carga de materiales (vienen de BC). Si BC está lento o falla, el
+  // buscador quedaba vacío en silencio ("no aparecen materiales"); ahora se ve y
+  // se puede reintentar.
+  const [itemsCargando, setItemsCargando] = useState(true);
+  const [itemsError, setItemsError] = useState(false);
   const [buscar, setBuscar] = useState(""); const [fPartida, setFPartida] = useState("");
   const [fTipo, setFTipo] = useState<"todas" | TipoPlantilla>("todas");
   // Por defecto cada quien ve SOLO las plantillas que creó; con el toggle puede ver todas.
@@ -39,11 +44,26 @@ export default function PlantillasPage() {
     } catch (e: any) { toast(String(e?.message ?? e), "error"); }
   }
   useEffect(() => { recargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    fetch("/api/compras/bc/items").then((r) => (r.ok ? r.json() : { items: [] }))
-      .then((d) => { if (Array.isArray(d.items)) setItems(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND" }))); })
-      .catch(() => {});
+
+  const cargarItems = useCallback(() => {
+    setItemsCargando(true);
+    setItemsError(false);
+    fetch("/api/compras/bc/items")
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
+        return d;
+      })
+      .then((d) => {
+        const arr = Array.isArray(d.items) ? d.items : [];
+        setItems(arr.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND" })));
+        // BC respondió pero sin materiales → lo tratamos como fallo recuperable.
+        if (arr.length === 0) setItemsError(true);
+      })
+      .catch(() => { setItems([]); setItemsError(true); })
+      .finally(() => setItemsCargando(false));
   }, []);
+  useEffect(() => { cargarItems(); }, [cargarItems]);
 
   // Bodega = sin amarre a clasificación. Compatibilidad: plantillas viejas sin tipo
   // que no tengan clasificación se tratan como bodega.
@@ -157,6 +177,7 @@ export default function PlantillasPage() {
 
         {editor && (
           <PlantillaEditor plantilla={editor === "new" ? null : editor} wbs={wbs} items={items} usuario={usuario ?? ""}
+            itemsCargando={itemsCargando} itemsError={itemsError} onReintentarItems={cargarItems}
             onClose={() => setEditor(null)} onSaved={() => { setEditor(null); recargar(); }} />
         )}
 
@@ -174,8 +195,10 @@ export default function PlantillasPage() {
   );
 }
 
-function PlantillaEditor({ plantilla, wbs, items, usuario, onClose, onSaved }: {
-  plantilla: Plantilla | null; wbs: Wbs; items: ItemBc[]; usuario: string; onClose: () => void; onSaved: () => void;
+function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsError, onReintentarItems, onClose, onSaved }: {
+  plantilla: Plantilla | null; wbs: Wbs; items: ItemBc[]; usuario: string;
+  itemsCargando: boolean; itemsError: boolean; onReintentarItems: () => void;
+  onClose: () => void; onSaved: () => void;
 }) {
   const toast = useToast();
   // Contexto inicial desde la clasificación de la plantilla (si edita).
@@ -293,7 +316,17 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, onClose, onSaved }: {
         <div className="row wrap gap-2" style={{ alignItems: "flex-end", margin: "8px 0 10px" }}>
           <div style={{ flex: "1 1 260px", minWidth: 200 }}>
             <label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Artículo</label>
-            <Combobox items={items} value={qaCode} onChange={(k) => setQaCode(k)} getKey={(i) => i.code} getLabel={(i) => `${i.code} — ${i.descripcion}`} getSearch={(i) => `${i.code} ${i.descripcion}`} placeholder="Buscar artículo…" />
+            <Combobox items={items} value={qaCode} onChange={(k) => setQaCode(k)} getKey={(i) => i.code} getLabel={(i) => `${i.code} — ${i.descripcion}`} getSearch={(i) => `${i.code} ${i.descripcion}`} placeholder={itemsCargando ? "Cargando materiales…" : "Buscar artículo…"} />
+            {itemsCargando ? (
+              <div className="ds-body-sm ds-muted" style={{ marginTop: 4 }}>Cargando materiales de Business Central…</div>
+            ) : itemsError ? (
+              <div className="ds-body-sm" style={{ marginTop: 4, color: "var(--ds-color-red, #c0392b)" }}>
+                No se pudieron cargar los materiales de BC (puede estar lento).{" "}
+                <button type="button" onClick={onReintentarItems} style={{ textDecoration: "underline", fontWeight: 600 }}>Reintentar</button>
+              </div>
+            ) : (
+              <div className="ds-body-sm ds-muted" style={{ marginTop: 4 }}>{items.length.toLocaleString("es-CR")} materiales · escribí para buscar</div>
+            )}
           </div>
           <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</label><Input type="number" min={0} value={qaQty} onChange={(e) => setQaQty(e.target.value)} placeholder="0" style={{ width: 100 }} /></div>
           <Button variant="outline" onClick={agregar} disabled={!qaCode || !(Number(qaQty) > 0)}>+ Agregar</Button>
