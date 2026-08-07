@@ -3,12 +3,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Input, Select } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { Table } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/Toast';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { SemanaOperativa, NominaSemanal, HorasObra, Subcontrato } from '@/lib/avance/mano-obra';
+
+// Tipos de subcontrato (lista fija, igual que obrascontrol, para poder tabular en
+// reportes). El "Tipo" se elige de este catálogo, no se escribe libre.
+const TIPOS_SUBCONTRATO = [
+  'Instalación Eléctrica',
+  'Plomería / Mecánico',
+  'Pintura Interior',
+  'Pintura Exterior',
+  'Acabados Finos',
+  'Cielos',
+  'Ventanas y Puertas',
+  'Pisos',
+  'A/C',
+  'Otro',
+] as const;
 
 // xlsx bajo demanda (importar horas), igual que en compras.
 async function loadXLSX(): Promise<typeof import('xlsx')> {
@@ -425,7 +440,13 @@ function TabSubcontratos({ semanaId }: { semanaId: number }) {
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 rounded-ds border border-ds-gray-200 p-4 sm:grid-cols-5">
         <Input label="Obra" value={obra} placeholder="VN-C.08" onChange={(e) => setObra(e.target.value)} />
-        <Input label="Tipo" value={tipo} placeholder="Pisos…" onChange={(e) => setTipo(e.target.value)} />
+        <Select
+          label="Tipo"
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value)}
+          placeholder="Seleccionar tipo…"
+          options={TIPOS_SUBCONTRATO.map((t) => ({ value: t, label: t }))}
+        />
         <Input label="Monto (₡)" type="number" min={0} value={monto} onChange={(e) => setMonto(e.target.value)} />
         <Input label="Descripción" value={desc} onChange={(e) => setDesc(e.target.value)} />
         <div className="flex items-end">
