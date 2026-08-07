@@ -631,7 +631,33 @@ function ModalAgregarEnsayo({ idMuestra, fechaColado, cerrar, onGuardado }: { id
       }
     >
       <div className="space-y-4">
-        <Input label="Edad (días)" type="number" value={edad} onChange={(e) => cambiarEdad(e.target.value)} />
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-ds-ink">Edad (días)</label>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[3, 7, 14, 28, 56, 90].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => cambiarEdad(String(d))}
+                className={`px-3 py-1.5 rounded-ds text-sm font-semibold border transition-colors ${
+                  Number(edad) === d
+                    ? 'bg-black text-white border-black'
+                    : 'bg-ds-surface text-ds-gray-500 border-ds-gray-200 hover:border-ds-gray-300'
+                }`}
+              >
+                {d}d
+              </button>
+            ))}
+            <Input
+              type="number"
+              value={edad}
+              onChange={(e) => cambiarEdad(e.target.value)}
+              className="w-24"
+              placeholder="Otra"
+            />
+          </div>
+          <p className="text-xs text-ds-gray-400">Edades preestablecidas o manual.</p>
+        </div>
         <DatePicker label="Fecha de prueba" value={fechaPrueba} onChange={setFechaPrueba} hint="Sugerida = colado + edad" />
       </div>
     </Modal>
