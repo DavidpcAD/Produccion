@@ -37,6 +37,9 @@ export default function PartidasPage() {
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [partidas, setPartidas] = useState<Partida[]>([]);
   const [subpartidas, setSubpartidas] = useState<SubPartida[]>([]);
+  // Catálogo de sprints (numero_global) para validar el N° de sprint de una
+  // subpartida — no debe permitirse un sprint que no existe en el catálogo.
+  const [sprintsCat, setSprintsCat] = useState<{ numero_global: number; codigo: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState('');
@@ -67,6 +70,17 @@ export default function PartidasPage() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // Catálogo de sprints (para validar/elegir el N° de sprint de una subpartida).
+  useEffect(() => {
+    fetch('/api/avance/sprints')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setSprintsCat(d?.sprints ?? []))
+      .catch(() => {});
+  }, []);
+
+  // Conjunto de números de sprint válidos (numero_global del catálogo).
+  const sprintsValidos = useMemo(() => new Set(sprintsCat.map(s => s.numero_global)), [sprintsCat]);
 
   const partidasDeEtapa = useMemo(
     () => (subForm.idEtapa ? partidas.filter(p => String(p.idEtapa) === subForm.idEtapa) : []),
@@ -106,6 +120,12 @@ export default function PartidasPage() {
     if (!subForm.codigo.trim()) { toast('El código es requerido', 'warning'); return; }
     if (!subForm.nombre.trim()) { toast('El nombre es requerido', 'warning'); return; }
     if (subForm.tiposCasa.length === 0) { toast('Elegí al menos un tipo de casa', 'warning'); return; }
+    // El sprint debe existir en el catálogo (si el catálogo pudo cargarse).
+    const nSprint = Number(subForm.numSprint) || 0;
+    if (sprintsValidos.size > 0 && !sprintsValidos.has(nSprint)) {
+      toast(`El sprint ${nSprint} no existe en el catálogo. Elegí un sprint válido.`, 'error');
+      return;
+    }
     setSaving(true);
     try {
       const editing = subEditId != null;
@@ -193,6 +213,9 @@ export default function PartidasPage() {
       etapa: e,
       partidas: partidas
         .filter(p => p.idEtapa === e.idEtapa)
+        // Orden por código numérico (1.1, 1.2, … 4.1, 4.2) — no por orden de creación,
+        // para que una partida nueva (ej. 4.2) caiga en su lugar y no arriba de la 4.1.
+        .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }))
         .map(p => {
           const subs = byPartida.get(p.idPartida) ?? [];
           const partidaMatches = match(p.codigo, p.nombre);
@@ -441,7 +464,28 @@ export default function PartidasPage() {
             <Input label="Nombre" value={subForm.nombre} onChange={e => setSub('nombre', e.target.value)} required maxLength={50} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Sprint (N°)" type="number" min={0} value={subForm.numSprint} onChange={e => setSub('numSprint', e.target.value)} />
+            {sprintsCat.length > 0 ? (
+              <Combobox
+                label="Sprint"
+                value={subForm.numSprint}
+                onChange={v => setSub('numSprint', v)}
+                placeholder="Seleccionar sprint"
+                emptyText="Sin sprints en el catálogo"
+                options={(() => {
+                  const opts = sprintsCat
+                    .slice()
+                    .sort((a, b) => a.numero_global - b.numero_global)
+                    .map(s => ({ value: String(s.numero_global), label: `Sprint ${s.numero_global} — ${s.nombre}`, parts: [{ text: `Sprint ${s.numero_global}`, weight: 'bold' as const }, { text: s.nombre, weight: 'light' as const }], search: `${s.codigo} ${s.nombre}` }));
+                  // Preserva un sprint heredado que ya no esté en el catálogo.
+                  if (subForm.numSprint && !sprintsCat.some(s => String(s.numero_global) === subForm.numSprint)) {
+                    opts.unshift({ value: subForm.numSprint, label: `Sprint ${subForm.numSprint} (fuera de catálogo)`, parts: [{ text: `Sprint ${subForm.numSprint}`, weight: 'bold' as const }, { text: 'fuera de catálogo', weight: 'light' as const }], search: subForm.numSprint });
+                  }
+                  return opts;
+                })()}
+              />
+            ) : (
+              <Input label="Sprint (N°)" type="number" min={0} value={subForm.numSprint} onChange={e => setSub('numSprint', e.target.value)} hint="Catálogo de sprints no disponible" />
+            )}
             <div className="flex items-end gap-4 pb-3">
               <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
                 <input type="checkbox" checked={subForm.esCritica} onChange={e => setSub('esCritica', e.target.checked)} className="w-4 h-4 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2" />
