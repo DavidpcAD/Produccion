@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -39,6 +39,8 @@ export function MatrizAvance({ proyecto, semana = null }: Props) {
   const [error, setError] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [ventaFiltro, setVentaFiltro] = useState<EstadoVenta | null>(null);
+  // Agrupador de filas (obras) por "matriz": tipo de casa, bloque o sprint.
+  const [agruparPor, setAgruparPor] = useState<'' | 'tipo_casa' | 'bloque_letra' | 'sprint_actual'>('');
 
   useEffect(() => {
     let cancel = false;
@@ -107,6 +109,24 @@ export function MatrizAvance({ proyecto, semana = null }: Props) {
     ? obrasTexto.filter((o) => o.estado_venta === ventaFiltro)
     : obrasTexto;
 
+  // Agrupa las filas (obras) por la dimensión elegida ("matriz"): tipo de casa,
+  // bloque o sprint. Sin agrupar → un solo grupo sin encabezado. Cálculo plano
+  // (NO useMemo): va después de los early returns, no puede ser un hook.
+  const gruposFilas = (() => {
+    if (!agruparPor) return [{ clave: '', label: null as string | null, obras: obrasFiltradas }];
+    const map = new Map<string, typeof obrasFiltradas>();
+    for (const o of obrasFiltradas) {
+      const k = String(o[agruparPor] ?? '—');
+      const arr = map.get(k);
+      if (arr) arr.push(o); else map.set(k, [o]);
+    }
+    const etiqueta = (k: string) =>
+      agruparPor === 'sprint_actual' ? `Sprint ${k}` : agruparPor === 'bloque_letra' ? `Bloque ${k}` : k;
+    return [...map.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], 'es', { numeric: true }))
+      .map(([k, obras]) => ({ clave: k, label: etiqueta(k), obras }));
+  })();
+
   const irACaptura = (codigo: string) => router.push(`/avance/${encodeURIComponent(codigo)}`);
   const irAPartida = (codigo: string, partidaCodigo: string) =>
     router.push(`/avance/${encodeURIComponent(codigo)}?partida=${encodeURIComponent(partidaCodigo)}`);
@@ -145,6 +165,19 @@ export function MatrizAvance({ proyecto, semana = null }: Props) {
             onClick={() => setVentaFiltro(ventaFiltro === ev ? null : ev)}
           />
         ))}
+      </div>
+
+      {/* Agrupador de filas por "matriz" (tipo de casa / bloque / sprint) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-body-sm text-ds-gray-400">Agrupar por:</span>
+        <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
+          {([['', 'Ninguno'], ['tipo_casa', 'Tipo de casa'], ['bloque_letra', 'Bloque'], ['sprint_actual', 'Sprint']] as const).map(([v, label]) => (
+            <button key={v} type="button" onClick={() => setAgruparPor(v)}
+              className={'px-3 py-1 rounded-ds text-xs font-semibold transition ' + (agruparPor === v ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div
@@ -204,12 +237,22 @@ export function MatrizAvance({ proyecto, semana = null }: Props) {
             </tr>
           </thead>
           <tbody>
-            {obrasFiltradas.map((o) => (
-              <tr
-                key={o.codigo}
-                className={`hover:bg-ds-gray-100/50 ${o.congelada ? 'opacity-50' : ''}`}
-                title={o.congelada ? `${o.codigo} — congelada (en espera por NC)` : undefined}
-              >
+            {gruposFilas.map((g) => (
+              <Fragment key={g.clave || 'all'}>
+                {g.label != null && (
+                  <tr>
+                    <td colSpan={partidas.length + 3}
+                      className="sticky left-0 z-[5] border-y border-ds-gray-200 bg-ds-gray-200/70 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-ds-gray-500">
+                      {g.label} · {g.obras.length} obra{g.obras.length === 1 ? '' : 's'}
+                    </td>
+                  </tr>
+                )}
+                {g.obras.map((o) => (
+                  <tr
+                    key={o.codigo}
+                    className={`hover:bg-ds-gray-100/50 ${o.congelada ? 'opacity-50' : ''}`}
+                    title={o.congelada ? `${o.codigo} — congelada (en espera por NC)` : undefined}
+                  >
                 <td className="sticky left-0 z-10 overflow-hidden border-b border-ds-gray-100 bg-ds-surface px-2 py-1">
                   <button
                     type="button"
@@ -243,7 +286,9 @@ export function MatrizAvance({ proyecto, semana = null }: Props) {
                 <td className={`${cellBase} font-semibold`} style={estiloResumen(o.avance_general)}>
                   {o.avance_general}
                 </td>
-              </tr>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
         </table>
