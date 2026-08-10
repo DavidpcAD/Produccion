@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
 import { Combobox } from '@/components/ui/Combobox';
 import { Icon } from '@/components/ds/Icon/Icon';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
@@ -156,7 +157,10 @@ export default function ReporteHistoricoPage() {
       )}
 
       {cargando ? (
-        <p className="text-ds-gray-400">Calculando histórico…</p>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-40" rounded="rounded-full" />
+          <SkeletonRows rows={6} />
+        </div>
       ) : !data ? (
         <p className="text-ds-gray-400">Elegí una semana.</p>
       ) : obras.length === 0 || subs.length === 0 ? (

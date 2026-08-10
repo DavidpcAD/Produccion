@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
 import { Input, Select } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { formatCRC } from '@/lib/utilidades/format';
@@ -103,7 +104,10 @@ export default function ReporteManoObraPage() {
       {!semanaId ? (
         <p className="text-ds-gray-400">Elegí una semana para ver el reporte.</p>
       ) : cargando && !calc ? (
-        <p className="text-ds-gray-400">Calculando reporte…</p>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-40" rounded="rounded-full" />
+          <SkeletonRows rows={6} />
+        </div>
       ) : calc ? (
         <div className="space-y-6">
           {cargando && <p className="text-xs text-ds-gray-400">Actualizando…</p>}

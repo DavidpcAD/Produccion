@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
 import { Select } from '@/components/ui/Input';
 import type { PendienteItem } from '@/lib/avance/reporte-pendientes';
 
@@ -75,7 +76,10 @@ export default function ReportePendientesPage() {
       )}
 
       {cargando ? (
-        <p className="text-ds-gray-400">Cargando pendientes…</p>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-40" rounded="rounded-full" />
+          <SkeletonRows rows={6} />
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">

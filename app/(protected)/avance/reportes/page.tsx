@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
 import { Select } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { formatCRC } from '@/lib/utilidades/format';
@@ -104,7 +105,10 @@ export default function ReportesPage() {
       {!semanaId ? (
         <p className="text-ds-gray-400">Elegí una semana para ver el resumen.</p>
       ) : cargando && !data ? (
-        <p className="text-ds-gray-400">Calculando reporte…</p>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-40" rounded="rounded-full" />
+          <SkeletonRows rows={6} />
+        </div>
       ) : data ? (
         <div className="space-y-6">
           <div className="space-y-0.5">
