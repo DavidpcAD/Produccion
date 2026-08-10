@@ -328,7 +328,7 @@ export default function PartidasPage() {
                 <div className="px-5 py-4 border-b border-ds-gray-200 flex items-center gap-3 flex-wrap">
                   {selEtapa && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono shrink-0">{selEtapa.codigo}</span>}
                   <span className="font-mono text-sm font-semibold text-ds-gray-500 shrink-0">{sel.codigo}</span>
-                  <h2 className="font-bold text-ds-ink truncate flex-1 min-w-0">{sel.nombre}</h2>
+                  <h2 className="text-body font-bold text-ds-ink truncate flex-1 min-w-0">{sel.nombre}</h2>
                   <span className="text-xs text-ds-gray-400 shrink-0">{selSubs.length} subpartidas</span>
                   {puede && (
                     <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">

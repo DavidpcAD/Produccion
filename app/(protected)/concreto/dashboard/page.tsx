@@ -138,7 +138,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="bg-ds-surface rounded-ds-lg shadow-ds-01 p-5 border border-ds-gray-200">
-        <h2 className="font-semibold text-ds-ink mb-4">m³ producidos por día — por planta y total</h2>
+        <h2 className="text-body font-semibold text-ds-ink mb-4">m³ producidos por día — por planta y total</h2>
         {loading || !kpis ? (
           <Skeleton className="h-64 rounded-ds" />
         ) : kpis.m3_por_dia.every((d) => d.m3 === 0) ? (

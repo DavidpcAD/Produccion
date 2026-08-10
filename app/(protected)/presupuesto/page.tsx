@@ -130,7 +130,7 @@ function StepHeader({ n, title, hint }: { n: number; title: string; hint?: strin
     <div className="flex items-start gap-3">
       <span className="w-7 h-7 rounded-full bg-black text-white text-sm font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
       <div className="min-w-0">
-        <h2 className="font-bold text-ds-ink leading-tight">{title}</h2>
+        <h2 className="text-body font-bold text-ds-ink leading-tight">{title}</h2>
         {hint && <p className="text-ds-gray-400 text-xs mt-0.5">{hint}</p>}
       </div>
     </div>
@@ -401,7 +401,7 @@ export default function PresupuestoPage() {
       {/* Plantillas guardadas (reutilizables) */}
       {plantillas.length > 0 && (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-2">
-          <h2 className="font-bold text-ds-ink">O empezá desde una plantilla guardada</h2>
+          <h2 className="text-body font-bold text-ds-ink">O empezá desde una plantilla guardada</h2>
           <p className="text-ds-gray-400 text-xs">En vez de cargar Excel, reutilizá una plantilla: se abre en la vista previa para editarla y subirla a la obra que elijas.</p>
           <div className="divide-y divide-ds-gray-100">
             {plantillas.map(pl => (

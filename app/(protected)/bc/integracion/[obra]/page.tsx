@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/Confirm';
@@ -131,7 +132,7 @@ export default function DetalleBcPage() {
         subtitle="Avance de ObrasControl vs Business Central por partida."
       />
 
-      {loading && <p className="text-body-sm text-ds-gray-400">Cargando…</p>}
+      {loading && <SkeletonRows rows={6} />}
 
       {!loading && preview && (
         <>
