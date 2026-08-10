@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
@@ -193,7 +194,7 @@ export default function IntegracionBcPage() {
                 <tr key={i} className="border-b border-ds-gray-100">
                   {Array.from({ length: 5 }).map((__, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 animate-pulse rounded-ds bg-ds-gray-100" />
+                      <Skeleton className="h-4" />
                     </td>
                   ))}
                 </tr>
