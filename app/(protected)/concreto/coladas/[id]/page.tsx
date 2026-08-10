@@ -13,7 +13,7 @@ import { useConfirm } from '@/components/ui/Confirm';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { ESTADO_COLADA } from '@/lib/concreto/estados';
-import type { ColadaDetalle } from '@/lib/concreto/tipos';
+import type { ColadaDetalle, BatchDetallePlanta } from '@/lib/concreto/tipos';
 import type { Obra } from '@/lib/concreto/tipos-workflow';
 
 // Línea del Pedido de Ensamblado BC (preview). El endpoint pedido-bc lo
@@ -46,6 +46,49 @@ function fmtDia(iso: string | null): string {
 function num(n: number | null, dec = 2): string {
   return n === null ? '—' : Number(n).toFixed(dec);
 }
+/** Celda de desviación (Δ%): rojo si |Δ| ≥ 5%, gris si no; guion si no hay dato. */
+function deltaPct(n: number | null): React.ReactNode {
+  if (n === null || n === undefined) return <span className="text-ds-gray-300">—</span>;
+  const alto = Math.abs(n) >= 5;
+  return (
+    <span className={`tabular-nums ${alto ? 'text-ds-red font-semibold' : 'text-ds-gray-500'}`}>
+      {n > 0 ? '+' : ''}{n.toFixed(1)}%
+    </span>
+  );
+}
+function numCell(n: number | null, dec = 2): React.ReactNode {
+  return n === null ? <span className="text-ds-gray-300">—</span> : <span className="tabular-nums">{Number(n).toFixed(dec)}</span>;
+}
+
+// Columnas de "Datos de planta" (datos crudos por batch). `always` = visibles en
+// la vista Resumen; el resto sale solo en Completo. Fuente: BatchDetallePlanta.
+type ColPlanta = { key: string; label: string; always?: boolean; align?: 'right'; render: (b: BatchDetallePlanta) => React.ReactNode };
+const COLS_PLANTA: ColPlanta[] = [
+  { key: 'record', label: 'Record', always: true, render: (b) => <span className="font-semibold text-ds-ink tabular-nums">#{b.record_no}</span> },
+  { key: 'fecha', label: 'Fecha', always: true, render: (b) => <span className="text-ds-gray-500">{fmtFecha(b.fecha_inicio)}</span> },
+  { key: 'receta', label: 'Receta', always: true, render: (b) => b.recipe_name_raw || <span className="text-ds-gray-300">—</span> },
+  { key: 'm3', label: 'm³', always: true, align: 'right', render: (b) => numCell(b.m3_producidos, 3) },
+  { key: 'ac', label: 'A/C', always: true, align: 'right', render: (b) => numCell(b.relacion_agua_cemento, 3) },
+  { key: 'dagua', label: 'Δ Agua', always: true, align: 'right', render: (b) => deltaPct(b.agua_delta_pct) },
+  { key: 'dcem', label: 'Δ Cemento', always: true, align: 'right', render: (b) => deltaPct(b.cemento_delta_pct) },
+  // Completo:
+  { key: 'agua_l', label: 'Agua (L)', align: 'right', render: (b) => numCell(b.agua_l) },
+  { key: 'agua_teor', label: 'Agua teór (L)', align: 'right', render: (b) => numCell(b.agua_l_teor) },
+  { key: 'cem_kg', label: 'Cemento (kg)', align: 'right', render: (b) => numCell(b.cemento_kg) },
+  { key: 'aa_kg', label: 'Árido A (kg)', align: 'right', render: (b) => numCell(b.arido_a_kg) },
+  { key: 'aa_d', label: 'Δ Árido A', align: 'right', render: (b) => deltaPct(b.arido_a_delta_pct) },
+  { key: 'ab_kg', label: 'Árido B (kg)', align: 'right', render: (b) => numCell(b.arido_b_kg) },
+  { key: 'ab_d', label: 'Δ Árido B', align: 'right', render: (b) => deltaPct(b.arido_b_delta_pct) },
+  { key: 'ad1', label: 'Adit.1 (L)', align: 'right', render: (b) => numCell(b.aditivo1_l) },
+  { key: 'ad1d', label: 'Δ Adit.1', align: 'right', render: (b) => deltaPct(b.aditivo1_delta_pct) },
+  { key: 'ad2', label: 'Adit.2 (L)', align: 'right', render: (b) => numCell(b.aditivo2_l) },
+  { key: 'ad2d', label: 'Δ Adit.2', align: 'right', render: (b) => deltaPct(b.aditivo2_delta_pct) },
+  { key: 'ad3', label: 'Adit.3 (L)', align: 'right', render: (b) => numCell(b.aditivo3_l) },
+  { key: 'ad3d', label: 'Δ Adit.3', align: 'right', render: (b) => deltaPct(b.aditivo3_delta_pct) },
+  { key: 'humA', label: 'Hum. A (%)', align: 'right', render: (b) => numCell(b.arido_a_moisture_pct) },
+  { key: 'humB', label: 'Hum. B (%)', align: 'right', render: (b) => numCell(b.arido_b_moisture_pct) },
+  { key: 'oper', label: 'Operador', render: (b) => b.operador || <span className="text-ds-gray-300">—</span> },
+];
 
 function Dato({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -89,6 +132,11 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
   const [lineasBC, setLineasBC] = useState<LineaPedidoBc[] | null>(null);
   const [lineasBCMsg, setLineasBCMsg] = useState<string | null>(null);
   const [lineasBCCargando, setLineasBCCargando] = useState(true);
+  // Datos crudos de planta por batch de la colada (aditivos, agua, cemento,
+  // áridos, humedad, deltas). Fuente: GET /api/concreto/batches?id_colada=.
+  const [datosPlanta, setDatosPlanta] = useState<BatchDetallePlanta[] | null>(null);
+  const [datosPlantaCargando, setDatosPlantaCargando] = useState(true);
+  const [datosCompleto, setDatosCompleto] = useState(false); // Resumen ↔ Completo
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -118,6 +166,22 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
       .finally(() => { if (!cancel) setLineasBCCargando(false); });
     return () => { cancel = true; };
   }, [id]);
+
+  // Datos de planta: batches (no excluidos) de la colada con sus valores crudos.
+  // Se re-consulta si cambia el nº de batches incluidos (al excluir/restaurar).
+  const idColada = data?.colada.id_colada ?? null;
+  const nBatchesIncluidos = data?.batches.filter((b) => !b.excluido).length ?? 0;
+  useEffect(() => {
+    if (idColada == null) return;
+    let cancel = false;
+    setDatosPlantaCargando(true);
+    fetch(`/api/concreto/batches?id_colada=${idColada}&por_pagina=500`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => { if (!cancel) setDatosPlanta((d.batches as BatchDetallePlanta[]) ?? []); })
+      .catch(() => { if (!cancel) setDatosPlanta([]); })
+      .finally(() => { if (!cancel) setDatosPlantaCargando(false); });
+    return () => { cancel = true; };
+  }, [idColada, nBatchesIncluidos]);
 
   // Ejecuta una acción POST. Todos los endpoints devuelven el detalle
   // actualizado → lo seteamos directo (sin recargar).
@@ -260,6 +324,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
   const anyBusy = busy !== null;
   // Batches se pueden editar (excluir/restaurar) solo en sugerida/confirmada.
   const batchesEditables = c.estado === 'sugerida' || c.estado === 'confirmada';
+  const colsVisiblesPlanta = datosCompleto ? COLS_PLANTA : COLS_PLANTA.filter((x) => x.always);
 
   return (
     <PageShell width="full" className="max-w-[1400px]">
@@ -389,6 +454,63 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+
+      {/* Datos de planta (datos crudos reportados por la planta, por batch) */}
+      <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+        <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
+            <Icon name="list" size="sm" color="currentColor" className="text-brand" />
+          </div>
+          <h2 className="font-bold text-ds-ink text-label">Datos de planta ({datosPlanta?.length ?? 0})</h2>
+          {datosPlanta && datosPlanta.length > 0 && (
+            <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface ml-auto">
+              {([['Resumen', false], ['Completo', true]] as const).map(([label, val]) => (
+                <button
+                  key={label}
+                  onClick={() => setDatosCompleto(val)}
+                  className={'px-3 py-1 rounded-ds text-xs font-semibold transition ' + (datosCompleto === val ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {datosPlantaCargando ? (
+          <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">Consultando datos de planta…</p>
+        ) : datosPlanta && datosPlanta.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm whitespace-nowrap">
+              <thead>
+                <tr className="text-left text-xs font-semibold text-ds-gray-400 border-b border-ds-gray-100">
+                  {colsVisiblesPlanta.map((cx) => (
+                    <th key={cx.key} className={`px-4 py-2.5 ${cx.align === 'right' ? 'text-right' : ''}`}>{cx.label}</th>
+                  ))}
+                  <th className="px-4 py-2.5">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ds-gray-100">
+                {datosPlanta.map((b) => (
+                  <tr key={b.id}>
+                    {colsVisiblesPlanta.map((cx) => (
+                      <td key={cx.key} className={`px-4 py-2.5 ${cx.align === 'right' ? 'text-right' : ''}`}>{cx.render(b)}</td>
+                    ))}
+                    <td className="px-4 py-2.5">
+                      <div className="flex gap-1 flex-wrap">
+                        {b.tuvo_alarma && <Badge variant="red" dot>{b.cantidad_alarmas}</Badge>}
+                        {b.receta_modificada && <Badge variant="yellow" dot>Receta mod.</Badge>}
+                        {!b.tuvo_alarma && !b.receta_modificada && <span className="text-ds-gray-300">OK</span>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">Sin datos de planta para esta colada.</p>
         )}
       </section>
 
