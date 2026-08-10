@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
-import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
+import { Badge, Button, Card, Field, Input, Modal, Select, Skeleton, useToast } from "@/components/compras/ui";
 import { SolicitudForm } from "@/components/compras/solicitud-form";
 import { IconPlus } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
@@ -145,7 +145,14 @@ export default function MatrizPage() {
           </div>
         </Card>
 
-        {cargando ? <div className="empty mt-6">Cargando…</div> : columnas.length === 0 ? (
+        {cargando ? (
+          <div className="mt-6" style={{ display: "grid", gap: 8 }}>
+            <Skeleton height={14} width={140} pill />
+            <Skeleton height={44} radius={8} />
+            <Skeleton height={44} radius={8} />
+            <Skeleton height={44} radius={8} />
+          </div>
+        ) : columnas.length === 0 ? (
           <div className="empty mt-6">{etapaSel ? "No hay clasificaciones en esta etapa." : "No hay clasificaciones."} Creá clasificaciones en el Maestro.</div>
         ) : (
           <Card className="mt-4" style={{ padding: 0, overflow: "hidden" }}>

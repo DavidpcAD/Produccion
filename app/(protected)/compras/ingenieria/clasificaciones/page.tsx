@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
-import { Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
+import { Button, Card, Field, Input, Modal, Select, Skeleton, useToast } from "@/components/compras/ui";
 import { IconEdit } from "@/components/compras/icons";
 
 type Etapa = { id: number; codigo: string; nombre: string };
@@ -96,7 +96,14 @@ export default function ClasificacionesPage() {
           <div className="ds-body-sm ds-muted mt-2">{total} clasificación(es) · {nPartidas} partida(s) · {secciones.length} etapa(s)</div>
         </Card>
 
-        {cargando && <div className="empty mt-6">Cargando…</div>}
+        {cargando && (
+          <div className="mt-6" style={{ display: "grid", gap: 8 }}>
+            <Skeleton height={14} width={140} pill />
+            <Skeleton height={44} radius={8} />
+            <Skeleton height={44} radius={8} />
+            <Skeleton height={44} radius={8} />
+          </div>
+        )}
         <div className="clasif-groups mt-4">
           {!cargando && secciones.length === 0 && <div className="empty">No hay clasificaciones. Creá la primera con “+ Nueva clasificación”.</div>}
           {secciones.map((s) => {
