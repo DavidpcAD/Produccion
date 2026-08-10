@@ -250,11 +250,11 @@ export default function PartidasPage() {
 
   if (mounted && session && !isSuperAdmin) {
     return (
-      <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
+      <PageShell>
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">
           No tenés acceso a esta sección.
         </div>
-      </div>
+      </PageShell>
     );
   }
 

@@ -223,26 +223,26 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <div className="p-6 max-w-[1200px] mx-auto space-y-4">
+      <PageShell width="narrow">
         <Skeleton className="h-8 w-1/3" rounded="rounded-full" />
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-6 space-y-3">
           <Skeleton className="h-4 w-1/2" rounded="rounded-full" />
           <Skeleton className="h-4 w-2/3" rounded="rounded-full" />
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   if (!obra) {
     return (
-      <div className="p-6 max-w-[1200px] mx-auto animate-fade-in">
-        <Button variant="outline" size="sm" className="mb-4" onClick={() => router.push('/obras')} icon={<Icon name="chevron-left" size="sm" color="currentColor" />}>
+      <PageShell width="narrow">
+        <Button variant="outline" size="sm" onClick={() => router.push('/obras')} icon={<Icon name="chevron-left" size="sm" color="currentColor" />}>
           Volver a obras
         </Button>
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">
           No se encontró la obra.
         </div>
-      </div>
+      </PageShell>
     );
   }
 

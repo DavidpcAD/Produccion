@@ -96,12 +96,12 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
   }
 
   if (loading || !proyecto) return (
-    <div className="p-6 max-w-[1200px] mx-auto">
-      <Skeleton className="h-8 w-1/3 mb-4" rounded="rounded-full" />
+    <PageShell width="narrow">
+      <Skeleton className="h-8 w-1/3" rounded="rounded-full" />
       <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-6">
         <Skeleton className="h-4 w-1/2" rounded="rounded-full" />
       </div>
-    </div>
+    </PageShell>
   );
 
   const activos = proyecto.asignaciones.filter(a => a.Activo);

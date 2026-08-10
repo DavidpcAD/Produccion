@@ -320,7 +320,7 @@ export default function PresupuestoPage() {
   }
 
   if (mounted && session && !puede) {
-    return <div className="p-6 max-w-[1200px] mx-auto"><div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div></div>;
+    return <PageShell width="narrow"><div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-400">No tenés acceso a esta sección.</div></PageShell>;
   }
 
   const tipos = plantilla ? Object.keys(plantilla.porTipo).filter(t => (plantilla.porTipo[t] ?? []).length > 0) : [];
