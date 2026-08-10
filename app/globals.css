@@ -43,6 +43,8 @@
   /* Font sizes */
   --font-size-body-sm: 12px;
   --line-height-body-sm: 16px;
+  --font-size-label:   14px;
+  --line-height-label: 20px;
   --font-size-body:    16px;
   --line-height-body:  24px;
   --font-size-sub-sm:  20px;

@@ -195,7 +195,7 @@ export default function AvancePage() {
           <div className="space-y-4">
             {porBloque.map(([bloque, lista]) => (
               <section key={bloque}>
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ds-gray-400">
+                <h2 className="mb-2 text-body-sm font-semibold uppercase tracking-wider text-ds-gray-400">
                   Bloque {bloque || '—'}
                 </h2>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">

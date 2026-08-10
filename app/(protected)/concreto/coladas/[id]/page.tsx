@@ -340,7 +340,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
           <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
             <Icon name="list" size="sm" color="currentColor" className="text-brand" />
           </div>
-          <h2 className="font-bold text-ds-ink text-sm">Batches ({data.batches.length})</h2>
+          <h2 className="font-bold text-ds-ink text-label">Batches ({data.batches.length})</h2>
         </div>
         {data.batches.length === 0 ? (
           <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">Sin batches asociados</p>
@@ -398,7 +398,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
           <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
             <Icon name="boleta" size="sm" color="currentColor" className="text-brand" />
           </div>
-          <h2 className="font-bold text-ds-ink text-sm">Cilindros ({data.cilindros.length})</h2>
+          <h2 className="font-bold text-ds-ink text-label">Cilindros ({data.cilindros.length})</h2>
         </div>
         {data.cilindros.length === 0 ? (
           <p className="px-5 py-6 text-sm text-ds-gray-400 text-center">Sin cilindros registrados</p>
@@ -440,7 +440,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
           <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
             <Icon name="boleta" size="sm" color="currentColor" className="text-brand" />
           </div>
-          <h2 className="font-bold text-ds-ink text-sm">Líneas de pedido BC{lineasBC ? ` (${lineasBC.length})` : ''}</h2>
+          <h2 className="font-bold text-ds-ink text-label">Líneas de pedido BC{lineasBC ? ` (${lineasBC.length})` : ''}</h2>
           {c.numero_pedido_ensamblado_bc && (
             <Badge variant="green" dot>Pedido {c.numero_pedido_ensamblado_bc}</Badge>
           )}

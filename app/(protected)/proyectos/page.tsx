@@ -97,7 +97,7 @@ export default function ProyectosPage() {
                   {p.Estado && <Badge variant={estadoVariant(p.Estado)}>{p.Estado}</Badge>}
                 </div>
               </div>
-              <h3 className="font-bold text-ds-ink mb-1 line-clamp-2 text-sm">{p.Nombre}</h3>
+              <h3 className="font-bold text-ds-ink mb-1 line-clamp-2 text-label">{p.Nombre}</h3>
               <p className="text-xs text-ds-gray-400 mb-4 font-mono">{p.CodigoBC}</p>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs text-ds-gray-400 font-medium">

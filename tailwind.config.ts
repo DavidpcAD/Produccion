@@ -41,6 +41,7 @@ const config: Config = {
       },
       fontSize: {
         "body-sm":   ["12px", { lineHeight: "16px", letterSpacing: "0" }],
+        "label":     ["14px", { lineHeight: "20px", letterSpacing: "0" }],
         "body":      ["16px", { lineHeight: "24px", letterSpacing: "0" }],
         "sub-sm":    ["20px", { lineHeight: "24px", letterSpacing: "0.4px" }],
         "sub":       ["24px", { lineHeight: "24px", letterSpacing: "0.4px" }],

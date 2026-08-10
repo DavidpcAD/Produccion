@@ -228,7 +228,7 @@ function SeccionSemanas() {
 
       {/* Abrir nueva semana */}
       <div className="mb-6 rounded-ds border border-ds-gray-200 p-4">
-        <h3 className="mb-3 text-sm font-semibold">Abrir nueva semana</h3>
+        <h3 className="mb-3 text-label font-semibold">Abrir nueva semana</h3>
         {abierta && (
           <p className="mb-3 rounded-ds bg-ds-yellow/10 px-3 py-2 text-xs text-ds-yellow-ink">
             Hay una semana abierta (Semana {abierta.numero_semana}/{abierta.anio}). Debe cerrarse

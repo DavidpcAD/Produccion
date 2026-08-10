@@ -266,13 +266,13 @@ export default function UtilidadesPage() {
 
           {/* Utilidad gastada (barras DS) */}
           <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-4 space-y-3">
-            <h3 className="font-bold text-ds-ink text-sm">Utilidad gastada — componentes</h3>
+            <h3 className="font-bold text-ds-ink text-label">Utilidad gastada — componentes</h3>
             <BarrasHorizontales datos={datosGastada} />
           </section>
 
           {/* Distribución por tipo */}
           <section className="space-y-2">
-            <h3 className="font-bold text-ds-ink text-sm">Distribución por tipo de movimiento</h3>
+            <h3 className="font-bold text-ds-ink text-label">Distribución por tipo de movimiento</h3>
             <DataTable
               columns={columnasTipo}
               data={resumen?.distribucionPorTipo ?? []}
@@ -312,7 +312,7 @@ export default function UtilidadesPage() {
 
           {/* Ingresos y utilidad por lote */}
           <section className="space-y-2">
-            <h3 className="font-bold text-ds-ink text-sm">Ingresos y utilidad por lote</h3>
+            <h3 className="font-bold text-ds-ink text-label">Ingresos y utilidad por lote</h3>
             <DataTable
               columns={columnasIngLote}
               data={ingresos?.porLote ?? []}
@@ -324,7 +324,7 @@ export default function UtilidadesPage() {
 
           {/* Movimientos por lote (del resumen) */}
           <section className="space-y-2">
-            <h3 className="font-bold text-ds-ink text-sm">Movimientos por lote</h3>
+            <h3 className="font-bold text-ds-ink text-label">Movimientos por lote</h3>
             <DataTable
               columns={columnasMovLote}
               data={movLote}

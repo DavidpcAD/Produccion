@@ -103,7 +103,7 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
   return (
     <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
       <div className="px-4 py-3 bg-ds-gray-100 border-b border-ds-gray-200">
-        <h2 className="font-bold text-ds-ink text-sm">{titulo}</h2>
+        <h2 className="font-bold text-ds-ink text-label">{titulo}</h2>
       </div>
       <dl className="divide-y divide-ds-gray-100 text-sm">{children}</dl>
     </div>
@@ -379,7 +379,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
             </div>
 
             <div>
-              <h3 className="mb-2 text-sm font-bold text-ds-ink">Resumen por grupos</h3>
+              <h3 className="mb-2 text-label font-bold text-ds-ink">Resumen por grupos</h3>
               <div className="overflow-hidden rounded-ds border border-ds-gray-200">
                 <table className="w-full text-sm">
                   <thead className="bg-ds-gray-100/60 text-left">
@@ -403,7 +403,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
             </div>
 
             <div>
-              <h3 className="mb-2 text-sm font-bold text-ds-ink">Detalle de partidas</h3>
+              <h3 className="mb-2 text-label font-bold text-ds-ink">Detalle de partidas</h3>
               <div className="overflow-hidden rounded-ds border border-ds-gray-200">
                 <table className="w-full text-sm">
                   <thead className="bg-ds-gray-100/60 text-left">

@@ -325,7 +325,7 @@ export default function EsclerometroDetallePage({
       {/* Header del ensayo */}
       <div className="rounded-ds-lg border border-ds-gray-100 bg-ds-surface p-6 shadow-ds-01">
         <div className="mb-4 flex items-center gap-3">
-          <h1 className="text-sub-sm font-bold text-ds-ink">Ensayo #{ensayo.numero}</h1>
+          <h1 className="text-heading font-bold text-ds-ink">Ensayo #{ensayo.numero}</h1>
           <span className="text-sm text-ds-gray-400">{fmtDia(ensayo.fecha)}</span>
         </div>
 

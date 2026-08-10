@@ -241,7 +241,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
 
       {/* Gráfico resistencia vs curva teórica */}
       <section className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
-        <h2 className="font-bold text-ds-ink text-sm mb-3">Curva de resistencia</h2>
+        <h2 className="font-bold text-ds-ink text-label mb-3">Curva de resistencia</h2>
         <GraficoResistencia ensayos={ensayos} fcObjetivo={data.fc_objetivo} curva={curva} />
       </section>
 
@@ -251,7 +251,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
           <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
             <Icon name="boleta" size="sm" color="currentColor" className="text-brand" />
           </div>
-          <h2 className="font-bold text-ds-ink text-sm">Ensayos ({ensayos.length})</h2>
+          <h2 className="font-bold text-ds-ink text-label">Ensayos ({ensayos.length})</h2>
           <Button size="xs" variant="outline" className="ml-auto" onClick={() => setAgregarEnsayo(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
             Agregar ensayo
           </Button>

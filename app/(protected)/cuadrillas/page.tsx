@@ -651,7 +651,7 @@ export default function CuadrillasPage() {
                       <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
                         <Icon name="list" size="sm" color="currentColor" className="text-brand" />
                       </div>
-                      <h2 className="font-bold text-ds-ink text-sm flex-1 min-w-0 truncate">{row.p.codigo} · {row.p.nombre}</h2>
+                      <h2 className="font-bold text-ds-ink text-label flex-1 min-w-0 truncate">{row.p.codigo} · {row.p.nombre}</h2>
                       <Icon name="open" size="sm" color="currentColor" className={`text-ds-gray-400 shrink-0 transition-transform ${expanded ? '' : 'rotate-180'}`} />
                     </button>
                     <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 shrink-0 ${row.conEnc === 0 ? 'text-ds-gray-400 bg-ds-gray-200' : completa ? 'text-black bg-brand' : 'text-black bg-brand/40'}`}>
@@ -826,7 +826,7 @@ export default function CuadrillasPage() {
                       <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
                         <Icon name="folder" size="sm" color="currentColor" className="text-brand" />
                       </div>
-                      <h3 className="font-bold text-ds-ink text-sm">{nom}</h3>
+                      <h3 className="font-bold text-ds-ink text-label">{nom}</h3>
                       <span className="text-xs text-ds-gray-400">· obras y subpartidas de este proyecto</span>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">

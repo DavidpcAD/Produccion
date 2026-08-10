@@ -363,7 +363,7 @@ function KpisProduccion({ t }: { t: ReporteTotales }) {
   const difCosto = t.costo_real_prom - t.costo_esperado_prom;
   return (
     <section className="space-y-2">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-ds-gray-500">Indicadores de la semana</h2>
+      <h2 className="text-body-sm font-semibold uppercase tracking-wider text-ds-gray-500">Indicadores de la semana</h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <Kpi label="Obras en construcción" value={String(t.construccion)} sub={`${t.trabajando} con trabajo · ${t.en_espera} en espera`} />
         <Kpi label="Área construida" value={fmtM2(t.area_construida)} sub={`de ${fmtM2(t.area_total)} · faltan ${fmtM2(t.area_por_construir)}`} />
