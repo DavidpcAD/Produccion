@@ -1,6 +1,7 @@
 import 'server-only';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import sql from 'mssql';
+import { bcConstructionConfigured, getWork, getWorkLines } from '@/lib/bc-construction';
 
 /**
  * Presupuestos importados desde Business Central (pro_bi.fact_presupuesto, snapshot
@@ -98,6 +99,64 @@ export async function listarPresupuestos(worksNo?: string): Promise<PresupuestoR
   return result.recordset.map(mapResumen);
 }
 
+/**
+ * Detalle por partida leído de BC EN VIVO (workLines), como fallback cuando el
+ * snapshot ETL (pro_bi.fact_presupuesto) todavía no tiene la obra — p.ej. obras
+ * administrativas o presupuestadas después de la última corrida del ETL. Toma la
+ * versión vigente (works.filterVersionCode; si no, el mayor REESTUDIO) y el costo
+ * directo (lineType 'Cost'). `fecha_carga` queda vacío (no viene del ETL).
+ */
+export async function detallePresupuestoBC(obra: string): Promise<PresupuestoDetalle | null> {
+  if (!bcConstructionConfigured()) return null;
+  const [work, lineas] = await Promise.all([
+    getWork(obra).catch(() => null),
+    getWorkLines(obra).catch(() => []),
+  ]);
+  const cost = lineas.filter((l) => l.lineType === 'Cost');
+  if (cost.length === 0) return null;
+
+  // Versión vigente: la de works; si no calza, el mayor REESTUDIO n de las líneas.
+  const versiones = [...new Set(cost.map((l) => l.versionCode).filter(Boolean))];
+  const nver = (v: string) => Number(v.replace(/\D/g, '')) || 0;
+  let version = work?.filterVersionCode?.trim() || '';
+  if (!version || !versiones.includes(version)) {
+    version = [...versiones].sort((a, b) => nver(b) - nver(a))[0] ?? '';
+  }
+  if (!version) return null;
+
+  const vlines = cost.filter((l) => l.versionCode === version);
+  const posting = vlines.filter((l) => l.taskType === 'Posting');
+  if (posting.length === 0) return null;
+  const totales = vlines.filter((l) => l.taskType === 'Total');
+  const total = posting.reduce((s, l) => s + l.lineAmount, 0);
+  const pct = (v: number) => (total > 0 ? Math.round((v / total) * 10000) / 100 : 0);
+  const porCodigo = (a: { taskNo: string }, b: { taskNo: string }) =>
+    a.taskNo.localeCompare(b.taskNo, undefined, { numeric: true });
+
+  return {
+    works_no: obra,
+    version_code: version,
+    es_ultima_version: true,
+    fecha_carga: '',
+    total_costo: total,
+    grupos: totales.sort(porCodigo).map((g) => ({
+      task_no: g.taskNo,
+      descripcion: g.description,
+      total: g.lineAmount,
+      peso_pct: pct(g.lineAmount),
+    })),
+    partidas: posting.sort(porCodigo).map((p) => ({
+      task_no: p.taskNo,
+      descripcion: p.description,
+      cantidad: p.quantity,
+      unidad: p.unitOfMeasure,
+      precio_unitario: p.unitAmount,
+      importe: p.lineAmount,
+      peso_pct: pct(p.lineAmount),
+    })),
+  };
+}
+
 /** Detalle de una versión de presupuesto (grupos + partidas). null si no existe. */
 export async function detallePresupuesto(
   obra: string,
@@ -118,7 +177,8 @@ export async function detallePresupuesto(
       `);
     version = vq.recordset[0]?.version_code ?? null;
   }
-  if (!version) return null;
+  // Sin snapshot para esta obra → fallback a BC en vivo (workLines).
+  if (!version) return detallePresupuestoBC(obra);
 
   const resumenQ = await pool
     .request()

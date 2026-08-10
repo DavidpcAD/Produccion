@@ -100,6 +100,38 @@ export async function nextVersionDisponible(worksNo: string): Promise<string> {
   }
 }
 
+// Línea de presupuesto leída de BC en vivo (entity workLines del API de construcción).
+// Misma estructura que pro_bi.fact_presupuesto: taskType 'Total' = grupo, 'Posting' = partida;
+// lineType 'Cost' = costo directo. Sirve de fallback cuando el snapshot ETL no tiene la obra.
+export interface WorkLineBC {
+  taskNo: string;
+  taskType: string;   // 'Total' | 'Posting'
+  lineType: string;   // 'Sales' | 'Cost' | 'Indirect Cost'
+  description: string;
+  quantity: number;
+  unitAmount: number;
+  lineAmount: number;
+  unitOfMeasure: string | null;
+  versionCode: string;
+}
+
+// Lee TODAS las líneas de presupuesto de una obra desde BC en vivo (todas las versiones/tipos).
+// El filtrado (Cost, versión vigente, Total/Posting) lo hace quien la consume.
+export async function getWorkLines(worksNo: string): Promise<WorkLineBC[]> {
+  const body = await req(`workLines?$filter=${encodeURIComponent(`worksNo eq '${worksNo}'`)}&$top=2000`, { method: 'GET' });
+  return ((body?.value ?? []) as Array<Record<string, unknown>>).map((l) => ({
+    taskNo: String(l.taskNo ?? ''),
+    taskType: String(l.taskType ?? ''),
+    lineType: String(l.lineType ?? ''),
+    description: String(l.description ?? ''),
+    quantity: Number(l.quantity) || 0,
+    unitAmount: Number(l.unitAmount) || 0,
+    lineAmount: Number(l.lineAmount) || 0,
+    unitOfMeasure: (l.unitOfMeasure as string) ?? null,
+    versionCode: String(l.versionCode ?? ''),
+  }));
+}
+
 export interface WorkTotals { salesLineAmount?: number; costLineAmount?: number; indirectCostLineAmount?: number; result?: number }
 
 export async function getWork(worksNo: string): Promise<(WorkTotals & { no: string; filterVersionCode?: string }) | null> {

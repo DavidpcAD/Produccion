@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, sql } from '@/lib/db';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
+import { detallePresupuestoBC } from '@/lib/bc/presupuestos';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -68,6 +69,32 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         monto,
       };
     });
+
+    // Sin filas en el snapshot ETL → fallback a BC en vivo (workLines). Cubre obras
+    // administrativas o presupuestadas después de la última corrida del ETL (que en
+    // BC ya tienen presupuesto pero aún no están en pro_bi.fact_presupuesto).
+    if (partidas.length === 0) {
+      const bc = await detallePresupuestoBC(worksNo).catch(() => null);
+      if (bc && bc.partidas.length > 0) {
+        const grupoDe = (taskNo: string) =>
+          bc.grupos.find((g) => g.task_no === taskNo.split('.')[0])?.descripcion ?? 'Otros';
+        return NextResponse.json({
+          cargado: true,
+          fuente: 'bc',
+          worksNo,
+          version: bc.version_code,
+          total: bc.total_costo,
+          grupos: bc.grupos.map((g) => ({ nombre: g.descripcion, monto: g.total, peso: g.peso_pct })),
+          partidas: bc.partidas.map((p) => ({
+            codigo: p.task_no,
+            nombre: p.descripcion,
+            grupo: grupoDe(p.task_no),
+            monto: p.importe,
+            peso: p.peso_pct,
+          })),
+        });
+      }
+    }
 
     // peso% por partida + orden estable (grupo, código).
     for (const p of partidas) (p as { peso?: number }).peso = total > 0 ? (p.monto / total) * 100 : 0;
