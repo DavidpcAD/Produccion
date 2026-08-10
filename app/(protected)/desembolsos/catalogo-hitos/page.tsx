@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -49,7 +50,7 @@ export default function CatalogoHitosPage() {
           </thead>
           <tbody>
             {cargando && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-ds-gray-400">Cargando…</td></tr>
+              <tr><td colSpan={5} className="px-3 py-6 text-center"><Skeleton className="h-4 w-48 mx-auto" rounded="rounded-full" /></td></tr>
             )}
             {!cargando && hitos.length === 0 && (
               <tr><td colSpan={5} className="px-3 py-6 text-center text-ds-gray-400">Sin hitos.</td></tr>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatCRC } from '@/lib/utilidades/format';
@@ -167,7 +168,7 @@ export default function MatrizPage() {
       )}
 
       {cargando && !data ? (
-        <p className="text-ds-gray-400">Cargando matriz…</p>
+        <SkeletonRows rows={6} />
       ) : data ? (
         <div className="space-y-6">
           {/* Encabezado de semanas + totales */}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Input, Select } from '@/components/ui/Input';
 import { formatCRC } from '@/lib/utilidades/format';
 import type {
@@ -288,7 +289,7 @@ export default function DesembolsosDashboardPage() {
           <tbody>
             {cargando && !data ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-ds-gray-400">Cargando…</td>
+                <td colSpan={7} className="px-4 py-10 text-center"><Skeleton className="h-4 w-48 mx-auto" rounded="rounded-full" /></td>
               </tr>
             ) : casosFiltrados.length === 0 ? (
               <tr>

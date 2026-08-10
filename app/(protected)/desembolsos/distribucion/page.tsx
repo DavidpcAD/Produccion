@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { SkeletonText } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -46,7 +47,7 @@ export default function DistribucionPage() {
       />
 
       <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-gray-200 bg-ds-surface">
-        {cargando && <p className="px-3 py-6 text-center text-ds-gray-400">Cargando proyectos…</p>}
+        {cargando && <div className="px-4 py-4"><SkeletonText lines={4} /></div>}
         {!cargando && proyectos.length === 0 && (
           <p className="px-3 py-6 text-center text-ds-gray-400">Sin proyectos con ventas activas.</p>
         )}

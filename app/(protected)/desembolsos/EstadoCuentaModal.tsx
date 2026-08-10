@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { SkeletonText } from '@/components/ui/Skeleton';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { EstadoCuentaData } from '@/lib/desembolsos/estado-cuenta';
 
@@ -58,7 +59,7 @@ export function EstadoCuentaModal({ idCaso, onClose }: { idCaso: number | null; 
       title={c ? `Estado de cuenta · ${c.Cliente}` : 'Estado de cuenta'}
     >
       {cargando && !data ? (
-        <p className="text-ds-gray-400">Cargando estado de cuenta…</p>
+        <SkeletonText lines={5} />
       ) : error ? (
         <p className="rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">{error}</p>
       ) : data && c && t ? (

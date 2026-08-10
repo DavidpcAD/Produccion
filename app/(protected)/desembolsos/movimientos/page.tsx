@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton, SkeletonText } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -154,7 +155,7 @@ export default function DesembolsosMovimientosPage() {
           <tbody>
             {cargando && movs.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-10 text-center text-ds-gray-400">Cargando…</td>
+                <td colSpan={8} className="px-3 py-10 text-center"><Skeleton className="h-4 w-48 mx-auto" rounded="rounded-full" /></td>
               </tr>
             ) : movs.length === 0 ? (
               <tr>
@@ -262,7 +263,7 @@ function CasoDetalleModal({
       }
     >
       {cargando && !data ? (
-        <p className="text-ds-gray-400">Cargando…</p>
+        <SkeletonText lines={5} />
       ) : data ? (
         <div className="space-y-6">
           {/* Hitos */}

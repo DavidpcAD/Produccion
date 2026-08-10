@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Input';
@@ -62,7 +63,7 @@ export default function EsquemasPage() {
         subtitle="Cada banco distribuye el desembolso por hito físico de la obra. Aplican a todos los proyectos. Los días y el día fijo del perito alimentan las fechas proyectadas de la matriz."
       />
 
-      {cargando && <p className="text-ds-gray-400">Cargando bancos…</p>}
+      {cargando && <SkeletonRows rows={4} />}
 
       {!cargando && (
         <>
