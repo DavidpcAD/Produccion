@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation';
 const TABS = [
   { href: '/partidas', label: 'Partidas y subpartidas' },
   { href: '/avance/tipos-casa', label: 'Tipos de casa' },
-  { href: '/avance/sprints', label: 'Sprints y semanas' },
+  { href: '/avance/sprints', label: 'Sprints' },
   { href: '/avance/pesos', label: 'Pesos' },
 ];
 

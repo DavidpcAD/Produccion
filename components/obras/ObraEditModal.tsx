@@ -249,8 +249,6 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
           {renderDim('centroCosto', 'Centro de costo (CC)', dimCC)}
           <Combobox label="Proyecto" value={String(form.idProyecto ?? '')} onChange={v => set('idProyecto', v)}
             placeholder="Seleccionar proyecto" options={proyectoOptions} />
-          <Input label="Origen principal" value={String(form.origenPrincipal ?? '')} disabled
-            hint="Fuente de datos del registro (definido por la importación) — no editable" />
           <Input label="Gerente de proyecto" value={String(form.gerenteProyecto ?? '')} onChange={e => set('gerenteProyecto', e.target.value)} />
           <Input label="Encargado" value={String(form.idEncargado ?? '')} onChange={e => set('idEncargado', e.target.value)} />
           <div className="sm:col-span-2">

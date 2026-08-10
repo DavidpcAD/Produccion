@@ -286,7 +286,6 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
     </Seccion>,
     <Seccion key="det" titulo="Detalles">
       <Campo label="Proyecto" value={obra.proyectoNombre} />
-      <Campo label="Origen principal" value={obra.origenPrincipal} />
       <Campo label="Gerente de proyecto" value={obra.gerenteProyecto} />
       <Campo label="Encargado" value={obra.idEncargado} />
       <Campo label="Ubicación" value={obra.ubicacion} />

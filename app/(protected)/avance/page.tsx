@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/Toast';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { MatrizAvance } from './MatrizAvance';
 import { KanbanAvance } from './KanbanAvance';
+import { SemanasOperativas } from '@/components/avance/SemanasOperativas';
 import { VENTA_META } from '@/lib/avance/venta';
 import type { EstadoVenta, ObraAvance, Proyecto } from '@/lib/avance/types';
 
@@ -149,7 +150,14 @@ export default function AvancePage() {
 
       {vista === 'matriz' && <MatrizAvance proyecto={proyectoActivo} />}
 
-      {vista === 'kanban' && <KanbanAvance proyecto={proyectoActivo} />}
+      {vista === 'kanban' && (
+        <div className="space-y-6">
+          {/* Gestión de la semana operativa (abrir / re-fijar línea base). Antes
+              vivía en la config de Sprints; ahora está acá, en Programación. */}
+          <SemanasOperativas />
+          <KanbanAvance proyecto={proyectoActivo} />
+        </div>
+      )}
 
       {vista === 'lista' && (
         <div className="space-y-4">
