@@ -91,6 +91,13 @@ export function getRouteLevel(pathname: string): number {
   // Órdenes de Compra (Ingeniería / Proveeduría / Aprobación): por ahora SOLO superadmin,
   // hasta definir los roles reales (Ingeniería / Gerencia / etc.). Cubre páginas y API.
   if (pathname.startsWith('/compras') || pathname.startsWith('/api/compras')) return 4;
+  // Integración BC: escribir a BC (reportar/registrar) exige superadmin (N4); ver
+  // el listado/detalle/presupuestos desde N2. Los /api/bc/{dimensions,jobs,tasks,
+  // inventory-groups} existentes quedan intactos (default N1, los usa el editor de obras).
+  if (pathname.startsWith('/api/bc/reportar') || pathname.startsWith('/api/bc/registrar')) return 4;
+  if (pathname.startsWith('/api/bc/preview') || pathname.startsWith('/api/bc/resumen')) return 2;
+  if (pathname.startsWith('/api/presupuestos')) return 2;
+  if (pathname.startsWith('/bc')) return 2;
   if (pathname.startsWith('/apps')) return 4;
   if (pathname.startsWith('/roles')) return 4;
   if (pathname.startsWith('/cuentas')) return 4;
@@ -189,6 +196,8 @@ export function rolLabelDeUsuario(
 export function getRouteModule(pathname: string): Modulo {
   const p = pathname;
   if (p === '/' ) return 'dashboard';
+  // Business Central (integración de avance + presupuestos por obra) = dominio Presupuesto.
+  if (p.startsWith('/bc') || p.startsWith('/api/bc') || p.startsWith('/api/presupuestos')) return 'presupuesto';
   // Catálogos que viven bajo /avance pero son del dominio de Partidas (Presupuesto).
   if (p.startsWith('/avance/tipos-casa') || p.startsWith('/avance/sprints') || p.startsWith('/avance/sub-partidas')) return 'presupuesto';
   if (p.startsWith('/obras') || p.startsWith('/proyectos') || p.startsWith('/partidas') || p.startsWith('/presupuesto')) return 'presupuesto';

@@ -43,6 +43,14 @@ const navItems: NavItemDef[] = [
   { href: '/partidas',  label: 'Partidas',      icon: 'calculator', minLevel: 4 },
   { href: '/presupuesto',label: 'Presupuesto',   icon: 'boleta',    minLevel: 2 },
   {
+    href: '/bc/integracion', label: 'Business Central', icon: 'traslado', minLevel: 2,
+    section: '/bc',
+    children: [
+      { href: '/bc/integracion', label: 'Integración BC' },
+      { href: '/bc/presupuestos', label: 'Presupuestos por obra' },
+    ],
+  },
+  {
     href: '/avance', label: 'Avance de obra', icon: 'completado', minLevel: 2,
     section: '/avance',
     children: [
