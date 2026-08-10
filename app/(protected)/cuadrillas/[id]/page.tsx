@@ -231,7 +231,7 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
       {/* Miembros */}
       <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-5 py-3 border-b border-ds-gray-200 bg-ds-gray-100">
-          <h2 className="font-bold text-ds-ink text-sm">Miembros activos</h2>
+          <h2 className="font-bold text-ds-ink text-label">Miembros activos</h2>
         </div>
         {activos.length === 0 ? (
           <div className="p-12 text-center text-ds-gray-300">

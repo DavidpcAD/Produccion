@@ -104,7 +104,7 @@ export function ComentariosPanel({
     <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Icon name="edit" size="sm" color="currentColor" />
-        <h3 className="font-bold text-ds-ink text-sm">{titulo}</h3>
+        <h3 className="font-bold text-ds-ink text-label">{titulo}</h3>
       </div>
 
       <div className="space-y-2">

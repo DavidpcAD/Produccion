@@ -390,7 +390,7 @@ function LotesPanel({ idCp }: { idCp: number }) {
 
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ds-gray-500">
+      <h3 className="mb-2 text-label font-semibold uppercase tracking-wide text-ds-gray-500">
         Lotes del crédito
       </h3>
       <Table<CreditoPuenteLote>
@@ -566,7 +566,7 @@ function MovimientosPanel({ idCp }: { idCp: number }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-ds-gray-500">
+        <h3 className="text-label font-semibold uppercase tracking-wide text-ds-gray-500">
           Movimientos del crédito
         </h3>
         <Button size="sm" variant="outline" onClick={abrirNuevo}>
