@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { SkeletonText, SkeletonRows } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
@@ -156,7 +157,7 @@ function TabNomina({ semanaId }: { semanaId: number }) {
     }
   }
 
-  if (cargando) return <p className="text-ds-gray-400">Cargando…</p>;
+  if (cargando) return <div className="max-w-md"><SkeletonText lines={4} /></div>;
 
   return (
     <div className="max-w-md space-y-4">
@@ -283,7 +284,7 @@ function TabHoras({ semanaId }: { semanaId: number }) {
     }
   }
 
-  if (cargando) return <p className="text-ds-gray-400">Cargando…</p>;
+  if (cargando) return <SkeletonRows rows={5} />;
 
   return (
     <div className="space-y-4">

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { SkeletonText } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
@@ -435,7 +436,7 @@ function SubPartidaModal({ partidas, editandoId, onClose, onGuardado }: ModalPro
       }
     >
       {!form ? (
-        <p className="text-ds-gray-400">Cargando datos…</p>
+        <SkeletonText lines={4} />
       ) : (
         <div className="space-y-4">
           {!esEdicion && (

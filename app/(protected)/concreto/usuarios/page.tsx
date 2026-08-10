@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
@@ -127,7 +128,7 @@ export default function ConcretoUsuariosPage() {
         </div>
       )}
 
-      {loading && <p className="text-ds-gray-400">Cargando…</p>}
+      {loading && <SkeletonRows rows={4} className="mt-2" />}
 
       {!loading && !noConfig && usuarios.length === 0 && (
         <p className="text-ds-gray-400">No hay usuarios para mostrar.</p>

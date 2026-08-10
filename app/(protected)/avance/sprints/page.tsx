@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { CatalogoTabs } from '@/components/layout/CatalogoTabs';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
@@ -294,8 +295,8 @@ function SeccionSemanas() {
           <tbody>
             {cargando && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-ds-gray-400">
-                  Cargando…
+                <td colSpan={6} className="px-3 py-6 text-center">
+                  <Skeleton className="h-4 w-48 mx-auto" rounded="rounded-full" />
                 </td>
               </tr>
             )}
@@ -431,8 +432,8 @@ function SeccionSprints() {
           <tbody>
             {cargando && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-ds-gray-400">
-                  Cargando…
+                <td colSpan={6} className="px-3 py-6 text-center">
+                  <Skeleton className="h-4 w-48 mx-auto" rounded="rounded-full" />
                 </td>
               </tr>
             )}
