@@ -138,31 +138,33 @@ export function AppShell({ role, children }: { role: Role; children: React.React
   return (
     <div className="px-4 py-6 sm:px-6 md:px-8">
       {hasNav && (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          {meta.nav.map((n) => {
-            const active = activeHref === n.href;
-            return (
-              <button
-                key={n.href}
-                type="button"
-                onClick={() => router.push(n.href)}
-                aria-current={active ? "page" : undefined}
-                className={
-                  "inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition " +
-                  (active
-                    ? "bg-black text-white"
-                    : "bg-ds-surface text-ds-gray-500 border border-ds-gray-200 hover:bg-ds-gray-100")
-                }
-              >
-                {n.label}
-              </button>
-            );
-          })}
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-1 w-fit">
+            {meta.nav.map((n) => {
+              const active = activeHref === n.href;
+              return (
+                <button
+                  key={n.href}
+                  type="button"
+                  onClick={() => router.push(n.href)}
+                  aria-current={active ? "page" : undefined}
+                  className={
+                    "rounded-ds px-3.5 py-1.5 text-label font-semibold transition-colors " +
+                    (active
+                      ? "bg-black text-white"
+                      : "text-ds-gray-500 hover:bg-ds-gray-100 hover:text-ds-ink")
+                  }
+                >
+                  {n.label}
+                </button>
+              );
+            })}
+          </div>
           {meta.action && (
             <button
               type="button"
               onClick={() => router.push(meta.action!.href)}
-              className="ml-auto inline-flex items-center gap-1 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-black"
+              className="ml-auto inline-flex items-center gap-1 rounded-ds bg-brand px-3.5 py-1.5 text-label font-semibold text-black transition-colors"
             >
               <IconPlus size={18} /> {meta.action.label}
             </button>
