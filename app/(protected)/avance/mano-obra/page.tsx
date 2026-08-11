@@ -382,6 +382,21 @@ function TabSubcontratos({ semanaId }: { semanaId: number }) {
   const [desc, setDesc] = useState('');
   const [guardando, setGuardando] = useState(false);
 
+  // La obra debe elegirse de la lista de obras activas (habilitadas en avance),
+  // no escribirse a mano (evita códigos inválidos en el reparto de M.O.).
+  const [obrasOpts, setObrasOpts] = useState<{ value: string; label: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/avance/obras')
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((d) => setObrasOpts(
+        (d.data ?? []).map((o: { codigo: string; tipo_casa?: string | null }) => ({
+          value: o.codigo,
+          label: o.tipo_casa ? `${o.codigo} · ${o.tipo_casa}` : o.codigo,
+        })),
+      ))
+      .catch(() => {});
+  }, []);
+
   function recargar() {
     setCargando(true);
     fetch('/api/avance/mano-obra/subcontratos')
@@ -395,7 +410,7 @@ function TabSubcontratos({ semanaId }: { semanaId: number }) {
   useEffect(recargar, [semanaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function agregar() {
-    if (obra.trim().length < 3) return toast('Indicá la obra.', 'error');
+    if (!obra.trim()) return toast('Seleccioná la obra de la lista.', 'error');
     if (!(Number(monto) >= 0) || !monto) return toast('Indicá el monto.', 'error');
     setGuardando(true);
     try {
@@ -440,7 +455,14 @@ function TabSubcontratos({ semanaId }: { semanaId: number }) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 rounded-ds border border-ds-gray-200 p-4 sm:grid-cols-5">
-        <Input label="Obra" value={obra} placeholder="VN-C.08" onChange={(e) => setObra(e.target.value)} />
+        <Combobox
+          label="Obra"
+          value={obra}
+          onChange={setObra}
+          placeholder="Seleccionar obra…"
+          emptyText="Sin obras activas"
+          options={obrasOpts}
+        />
         <Select
           label="Tipo"
           value={tipo}

@@ -176,7 +176,10 @@ export default function AvanceCapturaPage() {
         back={
           <button
             type="button"
-            onClick={() => router.push('/avance')}
+            // Volver EXACTAMENTE a donde se venía (matriz/kanban/lista con su
+            // proyecto y filtro): router.back() restaura la URL previa que el
+            // dashboard ya sincroniza. Fallback a /avance si se entró directo.
+            onClick={() => { if (window.history.length > 1) router.back(); else router.push('/avance'); }}
             className="mb-1 flex items-center gap-1 text-body-sm text-ds-gray-400 hover:text-ds-ink"
           >
             <Icon name="back" size="sm" color="currentColor" /> Volver a obras
