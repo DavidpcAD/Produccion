@@ -122,6 +122,7 @@ export default function ReportesPage() {
           </div>
           {reporte && <KpisProduccion t={reporte.totales} />}
           <ResumenGeneral data={data} semanaSel={semanaId} />
+          {reporte && <KpisFinanciero t={reporte.totales} />}
           <ResumenFinanciero data={data} semanaSel={semanaId} />
           {reporte && reporte.obras.length > 0 && <DetallePorObra obras={reporte.obras} />}
         </div>
@@ -377,6 +378,35 @@ function KpisProduccion({ t }: { t: ReporteTotales }) {
         <Kpi label="Producido acumulado" value={fmtMonto(t.monto_acumulado)} sub={`de ${fmtMonto(t.presupuesto_total)} · falta ${fmtMonto(t.faltante)}`} />
         <Kpi label="Venta acumulada" value={fmtMonto(t.venta_acumulada)} />
         <Kpi label="Utilidad acumulada" value={fmtMonto(t.utilidad_acumulada)} accent={t.utilidad_acumulada >= 0 ? 'pos' : 'neg'} />
+      </div>
+    </section>
+  );
+}
+
+// --------------------------------------------- KPIs financieros (tarjetas)
+
+/** Tarjetas Directo / Indirecto / Venta / Utilidad (valor de la semana + acumulado),
+ *  como el encabezado del reporte Financiero de obrascontrol. */
+function KpisFinanciero({ t }: { t: ReporteTotales }) {
+  const cards = [
+    { label: 'Costo directo', semana: t.monto_semana, acum: t.monto_acumulado, accent: '' as '' | 'pos' | 'neg' },
+    { label: 'Indirecto', semana: t.indirecto_semana, acum: t.indirecto_acumulado, accent: '' as '' | 'pos' | 'neg' },
+    { label: 'Venta', semana: t.venta_semana, acum: t.venta_acumulada, accent: 'pos' as '' | 'pos' | 'neg' },
+    { label: 'Utilidad', semana: t.utilidad_semana, acum: t.utilidad_acumulada, accent: (t.utilidad_semana >= 0 ? 'pos' : 'neg') as '' | 'pos' | 'neg' },
+  ];
+  return (
+    <section className="space-y-2">
+      <h2 className="text-body-sm font-semibold uppercase tracking-wider text-ds-gray-500">Financiero — producción de la semana</h2>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {cards.map((c) => (
+          <div key={c.label} className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ds-gray-500">{c.label}</p>
+            <p className={`mt-1 font-mono text-sub font-bold tabular-nums ${c.accent === 'neg' ? 'text-ds-red' : c.accent === 'pos' ? 'text-brand-dark' : 'text-ds-ink'}`}>
+              {formatCRC(c.semana)}
+            </p>
+            <p className="mt-0.5 text-xs text-ds-gray-400 tabular-nums">Acum: {formatCRC(c.acum)}</p>
+          </div>
+        ))}
       </div>
     </section>
   );

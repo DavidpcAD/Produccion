@@ -12,7 +12,7 @@ type Partida = { id: number; codigo: string; nombre: string; etapaId: number | n
 type SubPartida = { id: number; codigo: string; nombre: string; partidaId: number | null };
 type Clasif = { id: number; nombre: string; partidaId: number | null; subPartidaId: number | null };
 type Wbs = { etapas: Etapa[]; partidas: Partida[]; subpartidas: SubPartida[]; clasificaciones: Clasif[] };
-type Linea = { code: string; descripcion?: string; cantidad: number; unidad?: string; obraCodigo?: string };
+type Linea = { code: string; descripcion?: string; cantidad: number; unidad?: string; obraCodigo?: string; variantCode?: string; variantNombre?: string };
 type TipoPlantilla = "general" | "bodega";
 type Plantilla = { id: number; nombre: string; creadoPor: string; idClasificacion: number | null; lineas: Linea[]; tipo?: TipoPlantilla };
 type ItemBc = { code: string; descripcion: string; unidad: string };
@@ -213,6 +213,21 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
   const [nombre, setNombre] = useState(plantilla?.nombre ?? "");
   const [lineas, setLineas] = useState<Linea[]>(plantilla?.lineas ?? []);
   const [qaCode, setQaCode] = useState(""); const [qaQty, setQaQty] = useState("");
+  // Variantes del artículo elegido (BC). Para plantillas de bodega, el material
+  // que tiene variantes debe pedir cuál — así la solicitud sale con la variante.
+  const [qaVariantes, setQaVariantes] = useState<{ code: string; descripcion: string }[]>([]);
+  const [qaVariante, setQaVariante] = useState("");
+  useEffect(() => {
+    setQaVariante("");
+    if (!qaCode) { setQaVariantes([]); return; }
+    let vivo = true;
+    fetch(`/api/compras/bc/variants?item=${encodeURIComponent(qaCode)}`)
+      .then((r) => (r.ok ? r.json() : { variantes: [] }))
+      .then((d) => { if (vivo) setQaVariantes(d.variantes ?? []); })
+      .catch(() => { if (vivo) setQaVariantes([]); });
+    return () => { vivo = false; };
+  }, [qaCode]);
+  const variantePendiente = qaVariantes.length > 0 && !qaVariante;
   const [guardando, setGuardando] = useState(false);
   // Stock actual en Business Central por material (código → total | null s/d | "…" cargando).
   const [stockBc, setStockBc] = useState<Record<string, number | null | "loading">>({});
@@ -246,8 +261,10 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
   function agregar() {
     const it = items.find((x) => x.code === qaCode);
     if (!it || !(Number(qaQty) > 0)) { toast("Elegí un artículo y una cantidad.", "error"); return; }
-    setLineas((L) => [...L, { code: it.code, descripcion: it.descripcion, unidad: it.unidad, cantidad: Number(qaQty), obraCodigo: "" }]);
-    setQaCode(""); setQaQty("");
+    if (variantePendiente) { toast("Elegí la variante del material.", "error"); return; }
+    const v = qaVariantes.find((x) => x.code === qaVariante);
+    setLineas((L) => [...L, { code: it.code, descripcion: it.descripcion, unidad: it.unidad, cantidad: Number(qaQty), obraCodigo: "", variantCode: qaVariante || undefined, variantNombre: v?.descripcion || undefined }]);
+    setQaCode(""); setQaQty(""); setQaVariante(""); setQaVariantes([]);
   }
   const delLinea = (i: number) => setLineas((L) => L.filter((_, idx) => idx !== i));
   const setLinea = (i: number, patch: Partial<Linea>) => setLineas((L) => L.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -336,19 +353,29 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
               <div className="ds-body-sm ds-muted" style={{ marginTop: 4 }}>{items.length.toLocaleString("es-CR")} materiales · escribí para buscar</div>
             )}
           </div>
+          {qaVariantes.length > 0 && (
+            <div style={{ flex: "0 1 220px", minWidth: 170 }}>
+              <label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Variante</label>
+              <Combobox items={qaVariantes} value={qaVariante} onChange={(k) => setQaVariante(k)} getKey={(v) => v.code} getLabel={(v) => `${v.code} — ${v.descripcion}`} getSearch={(v) => `${v.code} ${v.descripcion}`} placeholder="Elegí variante…" />
+            </div>
+          )}
           <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</label><Input type="number" min={0} value={qaQty} onChange={(e) => setQaQty(e.target.value)} placeholder="0" style={{ width: 100 }} /></div>
-          <Button variant="outline" onClick={agregar} disabled={!qaCode || !(Number(qaQty) > 0)}>+ Agregar</Button>
+          <div className="col" style={{ gap: 2 }}>
+            <Button variant="outline" onClick={agregar} disabled={!qaCode || !(Number(qaQty) > 0) || variantePendiente}>+ Agregar</Button>
+            {variantePendiente && <span className="ds-body-sm ds-muted" style={{ textAlign: "center" }}>Elegí la variante</span>}
+          </div>
         </div>
         <div className="ds-table-wrap" style={{ boxShadow: "none", border: "1.5px solid var(--ds-color-gray-100)" }}>
           <table className="ds-table">
-            <thead><tr><th>Artículo</th><th>Unidad</th><th className="ds-num">Stock BC</th><th className="ds-num">Cantidad</th><th></th></tr></thead>
+            <thead><tr><th>Artículo</th><th>Variante</th><th>Unidad</th><th className="ds-num">Stock BC</th><th className="ds-num">Cantidad</th><th></th></tr></thead>
             <tbody>
-              {lineas.length === 0 && <tr><td colSpan={5}><div className="empty">Sin líneas. Agregá artículos.</div></td></tr>}
+              {lineas.length === 0 && <tr><td colSpan={6}><div className="empty">Sin líneas. Agregá artículos.</div></td></tr>}
               {lineas.map((l, i) => {
                 const st = stockBc[l.code];
                 return (
                 <tr key={i}>
                   <td><span className="ds-strong ds-body-sm">{l.code}</span> <span className="ds-muted">— {l.descripcion}</span></td>
+                  <td className="ds-muted">{l.variantCode ? `${l.variantCode}${l.variantNombre ? ` — ${l.variantNombre}` : ""}` : "—"}</td>
                   <td className="ds-muted">{l.unidad ?? "—"}</td>
                   <td className="ds-num">
                     {st === undefined || st === "loading"

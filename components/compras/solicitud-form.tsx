@@ -21,7 +21,7 @@ type Variante = { code: string; descripcion: string };
 const SOLICITANTES = ["Laura Ureña", "Loana", "Michael Thames", "Roger Solano"];
 
 // ---- Plantillas (persistidas en SQL: dbo.PlantillaSolicitud) ----
-type PlantillaLinea = { code: string; cantidad: number; obraCodigo: string };
+type PlantillaLinea = { code: string; cantidad: number; obraCodigo: string; variantCode?: string; variantNombre?: string };
 type Plantilla = { id: number; nombre: string; creadoPor: string; idClasificacion?: number | null; tipo?: "general" | "bodega"; lineas: PlantillaLinea[] };
 // WBS para filtrar plantillas por etapa/partida.
 type WbsNodo = { id: number; codigo: string; nombre: string };
@@ -332,7 +332,7 @@ export function SolicitudForm({
   }
 
   // ---- Importar Excel: detecta columnas por contenido (código BC, cantidad, obra) ----
-  function lineasDesde(items: { code: string; cantidad: number; obraCodigo: string }[]): { nuevas: DraftLine[]; sinMatch: number } {
+  function lineasDesde(items: { code: string; cantidad: number; obraCodigo: string; variantCode?: string; variantNombre?: string }[]): { nuevas: DraftLine[]; sinMatch: number } {
     const porCodigo = new Map(catArticulos.map((a) => [normTxt(a.code), a]));
     let sinMatch = 0;
     const nuevas: DraftLine[] = [];
@@ -345,7 +345,8 @@ export function SolicitudForm({
         articuloId: a.id,
         obraCodigo: o?.codigo ?? "",
         obraNombre: o?.nombre ?? "",
-        variantCode: "", variantNombre: "",
+        // La variante viene de la plantilla (p.ej. bodega); si no trae, queda vacía.
+        variantCode: it.variantCode ?? "", variantNombre: it.variantNombre ?? "",
         cantidad: it.cantidad > 0 ? String(it.cantidad) : "",
         cantidadPlantilla: it.cantidad > 0 ? it.cantidad : undefined,
       });
@@ -425,7 +426,9 @@ export function SolicitudForm({
     if (!lineas.length) { toast("No hay líneas para guardar.", "error"); return; }
     const lineasPl: PlantillaLinea[] = lineas.map((l) => {
       const a = catArticulos.find((x) => x.id === l.articuloId);
-      return { code: a?.code ?? "", cantidad: Number(l.cantidad) || 0, obraCodigo: l.obraCodigo };
+      // Conservar la variante elegida al guardar las líneas como plantilla (igual
+      // que el diálogo de plantillas) para que la variante viaje en la plantilla.
+      return { code: a?.code ?? "", cantidad: Number(l.cantidad) || 0, obraCodigo: l.obraCodigo, variantCode: l.variantCode || undefined, variantNombre: l.variantNombre || undefined };
     }).filter((x) => x.code);
     try {
       const r = await fetch("/api/compras/plantillas", {

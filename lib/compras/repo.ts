@@ -554,7 +554,7 @@ export async function listMovimientos(entidad: string, idEntidad: number) {
    filtra por creadoPor. Las líneas se guardan como JSON (code+cantidad+obra).
    ============================================================================ */
 
-export type PlantillaLineaDB = { code: string; descripcion?: string; cantidad: number; unidad?: string; obraCodigo: string };
+export type PlantillaLineaDB = { code: string; descripcion?: string; cantidad: number; unidad?: string; obraCodigo: string; variantCode?: string; variantNombre?: string };
 export type TipoPlantilla = "general" | "bodega";
 export type Plantilla = { id: number; nombre: string; creadoPor: string; idClasificacion: number | null; tipo: TipoPlantilla; lineas: PlantillaLineaDB[]; fechaCreacion: string };
 
