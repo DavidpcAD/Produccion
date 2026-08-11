@@ -14,6 +14,7 @@ interface Proyecto {
   CodigoBC: string;
   Nombre: string;
   Estado: string;
+  Ubicacion: string;
   TotalPersonas: number;
   FechaInicio: string;
   FechaFinEstimada: string;
@@ -28,6 +29,9 @@ export default function ProyectosPage() {
   const [loading, setLoading] = useState(true);
   // Filtro: por defecto solo activos; "Todos" incluye inactivos.
   const [verTodos, setVerTodos] = useState(false);
+  // Filtro por proyecto productivo (pertenece a Producción). Se filtra en cliente
+  // sobre lo ya cargado, igual que en Obras.
+  const [filtroProd, setFiltroProd] = useState<'todos' | 'produccion'>('todos');
 
   const load = useCallback((incluirInactivos: boolean) => {
     setLoading(true);
@@ -43,21 +47,32 @@ export default function ProyectosPage() {
   const estadoVariant = (e: string): 'green' | 'gray' =>
     e === 'Activo' || e === 'Open' ? 'green' : 'gray';
 
-  const activosCount = proyectos.filter(p => p.Activo).length;
+  const visibles = filtroProd === 'produccion' ? proyectos.filter(p => p.EsProductivo) : proyectos;
+  const activosCount = visibles.filter(p => p.Activo).length;
 
   return (
     <PageShell>
       <PageHeader
         title="Proyectos"
-        subtitle={`${activosCount} proyectos activos${verTodos && proyectos.length > activosCount ? ` · ${proyectos.length - activosCount} inactivos` : ''}`}
+        subtitle={`${activosCount} proyectos activos${filtroProd === 'produccion' ? ' de Producción' : ''}${verTodos && visibles.length > activosCount ? ` · ${visibles.length - activosCount} inactivos` : ''}`}
         actions={
-          <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
-            {([['Activos', false], ['Todos', true]] as const).map(([label, val]) => (
-              <button key={label} onClick={() => setVerTodos(val)}
-                className={'px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (verTodos === val ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
+              {([['Todos', 'todos'], ['Producción', 'produccion']] as const).map(([label, val]) => (
+                <button key={val} onClick={() => setFiltroProd(val)}
+                  className={'px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (filtroProd === val ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
+              {([['Activos', false], ['Todos', true]] as const).map(([label, val]) => (
+                <button key={label} onClick={() => setVerTodos(val)}
+                  className={'px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (verTodos === val ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
@@ -71,16 +86,18 @@ export default function ProyectosPage() {
             </div>
           ))}
         </div>
-      ) : proyectos.length === 0 ? (
+      ) : visibles.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
           <Icon name="boleta" size="lg" color="currentColor" className="mb-4" />
           <p className="text-body font-semibold text-ds-ink">Sin proyectos</p>
-          <p className="text-sm mt-1 text-ds-gray-400">Aún no hay proyectos registrados</p>
+          <p className="text-sm mt-1 text-ds-gray-400">
+            {filtroProd === 'produccion' ? 'Ningún proyecto está marcado como de Producción' : 'Aún no hay proyectos registrados'}
+          </p>
         </div>
       ) : (
         <motion.div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
           initial="hidden" animate="show" variants={listStagger}>
-          {proyectos.map(p => (
+          {visibles.map(p => (
             <motion.button
               key={p.IDProyecto}
               variants={listItem}

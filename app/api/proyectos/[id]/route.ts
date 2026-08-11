@@ -18,6 +18,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     .query(`
       SELECT p.idProyecto AS IDProyecto, p.abreviatura AS CodigoBC,
              p.nombre AS Nombre, p.categoria AS Estado,
+             p.linkUbicacion AS Ubicacion,
              p.activo AS Activo, p.esProductivo AS EsProductivo
       FROM dbo.Proyecto p
       WHERE p.idProyecto = @id
@@ -48,10 +49,12 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 }
 
 /**
- * PATCH /api/proyectos/{id} — marca el proyecto como productivo (pertenece a
- * Producción) y/o lo activa/inactiva. Body: { esProductivo?, activo? }.
- * Inactivar no borra nada: el proyecto deja de aparecer en selectores pero sus
- * obras y asignaciones siguen existiendo.
+ * PATCH /api/proyectos/{id} — edita la información del proyecto y/o sus banderas.
+ * Body (todos opcionales): { nombre?, categoria?, linkUbicacion?, esProductivo?, activo? }.
+ * - nombre/categoria/linkUbicacion: editan la ficha del proyecto.
+ * - esProductivo: marca que pertenece a Producción (filtra sus obras).
+ * - activo: inactivar NO borra nada — el proyecto deja de aparecer en selectores
+ *   por defecto, pero sus obras y asignaciones siguen existiendo.
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -63,6 +66,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const sets: string[] = [];
   const r = (await getDb()).request().input('id', sql.Int, parseInt(id));
+
+  if (body.nombre !== undefined) {
+    const nombre = String(body.nombre).trim();
+    if (!nombre) {
+      return NextResponse.json({ error: 'El nombre no puede estar vacío.' }, { status: 400 });
+    }
+    sets.push('nombre = @nombre');
+    r.input('nombre', sql.NVarChar, nombre);
+  }
+  if (body.categoria !== undefined) {
+    const categoria = body.categoria == null ? null : String(body.categoria).trim() || null;
+    sets.push('categoria = @categoria');
+    r.input('categoria', sql.NVarChar, categoria);
+  }
+  if (body.linkUbicacion !== undefined) {
+    const ubic = body.linkUbicacion == null ? null : String(body.linkUbicacion).trim() || null;
+    sets.push('linkUbicacion = @linkUbicacion');
+    r.input('linkUbicacion', sql.NVarChar, ubic);
+  }
   if (body.esProductivo !== undefined) {
     sets.push('esProductivo = @esProductivo');
     r.input('esProductivo', sql.Bit, body.esProductivo ? 1 : 0);
@@ -72,13 +94,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     r.input('activo', sql.Bit, body.activo ? 1 : 0);
   }
   if (sets.length === 0) {
-    return NextResponse.json({ error: 'Nada para actualizar (esProductivo/activo).' }, { status: 400 });
+    return NextResponse.json({ error: 'Nada para actualizar (nombre/categoria/linkUbicacion/esProductivo/activo).' }, { status: 400 });
   }
 
   try {
     const res = await r.query(`
       UPDATE dbo.Proyecto SET ${sets.join(', ')}
-      OUTPUT INSERTED.idProyecto AS IDProyecto, INSERTED.activo AS Activo, INSERTED.esProductivo AS EsProductivo
+      OUTPUT INSERTED.idProyecto AS IDProyecto, INSERTED.nombre AS Nombre,
+             INSERTED.categoria AS Estado, INSERTED.linkUbicacion AS Ubicacion,
+             INSERTED.activo AS Activo, INSERTED.esProductivo AS EsProductivo
       WHERE idProyecto = @id
     `);
     if (res.recordset.length === 0) {

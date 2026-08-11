@@ -344,7 +344,12 @@ export default function PartidasPage() {
                 ) : (
                   <ul className="divide-y divide-ds-gray-100 max-h-[62vh] overflow-y-auto no-scrollbar">
                     {selSubs.map(s => (
-                      <li key={s.idSubPartida} className="px-5 py-3 flex items-start gap-3 group">
+                      <li
+                        key={s.idSubPartida}
+                        onClick={puede ? () => abrirEditarSub(s) : undefined}
+                        title={puede ? 'Editar subpartida (sprint y tipos de casa)' : undefined}
+                        className={'px-5 py-3 flex items-start gap-3 ' + (puede ? 'cursor-pointer hover:bg-ds-gray-100 transition-colors' : '')}
+                      >
                         <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 pt-0.5">{s.codigo}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -352,19 +357,21 @@ export default function PartidasPage() {
                             {s.esCritica && <Badge variant="red">Crítica</Badge>}
                             {!s.activo && <Badge variant="gray">Inactiva</Badge>}
                           </div>
-                          {s.tiposCasa.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {s.tiposCasa.map(tc => (
-                                <span key={tc} className="rounded bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-500">{tc}</span>
-                              ))}
-                            </div>
-                          )}
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {s.tiposCasa.length > 0
+                              ? s.tiposCasa.map(tc => (
+                                  <span key={tc} className="rounded bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-500">{tc}</span>
+                                ))
+                              : <span className="text-[10px] font-semibold text-ds-red">Sin tipos de casa — clic para asignar</span>}
+                          </div>
                         </div>
-                        <span className="text-xs text-ds-gray-400 shrink-0 pt-0.5">S{s.numSprint}</span>
+                        <span className="rounded-full bg-ds-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ds-gray-500 shrink-0 whitespace-nowrap" title={`Sprint ${s.numSprint}`}>
+                          Sprint {s.numSprint}
+                        </span>
                         {puede && (
-                          <button onClick={() => abrirEditarSub(s)} className="text-ds-gray-300 hover:text-ds-ink p-1 shrink-0 opacity-0 group-hover:opacity-100 transition" title="Editar subpartida">
+                          <span className="text-ds-gray-400 p-1 shrink-0" aria-hidden>
                             <Icon name="edit" size="sm" color="currentColor" />
-                          </button>
+                          </span>
                         )}
                       </li>
                     ))}

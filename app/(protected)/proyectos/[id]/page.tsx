@@ -5,6 +5,7 @@ import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
@@ -23,7 +24,7 @@ interface Asignacion {
   Activo: boolean;
   FechaAsignacion: string;
 }
-interface Proyecto { IDProyecto: number; CodigoBC: string; Nombre: string; Estado: string; Activo: boolean; EsProductivo: boolean; asignaciones: Asignacion[]; }
+interface Proyecto { IDProyecto: number; CodigoBC: string; Nombre: string; Estado: string; Ubicacion: string; Activo: boolean; EsProductivo: boolean; asignaciones: Asignacion[]; }
 interface Colaborador { IDCol: number; NombreCompleto: string; Cedula: string; }
 
 export default function ProyectoDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -95,6 +96,42 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
     } finally { setPatching(false); }
   }
 
+  // Editar la ficha del proyecto (nombre, categoría, ubicación).
+  const [editOpen, setEditOpen] = useState(false);
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [editForm, setEditForm] = useState({ nombre: '', categoria: '', linkUbicacion: '' });
+
+  function openEdit() {
+    if (!proyecto) return;
+    setEditForm({
+      nombre: proyecto.Nombre ?? '',
+      categoria: proyecto.Estado ?? '',
+      linkUbicacion: proyecto.Ubicacion ?? '',
+    });
+    setEditOpen(true);
+  }
+
+  async function handleGuardarInfo() {
+    if (!editForm.nombre.trim()) { toast('El nombre es obligatorio', 'warning'); return; }
+    setSavingInfo(true);
+    try {
+      const res = await fetch(`/api/proyectos/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: editForm.nombre,
+          categoria: editForm.categoria,
+          linkUbicacion: editForm.linkUbicacion,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(data.error || 'No se pudo guardar la información', 'error'); return; }
+      toast('Información actualizada', 'success');
+      setEditOpen(false);
+      await load();
+    } finally { setSavingInfo(false); }
+  }
+
   if (loading || !proyecto) return (
     <PageShell width="narrow">
       <Skeleton className="h-8 w-1/3" rounded="rounded-full" />
@@ -136,6 +173,10 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
         }
         actions={session && session.nivelAdmin >= 2 && (
           <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={openEdit}
+              icon={<Icon name="edit" size="sm" color="currentColor" />}>
+              Editar información
+            </Button>
             <Button variant="outline" loading={patching}
               onClick={() => patchProyecto({ esProductivo: !proyecto.EsProductivo }, proyecto.EsProductivo ? 'Proyecto ya no es de Producción' : 'Proyecto marcado como de Producción')}
               icon={<Icon name={proyecto.EsProductivo ? 'remove' : 'check'} size="sm" color="currentColor" />}>
@@ -200,6 +241,25 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
           </div>
         ))
       )}
+
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar información del proyecto"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button loading={savingInfo} onClick={handleGuardarInfo}>Guardar</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input label="Nombre" value={editForm.nombre} required
+            onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))} />
+          <Input label="Categoría" value={editForm.categoria} placeholder="Ej: Producción, Ciudad del Valle…"
+            onChange={e => setEditForm(f => ({ ...f, categoria: e.target.value }))} />
+          <Input label="Ubicación (link)" value={editForm.linkUbicacion} placeholder="https://maps…"
+            onChange={e => setEditForm(f => ({ ...f, linkUbicacion: e.target.value }))} />
+          <p className="text-xs text-ds-gray-400">El código ({proyecto.CodigoBC}) es la llave del sistema y no se edita aquí.</p>
+        </div>
+      </Modal>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Asignar persona al proyecto"
         footer={

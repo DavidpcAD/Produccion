@@ -33,6 +33,9 @@ interface DataTableProps<T> {
   pageSize?: number;
   emptyMessage?: string;
   toolbarExtra?: React.ReactNode;
+  /** Si se define, la búsqueda / filtros / orden se recuerdan entre navegaciones
+   *  (sessionStorage). Útil para no perder el filtro al entrar a un detalle y volver. */
+  persistKey?: string;
 }
 
 // Filtro multi-selección: la fila pasa si su valor está entre los elegidos.
@@ -123,12 +126,36 @@ function useClickOutside(onClose: () => void) {
 export function DataTable<T>({
   columns, data, loading, onRowClick,
   searchPlaceholder = 'Buscar…', exportFilename = 'reporte',
-  pageSize = 20, emptyMessage = 'Sin resultados', toolbarExtra,
+  pageSize = 20, emptyMessage = 'Sin resultados', toolbarExtra, persistKey,
 }: DataTableProps<T>) {
   const [globalFilter, setGlobalFilter] = useState('');
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+
+  // Persistencia opcional (sessionStorage) para que la búsqueda / filtros / orden
+  // sobrevivan al entrar a un detalle y volver (la página se remonta y el estado
+  // se perdía). Se restaura una vez al montar y se guarda en cada cambio.
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (!persistKey) { restoredRef.current = true; return; }
+    try {
+      const raw = sessionStorage.getItem(`dt:${persistKey}`);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (typeof s.globalFilter === 'string') setGlobalFilter(s.globalFilter);
+        if (Array.isArray(s.columnFilters)) setColumnFilters(s.columnFilters);
+        if (Array.isArray(s.sorting)) setSorting(s.sorting);
+      }
+    } catch { /* sessionStorage no disponible → sin persistencia */ }
+    restoredRef.current = true;
+  }, [persistKey]);
+  useEffect(() => {
+    if (!persistKey || !restoredRef.current) return;
+    try {
+      sessionStorage.setItem(`dt:${persistKey}`, JSON.stringify({ globalFilter, columnFilters, sorting }));
+    } catch { /* ignore */ }
+  }, [persistKey, globalFilter, columnFilters, sorting]);
   const [colsOpen, setColsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState<string | null>(null);

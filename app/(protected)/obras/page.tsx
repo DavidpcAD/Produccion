@@ -291,6 +291,7 @@ export default function ObrasPage() {
         searchPlaceholder="Buscar por número, nombre o centro de costo…"
         exportFilename="obras"
         emptyMessage="Sin obras"
+        persistKey="obras"
       />
 
       {/* ─── Wizard: Nueva obra ─── */}
