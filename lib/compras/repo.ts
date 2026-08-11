@@ -12,7 +12,7 @@ import type { Orden, OrdenLinea, Pedido, PedidoLinea, Recepcion, RecepcionLinea,
 
 const NOMBRE_POR_CODIGO: Record<string, string> = {
   // pedido
-  borrador: "Borrador", aprobado: "Aprobado", en_orden: "En orden", cerrado: "Cerrado",
+  borrador: "Borrador", aprobado: "Aprobado", en_orden: "En orden", cerrado: "Cerrado", devuelto: "Devuelto",
   // orden
   abierto: "Abierto", pendiente_aprobacion: "Pendiente de aprobación", rechazado: "Rechazado", lanzado: "Lanzado", completado: "Completado",
 };
