@@ -1,8 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
 import { CatalogoTabs } from '@/components/layout/CatalogoTabs';
 import { useToast } from '@/components/ui/Toast';
 import type { SprintCatalogoDetalle } from '@/lib/avance/sprints';
@@ -46,6 +49,35 @@ function SeccionSprints() {
   }, [toast]);
   useEffect(() => recargar(), [recargar]);
 
+  // Crear sprint nuevo (se agrega al final de la secuencia global).
+  const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [creando, setCreando] = useState(false);
+  const [form, setForm] = useState({ nombre: '', categoria: 'CASA', descripcion: '', esEspera: false });
+  const proximoNumero = useMemo(() => (sprints.length ? Math.max(...sprints.map((s) => s.numero_global)) + 1 : 1), [sprints]);
+
+  async function crear() {
+    if (!form.nombre.trim()) { toast('Poné un nombre al sprint.', 'warning'); return; }
+    setCreando(true);
+    try {
+      const r = await fetch('/api/avance/sprints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: form.nombre.trim(),
+          categoria: form.categoria.trim() || 'CASA',
+          descripcion: form.descripcion.trim() || null,
+          es_espera: form.esEspera,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.error || 'No se pudo crear el sprint', 'error'); return; }
+      toast(`Sprint ${d.codigo ?? ''} creado. Asignalo a los tipos de casa y ponele pesos.`, 'success');
+      setNuevoOpen(false);
+      setForm({ nombre: '', categoria: 'CASA', descripcion: '', esEspera: false });
+      recargar();
+    } finally { setCreando(false); }
+  }
+
   async function toggleEspera(s: SprintCatalogoDetalle, esEspera: boolean) {
     if (esEspera && s.criticas > 0) {
       return toast(
@@ -77,7 +109,10 @@ function SeccionSprints() {
 
   return (
     <section>
-      <h2 className="mb-1 text-sub-sm font-bold">Catálogo de sprints</h2>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <h2 className="text-sub-sm font-bold">Catálogo de sprints</h2>
+        <Button size="sm" onClick={() => setNuevoOpen(true)}>+ Nuevo sprint</Button>
+      </div>
       <p className="mb-4 text-sm text-ds-gray-500">
         Secuencia global de sprints. Marcá un sprint como <strong>de espera</strong> (colado/curado)
         — no debe tener sub-partidas. La asignación de sub-partidas a cada sprint se hace en
@@ -140,6 +175,42 @@ function SeccionSprints() {
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={nuevoOpen}
+        onClose={() => setNuevoOpen(false)}
+        title="Nuevo sprint"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setNuevoOpen(false)}>Cancelar</Button>
+            <Button loading={creando} disabled={!form.nombre.trim()} onClick={crear}>Crear sprint</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input label="Nombre" value={form.nombre} required placeholder="Ej. Acabados finos"
+            onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="Categoría" value={form.categoria} placeholder="CASA"
+              onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} />
+            <div className="flex items-end pb-3">
+              <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
+                <input type="checkbox" checked={form.esEspera}
+                  onChange={(e) => setForm((f) => ({ ...f, esEspera: e.target.checked }))}
+                  className="h-4 w-4 accent-brand" />
+                De espera (colado/curado — sin sub-partidas)
+              </label>
+            </div>
+          </div>
+          <Input label="Descripción (opcional)" value={form.descripcion}
+            onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))} />
+          <p className="text-xs text-ds-gray-400">
+            Se agrega al final de la secuencia como <strong>sprint #{proximoNumero}</strong>. Después
+            asignalo a los tipos de casa (pestaña <strong>Tipos de casa</strong>) y ponele sus pesos
+            (pestaña <strong>Pesos</strong>).
+          </p>
+        </div>
+      </Modal>
     </section>
   );
 }
