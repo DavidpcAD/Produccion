@@ -513,6 +513,18 @@ function ObraCard(p: CardProps) {
   // poder capturarlas sin salir del Kanban.
   const arrastradas = (p.avance?.sub_partidas ?? []).filter((s) => s.arrastrada && !s.completada);
   const arrastradasPend = arrastradas.length;
+  // Cada pendiente arrastrada queda ANCLADA a su sprint original (no se mezcla
+  // con las del sprint actual): se agrupan por su sprint y siguen ahí hasta
+  // que se completen.
+  const arrastradasPorSprint = (() => {
+    const m = new Map<number, AvanceSubPartida[]>();
+    for (const sp of arrastradas) {
+      const arr = m.get(sp.sprint_numero);
+      if (arr) arr.push(sp);
+      else m.set(sp.sprint_numero, [sp]);
+    }
+    return Array.from(m.entries()).sort((a, b) => a[0] - b[0]);
+  })();
 
   return (
     <motion.div
@@ -680,30 +692,38 @@ function ObraCard(p: CardProps) {
                         <span className="inline-block h-2 w-2 rounded-full bg-ds-red" />
                         Pendientes arrastradas ({arrastradas.length})
                       </p>
-                      <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-red/20">
-                        {arrastradas.map((sp) => (
-                          <div key={sp.sub_partida_id} className="space-y-1.5 p-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="text-xs font-medium text-ds-ink">
-                                <span className="font-mono">{sp.codigo}</span> · {sp.nombre}
-                                <span className="ml-1 text-[10px] font-semibold text-ds-red-200">
-                                  sprint {sp.sprint_numero}
-                                </span>
-                              </p>
-                              <span className="shrink-0 rounded-full bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ds-gray-500">
-                                {sp.pct_completado}%
-                              </span>
+                      {/* Agrupadas por su sprint original: se quedan en su sprint hasta completarse. */}
+                      <div className="overflow-hidden rounded-ds border border-ds-red/20">
+                        {arrastradasPorSprint.map(([spr, subs]) => (
+                          <div key={spr}>
+                            <div className="flex items-center gap-2 bg-ds-red/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-ds-red-200">
+                              Sprint {spr}
+                              <span className="ml-auto font-semibold text-ds-red-200/80">{subs.length}</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <IconBtn title="Marcar completada" tone="ok" disabled={congelada} onClick={() => p.onCompletar(sp)}>
-                                <Check size={14} weight="bold" />
-                              </IconBtn>
-                              <IconBtn title="Fijar %" tone="ink" disabled={congelada} onClick={() => p.onPct(sp)}>
-                                <Percent size={14} weight="bold" />
-                              </IconBtn>
-                              <IconBtn title="No cumplió" tone="nc" disabled={congelada} onClick={() => p.onNC(sp)}>
-                                <XCircle size={14} weight="bold" />
-                              </IconBtn>
+                            <div className="divide-y divide-ds-gray-100">
+                              {subs.map((sp) => (
+                                <div key={sp.sub_partida_id} className="space-y-1.5 p-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="text-xs font-medium text-ds-ink">
+                                      <span className="font-mono">{sp.codigo}</span> · {sp.nombre}
+                                    </p>
+                                    <span className="shrink-0 rounded-full bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ds-gray-500">
+                                      {sp.pct_completado}%
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <IconBtn title="Marcar completada" tone="ok" disabled={congelada} onClick={() => p.onCompletar(sp)}>
+                                      <Check size={14} weight="bold" />
+                                    </IconBtn>
+                                    <IconBtn title="Fijar %" tone="ink" disabled={congelada} onClick={() => p.onPct(sp)}>
+                                      <Percent size={14} weight="bold" />
+                                    </IconBtn>
+                                    <IconBtn title="No cumplió" tone="nc" disabled={congelada} onClick={() => p.onNC(sp)}>
+                                      <XCircle size={14} weight="bold" />
+                                    </IconBtn>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         ))}
