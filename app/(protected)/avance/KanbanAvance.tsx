@@ -100,8 +100,11 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
   }, [cargarObras]);
 
   const cargarAvance = useCallback(
-    async (codigo: string) => {
-      setLoadingAvance(codigo);
+    // silent = refresco tras registrar avance: NO muestra el skeleton (evita que
+    // la tarjeta colapse y se reabra); mantiene los datos viejos hasta que llegan
+    // los nuevos y se actualizan en su lugar.
+    async (codigo: string, silent = false) => {
+      if (!silent) setLoadingAvance(codigo);
       try {
         const r = await fetch(`/api/avance/obras/${encodeURIComponent(codigo)}/avance`);
         const d = await r.json();
@@ -110,7 +113,7 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
       } catch {
         toast('No se pudo cargar el avance', 'error');
       } finally {
-        setLoadingAvance(null);
+        if (!silent) setLoadingAvance(null);
       }
     },
     [toast],
@@ -136,7 +139,7 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
         toast(d.error ?? 'No se pudo registrar', 'error');
         return false;
       }
-      await cargarAvance(codigo);
+      await cargarAvance(codigo, true); // refresco silencioso (sin colapsar la tarjeta)
       return true;
     } catch {
       toast('No se pudo registrar', 'error');
@@ -234,7 +237,7 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
         return;
       }
       toast(`${d.data?.completadas ?? 0} arrastradas completadas`, 'success');
-      await cargarAvance(codigo);
+      await cargarAvance(codigo, true);
     } catch {
       toast('No se pudo completar', 'error');
     }
@@ -485,6 +488,9 @@ interface CardProps {
 function ObraCard(p: CardProps) {
   const { obra: o } = p;
   const congelada = o.estado === 'en_espera';
+  // Obra que ya avanzó de sprint en la semana abierta → tarjeta púrpura (señal
+  // de "ya avanzó esta semana", igual que en obrascontrol).
+  const avanzoEstaSemana = !!o.avanzo_esta_semana && !congelada;
   const pct = p.avance?.avance_sprint ?? null;
 
   const delSprint = (p.avance?.sub_partidas ?? []).filter(
@@ -500,8 +506,10 @@ function ObraCard(p: CardProps) {
       exit={p.reduce ? undefined : { opacity: 0, scale: 0.97 }}
       transition={SPRING}
       whileHover={p.reduce ? undefined : { y: -2 }}
-      className={`overflow-hidden rounded-ds-lg border bg-ds-surface shadow-ds-01 transition-shadow hover:shadow-ds-03 ${
-        p.expandida ? 'border-ds-gray-300' : 'border-ds-gray-200'
+      className={`overflow-hidden rounded-ds-lg border shadow-ds-01 transition-shadow hover:shadow-ds-03 ${
+        avanzoEstaSemana
+          ? 'border-[#8b5cf6] bg-[#8b5cf6]/10'
+          : `bg-ds-surface ${p.expandida ? 'border-ds-gray-300' : 'border-ds-gray-200'}`
       } ${congelada ? 'opacity-75' : ''}`}
     >
       <button
@@ -514,6 +522,11 @@ function ObraCard(p: CardProps) {
             {o.codigo}
             <BadgeVenta estado={o.estado_venta} />
             {congelada && <Badge variant="gray">congelada</Badge>}
+            {avanzoEstaSemana && (
+              <span className="rounded-full bg-[#8b5cf6]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#6d28d9]">
+                avanzó
+              </span>
+            )}
           </p>
           <p className="truncate text-body-sm text-ds-gray-400">
             {o.tipo_casa ?? 'tipo —'} · sprint {o.sprint_actual}

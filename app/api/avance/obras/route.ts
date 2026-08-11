@@ -34,12 +34,19 @@ export async function GET(req: NextRequest) {
         tipo_casa: ObraAvance['tipo_casa'];
         sprint_actual: number;
         estado_venta: ObraAvance['estado_venta'];
+        avanzo_esta_semana: boolean;
       }>(`
-        SELECT obra_codigo AS codigo, estado, tipo_casa, sprint_actual, estado_venta
-        FROM pro_obc.obra_estado
-        WHERE estado IN ('en_ejecucion', 'en_espera')
-          AND (@like IS NULL OR obra_codigo LIKE @like)
-        ORDER BY obra_codigo
+        SELECT oe.obra_codigo AS codigo, oe.estado, oe.tipo_casa, oe.sprint_actual, oe.estado_venta,
+               CAST(CASE WHEN oe.avanzo_semana_id IS NOT NULL
+                          AND oe.avanzo_semana_id = (
+                            SELECT TOP 1 id FROM pro_obc.semanas_operativas
+                            WHERE estado = 'abierta' ORDER BY fecha_inicio DESC
+                          )
+                     THEN 1 ELSE 0 END AS BIT) AS avanzo_esta_semana
+        FROM pro_obc.obra_estado oe
+        WHERE oe.estado IN ('en_ejecucion', 'en_espera')
+          AND (@like IS NULL OR oe.obra_codigo LIKE @like)
+        ORDER BY oe.obra_codigo
       `);
 
     const bloqueDe = (codigo: string) => codigo.split('-')[1]?.split('.')[0] ?? '';
@@ -47,6 +54,7 @@ export async function GET(req: NextRequest) {
 
     const data: ObraAvance[] = r.recordset.map((o) => ({
       ...o,
+      avanzo_esta_semana: !!o.avanzo_esta_semana,
       bloque_letra: bloqueDe(o.codigo),
       proyecto_codigo: proyectoDe(o.codigo),
     }));

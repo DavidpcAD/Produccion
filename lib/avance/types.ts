@@ -40,6 +40,8 @@ export interface ObraAvance {
   estado_venta: EstadoVenta | null;
   bloque_letra: string;
   proyecto_codigo: string;
+  /** La obra avanzó de sprint en la semana operativa abierta (para marcarla). */
+  avanzo_esta_semana?: boolean;
 }
 
 /** Una sub-partida del sprint con su avance + peso efectivo (captura). */

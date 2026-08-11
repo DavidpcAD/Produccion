@@ -278,15 +278,17 @@ export function SemanasOperativas() {
                 </td>
               </tr>
             )}
-            {!cargando && semanas.length === 0 && (
+            {!cargando && !abierta && (
               <tr>
                 <td colSpan={6} className="px-3 py-6 text-center text-ds-gray-400">
-                  Sin semanas operativas.
+                  No hay una semana vigente abierta. Abrí una arriba.
                 </td>
               </tr>
             )}
+            {/* Solo la semana vigente (abierta); el histórico de semanas cerradas
+                no se lista acá (se ve en Reportes). */}
             {!cargando &&
-              semanas.map((s) => {
+              (abierta ? [abierta] : []).map((s) => {
                 const esAbierta = s.estado === 'abierta';
                 return (
                   <tr key={s.id} className="border-t border-ds-gray-100">
