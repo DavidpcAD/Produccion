@@ -351,6 +351,26 @@ export async function createOrden(input: NewOrdenDB): Promise<number> {
       }
       line += 10000;
     }
+    // Avanzar el estado del PEDIDO origen a "en_orden" cuando TODAS sus líneas ya
+    // quedaron ordenadas (mismo criterio que el modo demo). Antes el estado del
+    // pedido no se tocaba en SQL → "mis solicitudes" y la matriz quedaban viejas.
+    const detIds = input.lineas.map((l) => l.idPedidoCompraDet).filter((x): x is number => !!x);
+    if (detIds.length) {
+      const idEnOrden = await idDeEstado("en_orden");
+      const peds = await new sql.Request(tx).query(
+        `SELECT DISTINCT idPedidoCompra FROM dbo.PedidoCompraDet WHERE idPedidoCompraDet IN (${detIds.join(",")})`,
+      );
+      for (const row of peds.recordset) {
+        const idPed = row.idPedidoCompra as number;
+        const saldo = await new sql.Request(tx).input("p", sql.Int, idPed).query(
+          "SELECT COUNT(*) AS pend FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@p AND ISNULL(quantityOrdenado,0) < quantitySolicitado - 0.0001",
+        );
+        if (Number(saldo.recordset[0].pend) === 0) {
+          await new sql.Request(tx).input("p", sql.Int, idPed).input("e", sql.Int, idEnOrden)
+            .query("UPDATE dbo.PedidoCompra SET idEstado=@e, fechaModificacion=getdate() WHERE idPedidoCompra=@p");
+        }
+      }
+    }
     await logMov(tx, { entidad: "orden", idEntidad: idOrden, documentoNo: numero, tipoMovimiento: "creado", estadoNuevo: "abierto", usuario: input.usuario, rol: input.rol });
     await tx.commit();
     return idOrden;

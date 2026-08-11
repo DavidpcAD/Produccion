@@ -480,7 +480,7 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
     const mesFrom = `${y}-${pad(m + 1)}-01`, mesTo = iso(new Date(y, m + 1, 0));
     const hoyIso = iso(hoy);
     return createPortal(
-      <>
+      <div className="oc-scope">
         <div className="dt-filter-scrim" onClick={onClose} />
         <div className="dt-filter-pop" style={{ left: anchor.left, top: anchor.top }} onClick={(e) => e.stopPropagation()}>
           <div className="dt-filter-pop__list" style={{ padding: 14, gap: 12, display: "flex", flexDirection: "column" }}>
@@ -498,7 +498,7 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
             <button type="button" className="dt-date-clear" onClick={() => setRange({})}>Limpiar</button>
           </div>
         </div>
-      </>,
+      </div>,
       document.body,
     );
   }
@@ -514,7 +514,7 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
   };
 
   return createPortal(
-    <>
+    <div className="oc-scope">
       <div className="dt-filter-scrim" onClick={onClose} />
       <div className="dt-filter-pop" style={{ left: anchor.left, top: anchor.top }} onClick={(e) => e.stopPropagation()}>
         <div className="dt-filter-pop__search">
@@ -537,7 +537,7 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
           })}
         </div>
       </div>
-    </>,
+    </div>,
     document.body,
   );
 }
