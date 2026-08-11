@@ -24,7 +24,8 @@ interface Asignacion {
   Activo: boolean;
   FechaAsignacion: string;
 }
-interface Proyecto { IDProyecto: number; CodigoBC: string; Nombre: string; Estado: string; Ubicacion: string; Activo: boolean; EsProductivo: boolean; asignaciones: Asignacion[]; }
+interface ObraProy { IDObra: number; NumeroObra: string; Nombre: string | null; Estado: string | null; Activo: boolean; AreaCosteo: string | null; }
+interface Proyecto { IDProyecto: number; CodigoBC: string; Nombre: string; Estado: string; Ubicacion: string; Activo: boolean; EsProductivo: boolean; asignaciones: Asignacion[]; obras: ObraProy[]; }
 interface Colaborador { IDCol: number; NombreCompleto: string; Cedula: string; }
 
 export default function ProyectoDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -142,6 +143,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
   );
 
   const activos = proyecto.asignaciones.filter(a => a.Activo);
+  const obrasProy = proyecto.obras ?? [];
   const byTask = activos.reduce((acc, a) => {
     const key = a.TaskNoBC || 'Sin tarea';
     if (!acc[key]) acc[key] = { desc: a.DescripcionTask || 'Sin tarea asignada', members: [] };
@@ -166,9 +168,13 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
           </div>
         }
         subtitle={
-          <span className="flex items-center gap-1">
-            <Icon name="user" size="sm" color="currentColor" />
-            {activos.length} personas asignadas
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="flex items-center gap-1"><Icon name="user" size="sm" color="currentColor" />{activos.length} personas</span>
+            <span className="flex items-center gap-1"><Icon name="place" size="sm" color="currentColor" />{obrasProy.length} obras</span>
+            {proyecto.Estado && <span className="text-ds-gray-400">Categoría: {proyecto.Estado}</span>}
+            {proyecto.Ubicacion && (
+              <a href={proyecto.Ubicacion} target="_blank" rel="noreferrer" className="text-ds-green-ink hover:underline">Ver ubicación</a>
+            )}
           </span>
         }
         actions={session && session.nivelAdmin >= 2 && (
@@ -193,6 +199,29 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
           </div>
         )}
       />
+
+      {obrasProy.length > 0 && (
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+          <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-3">
+            <Icon name="place" size="sm" color="currentColor" className="text-ds-gray-400" />
+            <span className="font-bold text-ds-ink text-sm">Obras del proyecto</span>
+            <Badge variant="gray" className="ml-auto shrink-0">{obrasProy.length}</Badge>
+          </div>
+          <div className="divide-y divide-ds-gray-100 max-h-[50vh] overflow-y-auto">
+            {obrasProy.map(o => (
+              <button key={o.IDObra} onClick={() => router.push(`/obras/${o.IDObra}`)}
+                className={'w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-ds-gray-100/60 transition-colors ' + (o.Activo ? '' : 'opacity-60')}>
+                <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.NumeroObra}</span>
+                <span className="text-sm text-ds-ink flex-1 min-w-0 truncate">{o.Nombre || '—'}</span>
+                {o.AreaCosteo && <span className="hidden sm:inline text-xs text-ds-gray-400 shrink-0">{o.AreaCosteo}</span>}
+                {o.Estado && <Badge variant={o.Estado === 'Open' || o.Estado === 'Activo' ? 'green' : 'gray'}>{o.Estado}</Badge>}
+                {!o.Activo && <Badge variant="red">Inactiva</Badge>}
+                <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 shrink-0" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {Object.keys(byTask).length === 0 ? (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center text-ds-gray-300">

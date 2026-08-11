@@ -42,9 +42,21 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       ORDER BY v.calcNombreCompleto
     `);
 
+  // Obras del proyecto (para ver más información del proyecto en el detalle).
+  const obrasRes = await db.request()
+    .input('id', sql.Int, parseInt(id))
+    .query(`
+      SELECT o.idObra AS IDObra, o.numeroObra AS NumeroObra, o.nombreMostrado AS Nombre,
+             o.estado AS Estado, o.activo AS Activo, o.areaCosteo AS AreaCosteo
+      FROM dbo.Obra o
+      WHERE o.idProyecto = @id
+      ORDER BY o.numeroObra
+    `);
+
   return NextResponse.json({
     ...proyRes.recordset[0],
     asignaciones: asigRes.recordset,
+    obras: obrasRes.recordset,
   });
 }
 
