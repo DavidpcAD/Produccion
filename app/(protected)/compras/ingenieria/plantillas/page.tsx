@@ -269,7 +269,15 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
 
   return (
     <Modal title={plantilla ? "Editar plantilla" : "Nueva plantilla de pedido"} onClose={onClose} full
-      footer={<><Button variant="outline" onClick={onClose}>Cancelar</Button><Button onClick={guardar} disabled={guardando || !nombre.trim() || (tipo === "general" && !idClas)}>{guardando ? "Guardando…" : "Guardar plantilla"}</Button></>}>
+      footer={<>
+        {(!nombre.trim() || (tipo === "general" && !idClas)) && (
+          <span className="ds-body-sm ds-muted" style={{ marginRight: "auto" }}>
+            {!nombre.trim() ? "Poné un nombre a la plantilla" : "Elegí la clasificación"}
+          </span>
+        )}
+        <Button variant="outline" onClick={onClose}>Cancelar</Button>
+        <Button onClick={guardar} disabled={guardando || !nombre.trim() || (tipo === "general" && !idClas)}>{guardando ? "Guardando…" : "Guardar plantilla"}</Button>
+      </>}>
       {/* Tipo de plantilla: general (amarrada a clasificación) vs bodega (solo materiales) */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {([["general", "General", "Etapa · partida · clasificación"], ["bodega", "Bodega", "Solo lista de materiales"]] as const).map(([t, titulo, hint]) => {

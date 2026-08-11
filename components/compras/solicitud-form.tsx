@@ -290,8 +290,18 @@ export function SolicitudForm({
   }
   const qaArticulo = catArticulos.find((a) => a.id === qaArticuloId);
   const variantePendiente = qaVariantes.length > 0 && !qaVariante;
-  // En material se exige obra; pero si viene fija por preset (Matriz), esa alcanza.
-  const puedeAgregar = !!qaArticuloId && Number(qaCantidad) > 0 && (tipo === "material" ? (!!obraTodas || !!obraParam) : true) && !variantePendiente;
+  // Se puede agregar el material aunque no se haya elegido la obra en el
+  // encabezado: la obra se puede asignar por línea en la tabla (y el guardado la
+  // exige). La obra del encabezado es solo un default para lo que se agrega.
+  const puedeAgregar = !!qaArticuloId && Number(qaCantidad) > 0 && !variantePendiente;
+  // Motivo por el que "Agregar" está deshabilitado (para guiar al usuario).
+  const razonAgregar = !qaArticuloId
+    ? 'Elegí un material'
+    : !(Number(qaCantidad) > 0)
+      ? 'Poné la cantidad'
+      : variantePendiente
+        ? 'Elegí la variante'
+        : '';
 
   function agregar() {
     if (!puedeAgregar) return;
@@ -758,7 +768,10 @@ export function SolicitudForm({
               style={{ textAlign: "center" }}
               onChange={(e) => setQaCantidad(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") agregar(); }} />
           </div>
-          <Button onClick={agregar} disabled={!puedeAgregar} style={{ gap: "10px" }}><IconPlus size={20} /> Agregar</Button>
+          <div className="col" style={{ gap: 2 }}>
+            <Button onClick={agregar} disabled={!puedeAgregar} style={{ gap: "10px" }}><IconPlus size={20} /> Agregar</Button>
+            {razonAgregar && <span className="ds-body-sm ds-muted" style={{ textAlign: "center" }}>{razonAgregar}</span>}
+          </div>
         </div>
         {qaArticuloId && qaVariantesError && (
           <p className="ds-body-sm" style={{ color: "var(--ds-color-red-100)", marginTop: 8 }}>
