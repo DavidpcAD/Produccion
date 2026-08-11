@@ -179,6 +179,17 @@ export async function PUT(
         { status: 400 },
       );
 
+    // Una obra congelada (en_espera) o que no está en ejecución no admite avance.
+    if (estado.estado !== 'en_ejecucion') {
+      const detalle = estado.estado === 'en_espera'
+        ? 'está congelada'
+        : `no está en ejecución (estado: ${estado.estado})`;
+      return NextResponse.json(
+        { error: `No se puede registrar avance: la obra ${codigo} ${detalle}. Descongelala/reactivala primero.` },
+        { status: 409 },
+      );
+    }
+
     const tocaPct = pctRaw !== undefined || completadaRaw !== undefined;
     const tocaNc = 'nc_causa' in raw || 'nc_nota' in raw;
     if (!tocaPct && !tocaNc)
@@ -201,6 +212,28 @@ export async function PUT(
     if (sp.recordset.length === 0)
       return NextResponse.json({ error: 'Sub-partida no encontrada' }, { status: 404 });
     const { sprint_numero, partida_id } = sp.recordset[0]!;
+
+    // Regla: una sub-partida al 100% (completada) NO admite registrar NC.
+    if (tocaNc && ncCausa) {
+      let yaCompleta = completada; // si en el mismo request se sube a 100%
+      if (!tocaPct) {
+        const curQ = await db
+          .request()
+          .input('obra', sql.NVarChar(20), codigo)
+          .input('sub', sql.Int, subPartidaId)
+          .query<{ comp: boolean; pct: number }>(
+            'SELECT ISNULL(completada,0) AS comp, ISNULL(pct_completado,0) AS pct FROM pro_obc.avance_sub_partidas WHERE obra_codigo=@obra AND sub_partida_id=@sub',
+          );
+        const cur = curQ.recordset[0];
+        yaCompleta = !!cur?.comp || Number(cur?.pct ?? 0) >= 100;
+      }
+      if (yaCompleta) {
+        return NextResponse.json(
+          { error: 'Una sub-partida al 100% no admite NC (No Cumplió).' },
+          { status: 409 },
+        );
+      }
+    }
 
     // Regla 1b (solo si tocamos %): el % no puede bajar del último cerrado.
     if (tocaPct) {

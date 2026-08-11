@@ -84,6 +84,8 @@ export default function AvanceCapturaPage() {
   }, [avance]);
 
   const sprintActual = avance?.sprint ?? 0;
+  // Obra congelada (en_espera): no se puede registrar avance.
+  const congelada = avance?.estado_obra === 'en_espera';
   const defaultColapsadas = useMemo(() => {
     const s = new Set<string>();
     for (const [cod, g] of porPartida) {
@@ -134,6 +136,10 @@ export default function AvanceCapturaPage() {
   }
 
   function fijarPct(sp: AvanceSubPartida, pct: number) {
+    if (congelada) {
+      toast('La obra está congelada. Descongelala para registrar avance.', 'warning');
+      return;
+    }
     if (pct < sp.piso_pct) {
       toast(`El último cierre dejó esta sub-partida en ${sp.piso_pct}%. No se puede bajar.`, 'warning');
       return;
@@ -201,6 +207,13 @@ export default function AvanceCapturaPage() {
           ) : undefined
         }
       />
+
+      {congelada && (
+        <div className="flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-body-sm text-ds-gray-500">
+          <Icon name="alert" size="sm" color="currentColor" />
+          <span>Esta obra está <strong className="text-ds-ink">congelada</strong>. No se puede registrar avance hasta descongelarla.</span>
+        </div>
+      )}
 
       {partidaFoco && (
         <div className="flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-body-sm">
@@ -272,6 +285,8 @@ export default function AvanceCapturaPage() {
                     {g.subs.map((sp) => {
                       const est = estadoDe(sp);
                       const s = ESTILO[est];
+                      // Una sub-partida al 100% (o la obra congelada) no admite NC.
+                      const ncBloqueado = congelada || sp.completada || sp.pct_completado >= 100;
                       // Marca de programación (además del stripe de estado):
                       //  · roja  = atrasada (arrastrada de un sprint anterior sin completar)
                       //  · negra = programada en el sprint actual de la obra
@@ -315,7 +330,7 @@ export default function AvanceCapturaPage() {
                             <div className="flex flex-wrap items-center gap-1.5">
                               {PRESETS.map((p) => {
                                 const activo = sp.pct_completado === p;
-                                const bloqueado = p < sp.piso_pct;
+                                const bloqueado = congelada || p < sp.piso_pct;
                                 return (
                                   <button
                                     key={p}
@@ -336,8 +351,14 @@ export default function AvanceCapturaPage() {
                               })}
                               <button
                                 type="button"
+                                disabled={ncBloqueado}
                                 onClick={() => setNcDe(sp)}
-                                className="h-8 rounded-ds border border-ds-red/40 bg-ds-surface px-2.5 text-xs font-semibold text-ds-red-200 hover:bg-ds-red/10"
+                                title={ncBloqueado ? (congelada ? 'Obra congelada' : 'Una sub-partida al 100% no admite NC') : undefined}
+                                className={`h-8 rounded-ds border px-2.5 text-xs font-semibold ${
+                                  ncBloqueado
+                                    ? 'border-ds-gray-100 bg-ds-gray-100 text-ds-gray-300 cursor-not-allowed'
+                                    : 'border-ds-red/40 bg-ds-surface text-ds-red-200 hover:bg-ds-red/10'
+                                }`}
                               >
                                 No cumplió
                               </button>
