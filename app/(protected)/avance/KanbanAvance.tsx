@@ -391,7 +391,12 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
                         onAvanzar={() => accionSprint(o.codigo, 'avanzar')}
                         onRetroceder={() => accionSprint(o.codigo, 'retroceder')}
                         onCongelar={() => setCongelarDe(o.codigo)}
-                        onDescongelar={() => cambiarEstado(o.codigo, 'en_ejecucion')}
+                        onDescongelar={async () => {
+                          const ok = await cambiarEstado(o.codigo, 'en_ejecucion');
+                          // Recargar el avance para que reaparezcan las subpartidas
+                          // capturables tras reactivar (antes quedaba data vieja).
+                          if (ok) await cargarAvance(o.codigo, true);
+                        }}
                       />
                     ))}
                   </AnimatePresence>
@@ -496,7 +501,10 @@ function ObraCard(p: CardProps) {
   const delSprint = (p.avance?.sub_partidas ?? []).filter(
     (s) => s.sprint_numero === p.avance?.sprint && !s.arrastrada,
   );
-  const arrastradasPend = (p.avance?.sub_partidas ?? []).filter((s) => s.arrastrada && !s.completada).length;
+  // Pendientes arrastradas de sprints anteriores (sin completar) — se listan para
+  // poder capturarlas sin salir del Kanban.
+  const arrastradas = (p.avance?.sub_partidas ?? []).filter((s) => s.arrastrada && !s.completada);
+  const arrastradasPend = arrastradas.length;
 
   return (
     <motion.div
@@ -651,6 +659,43 @@ function ObraCard(p: CardProps) {
                       </p>
                     )}
                   </div>
+
+                  {arrastradas.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-ds-red-200">
+                        <span className="inline-block h-2 w-2 rounded-full bg-ds-red" />
+                        Pendientes arrastradas ({arrastradas.length})
+                      </p>
+                      <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-red/20">
+                        {arrastradas.map((sp) => (
+                          <div key={sp.sub_partida_id} className="space-y-1.5 p-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs font-medium text-ds-ink">
+                                <span className="font-mono">{sp.codigo}</span> · {sp.nombre}
+                                <span className="ml-1 text-[10px] font-semibold text-ds-red-200">
+                                  sprint {sp.sprint_numero}
+                                </span>
+                              </p>
+                              <span className="shrink-0 rounded-full bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ds-gray-500">
+                                {sp.pct_completado}%
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <IconBtn title="Marcar completada" tone="ok" onClick={() => p.onCompletar(sp)}>
+                                <Check size={14} weight="bold" />
+                              </IconBtn>
+                              <IconBtn title="Fijar %" tone="ink" onClick={() => p.onPct(sp)}>
+                                <Percent size={14} weight="bold" />
+                              </IconBtn>
+                              <IconBtn title="No cumplió" tone="nc" onClick={() => p.onNC(sp)}>
+                                <XCircle size={14} weight="bold" />
+                              </IconBtn>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="button"
