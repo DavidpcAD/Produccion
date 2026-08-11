@@ -198,6 +198,36 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
   }
 
+  // Auto-refresco (solo modo SQL): mantiene Producción al día con lo que crea
+  // Proveeduría en la base compartida —p. ej. una OC enviada a Aprobación— sin
+  // recargar a mano. Refresca cada 20s SOLO con la pestaña visible, y al instante
+  // cuando volvés a la pestaña. Silencioso (no toca el estado de carga) y sin
+  // solapar peticiones.
+  useEffect(() => {
+    if (!USE_API || !hydrated) return;
+    let cancel = false;
+    let busy = false;
+    const tick = async () => {
+      if (busy || typeof document === "undefined" || document.visibilityState !== "visible") return;
+      busy = true;
+      try {
+        const b = await api.bootstrap();
+        if (!cancel) setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+      } catch { /* red intermitente: reintenta en el próximo tick */ }
+      finally { busy = false; }
+    };
+    const id = setInterval(tick, 20000);
+    const onVisible = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      cancel = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [USE_API, hydrated]);
+
   const api2 = useMemo<StoreShape>(() => {
     const uid = () => Math.random().toString(36).slice(2, 9);
     const persona = usuario ?? (role ? PERSONA_POR_ROL[role] : "Sistema");
