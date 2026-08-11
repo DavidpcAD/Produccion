@@ -223,11 +223,13 @@ function HistoricoGrilla({
   return (
     <div className="overflow-auto rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01" style={{ maxHeight: '75vh' }}>
       <table className="border-collapse text-xs">
-        <thead className="sticky top-0 z-10">
+        <thead>
           <tr>
-            <th className="sticky left-0 z-20 border-b border-r border-ds-gray-200 bg-ds-gray-50 px-2 py-2 text-left">Sub-partida</th>
+            {/* sticky en las CELDAS (no en <thead>/<tr>, que varios navegadores ignoran)
+                para que la primera fila (encabezado de obras) quede anclada al hacer scroll. */}
+            <th className="sticky left-0 top-0 z-30 border-b border-r border-ds-gray-200 bg-ds-gray-50 px-2 py-2 text-left">Sub-partida</th>
             {obras.map((o) => (
-              <th key={o.codigo} className="border-b border-ds-gray-200 bg-ds-gray-50 px-1 py-2 text-center font-mono" style={{ minWidth: 44 }}
+              <th key={o.codigo} className="sticky top-0 z-10 border-b border-ds-gray-200 bg-ds-gray-50 px-1 py-2 text-center font-mono" style={{ minWidth: 44 }}
                 title={`${o.codigo}${o.tipo_casa ? ` · ${o.tipo_casa}` : ''}${o.sprint_actual != null ? ` · S${o.sprint_actual}` : ''}`}>
                 <span className="inline-block whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{o.codigo}</span>
               </th>
@@ -273,10 +275,10 @@ function GrupoFilas({
             const pct = celda(o.codigo, s.id);
             const marc = avanzo(o.codigo, s.id);
             return (
-              <td key={o.codigo} className="border-l border-ds-gray-100 px-1 py-1 text-center tabular-nums"
+              <td key={o.codigo} className={`border-l border-ds-gray-100 px-1 py-1 text-center tabular-nums ${pct != null && pct >= 100 ? 'font-bold text-ds-green-ink' : ''}`}
                 style={{ background: colorPct(pct), outline: marc ? '2px solid var(--color-brand)' : undefined, outlineOffset: -2 }}
-                title={`${o.codigo} · ${s.codigo}: ${pct == null ? 's/d' : Math.round(pct) + '%'}`}>
-                {pct == null ? '' : Math.round(pct)}
+                title={`${o.codigo} · ${s.codigo}: ${pct == null ? 's/d' : Math.round(pct) + '%'}${marc ? ' · avanzó esta semana' : ''}`}>
+                {pct == null ? '' : pct >= 100 ? '✓' : Math.round(pct)}
               </td>
             );
           })}
