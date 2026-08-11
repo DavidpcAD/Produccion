@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type {
   Almacen, Articulo, Maquina, Movimiento, Notificacion, Obra, Orden, OrdenLinea, Pedido, PedidoLinea,
   PlanCategoria, PlanFila, Proveedor, Recepcion, RecepcionLinea, Role, TipoSolicitud,
@@ -227,6 +228,17 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       window.removeEventListener("focus", onVisible);
     };
   }, [USE_API, hydrated]);
+
+  // Refresco inmediato al cambiar de menú dentro de compras (el store persiste
+  // entre navegaciones, así que sin esto los datos quedaban "viejos" hasta el
+  // próximo tick). No refetch en el montaje (la hidratación ya trajo todo).
+  const pathname = usePathname();
+  const primeraNav = useRef(true);
+  useEffect(() => {
+    if (!USE_API || !hydrated) return;
+    if (primeraNav.current) { primeraNav.current = false; return; }
+    refreshFromApi().catch(() => { /* red intermitente */ });
+  }, [pathname, USE_API, hydrated]);
 
   const api2 = useMemo<StoreShape>(() => {
     const uid = () => Math.random().toString(36).slice(2, 9);

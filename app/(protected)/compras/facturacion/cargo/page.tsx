@@ -243,9 +243,9 @@ export default function CargoSobreFacturaPage() {
             <div className="row gap-3 wrap" style={{ alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 260px", minWidth: 220 }}>
                 <span className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Tipo de cargo</span>
-                <Select value={chargeNo} onChange={(e) => onTipoCargo(e.target.value)} placeholder="Elegí el tipo de cargo…">
-                  {itemCharges.map((ic) => <option key={ic.no} value={ic.no}>{ic.no} · {ic.descripcion}</option>)}
-                </Select>
+                <Combobox items={itemCharges} value={chargeNo} onChange={(no) => onTipoCargo(no)}
+                  getKey={(ic) => ic.no} getLabel={(ic) => `${ic.no} · ${ic.descripcion}`} getSearch={(ic) => `${ic.no} ${ic.descripcion}`}
+                  placeholder={itemCharges.length ? "Elegí el tipo de cargo…" : "Cargando tipos de cargo…"} />
               </div>
               <div>
                 <span className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</span>

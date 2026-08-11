@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
@@ -269,6 +269,44 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
   const delLinea = (i: number) => setLineas((L) => L.filter((_, idx) => idx !== i));
   const setLinea = (i: number, patch: Partial<Linea>) => setLineas((L) => L.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
+  // Importar materiales desde Excel para armar la plantilla (detecta la columna de
+  // código por match con el catálogo BC y la de cantidad por ser la más numérica).
+  const fileRef = useRef<HTMLInputElement>(null);
+  async function importarExcel(file: File) {
+    try {
+      const mod = (await import("xlsx")) as unknown as { default?: typeof import("xlsx") } & typeof import("xlsx");
+      const XLSX = mod.default ?? mod;
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
+      if (!aoa.length) { toast("El Excel está vacío.", "error"); return; }
+      const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase();
+      const byCode = new Map(items.map((a) => [norm(a.code), a]));
+      const nCols = Math.max(...aoa.map((r) => r.length));
+      const count = (pred: (v: unknown) => boolean) => Array.from({ length: nCols }, (_, c) => aoa.reduce((n, r) => n + (pred(r[c]) ? 1 : 0), 0));
+      const codeHits = count((v) => byCode.has(norm(v)));
+      const codeCol = codeHits.indexOf(Math.max(...codeHits));
+      if (!codeHits[codeCol]) { toast("No encontré una columna con códigos de material de BC.", "error"); return; }
+      const numHits = count((v) => v !== "" && !isNaN(Number(v)) && Number(v) > 0).map((n, c) => (c === codeCol ? -1 : n));
+      const cantCol = Math.max(...numHits) > 0 ? numHits.indexOf(Math.max(...numHits)) : -1;
+      const nuevas: Linea[] = [];
+      let sinMatch = 0;
+      for (const r of aoa) {
+        const it = byCode.get(norm(r[codeCol]));
+        if (!it) { if (norm(r[codeCol])) sinMatch++; continue; }
+        nuevas.push({ code: it.code, descripcion: it.descripcion, unidad: it.unidad, cantidad: cantCol >= 0 ? (Number(r[cantCol]) || 0) : 0, obraCodigo: "" });
+      }
+      if (!nuevas.length) { toast("Ninguna fila coincidió con el catálogo de BC.", "error"); return; }
+      setLineas((L) => [...nuevas, ...L]);
+      toast(`Se importaron ${nuevas.length} material(es)${sinMatch ? ` · ${sinMatch} sin coincidencia (omitidos)` : ""}. Revisá cantidades y guardá la plantilla.`, "success");
+    } catch (e) {
+      toast(`No pude leer el Excel: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   async function guardar() {
     if (!nombre.trim()) { toast("Poné un nombre.", "error"); return; }
     if (tipo === "general" && !idClas) { toast("Elegí la clasificación (o cambiá a plantilla de bodega).", "error"); return; }
@@ -337,7 +375,12 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
       </div>
 
       <div className="mt-4">
-        <span className="ds-label ds-muted">Líneas de la plantilla</span>
+        <div className="row row--between wrap gap-2" style={{ alignItems: "center" }}>
+          <span className="ds-label ds-muted">Líneas de la plantilla</span>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) importarExcel(f); }} />
+          <Button variant="outline" onClick={() => fileRef.current?.click()}>↑ Importar Excel</Button>
+        </div>
         <div className="row wrap gap-2" style={{ alignItems: "flex-end", margin: "8px 0 10px" }}>
           <div style={{ flex: "1 1 260px", minWidth: 200 }}>
             <label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Artículo</label>

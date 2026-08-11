@@ -19,8 +19,11 @@ export default function AprobacionPage() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [lote, setLote] = useState(false);
   const [abierto, setAbierto] = useState<Set<string>>(new Set());
+  const [ordenMonto, setOrdenMonto] = useState<"desc" | "asc">("desc");
 
-  const porAprobar = ordenes.filter((o) => o.estado === "pendiente_aprobacion");
+  const totalDe = (o: Orden) => o.lineas.reduce((s, l) => s + ordenLineaImporte(l), 0);
+  const porAprobar = [...ordenes.filter((o) => o.estado === "pendiente_aprobacion")]
+    .sort((a, b) => (ordenMonto === "desc" ? totalDe(b) - totalDe(a) : totalDe(a) - totalDe(b)));
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAbierto = (id: string) => setAbierto((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const todasAbiertas = porAprobar.length > 0 && porAprobar.every((o) => abierto.has(o.id));
@@ -84,6 +87,18 @@ export default function AprobacionPage() {
                 style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--ds-color-green-200)", textDecoration: "underline" }}>
                 {todasAbiertas ? "Colapsar todas" : "Expandir todas"}
               </button>
+              {/* Ordenar por monto (mayor↔menor) */}
+              <div className="row gap-0" style={{ alignItems: "center", border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 8, overflow: "hidden" }}>
+                {([["desc", "Mayor $"], ["asc", "Menor $"]] as const).map(([v, label]) => (
+                  <button key={v} type="button" onClick={() => setOrdenMonto(v)}
+                    className="ds-body-sm ds-strong"
+                    style={{ padding: "5px 10px", cursor: "pointer", border: 0,
+                      background: ordenMonto === v ? "var(--ds-color-black)" : "transparent",
+                      color: ordenMonto === v ? "var(--ds-color-white)" : "var(--ds-color-gray-400)" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             {sel.size > 0 ? (
               <div style={{ flex: "1 1 300px", minWidth: 240, maxWidth: 420 }}>
@@ -120,8 +135,13 @@ export default function AprobacionPage() {
                       <Badge tone="yellow">Pendiente de aprobación</Badge>
                     </div>
                     <span className="ds-muted ds-label">{o.proveedorNo ?? prov(o.proveedorId)?.code} · {o.proveedorNombre ?? prov(o.proveedorId)?.nombre} · {formatDate(o.fecha)}</span>
-                    <span className="ds-muted ds-body-sm">{articulos.length} línea(s) · Total <span className="ds-strong">{money(total, o.currencyCode)}</span></span>
+                    <span className="ds-muted ds-body-sm">{articulos.length} línea(s)</span>
                   </button>
+                  {/* Monto total, grande y a la derecha (para leerlo de un vistazo) */}
+                  <div className="col" style={{ alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                    <span className="ds-muted ds-body-sm" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>Total</span>
+                    <span className="ds-strong" style={{ fontSize: 26, lineHeight: 1.05, fontVariantNumeric: "tabular-nums" }}>{money(total, o.currencyCode)}</span>
+                  </div>
                 </div>
 
                 {open && (
