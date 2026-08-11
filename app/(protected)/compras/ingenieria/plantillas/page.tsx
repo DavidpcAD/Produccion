@@ -361,7 +361,7 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
           )}
           <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</label><Input type="number" min={0} value={qaQty} onChange={(e) => setQaQty(e.target.value)} placeholder="0" style={{ width: 100 }} /></div>
           <div className="col" style={{ gap: 2 }}>
-            <Button variant="outline" onClick={agregar} disabled={!qaCode || !(Number(qaQty) > 0) || variantePendiente}>+ Agregar</Button>
+            <Button onClick={agregar} disabled={!qaCode || !(Number(qaQty) > 0) || variantePendiente}>+ Agregar</Button>
             {variantePendiente && <span className="ds-body-sm ds-muted" style={{ textAlign: "center" }}>Elegí la variante</span>}
           </div>
         </div>

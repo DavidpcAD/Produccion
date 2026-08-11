@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
-import { Select } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
@@ -88,11 +87,12 @@ export default function ReportesPage() {
           options={semanas.map((s) => ({ value: String(s.id), label: semanaLabel(s) }))}
           placeholder={semanas.length ? 'Elegí una semana…' : 'Cargando…'}
         />
-        <Select
+        <Combobox
           label="Filtro de venta"
           value={venta}
-          onChange={(e) => setVenta(e.target.value as FiltroVenta)}
+          onChange={(v) => setVenta((v as FiltroVenta) || 'todas')}
           options={FILTROS}
+          placeholder="Filtro de venta"
         />
       </div>
 

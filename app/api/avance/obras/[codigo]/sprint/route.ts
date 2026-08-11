@@ -236,6 +236,15 @@ export async function POST(
       );
     }
 
+    // Una obra congelada (en_espera) no se mueve de sprint: hay que descongelarla
+    // primero. Antes "avanzaba" y notificaba éxito aunque no debía.
+    if (estado.estado === 'en_espera') {
+      return NextResponse.json(
+        { error: `La obra ${codigo} está congelada. Descongelala antes de mover el sprint.` },
+        { status: 409 },
+      );
+    }
+
     // actualizado_por → usuarios_app.id (o NULL). No session.idCol: es idColaborador
     // y viola FK_obra_estado_usuario.
     const uid = await resolverUsuarioAppId(db, session);

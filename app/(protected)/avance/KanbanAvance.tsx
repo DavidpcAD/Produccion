@@ -57,7 +57,9 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
   const [busqueda, setBusqueda] = useState('');
   const [ventaFiltro, setVentaFiltro] = useState<EstadoVenta | null>(null);
 
-  const [expandida, setExpandida] = useState<string | null>(null);
+  // Varias tarjetas pueden quedar abiertas a la vez: se cierran solo cuando el
+  // usuario las cierra (antes abrir una cerraba la anterior).
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
   const [avanceMap, setAvanceMap] = useState<Record<string, AvanceSprint>>({});
   const [loadingAvance, setLoadingAvance] = useState<string | null>(null);
 
@@ -120,9 +122,14 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
   );
 
   function toggleExpand(codigo: string) {
-    setExpandida((prev) => {
-      const next = prev === codigo ? null : codigo;
-      if (next && !avanceMap[next]) cargarAvance(next);
+    setExpandidas((prev) => {
+      const next = new Set(prev);
+      if (next.has(codigo)) {
+        next.delete(codigo);
+      } else {
+        next.add(codigo);
+        if (!avanceMap[codigo]) cargarAvance(codigo);
+      }
       return next;
     });
   }
@@ -359,7 +366,7 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
                         key={o.codigo}
                         reduce={!!reduce}
                         obra={o}
-                        expandida={expandida === o.codigo}
+                        expandida={expandidas.has(o.codigo)}
                         avance={avanceMap[o.codigo] ?? null}
                         loadingAvance={loadingAvance === o.codigo}
                         causaLabel={(cod) => causas.find((c) => c.codigo === cod)?.descripcion ?? cod}
@@ -454,8 +461,9 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
           const ok = await cambiarEstado(congelarDe, 'en_espera', nota ? `${causa} — ${nota}` : causa);
           if (ok) {
             toast(`${congelarDe}: congelada`, 'success');
+            const cod = congelarDe;
             setCongelarDe(null);
-            setExpandida(null);
+            setExpandidas((prev) => { const n = new Set(prev); n.delete(cod); return n; });
           }
         }}
       />
@@ -581,8 +589,14 @@ function ObraCard(p: CardProps) {
                     <span className="font-semibold tabular-nums text-ds-ink">{p.avance.avance_sprint}%</span>
                   </div>
 
+                  {congelada && (
+                    <p className="flex items-center gap-1.5 rounded-ds bg-ds-gray-100 px-2.5 py-1.5 text-[11px] font-medium text-ds-gray-500">
+                      <Pause size={13} weight="bold" /> Obra congelada — descongelala para avanzar o registrar.
+                    </p>
+                  )}
+
                   <div className="flex flex-wrap gap-1.5">
-                    <Button size="xs" variant="outline" icon={<ArrowLeft size={14} weight="bold" />} onClick={p.onRetroceder}>
+                    <Button size="xs" variant="outline" icon={<ArrowLeft size={14} weight="bold" />} onClick={p.onRetroceder} disabled={congelada}>
                       Atrás
                     </Button>
                     {congelada ? (
@@ -594,12 +608,12 @@ function ObraCard(p: CardProps) {
                         Congelar
                       </Button>
                     )}
-                    <Button size="xs" variant="outline" iconRight={<ArrowRight size={14} weight="bold" />} onClick={p.onAvanzar}>
+                    <Button size="xs" variant="outline" iconRight={<ArrowRight size={14} weight="bold" />} onClick={p.onAvanzar} disabled={congelada}>
                       Avanzar
                     </Button>
                   </div>
 
-                  {arrastradasPend > 0 && (
+                  {arrastradasPend > 0 && !congelada && (
                     <Button size="xs" variant="ghost" icon={<Check size={14} weight="bold" />} onClick={p.onCompletarArrastradas}>
                       Completar {arrastradasPend} arrastrada{arrastradasPend === 1 ? '' : 's'}
                     </Button>
@@ -640,13 +654,13 @@ function ObraCard(p: CardProps) {
                             </p>
                           )}
                           <div className="flex items-center gap-1.5">
-                            <IconBtn title="Marcar completada" tone="ok" onClick={() => p.onCompletar(sp)}>
+                            <IconBtn title="Marcar completada" tone="ok" disabled={congelada} onClick={() => p.onCompletar(sp)}>
                               <Check size={14} weight="bold" />
                             </IconBtn>
-                            <IconBtn title="Fijar %" tone="ink" onClick={() => p.onPct(sp)}>
+                            <IconBtn title="Fijar %" tone="ink" disabled={congelada} onClick={() => p.onPct(sp)}>
                               <Percent size={14} weight="bold" />
                             </IconBtn>
-                            <IconBtn title="No cumplió" tone="nc" onClick={() => p.onNC(sp)}>
+                            <IconBtn title="No cumplió" tone="nc" disabled={congelada} onClick={() => p.onNC(sp)}>
                               <XCircle size={14} weight="bold" />
                             </IconBtn>
                           </div>
@@ -681,13 +695,13 @@ function ObraCard(p: CardProps) {
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              <IconBtn title="Marcar completada" tone="ok" onClick={() => p.onCompletar(sp)}>
+                              <IconBtn title="Marcar completada" tone="ok" disabled={congelada} onClick={() => p.onCompletar(sp)}>
                                 <Check size={14} weight="bold" />
                               </IconBtn>
-                              <IconBtn title="Fijar %" tone="ink" onClick={() => p.onPct(sp)}>
+                              <IconBtn title="Fijar %" tone="ink" disabled={congelada} onClick={() => p.onPct(sp)}>
                                 <Percent size={14} weight="bold" />
                               </IconBtn>
-                              <IconBtn title="No cumplió" tone="nc" onClick={() => p.onNC(sp)}>
+                              <IconBtn title="No cumplió" tone="nc" disabled={congelada} onClick={() => p.onNC(sp)}>
                                 <XCircle size={14} weight="bold" />
                               </IconBtn>
                             </div>
@@ -719,14 +733,17 @@ function IconBtn({
   tone,
   onClick,
   children,
+  disabled,
 }: {
   title: string;
   tone: 'ok' | 'ink' | 'nc';
   onClick: () => void;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
-  const cls =
-    tone === 'ok'
+  const cls = disabled
+    ? 'border-ds-gray-100 bg-ds-gray-100 text-ds-gray-300 cursor-not-allowed'
+    : tone === 'ok'
       ? 'border-ds-gray-200 text-ds-gray-500 hover:border-brand hover:text-ds-green-ink'
       : tone === 'nc'
         ? 'border-ds-red/40 text-ds-red-200 hover:bg-ds-red/10'
@@ -736,6 +753,7 @@ function IconBtn({
       type="button"
       onClick={onClick}
       title={title}
+      disabled={disabled}
       className={`flex h-7 w-7 items-center justify-center rounded-ds border transition-colors active:scale-95 ${cls}`}
     >
       {children}
