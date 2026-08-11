@@ -226,15 +226,22 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
   }
 }
 
-export async function setPedidoEstado(id: number, estado: string, usuario: string, rol: Role) {
+export async function setPedidoEstado(id: number, estado: string, usuario: string, rol: Role, motivo?: string) {
   const pool = await getPool();
-  const prev = await pool.request().input("id", sql.Int, id).query("SELECT idEstado, pedidoNo FROM dbo.PedidoCompra WHERE idPedidoCompra=@id");
+  const prev = await pool.request().input("id", sql.Int, id).query("SELECT idEstado, pedidoNo, notaCreador FROM dbo.PedidoCompra WHERE idPedidoCompra=@id");
   const idEstado = await idDeEstado(estado);
-  await pool.request().input("id", sql.Int, id).input("e", sql.Int, idEstado)
-    .input("u", sql.NVarChar(100), usuario)
-    .query("UPDATE dbo.PedidoCompra SET idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u WHERE idPedidoCompra=@id");
+  const req = pool.request().input("id", sql.Int, id).input("e", sql.Int, idEstado).input("u", sql.NVarChar(100), usuario);
+  const mot = motivo?.trim();
+  if (mot) {
+    // Guarda el motivo en la nota del pedido (para que el ingeniero vea por qué se devolvió).
+    const prevNota = prev.recordset[0]?.notaCreador as string | null;
+    req.input("nota", sql.NVarChar(sql.MAX), `↩ Devuelto: ${mot}${prevNota ? ` · ${prevNota}` : ""}`);
+    await req.query("UPDATE dbo.PedidoCompra SET idEstado=@e, notaCreador=@nota, fechaModificacion=getdate(), modificadoPor=@u WHERE idPedidoCompra=@id");
+  } else {
+    await req.query("UPDATE dbo.PedidoCompra SET idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u WHERE idPedidoCompra=@id");
+  }
   const tx = new sql.Transaction(pool); await tx.begin();
-  await logMov(tx, { entidad: "pedido", idEntidad: id, documentoNo: prev.recordset[0]?.pedidoNo ?? "", tipoMovimiento: estado, estadoAnterior: codigoDeId(prev.recordset[0]?.idEstado), estadoNuevo: estado, usuario, rol });
+  await logMov(tx, { entidad: "pedido", idEntidad: id, documentoNo: prev.recordset[0]?.pedidoNo ?? "", tipoMovimiento: estado, estadoAnterior: codigoDeId(prev.recordset[0]?.idEstado), estadoNuevo: estado, detalle: mot ? `Motivo: ${mot}` : undefined, usuario, rol });
   await tx.commit();
 }
 

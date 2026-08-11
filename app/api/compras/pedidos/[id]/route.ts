@@ -16,8 +16,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { estado, usuario, rol } = await req.json();
-    await setPedidoEstado(Number((await params).id), estado, usuario, rol);
+    const { estado, usuario, rol, motivo } = await req.json();
+    await setPedidoEstado(Number((await params).id), estado, usuario, rol, motivo);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
