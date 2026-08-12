@@ -478,6 +478,8 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
     .map((p) => ({ id: String(p.id), title: p.nombre, sub: esBodega(p) ? "Bodega" : "General" })), [plantillas, fTipoPl, usuario]);
 
   const validLines = lineas.filter((l) => l.articuloId && l.cantidad > 0);
+  // Para la vista previa (material): materiales agrupados por obra (una sección por obra).
+  const gruposPreview = grupos.map((g) => ({ g, filas: validLines.filter((l) => l.grupoKey === g.key) })).filter((x) => x.filas.length > 0);
   const hasData = validLines.length > 0 || !!destino || notas.trim().length > 0;
   const variantesDe = (l: Row) => { const a = catArticulos.find((x) => x.id === l.articuloId); return a ? (varMap[a.code] ?? []) : []; };
   const necesitaVariante = (l: Row) => { const vs = variantesDe(l); return vs.length > 0 && !l.variantCode; };
@@ -559,7 +561,8 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
       setTimeout(() => setFlashKey((k) => (k === ex.key ? null : k)), 1800);
       return;
     }
-    setLineas((ls) => [...ls, { key: uid(), grupoKey, articuloId, variantCode, variantNombre, cantidad, obraCodigo, obraNombre }]);
+    // El material nuevo se agrega ARRIBA (primero) dentro de su obra.
+    setLineas((ls) => [{ key: uid(), grupoKey, articuloId, variantCode, variantNombre, cantidad, obraCodigo, obraNombre }, ...ls]);
   }
   // Variantes de un artículo (por id) para el drill-down del buscador de materiales.
   const resolveVariantes = async (articuloId: string) => { const a = catArticulos.find((x) => x.id === articuloId); return a ? getVariantes(a.code) : []; };
@@ -663,10 +666,21 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
     if (!nombre || validLines.length === 0) return;
     setSavingPlant(true);
     const tipoPlant = tipo === "stock" ? "bodega" : "general";
-    const lineasPlant = validLines.map((l) => {
+    // Plantilla REUSABLE: NO se guarda la casa (obraCodigo vacío); la obra se elige al
+    // cargarla. Si el mismo material (+variante) estaba en varias obras, se unifica en
+    // una sola línea sumando la cantidad, para que quede un set de materiales limpio.
+    type LP = { code: string; descripcion: string; cantidad: number; unidad: string; obraCodigo: string; variantCode?: string; variantNombre?: string };
+    const mapPlant = new Map<string, LP>();
+    for (const l of validLines) {
       const a = catArticulos.find((x) => x.id === l.articuloId);
-      return { code: a?.code ?? l.articuloId, descripcion: l.variantNombre || a?.descripcion || "", cantidad: l.cantidad, unidad: a?.unidad || "UND", obraCodigo: esMaterial ? (l.obraCodigo || "") : "", variantCode: l.variantCode || undefined, variantNombre: l.variantNombre || undefined };
-    });
+      const code = a?.code ?? l.articuloId;
+      const variantCode = l.variantCode || undefined;
+      const k = `${code}|${variantCode ?? ""}`;
+      const prev = mapPlant.get(k);
+      if (prev) prev.cantidad += l.cantidad;
+      else mapPlant.set(k, { code, descripcion: l.variantNombre || a?.descripcion || "", cantidad: l.cantidad, unidad: a?.unidad || "UND", obraCodigo: "", variantCode, variantNombre: l.variantNombre || undefined });
+    }
+    const lineasPlant = [...mapPlant.values()];
     try {
       const r = await fetch("/api/compras/plantillas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre, creadoPor: usuario, tipo: tipoPlant, lineas: lineasPlant }) });
       if (!r.ok) throw new Error();
@@ -866,29 +880,59 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
                   <Badge tone={esMaterial ? "green" : tipo === "repuesto" ? "yellow" : "gray"}>{tipoMeta.label}</Badge>
                   {prioridad !== "normal" && <Badge tone={prioridad === "urgente" ? "red" : "yellow"}>{PRIORIDADES.find((p) => p.v === prioridad)!.label}</Badge>}
                 </div>
-                <div className="col gap-1">
-                  <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>{esMaterial ? "Obra" : tipoMeta.destino}</span>
-                  <span className="ds-subtitle">{(esMaterial ? headerObra().nombre : destinoNombre) || "—"}</span>
-                  {!esMaterial && destino && <span className="ds-muted ds-body-sm">{destino}</span>}
-                </div>
-                <div className="col gap-2">
-                  <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>Materiales ({validLines.length})</span>
-                  <div className="col gap-0" style={{ border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 14, overflow: "hidden" }}>
-                    {validLines.map((l, i) => {
-                      const a = catArticulos.find((x) => x.id === l.articuloId)!;
-                      const oc = l.obraCodigo || "";
-                      return (
-                        <div key={l.key} className="row row--between gap-3" style={{ alignItems: "center", padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0 }}>
-                          <div className="col" style={{ gap: 2, minWidth: 0 }}>
-                            <span className="ds-body-sm ds-strong">{l.variantNombre || a.descripcion}</span>
-                            <span className="ds-muted ds-label">{a.code}{esMaterial && oc ? ` · ${obraNombreDe(oc)}` : ""}</span>
-                          </div>
-                          <span className="ds-strong" style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{l.cantidad} {a.unidad}</span>
+                {esMaterial ? (
+                  /* Materiales SEPARADOS POR OBRA: una sección por obra, con su encabezado. */
+                  <div className="col gap-4">
+                    <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>
+                      Materiales ({validLines.length}) · {gruposPreview.length} obra{gruposPreview.length !== 1 ? "s" : ""}
+                    </span>
+                    {gruposPreview.map(({ g, filas }) => (
+                      <div key={g.key} className="col gap-0" style={{ border: "1.5px solid var(--ds-color-gray-200)", borderRadius: 14, overflow: "hidden", boxShadow: "var(--ds-shadow-01)" }}>
+                        <div className="row row--between" style={{ alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--ds-color-black)", color: "var(--ds-color-white)" }}>
+                          <span className="ds-strong" style={{ fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ds-color-white)" }}>{g.obraNombre || g.obraCodigo}</span>
+                          <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, letterSpacing: ".03em", color: "rgba(255,255,255,.65)" }}>{g.obraCodigo}</span>
                         </div>
-                      );
-                    })}
+                        {filas.map((l, i) => {
+                          const a = catArticulos.find((x) => x.id === l.articuloId)!;
+                          return (
+                            <div key={l.key} className="row row--between gap-3" style={{ alignItems: "center", padding: "10px 14px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0 }}>
+                              <div className="col" style={{ gap: 2, minWidth: 0 }}>
+                                <span className="ds-body-sm ds-strong">{l.variantNombre || a.descripcion}</span>
+                                <span className="ds-muted ds-label">{a.code}</span>
+                              </div>
+                              <span className="ds-strong" style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{l.cantidad} {a.unidad}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="col gap-1">
+                      <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>{tipoMeta.destino}</span>
+                      <span className="ds-subtitle">{destinoNombre || "—"}</span>
+                      {destino && <span className="ds-muted ds-body-sm">{destino}</span>}
+                    </div>
+                    <div className="col gap-2">
+                      <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>Materiales ({validLines.length})</span>
+                      <div className="col gap-0" style={{ border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 14, overflow: "hidden" }}>
+                        {validLines.map((l, i) => {
+                          const a = catArticulos.find((x) => x.id === l.articuloId)!;
+                          return (
+                            <div key={l.key} className="row row--between gap-3" style={{ alignItems: "center", padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0 }}>
+                              <div className="col" style={{ gap: 2, minWidth: 0 }}>
+                                <span className="ds-body-sm ds-strong">{l.variantNombre || a.descripcion}</span>
+                                <span className="ds-muted ds-label">{a.code}</span>
+                              </div>
+                              <span className="ds-strong" style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{l.cantidad} {a.unidad}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
                 {notas.trim() && (
                   <div className="col gap-1">
                     <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>Comentario</span>
