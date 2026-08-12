@@ -25,27 +25,32 @@ import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
 
 type Variante = { code: string; descripcion: string };
-type Row = { key: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string };
+// Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
+// varias obras (varias tarjetas). Para repuesto/bodega se usa un único grupo (SOLO).
+type Grupo = { key: string; obraCodigo?: string; obraNombre?: string };
+type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string };
 type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string };
 type Plantilla = { id: number; nombre: string; tipo?: "general" | "bodega"; idClasificacion?: number | null; lineas: PlantillaLinea[]; creadoPor?: string };
 type FTipo = "todas" | "mias" | "general" | "bodega";
 type Item = { id: string; title: string; sub?: string };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+const SOLO = "solo"; // grupo único para repuesto/bodega (sin obra)
 
-// Dos líneas son EL MISMO material si coinciden artículo + variante + obra. El
-// mismo material solo se puede repetir en OBRAS distintas (por eso la obra entra
-// en la llave); mismo material + misma obra = duplicado y no se permite.
-const dupKey = (articuloId: string, variantCode?: string, obraCodigo?: string) =>
-  `${articuloId}|${variantCode ?? ""}|${obraCodigo ?? ""}`;
+// Dentro de UNA obra (grupo), dos líneas son el MISMO material si coinciden
+// artículo + variante. El mismo material sí se puede pedir en OTRA obra (otro
+// grupo); mismo material + misma obra = duplicado y no se permite.
+const dupKey = (grupoKey: string, articuloId: string, variantCode?: string) =>
+  `${grupoKey}|${articuloId}|${variantCode ?? ""}`;
 
-// Colapsa líneas duplicadas (misma llave) sumando cantidades, conservando el
-// orden de la primera aparición. Devuelve cuántas se unificaron.
+// Colapsa líneas duplicadas (mismo material dentro de la misma obra) sumando
+// cantidades, conservando el orden de la primera aparición. Devuelve cuántas se
+// unificaron.
 function mergeDedup(rows: Row[]): { rows: Row[]; merged: number } {
   const byKey = new Map<string, Row>();
   let merged = 0;
   for (const r of rows) {
-    const k = dupKey(r.articuloId, r.variantCode, r.obraCodigo);
+    const k = dupKey(r.grupoKey, r.articuloId, r.variantCode);
     const prev = byKey.get(k);
     if (prev) { prev.cantidad += r.cantidad; merged++; }
     else byKey.set(k, { ...r });
@@ -121,9 +126,25 @@ function Popover({ anchorRef, open, onClose, children, minWidth }: {
 }
 
 // ─── Segmented (chips negro/gris) ───────────────────────────────────────────────
-function Segmented<T extends string>({ value, options, onChange, size = "md" }: {
-  value: T; options: { v: T; label: string }[]; onChange: (v: T) => void; size?: "sm" | "md";
+function Segmented<T extends string>({ value, options, onChange, size = "md", variant = "box" }: {
+  value: T; options: { v: T; label: string }[]; onChange: (v: T) => void; size?: "sm" | "md"; variant?: "box" | "pill";
 }) {
+  if (variant === "pill") {
+    // Pill full-width: las opciones se reparten el ancho; la activa es un pill negro grande.
+    return (
+      <div className="row gap-0" style={{ width: "100%", border: "1.5px solid var(--ds-color-gray-200)", borderRadius: 999, padding: 4, background: "var(--ds-color-white)", boxShadow: "var(--ds-shadow-01)" }}>
+        {options.map((o) => {
+          const active = o.v === value;
+          return (
+            <button key={o.v} type="button" onClick={() => onChange(o.v)} className="ds-body-sm ds-strong"
+              style={{ flex: 1, padding: "11px 12px", borderRadius: 999, cursor: "pointer", border: 0, background: active ? "var(--ds-color-black)" : "transparent", color: active ? "var(--ds-color-white)" : "var(--ds-color-gray-500)", transition: "background .15s ease, color .15s ease" }}>
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   const pad = size === "sm" ? "5px 10px" : "8px 14px";
   return (
     <div className="row gap-0" style={{ border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 10, overflow: "hidden", width: "fit-content", maxWidth: "100%", flexWrap: "wrap" }}>
@@ -213,7 +234,7 @@ function VarianteBtn({ variantes, value, onPick }: {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const sel = variantes.find((v) => v.code === value);
-  const label = sel ? (sel.descripcion || sel.code) : "Variante…";
+  const label = sel ? (sel.descripcion || sel.code) : "Agregar variante";
   return (
     <div ref={wrapRef} style={{ display: "inline-flex", width: "100%", minWidth: 0 }}>
       <button type="button" className="nsl-varbtn" data-warn={value ? undefined : "1"} title={label} onClick={() => setOpen((o) => !o)}>
@@ -304,6 +325,50 @@ function MaterialSearch({ items, resolveVariantes, onAdd }: {
   );
 }
 
+// ─── Chip de OBRA: colapsado muestra SOLO el código (corto, ej. VN-B.24). Al pasar
+//     el mouse se abre un panel con el detalle (nombre). Click abre el buscador. Se
+//     ve DISTINTO al buscador de materiales; amarillo mientras no se elige. ─────────
+function ObraChip({ obras, value, nombre, onPick }: {
+  obras: Item[]; value?: string; nombre?: string; onPick: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const matches = useMemo(() => filtrar(obras, q), [q, obras]);
+  const has = !!value;
+  const label = has ? value! : "Elegí obra"; // colapsado = código
+  return (
+    <div ref={wrapRef} style={{ display: "inline-flex", maxWidth: "100%" }}>
+      {/* Colapsado = código. Al pasar el mouse, el nombre se despliega A LA DERECHA en
+          la misma línea (expansión inline con transición CSS, sin panel flotante). */}
+      <button type="button" className="nsl-obrachip" data-empty={has ? undefined : "1"} aria-label={nombre || label}
+        onClick={() => { const n = !open; setOpen(n); if (n) setTimeout(() => inputRef.current?.focus(), 0); }}>
+        <svg className="nsl-obrachip__ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 21h18M6 21V8l6-4 6 4v13M10 21v-5h4v5" /></svg>
+        <span className="nsl-obrachip__label">{label}</span>
+        {has && nombre && <span className="nsl-obrachip__more"><span className="nsl-obrachip__moreinner">{nombre}</span></span>}
+        <svg className="nsl-obrachip__chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s ease" }}><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      <Popover anchorRef={wrapRef} open={open} onClose={() => { setOpen(false); setQ(""); }} minWidth={320}>
+        <div style={{ width: "100%", padding: 8, display: "flex", flexDirection: "column" }}>
+          <input ref={inputRef} value={q} placeholder="Buscar obra…" onChange={(e) => setQ(e.target.value)}
+            style={{ margin: "2px 4px 8px", height: 40, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 14px", fontSize: 14, outline: "none" }} />
+          <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 280 }}>
+            {matches.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin resultados.</div>}
+            {matches.map((o) => (
+              <button key={o.id} type="button" onClick={() => { onPick(o.id); setOpen(false); setQ(""); }}
+                className={`nsl-opt col${o.id === value ? " is-active" : ""}`} style={{ gap: 2, alignItems: "flex-start", width: "100%", textAlign: "left", padding: "10px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent" }}>
+                <span className="ds-body-sm ds-strong">{o.title}</span>
+                {o.sub && <span className="ds-muted ds-label">{o.sub}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
 export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
   const { articulos, obras, maquinas, almacenes, usuario, addPedido, setPedidoEstado } = useStore();
   const toast = useToast();
@@ -347,11 +412,12 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   const [step, setStep] = useState<1 | 2>(1);
   const [tipo, setTipo] = useState<TipoSolicitud>("material");
   const [destino, setDestino] = useState("");
-  const [mismaObra, setMismaObra] = useState(true);
   const [prioridad, setPrioridad] = useState<Pedido["prioridad"]>("normal");
   const [lineas, setLineas] = useState<Row[]>([]);
-  const [menuKey, setMenuKey] = useState<string | null>(null);
-  const [obraKey, setObraKey] = useState<string | null>(null);
+  // Tarjetas de obra (material). Arranca con una vacía para elegir obra + materiales.
+  const [grupos, setGrupos] = useState<Grupo[]>([]); // vacío al inicio: solo se ve "Agregar obra"
+  const [openMat, setOpenMat] = useState<string[]>([]); // grupos con el buscador de material abierto (independiente por tarjeta)
+  const [cardMenuKey, setCardMenuKey] = useState<string | null>(null); // menú ⋮ de una tarjeta de obra
   const [flashKey, setFlashKey] = useState<string | null>(null); // resalta una línea ya existente
   const [guardarPlantOpen, setGuardarPlantOpen] = useState(false);
   const [nombrePlant, setNombrePlant] = useState("");
@@ -362,7 +428,6 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   const varCache = useRef<Record<string, Variante[]>>({});
   const [varMap, setVarMap] = useState<Record<string, Variante[]>>({});
   const [fTipoPl, setFTipoPl] = useState<FTipo>("todas");
-  const [pendingPlantilla, setPendingPlantilla] = useState<string | null>(null); // plantilla general esperando obra
   const [plantillaSel, setPlantillaSel] = useState("");                          // plantilla elegida (para mostrarla en el campo)
 
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
@@ -416,19 +481,32 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   const hasData = validLines.length > 0 || !!destino || notas.trim().length > 0;
   const variantesDe = (l: Row) => { const a = catArticulos.find((x) => x.id === l.articuloId); return a ? (varMap[a.code] ?? []) : []; };
   const necesitaVariante = (l: Row) => { const vs = variantesDe(l); return vs.length > 0 && !l.variantCode; };
-  const destinoOk = esMaterial ? validLines.every((l) => !!l.obraCodigo) : !!destino;
+  // Material: cada línea debe tener obra (su tarjeta debe tener obra elegida).
+  const destinoOk = esMaterial ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo)) : !!destino;
   const canContinue = validLines.length > 0 && destinoOk && validLines.every((l) => !necesitaVariante(l));
 
   function reset() {
-    setStep(1); setTipo("material"); setDestino(""); setMismaObra(true); setPrioridad("normal");
-    setLineas([]); setNotas(""); setSaving(false); setFTipoPl("todas"); setMenuKey(null); setObraKey(null); setPendingPlantilla(null); setPlantillaSel(""); setExtraArt([]);
+    setStep(1); setTipo("material"); setDestino(""); setPrioridad("normal");
+    setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
+    setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]);
   }
   function close() { setConfirmExit(false); setOpen(false); setTimeout(reset, 260); }
   function requestDismiss() { if (hasData && !saving) setConfirmExit(true); else close(); }
 
-  function aplicarPlantilla(pl: Plantilla, obraCodigo?: string) {
-    const rows: Row[] = [];
+  // Cambia el tipo de solicitud y limpia lo dependiente (obra/almacén/materiales).
+  function cambiarTipo(v: TipoSolicitud) {
+    setTipo(v); setDestino(""); setPlantillaSel("");
+    setLineas([]); setGrupos([]); setOpenMat([]); setCardMenuKey(null);
+  }
+
+  // Carga una plantilla: agrupa sus materiales por obra → una tarjeta por obra.
+  // Bodega: todo a un único grupo (SOLO), sin obra.
+  function aplicarPlantilla(pl: Plantilla) {
+    const bodega = esBodega(pl);
     const extras: Articulo[] = [];
+    const rows: Row[] = [];
+    const nuevosGrupos: Grupo[] = [];
+    const porObra = new Map<string, string>(); // obraCodigo ("" = sin obra) -> grupoKey
     for (const pl2 of pl.lineas) {
       if (!pl2.code) continue;
       let a = catArticulos.find((x) => x.code === pl2.code) ?? extras.find((x) => x.code === pl2.code);
@@ -438,14 +516,21 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
         a = { id: pl2.code, code: pl2.code, descripcion: pl2.descripcion || pl2.code, unidad: pl2.unidad || "UND", almacenDefault: "", precioReferencia: 0, tipo: "inventario" };
         extras.push(a);
       }
-      const oc = pl2.obraCodigo || obraCodigo || undefined;
-      rows.push({ key: uid(), articuloId: a.id, variantCode: pl2.variantCode, variantNombre: pl2.variantNombre, cantidad: pl2.cantidad || 1, obraCodigo: oc, obraNombre: oc ? obraNombreDe(oc) : undefined });
+      const oc = bodega ? "" : (pl2.obraCodigo || "");
+      let gKey: string;
+      if (bodega) gKey = SOLO;
+      else {
+        gKey = porObra.get(oc) ?? "";
+        if (!gKey) { gKey = uid(); porObra.set(oc, gKey); nuevosGrupos.push({ key: gKey, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined }); }
+      }
+      rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: pl2.variantCode, variantNombre: pl2.variantNombre, cantidad: pl2.cantidad || 1, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
     }
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
-    // La plantilla puede traer el mismo material repetido para la misma obra: se
+    // La plantilla puede traer el mismo material repetido en la misma obra: se
     // unifican (suma cantidades) para no cargar líneas duplicadas.
     const { rows: dedup, merged } = mergeDedup(rows);
     if (dedup.length) {
+      setGrupos(bodega ? [] : nuevosGrupos);
       setLineas(dedup);
       toast(`Plantilla "${pl.nombre}" cargada (${dedup.length} materiales)${merged ? ` · ${merged} repetido${merged > 1 ? "s" : ""} unificado${merged > 1 ? "s" : ""}` : ""}`, "success");
     } else toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
@@ -454,60 +539,75 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
     const pl = plantillas.find((p) => String(p.id) === id);
     if (!pl) return;
     setPlantillaSel(id);
-    if (esBodega(pl)) {
-      // Bodega: va para bodega, sin obra. Se vuelve una solicitud de Bodega.
-      setTipo("stock"); setDestino(""); setPendingPlantilla(null); aplicarPlantilla(pl, undefined);
-      return;
-    }
-    // General: va a una obra. Primero se elige la obra, luego se cargan los materiales.
-    setTipo("material");
-    if (destino) { aplicarPlantilla(pl, destino); }
-    else { setPendingPlantilla(id); toast(`Elegí la obra y se cargan los materiales de "${pl.nombre}".`, "info"); }
+    if (esBodega(pl)) { setTipo("stock"); setDestino(""); }
+    else { setTipo("material"); }
+    aplicarPlantilla(pl);
   }
 
-  function addRow(articuloId: string, variantCode?: string, variantNombre?: string, cantidad = 1) {
-    const obraCodigo = esMaterial ? (destino || undefined) : undefined;
-    // Si el material YA está en el pedido PARA ESA OBRA, no lo duplica ni suma en
-    // silencio: avisa y resalta la línea existente. El mismo material sí se puede
-    // volver a pedir si es para OTRA obra (o con otra variante).
-    const ex = lineas.find((l) => dupKey(l.articuloId, l.variantCode, l.obraCodigo) === dupKey(articuloId, variantCode, obraCodigo));
+  // Agrega un material a una obra (grupo). No permite el mismo material repetido
+  // DENTRO de la misma obra; sí se puede pedir en otra obra (otra tarjeta).
+  function addRow(grupoKey: string, articuloId: string, variantCode?: string, variantNombre?: string, cantidad = 1) {
+    const g = grupos.find((x) => x.key === grupoKey);
+    const obraCodigo = esMaterial ? g?.obraCodigo : undefined;
+    const obraNombre = esMaterial ? g?.obraNombre : undefined;
+    const ex = lineas.find((l) => dupKey(l.grupoKey, l.articuloId, l.variantCode) === dupKey(grupoKey, articuloId, variantCode));
     if (ex) {
       const a = catArticulos.find((x) => x.id === articuloId);
-      const scope = esMaterial && obraCodigo ? " para esa obra" : "";
-      const salida = esMaterial ? ", o agregalo a otra obra" : "";
-      toast(`"${a?.descripcion ?? "Ese material"}" ya está en el pedido${scope}. Cambiá la cantidad en su línea${salida}.`, "info");
+      const scope = esMaterial && obraCodigo ? " en esta obra" : "";
+      toast(`"${a?.descripcion ?? "Ese material"}" ya está${scope}. Cambiá la cantidad en su línea${esMaterial ? ", o agregalo a otra obra" : ""}.`, "info");
       setFlashKey(ex.key);
       setTimeout(() => setFlashKey((k) => (k === ex.key ? null : k)), 1800);
       return;
     }
-    // Los materiales nuevos se agregan ARRIBA (los más recientes primero).
-    setLineas((ls) => [{ key: uid(), articuloId, variantCode, variantNombre, cantidad, obraCodigo, obraNombre: obraCodigo ? obraNombreDe(obraCodigo) : undefined }, ...ls]);
+    setLineas((ls) => [...ls, { key: uid(), grupoKey, articuloId, variantCode, variantNombre, cantidad, obraCodigo, obraNombre }]);
   }
   // Variantes de un artículo (por id) para el drill-down del buscador de materiales.
   const resolveVariantes = async (articuloId: string) => { const a = catArticulos.find((x) => x.id === articuloId); return a ? getVariantes(a.code) : []; };
-  function pickGlobalObra(code: string) {
-    setDestino(code);
-    // Al fijar UNA sola obra para todas las líneas, dos materiales iguales que
-    // estaban en obras distintas quedarían idénticos: se unifican (suma cantidad).
-    if (mismaObra) setLineas((ls) => mergeDedup(ls.map((l) => ({ ...l, obraCodigo: code, obraNombre: obraNombreDe(code) }))).rows);
-    if (pendingPlantilla) {
-      const pl = plantillas.find((p) => String(p.id) === pendingPlantilla);
-      setPendingPlantilla(null);
-      if (pl) aplicarPlantilla(pl, code);
+
+  // ── Tarjetas de obra (grupos) ───────────────────────────────────────────────
+  function addGrupo() { setGrupos((gs) => [...gs, { key: uid() }]); }
+  function setGrupoObra(grupoKey: string, code: string) {
+    // No se permiten dos tarjetas con la misma obra: los materiales de una obra van
+    // todos en una sola tarjeta.
+    if (code && grupos.some((g) => g.key !== grupoKey && g.obraCodigo === code)) {
+      toast(`"${obraNombreDe(code)}" ya tiene una tarjeta. Agregá ahí sus materiales.`, "info");
+      return;
     }
+    const nombre = code ? obraNombreDe(code) : undefined;
+    setGrupos((gs) => gs.map((g) => (g.key === grupoKey ? { ...g, obraCodigo: code || undefined, obraNombre: nombre } : g)));
+    // Sincroniza la obra en las líneas de esa tarjeta (para el resumen/plantilla/BC).
+    setLineas((ls) => ls.map((l) => (l.grupoKey === grupoKey ? { ...l, obraCodigo: code || undefined, obraNombre: nombre } : l)));
   }
+  function delGrupo(grupoKey: string) {
+    setGrupos((gs) => gs.filter((g) => g.key !== grupoKey));
+    setLineas((ls) => ls.filter((l) => l.grupoKey !== grupoKey));
+    setCardMenuKey(null);
+    setOpenMat((ks) => ks.filter((k) => k !== grupoKey));
+  }
+  // Duplica una obra: copia TODOS sus materiales (con cantidad y variante) a una
+  // tarjeta NUEVA sin obra, para repetir el mismo set en otra casa cambiando solo
+  // la obra. La tarjeta nueva se inserta justo debajo de la original.
+  function duplicarGrupo(grupoKey: string) {
+    const filas = lineas.filter((l) => l.grupoKey === grupoKey);
+    const nuevoKey = uid();
+    const copias: Row[] = filas.map((l) => ({ ...l, key: uid(), grupoKey: nuevoKey, obraCodigo: undefined, obraNombre: undefined }));
+    setGrupos((gs) => { const i = gs.findIndex((g) => g.key === grupoKey); const copy = [...gs]; copy.splice(i < 0 ? gs.length : i + 1, 0, { key: nuevoKey }); return copy; });
+    if (copias.length) setLineas((ls) => [...ls, ...copias]);
+    setCardMenuKey(null);
+    toast(copias.length ? `${copias.length} material(es) copiados — elegí la casa de la obra nueva.` : "Obra nueva agregada — elegí la casa.", "info");
+  }
+
   const setLinea = (key: string, patch: Partial<Row>) => {
-    // Cambiar la VARIANTE o la OBRA de una fila no puede dejarla idéntica a otra ya
-    // existente (mismo artículo+variante+obra). Si chocaría, avisamos y no aplicamos
-    // el cambio. (La cantidad y demás no generan duplicados: pasan directo.)
-    if ("variantCode" in patch || "obraCodigo" in patch) {
+    // Cambiar la VARIANTE de una fila no puede dejarla idéntica a otra de la MISMA
+    // obra (mismo artículo+variante). Si chocaría, avisamos y no aplicamos el cambio.
+    if ("variantCode" in patch) {
       const cur = lineas.find((l) => l.key === key);
       if (cur) {
-        const next = { ...cur, ...patch };
-        const choca = lineas.some((l) => l.key !== key && dupKey(l.articuloId, l.variantCode, l.obraCodigo) === dupKey(next.articuloId, next.variantCode, next.obraCodigo));
+        const nextVar = "variantCode" in patch ? patch.variantCode : cur.variantCode;
+        const choca = lineas.some((l) => l.key !== key && dupKey(l.grupoKey, l.articuloId, l.variantCode) === dupKey(cur.grupoKey, cur.articuloId, nextVar));
         if (choca) {
           const a = catArticulos.find((x) => x.id === cur.articuloId);
-          toast(`"${a?.descripcion ?? "Ese material"}" ya está en el pedido para esa obra. Elegí otra obra o variante.`, "info");
+          toast(`"${a?.descripcion ?? "Ese material"}" con esa variante ya está en esta obra.`, "info");
           return;
         }
       }
@@ -515,18 +615,6 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
     setLineas((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   };
   const delLinea = (key: string) => setLineas((ls) => ls.filter((l) => l.key !== key));
-  function duplicarLinea(key: string) {
-    // Duplicar sirve para pedir el MISMO material en OTRA obra: la copia nace SIN
-    // obra para que se le asigne una distinta (dos líneas idénticas no se permiten).
-    setLineas((ls) => {
-      const idx = ls.findIndex((x) => x.key === key); if (idx < 0) return ls;
-      const copia: Row = esMaterial
-        ? { ...ls[idx], key: uid(), obraCodigo: undefined, obraNombre: undefined }
-        : { ...ls[idx], key: uid() };
-      return [...ls.slice(0, idx + 1), copia, ...ls.slice(idx + 1)];
-    });
-    if (esMaterial) toast("Copia agregada: elegí la obra (el mismo material solo se repite en otra obra).", "info");
-  }
 
   function headerObra(): { codigo?: string; nombre?: string } {
     if (tipo === "repuesto") return {};
@@ -612,94 +700,162 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
             {step === 1 ? (
               <div className="col gap-5">
                 <Field label="Tipo de solicitud">
-                  <Segmented value={tipo} options={TIPOS.map((t) => ({ v: t.v, label: t.label }))} onChange={(v) => { setTipo(v); setDestino(""); setPendingPlantilla(null); }} />
+                  <Segmented variant="pill" value={tipo} options={TIPOS.map((t) => ({ v: t.v, label: t.label }))} onChange={cambiarTipo} />
                 </Field>
 
-                {/* Plantilla (opcional) + Destino: lado a lado */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, alignItems: "start" }}>
-                  <div className="col gap-2">
-                    <span className="ds-form-field__label">Plantilla (opcional)</span>
-                    <Dropdown placeholder="Buscar plantilla…" items={plantillaItems} value={plantillaSel} onPick={cargarPlantilla} badgeSub
-                      onClear={() => { setPlantillaSel(""); setLineas([]); setPendingPlantilla(null); }}
-                      filterNode={<Segmented size="sm" value={fTipoPl} options={F_TIPOS} onChange={setFTipoPl} />} />
-                  </div>
-                  <div className="col gap-2">
-                    <div className="row row--between wrap gap-2" style={{ alignItems: "center" }}>
-                      <span className="ds-form-field__label">{tipoMeta.destino}</span>
-                      {esMaterial && (
-                        <label className="row gap-2" style={{ alignItems: "center", cursor: "pointer" }} title="La obra elegida se aplica a todos los materiales">
-                          <input type="checkbox" className="ds-cbx" checked={mismaObra} onChange={(e) => setMismaObra(e.target.checked)} />
-                          <span className="ds-label ds-muted">Aplicar a todos</span>
-                        </label>
-                      )}
-                    </div>
-                    <Dropdown placeholder={`Elegí ${tipoMeta.destino.toLowerCase()}…`} items={destinoItems} value={destino} onPick={esMaterial ? pickGlobalObra : setDestino} />
-                  </div>
+                {/* Plantilla (opcional) */}
+                <div className="col gap-2">
+                  <span className="ds-form-field__label">Plantilla (opcional)</span>
+                  <Dropdown placeholder="Buscar plantilla…" items={plantillaItems} value={plantillaSel} onPick={cargarPlantilla} badgeSub
+                    onClear={() => { setPlantillaSel(""); setLineas([]); setGrupos([]); }}
+                    filterNode={<Segmented size="sm" value={fTipoPl} options={F_TIPOS} onChange={setFTipoPl} />} />
                 </div>
 
-                {/* Materiales */}
-                <div className="col gap-2">
-                  <div className="row row--between" style={{ alignItems: "center" }}>
-                    <span className="ds-form-field__label">Materiales</span>
-                    <span className="ds-muted ds-label">{validLines.length} línea(s)</span>
-                  </div>
-                  <MaterialSearch items={articuloItems} resolveVariantes={resolveVariantes} onAdd={addRow} />
-
-                  {lineas.length > 0 && (
-                    <div className="col gap-2" style={{ marginTop: 4 }}>
-                      {lineas.map((l) => {
-                        const a = catArticulos.find((x) => x.id === l.articuloId);
-                        const showObra = esMaterial && (!mismaObra || obraKey === l.key);
-                        const variantes = variantesDe(l);
-                        const faltaVar = necesitaVariante(l);
-                        const warn = (esMaterial && !mismaObra && !l.obraCodigo) || faltaVar;
-                        const flash = l.key === flashKey;
+                {esMaterial ? (
+                  /* MATERIAL: una TARJETA por obra; adentro, sus materiales. */
+                  <div className="col gap-2">
+                    <div className="row row--between" style={{ alignItems: "center" }}>
+                      <span className="ds-form-field__label">Obras y materiales</span>
+                      <span className="ds-muted ds-label">{validLines.length} línea(s)</span>
+                    </div>
+                    <div className="col gap-3">
+                      {grupos.map((g) => {
+                        const filas = lineas.filter((l) => l.grupoKey === g.key);
+                        const abierto = openMat.includes(g.key);
                         return (
-                          <div key={l.key} className="col gap-2" style={{ position: "relative", padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${flash ? "var(--ds-color-green-100)" : warn ? "var(--ds-color-yellow)" : "var(--ds-color-gray-100)"}`, background: "var(--ds-color-white)", boxShadow: flash ? "0 0 0 3px color-mix(in srgb, var(--ds-color-green-100) 40%, transparent)" : undefined, transition: "box-shadow .2s ease, border-color .2s ease" }}>
-                            <div className="row gap-3 wrap" style={{ alignItems: "center" }}>
-                              <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 200px" }}>
-                                <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
-                                <span className="ds-muted ds-label">{a?.code}</span>
+                          <div key={g.key} className="col gap-0" style={{ position: "relative", borderRadius: 18, border: "1.5px solid var(--ds-color-gray-100)", background: "var(--ds-color-white)", overflow: "hidden" }}>
+                            {/* Cabecera (franja): OBRA como chip prominente + agregar material (+) + menú (⋮) */}
+                            <div className="row gap-2 nsl-obra-head" data-empty={g.obraCodigo ? undefined : "1"} style={{ alignItems: "center", padding: "10px 12px" }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <ObraChip obras={obraItems} value={g.obraCodigo} nombre={g.obraNombre} onPick={(code) => setGrupoObra(g.key, code)} />
                               </div>
-                              {showObra && (
-                                <div style={{ flex: "0 0 180px", minWidth: 0 }}>
-                                  <Dropdown small warn placeholder="Obra…" items={obraItems} value={l.obraCodigo ?? ""}
-                                    onPick={(code) => { setLinea(l.key, { obraCodigo: code, obraNombre: obraNombreDe(code) }); setObraKey(null); }} />
-                                </div>
+                              <button type="button" onClick={() => setOpenMat((ks) => (ks.includes(g.key) ? [] : [g.key]))}
+                                aria-label="Agregar material" title="Agregar material a esta obra"
+                                style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 12, border: 0, background: "var(--ds-color-green-100)", color: "var(--ds-color-black)", cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "var(--ds-shadow-01)" }}>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden style={{ transform: abierto ? "rotate(45deg)" : "none", transition: "transform .15s ease" }}><path d="M12 5v14M5 12h14" /></svg>
+                              </button>
+                              <button type="button" onClick={() => setCardMenuKey((k) => (k === g.key ? null : g.key))} aria-label="Opciones de la obra"
+                                style={{ flexShrink: 0, background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>
+                              </button>
+                              {cardMenuKey === g.key && (
+                                <>
+                                  <div onClick={() => setCardMenuKey(null)} style={{ position: "fixed", inset: 0, zIndex: 3 }} />
+                                  <div className="col" style={{ position: "absolute", top: 52, right: 10, zIndex: 4, minWidth: 200, background: "var(--ds-color-white)", border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 30px rgba(15,18,20,.16)" }}>
+                                    {filas.length > 0 && (
+                                      <button type="button" onClick={() => duplicarGrupo(g.key)} className="ds-body-sm" style={{ textAlign: "left", padding: "10px 14px", border: 0, background: "none", cursor: "pointer" }}>Duplicar a otra obra</button>
+                                    )}
+                                    <button type="button" onClick={() => delGrupo(g.key)} className="ds-body-sm ds-strong" style={{ textAlign: "left", padding: "10px 14px", border: 0, borderTop: filas.length > 0 ? "1.5px solid var(--ds-color-gray-100)" : 0, background: "none", cursor: "pointer", color: "var(--ds-color-red-100)" }}>Quitar obra</button>
+                                  </div>
+                                </>
                               )}
-                              {variantes.length > 0 && (
-                                <div style={{ flex: "0 0 180px", minWidth: 0 }}>
-                                  <VarianteBtn variantes={variantes} value={l.variantCode ?? ""}
-                                    onPick={(code, nombre) => setLinea(l.key, { variantCode: code, variantNombre: nombre })} />
-                                </div>
-                              )}
-                              <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
-                                <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n })} />
-                                <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
-                                <button type="button" onClick={() => setMenuKey((k) => (k === l.key ? null : l.key))} aria-label="Opciones"
-                                  style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>
-                                </button>
-                              </div>
                             </div>
-                            {menuKey === l.key && (
-                              <>
-                                <div onClick={() => setMenuKey(null)} style={{ position: "fixed", inset: 0, zIndex: 3 }} />
-                                <div className="col" style={{ position: "absolute", top: 46, right: 10, zIndex: 4, minWidth: 170, background: "var(--ds-color-white)", border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 30px rgba(15,18,20,.16)" }}>
-                                  {esMaterial && <button type="button" onClick={() => { setObraKey(l.key); setMenuKey(null); }} className="ds-body-sm" style={{ textAlign: "left", padding: "10px 14px", border: 0, background: "none", cursor: "pointer" }}>Cambiar obra</button>}
-                                  <button type="button" onClick={() => { duplicarLinea(l.key); setMenuKey(null); }} className="ds-body-sm" style={{ textAlign: "left", padding: "10px 14px", border: 0, background: "none", cursor: "pointer", borderTop: esMaterial ? "1.5px solid var(--ds-color-gray-100)" : 0 }}>Duplicar</button>
-                                  <button type="button" onClick={() => { delLinea(l.key); setMenuKey(null); }} className="ds-body-sm ds-strong" style={{ textAlign: "left", padding: "10px 14px", border: 0, borderTop: "1.5px solid var(--ds-color-gray-100)", background: "none", cursor: "pointer", color: "var(--ds-color-red-100)" }}>Eliminar</button>
-                                </div>
-                              </>
+
+                            {/* Buscador de material (se abre con el +) */}
+                            {abierto && (
+                              <div style={{ padding: "0 12px 10px" }}>
+                                <MaterialSearch items={articuloItems} resolveVariantes={resolveVariantes}
+                                  onAdd={(id, vc, vn) => addRow(g.key, id, vc, vn)} />
+                              </div>
+                            )}
+
+                            {/* Materiales de esta obra */}
+                            {filas.length === 0 ? (
+                              <div className="ds-muted ds-body-sm" style={{ padding: "0 14px 14px" }}>
+                                {g.obraCodigo ? "Agregá materiales con el +." : "Elegí una obra y agregá sus materiales con el +."}
+                              </div>
+                            ) : (
+                              <div className="col gap-0" style={{ borderTop: "1.5px solid var(--ds-color-gray-100)" }}>
+                                {filas.map((l, i) => {
+                                  const a = catArticulos.find((x) => x.id === l.articuloId);
+                                  const variantes = variantesDe(l);
+                                  const faltaVar = necesitaVariante(l);
+                                  const flash = l.key === flashKey;
+                                  return (
+                                    <div key={l.key} className="row gap-3 wrap" style={{ alignItems: "center", padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0, background: flash ? "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" : faltaVar ? "color-mix(in srgb, var(--ds-color-yellow) 12%, var(--ds-color-white))" : "transparent", transition: "background .2s ease" }}>
+                                      <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
+                                        <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
+                                        <span className="ds-muted ds-label">{a?.code}</span>
+                                      </div>
+                                      {variantes.length > 0 && (
+                                        <div style={{ flex: "0 0 200px", minWidth: 0 }}>
+                                          <VarianteBtn variantes={variantes} value={l.variantCode ?? ""}
+                                            onPick={(code, nombre) => setLinea(l.key, { variantCode: code, variantNombre: nombre })} />
+                                        </div>
+                                      )}
+                                      <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
+                                        <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n })} />
+                                        <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
+                                        <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
+                                          style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
+                                          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             )}
                           </div>
                         );
                       })}
                     </div>
-                  )}
-                </div>
+                    <button type="button" onClick={addGrupo} className="row gap-2"
+                      style={{ alignItems: "center", justifyContent: "center", width: "100%", padding: 12, borderRadius: 14, border: "1.5px dashed var(--ds-color-gray-300)", background: "var(--ds-tint-base)", cursor: "pointer", color: "var(--ds-color-ink)", fontWeight: 600 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
+                      Agregar obra
+                    </button>
+                  </div>
+                ) : (
+                  /* REPUESTO / BODEGA: un solo destino (máquina/almacén) + lista de materiales. */
+                  <div className="col gap-4">
+                    <div className="col gap-2">
+                      <span className="ds-form-field__label">{tipoMeta.destino}</span>
+                      <Dropdown placeholder={`Elegí ${tipoMeta.destino.toLowerCase()}…`} items={destinoItems} value={destino} onPick={setDestino} />
+                    </div>
+                    <div className="col gap-2">
+                      <div className="row row--between" style={{ alignItems: "center" }}>
+                        <span className="ds-form-field__label">Materiales</span>
+                        <span className="ds-muted ds-label">{validLines.length} línea(s)</span>
+                      </div>
+                      <MaterialSearch items={articuloItems} resolveVariantes={resolveVariantes} onAdd={(id, vc, vn) => addRow(SOLO, id, vc, vn)} />
+                      {lineas.length > 0 && (
+                        <div className="col gap-2" style={{ marginTop: 4 }}>
+                          {lineas.map((l) => {
+                            const a = catArticulos.find((x) => x.id === l.articuloId);
+                            const variantes = variantesDe(l);
+                            const faltaVar = necesitaVariante(l);
+                            const flash = l.key === flashKey;
+                            return (
+                              <div key={l.key} className="row gap-3 wrap" style={{ alignItems: "center", padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${flash ? "var(--ds-color-green-100)" : faltaVar ? "var(--ds-color-yellow)" : "var(--ds-color-gray-100)"}`, background: "var(--ds-color-white)", transition: "border-color .2s ease" }}>
+                                <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
+                                  <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
+                                  <span className="ds-muted ds-label">{a?.code}</span>
+                                </div>
+                                {variantes.length > 0 && (
+                                  <div style={{ flex: "0 0 200px", minWidth: 0 }}>
+                                    <VarianteBtn variantes={variantes} value={l.variantCode ?? ""}
+                                      onPick={(code, nombre) => setLinea(l.key, { variantCode: code, variantNombre: nombre })} />
+                                  </div>
+                                )}
+                                <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
+                                  <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n })} />
+                                  <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
+                                  <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
+                                    style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-                <Field label="Prioridad"><Segmented value={prioridad} options={PRIORIDADES} onChange={setPrioridad} /></Field>
+                <Field label="Prioridad"><Segmented variant="pill" value={prioridad} options={PRIORIDADES} onChange={setPrioridad} /></Field>
                 <Field label="Comentario (opcional)">
                   <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} placeholder="Nota para proveeduría…" className="ds-form-field__input" style={{ width: "100%", resize: "vertical" }} />
                 </Field>
