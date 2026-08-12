@@ -81,10 +81,9 @@ const navItems: NavItemDef[] = [
     ],
   },
   {
-    href: '/compras/ingenieria/dashboard', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4,
+    href: '/compras/ingenieria', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4,
     section: '/compras/ingenieria',
     children: [
-      { href: '/compras/ingenieria/dashboard', label: 'Dashboard' },
       { href: '/compras/ingenieria', label: 'Mis solicitudes', exact: true },
       { href: '/compras/ingenieria/devoluciones', label: 'Devoluciones' },
       { href: '/compras/ingenieria/matriz', label: 'Matriz' },

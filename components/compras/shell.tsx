@@ -30,9 +30,8 @@ type RoleAction = { href: string; label: string };
 
 const ROLE_META: Record<Role, { label: string; persona: string; home: string; nav: NavItem[]; action?: RoleAction; color: string }> = {
   ingenieria: {
-    label: "Ingeniería", persona: "Laura", home: "/compras/ingenieria/dashboard", color: "var(--ds-color-green-100)",
+    label: "Ingeniería", persona: "Laura", home: "/compras/ingenieria", color: "var(--ds-color-green-100)",
     nav: [
-      { href: "/compras/ingenieria/dashboard", label: "Dashboard", icon: IconDashboard },
       { href: "/compras/ingenieria", label: "Mis solicitudes", icon: IconList },
       { href: "/compras/ingenieria/devoluciones", label: "Devoluciones", icon: IconWarning },
       { href: "/compras/ingenieria/matriz", label: "Matriz", icon: IconMatrix },
