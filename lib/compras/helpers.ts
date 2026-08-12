@@ -1,4 +1,4 @@
-import type { Orden, OrdenLinea, Pedido, PedidoLinea, TipoSolicitud } from "./types";
+import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, TipoSolicitud } from "./types";
 
 // Badge del tipo de solicitud (Material / Repuesto / Stock).
 export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: string } {
@@ -82,6 +82,34 @@ export function formatDateTime(iso: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleString("es-CR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// Fecha compacta "8 Agosto" (día + mes) para la lista de solicitudes. El detalle
+// completo (dd/mm/aaaa) queda en el tooltip. Igual que formatDate, toma los dígitos
+// del ISO "solo día" sin convertir zona horaria (evita el corrimiento en CR).
+export function formatDiaMes(iso: string): string {
+  if (!iso) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
+  if (isNaN(+d)) return "—";
+  const mes = d.toLocaleDateString("es-CR", { month: "long" });
+  return `${d.getDate()} ${mes.charAt(0).toUpperCase()}${mes.slice(1)}`;
+}
+
+// Número de solicitud "corto" para la UI: solo los últimos 4 dígitos (PED-000025 →
+// "0025"). En SQL se guarda el número completo; esto es puramente visual. El
+// número completo va en el tooltip.
+export function pedidoNumeroCorto(numero: string): string {
+  const dig = (numero || "").replace(/\D/g, "");
+  return dig ? dig.slice(-4).padStart(4, "0") : (numero || "—");
+}
+
+// Iniciales de una persona para el avatar (una o dos letras). "Laura Jiménez" → "LJ".
+export function iniciales(nombre: string): string {
+  const parts = (nombre || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 export const PERSONA_POR_ROL: Record<string, string> = {
@@ -201,6 +229,91 @@ export function pedidoCompraBadge(p: Pedido): { label: string; tone: string } {
   if (pct >= 100) return { label: "100% comprado", tone: "green" };
   if (pct > 0) return { label: "Parcialmente comprado", tone: "yellow" };
   return { label: "Pendiente de comprar", tone: "gray" };
+}
+
+// ---- progreso de una solicitud (pipeline de 5 pasos) ----
+// Pedido → Proveeduría → Orden → Aprobado → Facturado. Mapea el ciclo de vida
+// real (estado del pedido + estado de las órdenes ligadas + recepción) a un paso
+// 1..5 para el mini-stepper de "Mis solicitudes".
+export interface PedidoProgresoPaso { label: string; tip: string; done: boolean; current: boolean; }
+export interface PedidoProgreso {
+  nivel: number;        // paso alcanzado (1..5)
+  total: number;        // 5
+  devuelto: boolean;    // volvió a Ingeniería (estado devuelto)
+  completado: boolean;  // terminó TODO el flujo (los 5 pasos con ✓)
+  motivo?: string;      // motivo de la devolución (si devuelto)
+  actualLabel: string;  // nombre del paso actual
+  pasos: PedidoProgresoPaso[];
+}
+
+// Extrae el motivo de una devolución del comentario del pedido. Al devolver, el
+// store guarda notas como "↩ Devuelto: <motivo> · <resto>".
+export function motivoDevolucion(p: Pedido): string | undefined {
+  const m = /devuelto:\s*([^·]+)/i.exec(p.notas ?? "");
+  return m ? m[1].trim() : undefined;
+}
+
+// Quién devolvió la solicitud (y de qué área), leído de la bitácora: el último
+// movimiento "devuelto" del pedido guarda usuario + rol. Sirve para el detalle
+// "Devuelta por … · Proveeduría" en el stepper.
+export interface DevolucionInfo { por?: string; rolLabel?: string; fecha?: string; }
+export function devolucionInfo(p: Pedido, movimientos: Movimiento[]): DevolucionInfo | undefined {
+  if (p.estado !== "devuelto") return undefined;
+  const m = movimientos
+    .filter((x) => x.entidad === "pedido" && x.idEntidad === p.id && x.tipoMovimiento === "devuelto")
+    .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))[0];
+  if (!m) return undefined;
+  return { por: m.usuario, rolLabel: m.rol ? ROL_LABEL[m.rol] : undefined, fecha: m.fecha };
+}
+
+const PASOS_SOLICITUD: { label: string; tip: string }[] = [
+  { label: "Pedido", tip: "Solicitud creada" },
+  { label: "Proveeduría", tip: "En Proveeduría" },
+  { label: "Orden", tip: "En orden de compra" },
+  { label: "Aprobado", tip: "Orden aprobada y lanzada" },
+  { label: "Facturado", tip: "Recibido y facturado" },
+];
+
+// Órdenes que incluyen al menos una línea de este pedido (enlace N:M por
+// OrdenLinea.pedidoLineaId).
+export function ordenesDePedido(ordenes: Orden[], p: Pedido): Orden[] {
+  const ids = new Set(p.lineas.map((l) => l.id));
+  return ordenes.filter((o) => o.lineas.some((l) => l.pedidoLineaId && ids.has(l.pedidoLineaId)));
+}
+
+export function pedidoProgreso(p: Pedido, ordenes: Orden[]): PedidoProgreso {
+  const ligadas = ordenesDePedido(ordenes, p);
+  const totalCant = p.lineas.reduce((s, l) => s + l.cantidad, 0);
+  const recibida = p.lineas.reduce((s, l) => s + recibidoDeLineaPedido(ordenes, l.id), 0);
+  const recibidoTotal = totalCant > 0 && recibida >= totalCant - 1e-9;
+  const parcialRecibido = recibida > 1e-9 && !recibidoTotal;
+
+  const enProveeduria = p.estado !== "borrador";               // ya fue enviada
+  const hayOrden = ligadas.length > 0 || pedidoOrdenadoPct(p) > 0;
+  const ordenAprobada = ligadas.some((o) => o.estado === "lanzado" || o.estado === "completado");
+  // COMPLETADA = todo el flujo terminó (recibida y facturada / cerrada). Solo así
+  // el paso 5 lleva ✓; mientras se recibe, el paso 5 queda "en curso".
+  const completado = p.estado === "cerrado" || (hayOrden && recibidoTotal);
+
+  let nivel = 1;
+  if (enProveeduria) nivel = 2;
+  if (hayOrden) nivel = 3;
+  if (ordenAprobada) nivel = 4;
+  if (ordenAprobada && parcialRecibido) nivel = 5; // recibiendo → Facturado en curso
+  if (completado) nivel = 5;
+
+  const pasos = PASOS_SOLICITUD.map((s, i) => ({
+    label: s.label, tip: s.tip,
+    done: completado ? true : i + 1 < nivel,
+    current: completado ? false : i + 1 === nivel,
+  }));
+  const devuelto = p.estado === "devuelto";
+  return {
+    nivel, total: PASOS_SOLICITUD.length, devuelto, completado,
+    motivo: devuelto ? motivoDevolucion(p) : undefined,
+    actualLabel: completado ? "Completada" : PASOS_SOLICITUD[nivel - 1].label,
+    pasos,
+  };
 }
 
 export function ordenBadge(estado: Orden["estado"]): { label: string; tone: string } {

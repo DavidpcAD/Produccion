@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { RangeCalendar } from "@/components/compras/range-calendar";
 import {
   useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel,
   getFacetedRowModel, getFacetedUniqueValues, flexRender,
@@ -74,7 +75,7 @@ export function DataTable<T>({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [filterCol, setFilterCol] = useState<string | null>(null);
-  const [filterAnchor, setFilterAnchor] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
+  const [filterAnchor, setFilterAnchor] = useState<{ left: number; top: number; bottom: number }>({ left: 0, top: 0, bottom: 0 });
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() => columns.map((c) => c.id!).filter(Boolean));
@@ -96,12 +97,13 @@ export function DataTable<T>({
     getFacetedRowModel: getFacetedRowModel(), getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-  // Abre el popover de filtro anclado bajo el botón de la columna.
+  // Abre el menú de la columna anclado al botón del header (guarda arriba y abajo
+  // para poder voltear el popover si no cabe hacia abajo).
   function abrirFiltro(colId: string, btn: HTMLElement) {
     if (filterCol === colId) { setFilterCol(null); return; }
     const r = btn.getBoundingClientRect();
-    const left = Math.min(r.left, window.innerWidth - 330 - 12);
-    setFilterAnchor({ left: Math.max(12, left), top: r.bottom + 6 });
+    const left = Math.min(Math.max(12, r.left), window.innerWidth - 320 - 12);
+    setFilterAnchor({ left, top: r.top, bottom: r.bottom });
     setFilterCol(colId);
   }
 
@@ -313,13 +315,13 @@ export function DataTable<T>({
       {/* Vista Grid (tarjetas) */}
       {modo === "grid" ? (
         rows.length === 0 ? <div className="empty">{vacio}</div> : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
             {rows.map((row) => (
-              <Card key={row.id} className={rowClassName?.(row.original) ?? ""} interactive={!!onRowClick} onClick={onRowClick ? () => onRowClick(row.original) : undefined} style={{ minWidth: 0 }}>
-                {row.getVisibleCells().map((cell) => (
-                  <div key={cell.id} style={{ display: "grid", gridTemplateColumns: "minmax(64px, 38%) 1fr", gap: 8, alignItems: "start", padding: "4px 0" }}>
-                    <span className="ds-muted ds-body-sm" style={{ overflowWrap: "anywhere" }}>{(cell.column.columnDef.meta as ColMeta | undefined)?.label ?? cell.column.id}</span>
-                    <span className="ds-body-sm" style={{ textAlign: "right", minWidth: 0, overflowWrap: "anywhere" }}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</span>
+              <Card key={row.id} className={`dt-gridcard ${rowClassName?.(row.original) ?? ""}`.trim()} interactive={!!onRowClick} onClick={onRowClick ? () => onRowClick(row.original) : undefined}>
+                {row.getVisibleCells().map((cell, i) => (
+                  <div key={cell.id} className={`dt-gridcard__row${i === 0 ? " is-title" : ""}`}>
+                    <span className="dt-gridcard__label">{(cell.column.columnDef.meta as ColMeta | undefined)?.label ?? cell.column.id}</span>
+                    <span className="dt-gridcard__value">{flexRender(cell.column.columnDef.cell, cell.getContext())}</span>
                   </div>
                 ))}
               </Card>
@@ -357,21 +359,23 @@ export function DataTable<T>({
                           onDragEnd={() => setDragCol(null)}
                           style={{ opacity: isDragging ? 0.4 : 1, boxShadow: isTarget ? "inset 2px 0 0 var(--ds-color-green-100)" : undefined }}
                         >
-                          <div className="dt-hpill">
-                            <button type="button" className="dt-hpill__label" title="Ordenar · arrastrá para mover"
-                              onClick={canSort ? h.column.getToggleSortingHandler() : undefined}>
-                              {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
-                              {canSort && <span className="dt-hpill__sort" aria-hidden>{sorted === "asc" ? "▲" : sorted === "desc" ? "▼" : "↕"}</span>}
-                            </button>
-                            {canFilter && (
-                              <button type="button" className={`dt-hpill__filter${activos ? " is-active" : ""}${filterCol === h.column.id ? " is-open" : ""}`}
-                                title={activos ? `${activos} filtro(s)` : "Filtrar"}
+                          {(() => {
+                            const headerNode = h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext());
+                            // Un SOLO botón por columna: al hacer click abre el menú de la
+                            // columna (filtrar + ordenar). Columnas sin orden ni filtro quedan como texto.
+                            if (!canSort && !canFilter) return <div className="dt-hpill"><span className="dt-hpill__label">{headerNode}</span></div>;
+                            return (
+                              <button type="button"
+                                className={`dt-hpill dt-hpill--btn${(activos || sorted) ? " is-active" : ""}${filterCol === h.column.id ? " is-open" : ""}`}
+                                title="Filtrar y ordenar · arrastrá para mover"
                                 onClick={(e) => { e.stopPropagation(); abrirFiltro(h.column.id, e.currentTarget); }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>
+                                <span className="dt-hpill__label">{headerNode}</span>
+                                {sorted && <span className="dt-hpill__sort" aria-hidden>{sorted === "asc" ? "▲" : "▼"}</span>}
                                 {activos > 0 && <span className="dt-hpill__badge">{activos}</span>}
+                                <svg className="dt-hpill__icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>
                               </button>
-                            )}
-                          </div>
+                            );
+                          })()}
                         </th>
                       );
                     })}
@@ -446,14 +450,37 @@ export function DataTable<T>({
   );
 }
 
-// Popover de filtro estilo Adelante: cajita blanca flotante con buscador y lista
-// de opciones (valores distintos de la columna) como checkboxes multi-selección.
-// "Todos" limpia el filtro. Posición fija (evita recortes por el scroll horizontal).
+// Reposiciona el popover para que NUNCA quede escondido: si no cabe hacia abajo,
+// se abre hacia ARRIBA; y limita su alto al espacio disponible (con scroll interno).
+function useFlipStyle(anchor: { left: number; top: number; bottom: number }, ready: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<CSSProperties>({ left: anchor.left, top: anchor.bottom + 6, visibility: "hidden" });
+  useEffect(() => {
+    if (!ready) return;
+    const el = ref.current;
+    if (!el) return;
+    const gap = 6, margin = 10, vh = window.innerHeight;
+    const h = el.offsetHeight;
+    const belowTop = anchor.bottom + gap;
+    const spaceBelow = vh - belowTop - margin;
+    const spaceAbove = anchor.top - gap - margin;
+    let top: number, maxHeight: number;
+    if (h <= spaceBelow || spaceBelow >= spaceAbove) {
+      top = belowTop; maxHeight = Math.max(160, spaceBelow);                        // abre hacia abajo
+    } else {
+      maxHeight = Math.max(160, spaceAbove);                                        // abre hacia arriba
+      top = Math.max(margin, anchor.top - gap - Math.min(h, maxHeight));
+    }
+    setStyle({ left: anchor.left, top, maxHeight, overflowY: "auto", visibility: "visible" });
+  }, [ready, anchor.left, anchor.top, anchor.bottom]);
+  return { ref, style };
+}
+
+// Menú de columna (portalizado a <body>): buscador arriba, ordenar, y filtro
+// (checkboxes o calendario de rango para fechas). Se voltea si no cabe.
 function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
-  col: Column<T, unknown>; label: string; anchor: { left: number; top: number }; onClose: () => void;
+  col: Column<T, unknown>; label: string; anchor: { left: number; top: number; bottom: number }; onClose: () => void;
 }) {
-  // Hooks primero (siempre), luego la rama de fecha retorna antes de tocar `sel`
-  // (para fecha el filtro es un objeto {from,to}, no un arreglo).
   const [q, setQ] = useState("");
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -463,13 +490,22 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
     for (const k of col.getFacetedUniqueValues().keys()) { const s = asText(k); if (s !== "") set.add(s); }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
   }, [col]);
+  const flip = useFlipStyle(anchor, mounted);
 
-  // Se portaliza a <body> para que el `position: fixed` quede anclado al
-  // viewport (no a un ancestro con transform, que lo hacía flotar fuera de la
-  // tabla). Requiere estar montado en cliente.
   if (!mounted) return null;
 
-  // Columna de fecha: filtro por rango (día / mes / año / rango libre).
+  const sortState = col.getIsSorted();
+  const canFilterCol = col.getCanFilter();
+  const sortUI = col.getCanSort() ? (
+    <div className="dt-filter-sort">
+      <button type="button" className={`dt-sortbtn${sortState === "asc" ? " is-active" : ""}`}
+        onClick={() => (sortState === "asc" ? col.clearSorting() : col.toggleSorting(false))}><span aria-hidden>↑</span> Ascendente</button>
+      <button type="button" className={`dt-sortbtn${sortState === "desc" ? " is-active" : ""}`}
+        onClick={() => (sortState === "desc" ? col.clearSorting() : col.toggleSorting(true))}><span aria-hidden>↓</span> Descendente</button>
+    </div>
+  ) : null;
+
+  // Columna de FECHA: calendario de rango (estilo Airbnb) + accesos rápidos.
   if (isDateCol(col.columnDef)) {
     const range = (col.getFilterValue() as DateRange | undefined) ?? {};
     const setRange = (r: DateRange) => col.setFilterValue(r.from || r.to ? r : undefined);
@@ -479,23 +515,24 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
     const iso = (dt: Date) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
     const mesFrom = `${y}-${pad(m + 1)}-01`, mesTo = iso(new Date(y, m + 1, 0));
     const hoyIso = iso(hoy);
+    const fmt = (s?: string) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}` : "");
+    const resumen = range.from ? (range.to && range.to !== range.from ? `${fmt(range.from)} → ${fmt(range.to)}` : fmt(range.from)) : "Elegí un rango en el calendario";
     return createPortal(
       <div className="oc-scope">
         <div className="dt-filter-scrim" onClick={onClose} />
-        <div className="dt-filter-pop" style={{ left: anchor.left, top: anchor.top }} onClick={(e) => e.stopPropagation()}>
-          <div className="dt-filter-pop__list" style={{ padding: 14, gap: 12, display: "flex", flexDirection: "column" }}>
+        <div ref={flip.ref} className="dt-filter-pop dt-filter-pop--date" style={flip.style} onClick={(e) => e.stopPropagation()}>
+          {sortUI}
+          <div className="dt-datecard">
             <div className="dt-date-quick">
               <button type="button" onClick={() => setRange({ from: hoyIso, to: hoyIso })}>Hoy</button>
               <button type="button" onClick={() => setRange({ from: mesFrom, to: mesTo })}>Este mes</button>
               <button type="button" onClick={() => setRange({ from: `${y}-01-01`, to: `${y}-12-31` })}>Este año</button>
             </div>
-            <label className="dt-date-field"><span>Desde</span>
-              <input type="date" value={range.from ?? ""} max={range.to || undefined} onChange={(e) => setRange({ ...range, from: e.target.value })} />
-            </label>
-            <label className="dt-date-field"><span>Hasta</span>
-              <input type="date" value={range.to ?? ""} min={range.from || undefined} onChange={(e) => setRange({ ...range, to: e.target.value })} />
-            </label>
-            <button type="button" className="dt-date-clear" onClick={() => setRange({})}>Limpiar</button>
+            <RangeCalendar from={range.from} to={range.to} onChange={(r) => setRange(r)} />
+            <div className="dt-date-foot">
+              <span className="dt-date-sel">{resumen}</span>
+              <button type="button" className="dt-date-clear" onClick={() => setRange({})}>Limpiar</button>
+            </div>
           </div>
         </div>
       </div>,
@@ -503,7 +540,7 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
     );
   }
 
-  // Columna normal: multi-selección por checkboxes.
+  // Columna normal: buscador ARRIBA (sobre el header), luego ordenar, luego opciones.
   const sel = new Set((col.getFilterValue() as string[] | undefined) ?? []);
   const visibles = opciones.filter((o) => o.toLowerCase().includes(q.toLowerCase()));
   const todos = sel.size === 0;
@@ -516,26 +553,31 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
   return createPortal(
     <div className="oc-scope">
       <div className="dt-filter-scrim" onClick={onClose} />
-      <div className="dt-filter-pop" style={{ left: anchor.left, top: anchor.top }} onClick={(e) => e.stopPropagation()}>
-        <div className="dt-filter-pop__search">
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar en ${label}…`} />
-        </div>
-        <div className="dt-filter-pop__list">
-          <button type="button" className="dt-filter-row" onClick={() => col.setFilterValue(undefined)}>
-            <span className={`dt-check${todos ? " is-checked" : ""}`} aria-hidden>{todos ? "✓" : ""}</span>
-            <span className="dt-strong">Todos</span>
-          </button>
-          {visibles.length === 0 && <div className="dt-filter-empty">Sin coincidencias</div>}
-          {visibles.map((opt) => {
-            const on = sel.has(opt);
-            return (
-              <button key={opt} type="button" className="dt-filter-row" onClick={() => toggle(opt)}>
-                <span className={`dt-check${on ? " is-checked" : ""}`} aria-hidden>{on ? "✓" : ""}</span>
-                <span>{opt}</span>
-              </button>
-            );
-          })}
-        </div>
+      <div ref={flip.ref} className="dt-filter-pop" style={flip.style} onClick={(e) => e.stopPropagation()}>
+        {canFilterCol && (
+          <div className="dt-filter-pop__search">
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar en ${label}…`} />
+          </div>
+        )}
+        {sortUI}
+        {canFilterCol && (
+          <div className="dt-filter-pop__list">
+            <button type="button" className="dt-filter-row" onClick={() => col.setFilterValue(undefined)}>
+              <span className={`dt-check${todos ? " is-checked" : ""}`} aria-hidden>{todos ? "✓" : ""}</span>
+              <span className="dt-strong">Todos</span>
+            </button>
+            {visibles.length === 0 && <div className="dt-filter-empty">Sin coincidencias</div>}
+            {visibles.map((opt) => {
+              const on = sel.has(opt);
+              return (
+                <button key={opt} type="button" className="dt-filter-row" onClick={() => toggle(opt)}>
+                  <span className={`dt-check${on ? " is-checked" : ""}`} aria-hidden>{on ? "✓" : ""}</span>
+                  <span>{opt}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

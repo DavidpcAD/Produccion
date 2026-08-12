@@ -153,6 +153,16 @@
 .oc-scope .ds-btn--black { background: var(--ds-color-black);     color: var(--ds-color-white); }
 .oc-scope .ds-btn--yellow { background: var(--ds-color-yellow);    color: var(--ds-color-black); }
 
+/* Hover — afordancia "presionable": anillo suave + leve elevación. */
+.oc-scope .ds-btn { transition: box-shadow 120ms ease, background 100ms ease, transform 110ms ease; }
+.oc-scope .ds-btn:not([disabled]):not(.ds-btn--outline):hover { transform: translateY(-1px); }
+.oc-scope .ds-btn:not([disabled]):active { transform: translateY(0); }
+.oc-scope .ds-btn--green:hover { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-color-green-200) 45%, transparent), var(--ds-shadow-03-big); }
+.oc-scope .ds-btn--red:hover { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-color-red-100) 45%, transparent), var(--ds-shadow-03-big); }
+.oc-scope .ds-btn--black:hover { box-shadow: 0 0 0 4px rgba(0, 0, 0, .32), var(--ds-shadow-03-big); }
+.oc-scope .ds-btn--yellow:hover { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ds-color-yellow) 55%, transparent), var(--ds-shadow-03-big); }
+.oc-scope .ds-btn--white:hover { box-shadow: 0 0 0 4px var(--ds-color-gray-100), var(--ds-shadow-03-big); }
+
 /* Pressed — anillo exterior de 8px (Figma) */
 .oc-scope .ds-btn--green:active, .oc-scope .ds-btn--green.ds-btn--pressed { box-shadow: 0 0 0 8px var(--ds-color-green-200), var(--ds-shadow-03-big); }
 .oc-scope .ds-btn--red:active, .oc-scope .ds-btn--red.ds-btn--pressed { background: var(--ds-color-red-200); box-shadow: 0 0 0 8px var(--ds-color-red-100), var(--ds-shadow-03-big); }
@@ -308,6 +318,173 @@
 .oc-scope .ds-progress--compact { min-width: 104px; }
 .oc-scope .ds-progress--compact .ds-progress__track { width: 70px; height: 8px; }
 
+/* =====================  MINI-STEPPER (progreso de solicitud)  ===================== */
+/* 5 pasos con conectores punteados, estilo del mockup Step 1..5. */
+.oc-scope .sol-steps { display: inline-flex; align-items: center; cursor: default; }
+.oc-scope .sol-steps__seg { display: inline-flex; align-items: center; }
+.oc-scope .sol-steps__line {
+  width: 18px; height: 0; margin: 0 3px;
+  border-top: 2px dotted var(--ds-color-gray-300);
+}
+.oc-scope .sol-steps__dot {
+  position: relative; flex: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--ds-surface);
+  border: 2px solid var(--ds-color-gray-300);
+  display: inline-grid; place-items: center;
+  cursor: default; outline: none;
+  transition: transform .16s cubic-bezier(.34, 1.6, .64, 1), background .12s ease, border-color .12s ease;
+}
+.oc-scope .sol-steps__dot.is-interactive { cursor: pointer; }
+.oc-scope .sol-steps__dot svg { width: 12px; height: 12px; color: var(--ds-color-white); }
+/* Aro que aparece alrededor del punto al pasar el mouse (o enfocar) — SOLO en los
+   pasos cumplidos (✓) y el actual. El color sigue el estado: verde (hecho/actual),
+   rojo (devuelto). Los pasos futuros no reaccionan. */
+.oc-scope .sol-steps__dot::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  border: 2.5px solid var(--ds-color-gray-300);
+  opacity: 0; transform: scale(.5);
+  transition: opacity .16s ease, transform .18s cubic-bezier(.34, 1.6, .64, 1);
+  pointer-events: none;
+}
+.oc-scope .sol-steps__dot.is-done::after,
+.oc-scope .sol-steps__dot.is-current::after { border-color: var(--ds-color-green-100); }
+.oc-scope .sol-steps--devuelto .sol-steps__dot.is-current::after { border-color: var(--ds-color-red-100); }
+.oc-scope .sol-steps__dot.is-interactive:hover,
+.oc-scope .sol-steps__dot.is-interactive:focus-visible { transform: scale(1.3); z-index: 1; }
+.oc-scope .sol-steps__dot.is-interactive:hover::after,
+.oc-scope .sol-steps__dot.is-interactive:focus-visible::after { opacity: 1; transform: scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  .oc-scope .sol-steps__dot, .oc-scope .sol-steps__dot::after { transition: opacity .12s ease; }
+  .oc-scope .sol-steps__dot.is-interactive:hover, .oc-scope .sol-steps__dot.is-interactive:focus-visible { transform: none; }
+}
+/* Paso completado: verde lleno con ✓. */
+.oc-scope .sol-steps__dot.is-done {
+  background: var(--ds-color-green-100); border-color: var(--ds-color-green-100);
+}
+/* Paso actual: verde lleno con núcleo (punto sólido). */
+.oc-scope .sol-steps__dot.is-current {
+  border-color: var(--ds-color-green-100);
+  box-shadow: inset 0 0 0 3px var(--ds-surface), inset 0 0 0 10px var(--ds-color-green-100);
+}
+/* Solicitud devuelta a Ingeniería: el paso actual se marca en rojo. */
+.oc-scope .sol-steps--devuelto .sol-steps__dot.is-current {
+  border-color: var(--ds-color-red-100);
+  box-shadow: inset 0 0 0 3px var(--ds-surface), inset 0 0 0 10px var(--ds-color-red-100);
+}
+
+/* =====================  AVATAR DE INICIALES  ===================== */
+.oc-scope .sol-avatar {
+  display: inline-grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base));
+  color: var(--ds-color-green-200);
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold);
+  letter-spacing: .02em; cursor: default; user-select: none;
+}
+
+/* Usuario: iniciales que se expanden a nombre completo EN LA MISMA LÍNEA (hover). */
+.oc-scope .sol-user { position: relative; display: inline-flex; align-items: center; height: 30px; outline: none; cursor: default; }
+.oc-scope .sol-user__ini {
+  position: relative; z-index: 2; flex: none;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--ds-color-green-100) 24%, var(--ds-tint-base));
+  color: var(--ds-color-green-200);
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold);
+  letter-spacing: .02em; user-select: none;
+  transition: box-shadow .18s ease;
+}
+.oc-scope .sol-user:hover .sol-user__ini,
+.oc-scope .sol-user:focus-visible .sol-user__ini { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-color-green-100) 22%, transparent); }
+/* Pill del nombre completo (portal): se ancla sobre el avatar y crece a la derecha. */
+.oc-scope .sol-userpop {
+  position: fixed; z-index: 85; pointer-events: none;
+  display: inline-flex; align-items: center; padding-right: 15px;
+  border-radius: 999px; white-space: nowrap;
+  background: var(--ds-surface); border: 1px solid var(--ds-color-gray-200);
+  box-shadow: 0 12px 28px rgba(0,0,0,.18);
+  transform-origin: left center;
+  animation: sol-userpop-in .22s cubic-bezier(.34, 1.5, .64, 1) both;
+}
+.oc-scope .sol-userpop__ini {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--ds-color-green-100) 24%, var(--ds-tint-base));
+  color: var(--ds-color-green-200);
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); letter-spacing: .02em;
+}
+.oc-scope .sol-userpop__name {
+  padding-left: 9px; color: var(--ds-color-gray-500);
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold);
+}
+@keyframes sol-userpop-in {
+  0%   { opacity: 0; transform: scaleX(.86); }
+  100% { opacity: 1; transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) { .oc-scope .sol-userpop { animation: none; } }
+
+/* =====================  HOVER CARD (tooltip flotante, portal)  ===================== */
+.oc-scope .hc-trigger { display: inline-flex; align-items: center; outline: none; }
+.oc-scope .hc-pop { position: fixed; z-index: 80; pointer-events: none; will-change: transform, opacity; }
+.oc-scope .hc-pop__inner {
+  position: relative; z-index: 1;
+  background: var(--ds-color-black); color: var(--ds-color-white);
+  border-radius: 14px; padding: 10px 13px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.30), 0 3px 10px rgba(0,0,0,.18);
+  font-size: var(--ds-font-size-body-sm); line-height: 1.45;
+}
+.oc-scope .hc-pop__arrow {
+  position: absolute; z-index: 0; width: 11px; height: 11px;
+  background: var(--ds-color-black); transform: rotate(45deg); border-radius: 2px;
+}
+/* --- Arriba (gota de agua) --- */
+.oc-scope .hc-pop--top.hc-pop--center { transform: translate(-50%, calc(-100% - 10px)); transform-origin: bottom center; animation: hc-drop-top .24s cubic-bezier(.34, 1.56, .64, 1) both; }
+.oc-scope .hc-pop--top.hc-pop--start  { transform: translate(0, calc(-100% - 10px)); transform-origin: bottom left; animation: hc-drop-top-start .24s cubic-bezier(.34, 1.56, .64, 1) both; }
+.oc-scope .hc-pop--top .hc-pop__arrow { bottom: -4px; left: 50%; margin-left: -5.5px; }
+.oc-scope .hc-pop--top.hc-pop--start .hc-pop__arrow { left: 20px; margin-left: 0; }
+@keyframes hc-drop-top {
+  0%   { opacity: 0; transform: translate(-50%, calc(-100% - 2px)) scale(.68); }
+  55%  { opacity: 1; transform: translate(-50%, calc(-100% - 13px)) scale(1.04); }
+  100% { opacity: 1; transform: translate(-50%, calc(-100% - 10px)) scale(1); }
+}
+@keyframes hc-drop-top-start {
+  0%   { opacity: 0; transform: translate(0, calc(-100% - 2px)) scale(.68); }
+  55%  { opacity: 1; transform: translate(0, calc(-100% - 13px)) scale(1.04); }
+  100% { opacity: 1; transform: translate(0, calc(-100% - 10px)) scale(1); }
+}
+/* --- Abajo (se despliega hacia abajo) --- */
+.oc-scope .hc-pop--bottom.hc-pop--center { transform: translate(-50%, 10px); transform-origin: top center; animation: hc-open-bottom-c .2s cubic-bezier(.22, 1, .36, 1) both; }
+.oc-scope .hc-pop--bottom.hc-pop--start  { transform: translate(0, 10px); transform-origin: top left; animation: hc-open-bottom-s .2s cubic-bezier(.22, 1, .36, 1) both; }
+.oc-scope .hc-pop--bottom .hc-pop__arrow { top: -4px; left: 50%; margin-left: -5.5px; }
+.oc-scope .hc-pop--bottom.hc-pop--start .hc-pop__arrow { left: 22px; margin-left: 0; }
+@keyframes hc-open-bottom-c {
+  0%   { opacity: 0; transform: translate(-50%, 3px) scaleY(.86); }
+  100% { opacity: 1; transform: translate(-50%, 10px) scaleY(1); }
+}
+@keyframes hc-open-bottom-s {
+  0%   { opacity: 0; transform: translate(0, 3px) scaleY(.86); }
+  100% { opacity: 1; transform: translate(0, 10px) scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oc-scope .hc-pop { animation: none !important; }
+}
+
+/* Contenido: detalle de un paso del stepper */
+.oc-scope .hc-step__title { font-weight: 700; font-size: var(--ds-font-size-label); }
+.oc-scope .hc-step__title--danger { color: #ff9a9a; }
+.oc-scope .hc-step__sub { color: rgba(255,255,255,.72); margin-top: 2px; }
+.oc-scope .hc-step__state { display: inline-block; margin-top: 7px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+/* Color del tag según el estado del paso: verde (completado), amarillo (en curso),
+   rojo (devuelta), gris (pendiente). */
+.oc-scope .hc-step__state--done { background: color-mix(in srgb, var(--ds-color-green-100) 32%, transparent); color: var(--ds-color-green-100); }
+.oc-scope .hc-step__state--current { background: rgba(232, 205, 62, .22); color: #ecd657; }
+.oc-scope .hc-step__state--devuelto { background: rgba(255, 120, 120, .22); color: #ff9a9a; }
+.oc-scope .hc-step__state--next { background: rgba(255,255,255,.12); color: rgba(255,255,255,.72); }
+.oc-scope .hc-step__motivo { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(255,255,255,.16); color: rgba(255,255,255,.92); }
+/* Contenido: comentario completo */
+.oc-scope .hc-comentario { display: block; white-space: normal; word-break: break-word; }
+
 /* =====================  TABLE  ===================== */
 .oc-scope .ds-table-wrap { width: 100%; overflow-x: auto; border-radius: var(--ds-radius-lg); background: var(--ds-surface); box-shadow: var(--ds-shadow-01); }
 .oc-scope .ds-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--ds-font-size-label); }
@@ -455,6 +632,32 @@
 .oc-scope .combo__tag--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
 .oc-scope .combo__tag--general { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
 .oc-scope .combo__empty { padding: 10px 12px; color: var(--ds-color-gray-400); font-size: var(--ds-font-size-body-sm); }
+
+/* Ítems de los dropdowns del sheet (Nueva solicitud): hover notorio, esquinas
+   redondeadas (sin separadores duros que se ven feos en las esquinas). */
+.oc-scope .nsl-opt { transition: background .12s ease; }
+.oc-scope .nsl-opt:hover { background: color-mix(in srgb, var(--ds-color-green-100) 18%, var(--ds-tint-base)) !important; }
+.oc-scope .nsl-opt.is-active { background: color-mix(in srgb, var(--ds-color-green-100) 26%, var(--ds-tint-base)) !important; }
+.oc-scope .nsl-opt.is-active:hover { background: color-mix(in srgb, var(--ds-color-green-100) 32%, var(--ds-tint-base)) !important; }
+/* Scrollbar delgado y redondeado (no rompe las esquinas del menú) */
+.oc-scope .nsl-list { scrollbar-width: thin; scrollbar-color: var(--ds-color-gray-200) transparent; }
+.oc-scope .nsl-list::-webkit-scrollbar { width: 8px; }
+.oc-scope .nsl-list::-webkit-scrollbar-thumb { background: var(--ds-color-gray-200); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+.oc-scope .nsl-list::-webkit-scrollbar-track { background: transparent; }
+/* Botón X para quitar (ej. plantilla): reemplaza al botón de abrir cuando hay valor. */
+.oc-scope .nsl-clear { flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); cursor: pointer; transition: background .12s, color .12s; }
+.oc-scope .nsl-clear:hover { background: color-mix(in srgb, var(--ds-color-red-100) 22%, var(--ds-tint-base)); color: var(--ds-color-red-200); }
+/* Selector de variante como BOTÓN (no se ve como dropdown); abre la lista al click. */
+.oc-scope .nsl-varbtn { display: inline-flex; align-items: center; gap: 6px; width: 100%; min-width: 0; height: 40px; padding: 0 8px 0 14px; border-radius: 999px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-surface); color: var(--ds-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, box-shadow .12s, transform .1s; }
+.oc-scope .nsl-varbtn:hover { border-color: var(--ds-color-gray-400); box-shadow: 0 0 0 3px var(--ds-color-gray-100); }
+.oc-scope .nsl-varbtn:active { transform: translateY(1px); }
+.oc-scope .nsl-varbtn[data-warn] { border-color: var(--ds-color-yellow); color: var(--ds-color-gray-500); }
+.oc-scope .nsl-varbtn__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.oc-scope .nsl-varbtn__chev { flex-shrink: 0; color: var(--ds-color-gray-400); }
+/* Badge del tipo de plantilla en el campo elegido (General / Bodega) */
+.oc-scope .nsl-typebadge { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.oc-scope .nsl-typebadge--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
+.oc-scope .nsl-typebadge--general { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
 .oc-scope .combo__more { padding: 7px 12px; color: var(--ds-color-gray-400); font-size: 11px; border-top: 1px solid var(--ds-color-gray-100); position: sticky; bottom: 0; background: var(--ds-surface); }
 
 /* Caja del área de agregar materiales (obra + quick-add) */
@@ -559,6 +762,43 @@
 .oc-scope .dt-date-clear { border: 0; background: none; color: var(--ds-color-gray-500); font: inherit; font-size: 13px; font-weight: var(--ds-font-weight-semibold); cursor: pointer; padding: 4px; align-self: flex-start; }
 .oc-scope .dt-date-clear:hover { color: var(--ds-color-red-200); }
 
+/* ===================== FILTRO DE FECHA (calendario tipo Airbnb) ===================== */
+.oc-scope .dt-filter-pop--date { width: 320px; }
+.oc-scope .dt-datecard {
+  background: var(--ds-surface); border-radius: var(--ds-radius-xl, 18px);
+  box-shadow: var(--ds-shadow-02, 0 6px 20px rgba(0,0,0,.14));
+  padding: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.oc-scope .dt-date-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 2px; border-top: 1px solid var(--ds-color-gray-100); }
+.oc-scope .dt-date-sel { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-500); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.oc-scope .rc { display: flex; flex-direction: column; gap: 6px; }
+.oc-scope .rc__head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 4px; }
+.oc-scope .rc__title { font-weight: 700; font-size: var(--ds-font-size-body); }
+.oc-scope .rc__nav { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--ds-color-gray-200); background: var(--ds-surface); cursor: pointer; font-size: 18px; line-height: 1; color: var(--ds-color-gray-500); display: grid; place-items: center; }
+.oc-scope .rc__nav:hover { border-color: var(--ds-color-gray-400); color: var(--ds-text); }
+.oc-scope .rc__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; }
+.oc-scope .rc__dowcell { text-align: center; font-size: 11px; color: var(--ds-color-gray-400); font-weight: 600; padding: 2px 0 4px; }
+.oc-scope .rc__cell { aspect-ratio: 1; border: 0; background: transparent; cursor: pointer; font: inherit; font-size: var(--ds-font-size-body-sm); color: var(--ds-text); display: grid; place-items: center; border-radius: 50%; transition: background .1s; }
+.oc-scope .rc__cell--empty { cursor: default; }
+.oc-scope .rc__cell:not(.rc__cell--empty):not(.is-from):not(.is-to):hover { background: var(--ds-color-gray-100); }
+.oc-scope .rc__cell.is-today { font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--ds-color-gray-300); }
+.oc-scope .rc__cell.is-in { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); border-radius: 0; }
+.oc-scope .rc__cell.is-from, .oc-scope .rc__cell.is-to { background: var(--ds-color-green-100); color: #000; font-weight: 700; box-shadow: none; }
+.oc-scope .rc__cell.is-from:not(.is-single) { border-radius: 50% 0 0 50%; }
+.oc-scope .rc__cell.is-to { border-radius: 0 50% 50% 0; }
+.oc-scope .rc__cell.is-single, .oc-scope .rc__cell.is-from.is-to { border-radius: 50%; }
+
+/* ===================== VISTA GRID (tarjetas) ===================== */
+.oc-scope .dt-gridcard { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.oc-scope .dt-gridcard__row { display: grid; grid-template-columns: 84px 1fr; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--ds-color-gray-100); min-width: 0; }
+.oc-scope .dt-gridcard__row:last-child { border-bottom: 0; }
+.oc-scope .dt-gridcard__row.is-title { grid-template-columns: 1fr; padding-bottom: 10px; }
+.oc-scope .dt-gridcard__row.is-title .dt-gridcard__label { display: none; }
+.oc-scope .dt-gridcard__row.is-title .dt-gridcard__value { font-size: var(--ds-font-size-sub); font-weight: var(--ds-font-weight-semibold); }
+.oc-scope .dt-gridcard__label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ds-color-gray-400); font-weight: 700; }
+.oc-scope .dt-gridcard__value { font-size: var(--ds-font-size-body-sm); color: var(--ds-text); min-width: 0; overflow-wrap: anywhere; }
+
 /* ── DataTable: header oscuro con pills (estilo Prototipo/Usuarios) ── */
 .oc-scope .ds-table.dt-dark { border-collapse: separate; border-spacing: 0; }
 /* Combinadores de hijo directo: NO afectar tablas anidadas (líneas expandidas). */
@@ -569,15 +809,24 @@
 .oc-scope .ds-table.dt-dark > thead > tr > th.dt-hx { width: 44px; }
 .oc-scope .ds-table.dt-dark > tbody > tr:first-child > td { padding-top: 14px; }
 
-.oc-scope .dt-hpill { display: inline-flex; align-items: center; gap: 2px; }
-.oc-scope .dt-hpill__label { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; color: inherit; font: inherit; font-weight: var(--ds-font-weight-semibold); cursor: pointer; padding: 8px 8px; border-radius: 999px; white-space: nowrap; transition: background .12s; }
-.oc-scope .dt-hpill__label:hover { background: rgba(255, 255, 255, 0.12); }
-.oc-scope .dt-hpill__sort { font-size: 10px; color: var(--ds-color-gray-300); }
-.oc-scope .dt-hpill__filter { position: relative; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 0; background: transparent; color: var(--ds-color-gray-300); cursor: pointer; transition: background .12s, color .12s; flex-shrink: 0; }
-.oc-scope .dt-hpill__filter:hover { background: rgba(255, 255, 255, 0.16); color: var(--ds-color-white); }
-.oc-scope .dt-hpill__filter.is-active { color: var(--ds-color-black); background: var(--ds-color-green-100); }
-.oc-scope .dt-hpill__filter.is-open { box-shadow: 0 0 0 2px var(--ds-color-green-100); }
-.oc-scope .dt-hpill__badge { position: absolute; top: -2px; right: -2px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: var(--ds-color-green-100); color: #000; font-size: 9px; font-weight: 700; display: grid; place-items: center; }
+.oc-scope .dt-hpill { display: inline-flex; align-items: center; gap: 6px; }
+/* Header = UN solo botón: al hacer click abre el menú (filtrar + ordenar) de la columna. */
+.oc-scope .dt-hpill--btn { background: none; border: 0; color: inherit; font: inherit; font-weight: var(--ds-font-weight-semibold); cursor: pointer; padding: 8px 10px; border-radius: 999px; white-space: nowrap; transition: background .12s, box-shadow .12s; }
+.oc-scope .dt-hpill--btn:hover { background: rgba(255, 255, 255, 0.12); }
+.oc-scope .dt-hpill--btn.is-open { background: rgba(255, 255, 255, 0.12); box-shadow: 0 0 0 2px var(--ds-color-green-100); }
+.oc-scope .dt-hpill__label { display: inline-flex; align-items: center; }
+.oc-scope .dt-hpill__sort { font-size: 10px; color: var(--ds-color-green-100); font-weight: 700; }
+.oc-scope .dt-hpill__icon { color: var(--ds-color-gray-300); flex-shrink: 0; transition: color .12s; }
+.oc-scope .dt-hpill--btn:hover .dt-hpill__icon,
+.oc-scope .dt-hpill--btn.is-open .dt-hpill__icon { color: var(--ds-color-white); }
+.oc-scope .dt-hpill--btn.is-active .dt-hpill__icon { color: var(--ds-color-green-100); }
+.oc-scope .dt-hpill__badge { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--ds-color-green-100); color: #000; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+
+/* Sección de ordenar dentro del menú de columna */
+.oc-scope .dt-filter-sort { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--ds-color-gray-100); }
+.oc-scope .dt-sortbtn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 8px; border-radius: 10px; border: 1px solid var(--ds-color-gray-200); background: var(--ds-surface); color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); font-weight: 600; cursor: pointer; transition: border-color .12s, background .12s, color .12s; }
+.oc-scope .dt-sortbtn:hover { border-color: var(--ds-color-gray-400); }
+.oc-scope .dt-sortbtn.is-active { border-color: var(--ds-color-green-100); background: color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
 
 /* Botón ⇕ de expandir por fila */
 .oc-scope .dt-xcell { width: 52px; text-align: center; }
