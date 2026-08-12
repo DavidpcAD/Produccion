@@ -1204,7 +1204,10 @@
 .oc-scope .timeline__meta { color: var(--ds-color-gray-400); font-size: var(--ds-font-size-body-sm); }
 
 /* toast */
-.oc-scope .toast-wrap { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+/* z-index 3000: por ENCIMA del drawer "Nueva solicitud" (1000) y de sus dropdowns
+   internos (2000). Casi todos estos toasts se disparan con el drawer abierto, así
+   que deben quedar visibles sobre él, no tapados detrás. */
+.oc-scope .toast-wrap { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .oc-scope .toast { background: var(--ds-color-black); color: #fff; padding: 12px 20px; border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-03-big); font-size: var(--ds-font-size-label); animation: toastIn .2s ease; }
 .oc-scope .toast--error { background: var(--ds-color-red-200); }
 .oc-scope .toast--success { background: var(--ds-color-green-200); color: #fff; }

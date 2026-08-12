@@ -32,6 +32,26 @@ type FTipo = "todas" | "mias" | "general" | "bodega";
 type Item = { id: string; title: string; sub?: string };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+// Dos líneas son EL MISMO material si coinciden artículo + variante + obra. El
+// mismo material solo se puede repetir en OBRAS distintas (por eso la obra entra
+// en la llave); mismo material + misma obra = duplicado y no se permite.
+const dupKey = (articuloId: string, variantCode?: string, obraCodigo?: string) =>
+  `${articuloId}|${variantCode ?? ""}|${obraCodigo ?? ""}`;
+
+// Colapsa líneas duplicadas (misma llave) sumando cantidades, conservando el
+// orden de la primera aparición. Devuelve cuántas se unificaron.
+function mergeDedup(rows: Row[]): { rows: Row[]; merged: number } {
+  const byKey = new Map<string, Row>();
+  let merged = 0;
+  for (const r of rows) {
+    const k = dupKey(r.articuloId, r.variantCode, r.obraCodigo);
+    const prev = byKey.get(k);
+    if (prev) { prev.cantidad += r.cantidad; merged++; }
+    else byKey.set(k, { ...r });
+  }
+  return { rows: [...byKey.values()], merged };
+}
 const TIPOS: { v: TipoSolicitud; label: string; destino: string }[] = [
   { v: "material", label: "Material", destino: "Obra" },
   { v: "repuesto", label: "Repuesto", destino: "Máquina" },
@@ -422,8 +442,13 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
       rows.push({ key: uid(), articuloId: a.id, variantCode: pl2.variantCode, variantNombre: pl2.variantNombre, cantidad: pl2.cantidad || 1, obraCodigo: oc, obraNombre: oc ? obraNombreDe(oc) : undefined });
     }
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
-    if (rows.length) { setLineas(rows); toast(`Plantilla "${pl.nombre}" cargada (${rows.length} materiales)`, "success"); }
-    else toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
+    // La plantilla puede traer el mismo material repetido para la misma obra: se
+    // unifican (suma cantidades) para no cargar líneas duplicadas.
+    const { rows: dedup, merged } = mergeDedup(rows);
+    if (dedup.length) {
+      setLineas(dedup);
+      toast(`Plantilla "${pl.nombre}" cargada (${dedup.length} materiales)${merged ? ` · ${merged} repetido${merged > 1 ? "s" : ""} unificado${merged > 1 ? "s" : ""}` : ""}`, "success");
+    } else toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
   }
   function cargarPlantilla(id: string) {
     const pl = plantillas.find((p) => String(p.id) === id);
@@ -441,17 +466,20 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   }
 
   function addRow(articuloId: string, variantCode?: string, variantNombre?: string, cantidad = 1) {
-    // Si el material YA está en el pedido, no lo duplica ni suma en silencio: avisa y
-    // resalta la línea existente para que ahí cambien la cantidad o la obra.
-    const ex = lineas.find((l) => l.articuloId === articuloId && (l.variantCode ?? "") === (variantCode ?? ""));
+    const obraCodigo = esMaterial ? (destino || undefined) : undefined;
+    // Si el material YA está en el pedido PARA ESA OBRA, no lo duplica ni suma en
+    // silencio: avisa y resalta la línea existente. El mismo material sí se puede
+    // volver a pedir si es para OTRA obra (o con otra variante).
+    const ex = lineas.find((l) => dupKey(l.articuloId, l.variantCode, l.obraCodigo) === dupKey(articuloId, variantCode, obraCodigo));
     if (ex) {
       const a = catArticulos.find((x) => x.id === articuloId);
-      toast(`"${a?.descripcion ?? "Ese material"}" ya está en el pedido. Cambiá la cantidad o la obra en su línea.`, "info");
+      const scope = esMaterial && obraCodigo ? " para esa obra" : "";
+      const salida = esMaterial ? ", o agregalo a otra obra" : "";
+      toast(`"${a?.descripcion ?? "Ese material"}" ya está en el pedido${scope}. Cambiá la cantidad en su línea${salida}.`, "info");
       setFlashKey(ex.key);
       setTimeout(() => setFlashKey((k) => (k === ex.key ? null : k)), 1800);
       return;
     }
-    const obraCodigo = esMaterial ? (destino || undefined) : undefined;
     // Los materiales nuevos se agregan ARRIBA (los más recientes primero).
     setLineas((ls) => [{ key: uid(), articuloId, variantCode, variantNombre, cantidad, obraCodigo, obraNombre: obraCodigo ? obraNombreDe(obraCodigo) : undefined }, ...ls]);
   }
@@ -459,17 +487,45 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   const resolveVariantes = async (articuloId: string) => { const a = catArticulos.find((x) => x.id === articuloId); return a ? getVariantes(a.code) : []; };
   function pickGlobalObra(code: string) {
     setDestino(code);
-    if (mismaObra) setLineas((ls) => ls.map((l) => ({ ...l, obraCodigo: code, obraNombre: obraNombreDe(code) })));
+    // Al fijar UNA sola obra para todas las líneas, dos materiales iguales que
+    // estaban en obras distintas quedarían idénticos: se unifican (suma cantidad).
+    if (mismaObra) setLineas((ls) => mergeDedup(ls.map((l) => ({ ...l, obraCodigo: code, obraNombre: obraNombreDe(code) }))).rows);
     if (pendingPlantilla) {
       const pl = plantillas.find((p) => String(p.id) === pendingPlantilla);
       setPendingPlantilla(null);
       if (pl) aplicarPlantilla(pl, code);
     }
   }
-  const setLinea = (key: string, patch: Partial<Row>) => setLineas((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  const setLinea = (key: string, patch: Partial<Row>) => {
+    // Cambiar la VARIANTE o la OBRA de una fila no puede dejarla idéntica a otra ya
+    // existente (mismo artículo+variante+obra). Si chocaría, avisamos y no aplicamos
+    // el cambio. (La cantidad y demás no generan duplicados: pasan directo.)
+    if ("variantCode" in patch || "obraCodigo" in patch) {
+      const cur = lineas.find((l) => l.key === key);
+      if (cur) {
+        const next = { ...cur, ...patch };
+        const choca = lineas.some((l) => l.key !== key && dupKey(l.articuloId, l.variantCode, l.obraCodigo) === dupKey(next.articuloId, next.variantCode, next.obraCodigo));
+        if (choca) {
+          const a = catArticulos.find((x) => x.id === cur.articuloId);
+          toast(`"${a?.descripcion ?? "Ese material"}" ya está en el pedido para esa obra. Elegí otra obra o variante.`, "info");
+          return;
+        }
+      }
+    }
+    setLineas((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  };
   const delLinea = (key: string) => setLineas((ls) => ls.filter((l) => l.key !== key));
   function duplicarLinea(key: string) {
-    setLineas((ls) => { const idx = ls.findIndex((x) => x.key === key); if (idx < 0) return ls; return [...ls.slice(0, idx + 1), { ...ls[idx], key: uid() }, ...ls.slice(idx + 1)]; });
+    // Duplicar sirve para pedir el MISMO material en OTRA obra: la copia nace SIN
+    // obra para que se le asigne una distinta (dos líneas idénticas no se permiten).
+    setLineas((ls) => {
+      const idx = ls.findIndex((x) => x.key === key); if (idx < 0) return ls;
+      const copia: Row = esMaterial
+        ? { ...ls[idx], key: uid(), obraCodigo: undefined, obraNombre: undefined }
+        : { ...ls[idx], key: uid() };
+      return [...ls.slice(0, idx + 1), copia, ...ls.slice(idx + 1)];
+    });
+    if (esMaterial) toast("Copia agregada: elegí la obra (el mismo material solo se repite en otra obra).", "info");
   }
 
   function headerObra(): { codigo?: string; nombre?: string } {

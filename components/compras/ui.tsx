@@ -268,12 +268,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="toast-wrap">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.tone === "success" ? "toast--success" : t.tone === "error" ? "toast--error" : ""}`}>
-            {t.text}
-          </div>
-        ))}
+      {/* El contenedor DEBE ir dentro de .oc-scope: los estilos del toast
+          (position:fixed, fondo, variables --ds-*) están scopeados ahí. Si queda
+          fuera, el toast sale sin estilo ni posición (texto pelón flotando). */}
+      <div className="oc-scope">
+        <div className="toast-wrap">
+          {toasts.map((t) => (
+            <div key={t.id} className={`toast ${t.tone === "success" ? "toast--success" : t.tone === "error" ? "toast--error" : ""}`}>
+              {t.text}
+            </div>
+          ))}
+        </div>
       </div>
     </ToastCtx.Provider>
   );
