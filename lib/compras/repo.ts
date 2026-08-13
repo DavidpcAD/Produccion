@@ -291,6 +291,7 @@ function mapOrden(o: any, lineas: any[]): Orden {
       unidad: l.unitOfMeasureCode ?? "", almacen: l.locationCode ?? "", precioUnitario: Number(l.directUnitCost ?? 0),
       ivaPct: Number(l.vatPct ?? 0), descuentoPct: Number(l.lineDiscountPct ?? 0) || undefined,
       proyecto: l.jobNo ?? undefined, taskNo: l.taskNo ?? undefined,
+      chargeNo: l.chargeNo ?? undefined, chargeMethod: l.chargeMethod ?? undefined,
       cantidadRecibida: Number(l.quantityRecibida ?? 0), cantidadFacturada: Number(l.quantityFacturada ?? 0),
     })),
   };
@@ -301,6 +302,7 @@ export interface NewOrdenDB {
   lineas: {
     tipoLinea: string; itemNo?: string; variantCode?: string; idPedidoCompraDet?: number; descripcion: string; cantidad: number;
     unidad: string; almacen: string; precioUnitario: number; ivaPct: number; descuentoPct?: number; jobNo?: string; taskNo?: string;
+    chargeNo?: string; chargeMethod?: string; // solo líneas tipo "cargo": tipo (Item Charge BC) y método de asignación
   }[];
 }
 
@@ -341,9 +343,13 @@ export async function createOrden(input: NewOrdenDB): Promise<number> {
         .input("lineDiscountPct", sql.Decimal(9, 4), l.descuentoPct ?? 0)
         .input("jobNo", sql.NVarChar(20), l.jobNo ?? null)
         .input("taskNo", sql.NVarChar(15), l.taskNo ?? null)
+        // Cargo de producto: tipo (Item Charge de BC) + método de asignación. Sin esto,
+        // el cargo se lanzaba a BC sin tipo y BC lo rechazaba ("El cargo no tiene tipo").
+        .input("chargeNo", sql.NVarChar(20), l.chargeNo ?? null)
+        .input("chargeMethod", sql.NVarChar(20), l.chargeMethod ?? null)
         .input("creadoPor", sql.NVarChar(100), input.usuario)
-        .query(`INSERT dbo.OrdenCompraDet (idOrdenCompra,idPedidoCompraDet,lineNum,tipoLinea,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,quantity,quantityRecibida,quantityFacturada,directUnitCost,vatPct,lineDiscountPct,jobNo,taskNo,fechaCreacion,creadoPor)
-                VALUES (@idOrdenCompra,@idPedidoCompraDet,@lineNum,@tipoLinea,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@quantity,0,0,@directUnitCost,@vatPct,@lineDiscountPct,@jobNo,@taskNo,getdate(),@creadoPor)`);
+        .query(`INSERT dbo.OrdenCompraDet (idOrdenCompra,idPedidoCompraDet,lineNum,tipoLinea,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,quantity,quantityRecibida,quantityFacturada,directUnitCost,vatPct,lineDiscountPct,jobNo,taskNo,chargeNo,chargeMethod,fechaCreacion,creadoPor)
+                VALUES (@idOrdenCompra,@idPedidoCompraDet,@lineNum,@tipoLinea,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@quantity,0,0,@directUnitCost,@vatPct,@lineDiscountPct,@jobNo,@taskNo,@chargeNo,@chargeMethod,getdate(),@creadoPor)`);
       // descontar saldo del pedido origen
       if (l.idPedidoCompraDet) {
         await new sql.Request(tx).input("id", sql.Int, l.idPedidoCompraDet).input("q", sql.Decimal(18, 4), l.cantidad)

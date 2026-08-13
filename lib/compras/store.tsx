@@ -351,6 +351,9 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
             tipoLinea: l.tipo, itemNo: l.articuloId, variantCode: l.variantCode, idPedidoCompraDet: l.pedidoLineaId ? Number(l.pedidoLineaId) : undefined,
             descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad, almacen: l.almacen,
             precioUnitario: l.precioUnitario, ivaPct: l.ivaPct, descuentoPct: l.descuentoPct, jobNo: l.proyecto, taskNo: l.taskNo,
+            // Cargo de producto: el tipo (Item Charge) y el método de asignación deben
+            // viajar hasta BC. Antes se caían acá y el cargo llegaba sin tipo → BC lo rechazaba.
+            chargeNo: l.chargeNo, chargeMethod: l.chargeMethod,
           })),
         });
         const o = await api.getOrden(String(idOrdenCompra));
