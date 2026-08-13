@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bcResyncPedidoLines, bcReleasePedido, bcAssignItemCharges, bcAddChargeLine } from "@/lib/compras/bc";
+import { bcResyncPedidoLines, bcReleasePedido, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo } from "@/lib/compras/bc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,10 +19,13 @@ export async function POST(req: Request) {
     // pero SÍ reporta el error (antes se tragaba y quedaba lanzada sin flete).
     let cargoError: string | undefined;
     if (Array.isArray(cargos)) {
+      // Catálogo de BC para recuperar el tipo por descripción si el cargo viene sin
+      // chargeNo (cliente con bundle viejo). Se carga una sola vez.
+      const catalogoCargos = cargos.some((c: any) => c?.precio > 0) ? await bcItemCharges() : [];
       for (const cg of cargos) {
         if (!(cg?.precio > 0)) continue;
-        const chargeNo = (cg.chargeNo || process.env.BC_ITEM_CHARGE_FLETE || "").trim();
-        if (!chargeNo) { if (!cargoError) cargoError = "El cargo no tiene tipo (Item Charge). Elegí el tipo y reintentá."; continue; }
+        const chargeNo = resolverItemChargeNo(cg, catalogoCargos);
+        if (!chargeNo) { if (!cargoError) cargoError = "El cargo no tiene tipo (Item Charge) y no se pudo deducir por la descripción. Elegí el tipo y reintentá."; continue; }
         try { await bcAddChargeLine(orderNo, chargeNo, cg.descripcion || "CARGO / TRANSPORTE", cg.cantidad || 1, cg.precio); }
         catch (e: any) { if (!cargoError) cargoError = `cargo ${chargeNo}: ${String(e?.message ?? e)}`; }
       }

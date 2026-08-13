@@ -326,6 +326,24 @@ export async function bcItemCharges(): Promise<BcItemCharge[]> {
   }
 }
 
+// Resuelve el TIPO (Item Charge) de un cargo, robusto ante clientes con bundle viejo:
+//   1) el chargeNo que mandó el cliente (si viene);
+//   2) si viene vacío, se DEDUCE por la descripción contra el catálogo de BC
+//      (p.ej. "Transporte" -> "01"), porque la descripción del cargo se copia del
+//      propio catálogo al elegir el tipo y SÍ se persiste;
+//   3) fallback env (BC_ITEM_CHARGE_FLETE) por si acaso.
+// Devuelve "" si no se pudo determinar (el llamador decide si aborta/omite).
+export function resolverItemChargeNo(cargo: { chargeNo?: string; descripcion?: string }, catalogo: BcItemCharge[]): string {
+  const directo = (cargo.chargeNo || "").trim();
+  if (directo) return directo;
+  const desc = (cargo.descripcion || "").trim().toLowerCase();
+  if (desc) {
+    const hit = catalogo.find((x) => (x.descripcion || "").trim().toLowerCase() === desc);
+    if (hit?.no) return hit.no;
+  }
+  return (process.env.BC_ITEM_CHARGE_FLETE || "").trim();
+}
+
 export type BcPostedReceiptLine = {
   documentNo: string;    // N.º de recepción registrada (albarán), p.ej. CR-000003
   lineNo: number;        // N.º de línea dentro de la recepción
@@ -591,14 +609,15 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   const lineas = (input.lineas ?? []).filter((l) => l.itemNo && l.cantidad > 0);
   if (!lineas.length) throw new Error("No hay líneas de material válidas para el pedido.");
   // GUARD (antes de tocar BC): TODO cargo con importe debe tener su tipo (Item Charge).
-  // Si a alguno le falta, abortamos SIN crear nada en BC — así una orden con el cargo
-  // roto nunca queda a medias en BC (antes se creaba y lanzaba el pedido sin el cargo).
-  const fleteEnv = (process.env.BC_ITEM_CHARGE_FLETE || "").trim();
+  // El tipo se resuelve por chargeNo directo o, si falta, por la descripción contra el
+  // catálogo de BC (recupera el tipo aunque el cliente traiga un bundle viejo). Si aun
+  // así no se determina, abortamos SIN crear nada en BC (la orden no queda a medias).
   const cargosEfectivos: CargoBc[] = (input.cargos && input.cargos.length)
     ? input.cargos
     : (input.flete && input.flete.monto > 0 ? [{ descripcion: input.flete.descripcion, cantidad: 1, precio: input.flete.monto }] : []);
-  if (cargosEfectivos.some((c) => c.precio > 0 && !((c.chargeNo || fleteEnv).trim()))) {
-    throw new Error("El cargo no tiene tipo (Item Charge). La orden NO se creó ni se lanzó en BC. Elegí el tipo de cargo en Proveeduría y reintentá.");
+  const catalogoCargos = cargosEfectivos.some((c) => c.precio > 0) ? await bcItemCharges() : [];
+  if (cargosEfectivos.some((c) => c.precio > 0 && !resolverItemChargeNo(c, catalogoCargos))) {
+    throw new Error("El cargo no tiene tipo (Item Charge) y no se pudo deducir por la descripción. Elegí el tipo de cargo en Proveeduría y reintentá.");
   }
   const cid = await getStdCompanyId(); // MISMA compañía que items/vendors (API estándar)
   const jsonHeaders = { "Content-Type": "application/json" };
@@ -648,10 +667,9 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
     for (const cg of cargos) {
       const qty = cg.cantidad && cg.cantidad > 0 ? cg.cantidad : 1;
       if (!(cg.precio > 0)) continue;
-      // El tipo (Item Charge) debe ser un código REAL de BC. Antes caía a "FLETE",
-      // que no existe → 404 y la orden quedaba sin flete. Si no hay tipo válido, se
-      // omite el cargo y se reporta (no se inventa un código).
-      const chargeNo = (cg.chargeNo || process.env.BC_ITEM_CHARGE_FLETE || "").trim();
+      // El tipo (Item Charge) debe ser un código REAL de BC. Se resuelve por chargeNo
+      // directo o, si falta, por la descripción contra el catálogo (ya cargado arriba).
+      const chargeNo = resolverItemChargeNo(cg, catalogoCargos);
       if (!chargeNo) {
         if (!cargoError) cargoError = "El cargo no tiene tipo (Item Charge). Elegí el tipo de cargo y reintentá.";
         continue;
