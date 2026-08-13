@@ -31,6 +31,16 @@ type Grupo = { key: string; obraCodigo?: string; obraNombre?: string };
 type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string };
 type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string };
 type Plantilla = { id: number; nombre: string; tipo?: "general" | "bodega"; idClasificacion?: number | null; lineas: PlantillaLinea[]; creadoPor?: string };
+// Semilla para "Copiar pedido": abre el drawer ya cargado con las líneas de un
+// pedido existente. Las líneas usan el MISMO shape que una plantilla (code/obra/
+// variante/cantidad), por eso se reusa el mismo armado de grupos+filas.
+export type NuevaSolicitudSeed = {
+  tipo: TipoSolicitud;
+  prioridad?: Pedido["prioridad"];
+  notas?: string;
+  destino?: string;          // repuesto → máquina; stock → almacén
+  lineas: PlantillaLinea[];
+};
 type FTipo = "todas" | "mias" | "general" | "bodega";
 type Item = { id: string; title: string; sub?: string };
 
@@ -467,7 +477,7 @@ function UsarPlantillaBtn({ items, value, onPick, onClear, filterNode, hasMateri
   );
 }
 
-export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
+export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; setOpen: (v: boolean) => void; seed?: NuevaSolicitudSeed | null }) {
   const { articulos, obras, maquinas, almacenes, usuario, addPedido, setPedidoEstado } = useStore();
   const toast = useToast();
 
@@ -525,6 +535,7 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   const [confirmExit, setConfirmExit] = useState(false);
   const [confirmPedir, setConfirmPedir] = useState(false); // confirmación antes de enviar
   const varCache = useRef<Record<string, Variante[]>>({});
+  const seedApplied = useRef(false); // "Copiar pedido": aplicar la semilla una sola vez por apertura
   const [varMap, setVarMap] = useState<Record<string, Variante[]>>({});
   const [fTipoPl, setFTipoPl] = useState<FTipo>("todas");
   const [plantillaSel, setPlantillaSel] = useState("");                          // plantilla elegida (para mostrarla en el campo)
@@ -604,20 +615,20 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
     setLineas([]); setGrupos([]); setOpenMat([]); setCardMenuKey(null);
   }
 
-  // Carga una plantilla: agrupa sus materiales por obra → una tarjeta por obra.
-  // Bodega: todo a un único grupo (SOLO), sin obra.
-  function aplicarPlantilla(pl: Plantilla) {
-    const bodega = esBodega(pl);
+  // Convierte una lista de líneas (código/obra/variante/cantidad) en el modelo del
+  // drawer: una tarjeta (grupo) por obra + sus filas. Bodega/repuesto → grupo único
+  // (SOLO), sin obra. Los materiales que no estén en el catálogo cargado se sintetizan
+  // con su código/descr/unidad para no perder la línea. Reutilizado por plantillas y
+  // por "Copiar pedido".
+  function armarGruposFilas(lineasIn: PlantillaLinea[], bodega: boolean): { grupos: Grupo[]; rows: Row[]; extras: Articulo[] } {
     const extras: Articulo[] = [];
     const rows: Row[] = [];
     const nuevosGrupos: Grupo[] = [];
     const porObra = new Map<string, string>(); // obraCodigo ("" = sin obra) -> grupoKey
-    for (const pl2 of pl.lineas) {
+    for (const pl2 of lineasIn) {
       if (!pl2.code) continue;
       let a = catArticulos.find((x) => x.code === pl2.code) ?? extras.find((x) => x.code === pl2.code);
       if (!a) {
-        // El material no está en el catálogo cargado: se sintetiza con la info de
-        // la plantilla (código, descripción, unidad) para no perder la línea.
         a = { id: pl2.code, code: pl2.code, descripcion: pl2.descripcion || pl2.code, unidad: pl2.unidad || "UND", almacenDefault: "", precioReferencia: 0, tipo: "inventario" };
         extras.push(a);
       }
@@ -630,6 +641,14 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
       }
       rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: pl2.variantCode, variantNombre: pl2.variantNombre, cantidad: pl2.cantidad || 1, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
     }
+    return { grupos: nuevosGrupos, rows, extras };
+  }
+
+  // Carga una plantilla: agrupa sus materiales por obra → una tarjeta por obra.
+  // Bodega: todo a un único grupo (SOLO), sin obra.
+  function aplicarPlantilla(pl: Plantilla) {
+    const bodega = esBodega(pl);
+    const { grupos: nuevosGrupos, rows, extras } = armarGruposFilas(pl.lineas, bodega);
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
     // La plantilla puede traer el mismo material repetido en la misma obra: se
     // unifican (suma cantidades) para no cargar líneas duplicadas.
@@ -640,6 +659,28 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
       toast(`Plantilla "${pl.nombre}" cargada (${dedup.length} materiales)${merged ? ` · ${merged} repetido${merged > 1 ? "s" : ""} unificado${merged > 1 ? "s" : ""}` : ""}`, "success");
     } else toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
   }
+
+  // Copiar pedido: siembra el drawer con las líneas de un pedido existente. Mismo
+  // armado que una plantilla; setea además tipo/prioridad/notas/destino del origen.
+  function aplicarSeed(s: NuevaSolicitudSeed) {
+    const bodega = s.tipo !== "material"; // repuesto/stock: grupo único, sin obra (usa destino)
+    const { grupos: gs, rows, extras } = armarGruposFilas(s.lineas, bodega);
+    if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
+    const { rows: dedup } = mergeDedup(rows);
+    setTipo(s.tipo);
+    if (s.destino) setDestino(s.destino);
+    if (s.prioridad) setPrioridad(s.prioridad);
+    if (s.notas) setNotas(s.notas);
+    setGrupos(bodega ? [] : gs);
+    setLineas(dedup);
+  }
+
+  // Al abrir el drawer con una semilla (botón "Copiar" del detalle), precargar una
+  // sola vez. Al cerrar se limpia el flag para la próxima apertura.
+  useEffect(() => {
+    if (open && seed && !seedApplied.current) { aplicarSeed(seed); seedApplied.current = true; }
+    if (!open) seedApplied.current = false;
+  }, [open, seed]); // eslint-disable-line react-hooks/exhaustive-deps
   function cargarPlantilla(id: string) {
     const pl = plantillas.find((p) => String(p.id) === id);
     if (!pl) return;

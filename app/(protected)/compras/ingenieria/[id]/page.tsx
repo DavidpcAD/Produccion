@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
+import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
 import { destinoLabel, formatDate, num, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
@@ -12,6 +14,7 @@ export default function PedidoDetallePage() {
   const router = useRouter();
   const toast = useToast();
   const { pedidos, ordenes, setPedidoEstado, deletePedido } = useStore();
+  const [copiarOpen, setCopiarOpen] = useState(false);
 
   const pedido = pedidos.find((p) => p.id === id);
   if (!pedido) {
@@ -25,8 +28,24 @@ export default function PedidoDetallePage() {
   const t = tipoSolicitudBadge(pedido.tipoSolicitud);
   const ordenado = pedido.lineas.some((l) => l.cantidadOrdenada > 0);
 
+  // "Copiar": abre el drawer nuevo ya cargado con las líneas de este pedido (mismo
+  // material/obra/variante/cantidad) en vez de la pantalla completa vieja.
+  const seedCopia: NuevaSolicitudSeed = {
+    tipo: pedido.tipoSolicitud,
+    prioridad: pedido.prioridad,
+    notas: pedido.notas,
+    destino: pedido.tipoSolicitud === "repuesto" ? pedido.maquinaNo
+      : pedido.tipoSolicitud === "stock" ? pedido.lineas[0]?.almacen : undefined,
+    lineas: pedido.lineas.map((l) => ({
+      code: l.articuloId, cantidad: l.cantidad,
+      obraCodigo: pedido.tipoSolicitud === "material" ? l.almacen : undefined,
+      variantCode: l.variantCode, descripcion: l.descripcion, unidad: l.unidad,
+    })),
+  };
+
   return (
     <AppShell role="ingenieria">
+      <NuevaSolicitudSheet open={copiarOpen} setOpen={setCopiarOpen} seed={seedCopia} />
       <main className="page">
         <div className="back-link" onClick={() => router.push("/compras/ingenieria")}>Volver a pedidos</div>
         <div className="page__head">
@@ -39,7 +58,7 @@ export default function PedidoDetallePage() {
             <p className="ds-muted">{destinoLabel(pedido)} · {pedido.solicitante} · {formatDate(pedido.fecha)}</p>
           </div>
           <div className="row gap-3">
-            <Button variant="outline" title="Crear una solicitud nueva con las mismas líneas" onClick={() => router.push(`/compras/ingenieria/copiar/${pedido.id}`)}>
+            <Button variant="outline" title="Crear una solicitud nueva con las mismas líneas" onClick={() => setCopiarOpen(true)}>
               ⧉ Copiar
             </Button>
             {(pedido.estado === "borrador" || pedido.estado === "devuelto") && (
