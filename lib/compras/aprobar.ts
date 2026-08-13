@@ -33,6 +33,14 @@ export async function aprobarYLanzar(
     return { ok: true, tone: "success", message: `${orden.numero} aprobada y lanzada (sin envío a BC)` };
   }
 
+  // Blindaje: si algún cargo con importe no tiene tipo (Item Charge), NO se lanza a
+  // BC. La orden queda pendiente para corregir el tipo en Proveeduría. Antes se lanzaba
+  // igual y el pedido quedaba en BC sin el cargo (la queja que originó este candado).
+  const cargoSinTipo = cargos.find((c) => (c.precio || 0) > 0 && !c.chargeNo);
+  if (cargoSinTipo) {
+    return { ok: false, tone: "error", message: `El cargo "${cargoSinTipo.descripcion}" no tiene tipo (Item Charge). La orden NO se lanzó a BC. Elegí el tipo en Proveeduría (recreá la orden con el tipo elegido) y reintentá.` };
+  }
+
   // Precio obligatorio: ninguna línea puede ir a BC en 0 (BC la deja sin costo).
   const sinPrecio = lineasBc.filter((l) => !(l.precio > 0));
   if (sinPrecio.length) {

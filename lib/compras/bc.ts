@@ -590,6 +590,16 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   if (!input?.vendorNo) throw new Error("Falta el proveedor (vendorNo).");
   const lineas = (input.lineas ?? []).filter((l) => l.itemNo && l.cantidad > 0);
   if (!lineas.length) throw new Error("No hay líneas de material válidas para el pedido.");
+  // GUARD (antes de tocar BC): TODO cargo con importe debe tener su tipo (Item Charge).
+  // Si a alguno le falta, abortamos SIN crear nada en BC — así una orden con el cargo
+  // roto nunca queda a medias en BC (antes se creaba y lanzaba el pedido sin el cargo).
+  const fleteEnv = (process.env.BC_ITEM_CHARGE_FLETE || "").trim();
+  const cargosEfectivos: CargoBc[] = (input.cargos && input.cargos.length)
+    ? input.cargos
+    : (input.flete && input.flete.monto > 0 ? [{ descripcion: input.flete.descripcion, cantidad: 1, precio: input.flete.monto }] : []);
+  if (cargosEfectivos.some((c) => c.precio > 0 && !((c.chargeNo || fleteEnv).trim()))) {
+    throw new Error("El cargo no tiene tipo (Item Charge). La orden NO se creó ni se lanzó en BC. Elegí el tipo de cargo en Proveeduría y reintentá.");
+  }
   const cid = await getStdCompanyId(); // MISMA compañía que items/vendors (API estándar)
   const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -633,9 +643,7 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   // 3) CARGOS DE PRODUCTO (Item Charge): NO por la API estándar (se traga la línea
   // sin avisar). Van por el codeunit AdelantePO_AddChargeLine (idempotente por
   // itemChargeNo). El reparto por importe lo hace el codeunit al registrar.
-  const cargos: CargoBc[] = (input.cargos && input.cargos.length)
-    ? input.cargos
-    : (input.flete && input.flete.monto > 0 ? [{ descripcion: input.flete.descripcion, cantidad: 1, precio: input.flete.monto }] : []);
+  const cargos: CargoBc[] = cargosEfectivos; // ya validado arriba: todos con tipo (Item Charge)
   if (creadas > 0) {
     for (const cg of cargos) {
       const qty = cg.cantidad && cg.cantidad > 0 ? cg.cantidad : 1;
