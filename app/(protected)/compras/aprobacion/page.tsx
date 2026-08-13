@@ -6,7 +6,7 @@ import { Badge, Button, Card, Modal, Textarea, Tile, useToast } from "@/componen
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
 import { AprobarControl } from "@/components/compras/aprobar-control";
-import { money, formatDate, num, ordenLineaImporte } from "@/lib/compras/helpers";
+import { money, formatDate, num, ordenLineaImporte, ordenTotalConIva } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 export default function AprobacionPage() {
@@ -21,7 +21,7 @@ export default function AprobacionPage() {
   const [abierto, setAbierto] = useState<Set<string>>(new Set());
   const [ordenMonto, setOrdenMonto] = useState<"desc" | "asc">("desc");
 
-  const totalDe = (o: Orden) => o.lineas.reduce((s, l) => s + ordenLineaImporte(l), 0);
+  const totalDe = (o: Orden) => ordenTotalConIva(o);
   const porAprobar = [...ordenes.filter((o) => o.estado === "pendiente_aprobacion")]
     .sort((a, b) => (ordenMonto === "desc" ? totalDe(b) - totalDe(a) : totalDe(a) - totalDe(b)));
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -115,7 +115,7 @@ export default function AprobacionPage() {
           {porAprobar.length === 0 && <Card><div className="empty" style={{ lineHeight: 1.6 }}>No hay órdenes pendientes de aprobación.<br /><span className="ds-muted ds-body-sm">Para ver las que ya aprobaste o se completaron, abrí la pestaña <strong>“Todas las órdenes”</strong> arriba.</span></div></Card>}
           {porAprobar.map((o) => {
             const articulos = o.lineas.filter((l) => l.tipo === "articulo");
-            const total = o.lineas.reduce((s, l) => s + ordenLineaImporte(l), 0);
+            const total = ordenTotalConIva(o);
             const open = abierto.has(o.id);
             return (
               <Card key={o.id}>

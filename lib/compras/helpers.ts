@@ -182,6 +182,17 @@ export function ordenSubtotal(o: Orden): number {
   return o.lineas.reduce((s, l) => s + ordenLineaImporte(l), 0);
 }
 
+// Total de la orden CON IVA — el mismo número que ve Proveeduría en el detalle:
+// importe neto de cada línea + 13% (o el % de la línea) SOLO sobre los artículos;
+// los cargos (flete) van sin IVA. Fuente única para que Aprobación y el detalle
+// muestren SIEMPRE el mismo total (antes Aprobación sumaba sin IVA y no cuadraba).
+export function ordenTotalConIva(o: Orden): number {
+  return o.lineas.reduce(
+    (s, l) => s + ordenLineaImporte(l) * (l.tipo === "articulo" ? 1 + (l.ivaPct ?? 0) / 100 : 1),
+    0,
+  );
+}
+
 export function ordenRecibidoPct(o: Orden): number {
   const total = o.lineas.reduce((s, l) => s + l.cantidad, 0);
   if (total === 0) return 0;

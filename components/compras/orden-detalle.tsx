@@ -7,7 +7,7 @@ import { IconChevronDown } from "@/components/compras/icons";
 import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { money, num, formatDate, ordenBadge, ordenLineaImporte, ordenRecibidoPct, ordenPedidos, ordenEsDirecta } from "@/lib/compras/helpers";
+import { money, num, formatDate, ordenBadge, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenEsDirecta } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Vista de detalle de una orden, reutilizada por Proveeduría, Aprobación y Bodega.
@@ -135,7 +135,7 @@ export function OrdenDetalle({
               <div className="totals__row"><span>Subtotal artículos</span><span>{money(subtotal, orden.currencyCode)}</span></div>
               <div className="totals__row"><span>Flete</span><span>{money(flete, orden.currencyCode)}</span></div>
               <div className="totals__row"><span>IVA (materiales)</span><span>{money(iva, orden.currencyCode)}</span></div>
-              <div className="totals__row totals__row--grand" style={{ gridColumn: "1 / -1" }}><span>Total orden</span><span>{money(subtotal + flete + iva, orden.currencyCode)}</span></div>
+              <div className="totals__row totals__row--grand" style={{ gridColumn: "1 / -1" }}><span>Total orden</span><span>{money(ordenTotalConIva(orden), orden.currencyCode)}</span></div>
               {orden.bcNumber && <div style={{ gridColumn: "1 / -1" }} className="ds-body-sm ds-muted">Estimado local · los totales definitivos los calcula BC.</div>}
             </>
           )}
