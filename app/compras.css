@@ -648,12 +648,30 @@
 .oc-scope .nsl-clear { flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); cursor: pointer; transition: background .12s, color .12s; }
 .oc-scope .nsl-clear:hover { background: color-mix(in srgb, var(--ds-color-red-100) 22%, var(--ds-tint-base)); color: var(--ds-color-red-200); }
 /* Selector de variante como BOTÓN (no se ve como dropdown); abre la lista al click. */
-.oc-scope .nsl-varbtn { display: inline-flex; align-items: center; gap: 6px; width: 100%; min-width: 0; height: 40px; padding: 0 8px 0 14px; border-radius: 999px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-surface); color: var(--ds-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, box-shadow .12s, transform .1s; }
+/* AGREGAR VARIANTE: caja blanca radio 8, texto AMARILLO en mayúsculas cuando falta
+   elegir (igual que la referencia); cuando hay variante elegida, texto normal. */
+.oc-scope .nsl-varbtn { display: inline-flex; align-items: center; gap: 6px; width: 100%; min-width: 0; height: 40px; padding: 0 8px 0 14px; border-radius: 8px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white); color: var(--ds-text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, box-shadow .12s, transform .1s; }
 .oc-scope .nsl-varbtn:hover { border-color: var(--ds-color-gray-400); box-shadow: 0 0 0 3px var(--ds-color-gray-100); }
 .oc-scope .nsl-varbtn:active { transform: translateY(1px); }
-.oc-scope .nsl-varbtn[data-warn] { border-color: var(--ds-color-yellow); color: var(--ds-color-gray-500); }
+.oc-scope .nsl-varbtn[data-warn] { border-color: var(--ds-color-gray-200); color: var(--ds-color-yellow); }
+.oc-scope .nsl-varbtn[data-warn] .nsl-varbtn__label { text-transform: uppercase; letter-spacing: .04em; }
 .oc-scope .nsl-varbtn__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .oc-scope .nsl-varbtn__chev { flex-shrink: 0; color: var(--ds-color-gray-400); }
+/* Botones de la barra de acciones (prioridad · comentario · plantilla). */
+.oc-scope .nsl-toolbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 48px; min-width: 48px; padding: 0 12px; border-radius: 14px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white); color: var(--ds-color-gray-500); cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, color .12s, background .12s; }
+.oc-scope .nsl-toolbtn:hover { border-color: var(--ds-color-gray-400); color: var(--ds-color-ink); }
+.oc-scope .nsl-toolbtn[data-active="1"] { border-color: var(--ds-color-green-100); color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-color-white)); }
+.oc-scope .nsl-toolbtn:disabled { opacity: .45; cursor: not-allowed; }
+/* Tooltip (pastilla negra) arriba del botón al pasar el mouse. */
+.oc-scope .nsl-toolbtn[data-tip] { position: relative; }
+.oc-scope .nsl-toolbtn[data-tip]::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px); white-space: nowrap; background: var(--ds-color-black); color: #fff; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; box-shadow: 0 8px 20px rgba(15, 18, 20, .22); opacity: 0; pointer-events: none; transition: opacity .12s ease, transform .12s ease; z-index: 2600; }
+.oc-scope .nsl-toolbtn[data-tip]:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* "USAR PLANTILLA": botón full-width. Verde pálido cuando el pedido está vacío;
+   gris con borde verde cuando ya hay materiales (igual que la referencia). */
+.oc-scope .nsl-plantbtn { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 52px; padding: 0 24px; border-radius: 20px; border: 0; background: #d3e27f; color: var(--ds-color-black); font: inherit; font-size: 14px; font-weight: 700; letter-spacing: .4px; cursor: pointer; box-shadow: 0 0 0 1.5px rgba(173, 208, 16, 0); transition: background .18s ease, box-shadow .18s ease; }
+.oc-scope .nsl-plantbtn[data-has="1"] { background: var(--ds-color-gray-100); box-shadow: 0 0 0 1.5px var(--ds-color-green-100); }
+.oc-scope .nsl-plantbtn:active { transform: translateY(1px); }
+.oc-scope .nsl-plantbtn__label { text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Badge del tipo de plantilla en el campo elegido (General / Bodega) */
 .oc-scope .nsl-typebadge { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
 .oc-scope .nsl-typebadge--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
@@ -666,11 +684,13 @@
 .oc-scope .nsl-obra-head[data-empty="1"] { background: color-mix(in srgb, var(--ds-color-yellow) 14%, var(--ds-color-white)); border-bottom-color: color-mix(in srgb, var(--ds-color-yellow) 45%, var(--ds-color-gray-100)); }
 /* Chip de OBRA: etiqueta prominente (ícono + nombre en negrita) que abre el
    buscador de obras. Se ve DISTINTA al buscador de materiales para no confundir. */
-.oc-scope .nsl-obrachip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white); color: var(--ds-text); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, box-shadow .12s; }
+/* Con obra: CAJA blanca "A05" (borde gris, código en negrita). */
+.oc-scope .nsl-obrachip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 40px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white); color: var(--ds-text); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }
 .oc-scope .nsl-obrachip:hover { border-color: var(--ds-color-gray-400); box-shadow: 0 0 0 3px var(--ds-color-gray-100); }
-.oc-scope .nsl-obrachip[data-empty="1"] { border-color: var(--ds-color-yellow); color: var(--ds-color-gray-500); font-weight: 600; }
-.oc-scope .nsl-obrachip__ic { flex: none; color: var(--ds-color-green-200); }
-.oc-scope .nsl-obrachip[data-empty="1"] .nsl-obrachip__ic { color: #b89a00; }
+/* Sin obra: pill VERDE "OBRA +" (mismos colores de la referencia). */
+.oc-scope .nsl-obrachip[data-empty="1"] { border-radius: 999px; border-color: var(--ds-color-green-100); background: var(--ds-color-green-100); color: var(--ds-color-black); box-shadow: var(--ds-shadow-01); }
+.oc-scope .nsl-obrachip[data-empty="1"]:hover { border-color: var(--ds-color-green-200); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-color-green-100) 40%, transparent); }
+.oc-scope .nsl-obrachip__plus { flex: none; }
 .oc-scope .nsl-obrachip__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oc-scope .nsl-obrachip__chev { flex: none; color: var(--ds-color-gray-400); }
 /* Al pasar el mouse por el chip, el NOMBRE se despliega a la DERECHA en la misma

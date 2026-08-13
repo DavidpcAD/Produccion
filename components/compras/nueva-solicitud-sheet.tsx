@@ -264,13 +264,13 @@ function Cantidad({ value, onChange }: { value: number; onChange: (n: number) =>
   return (
     <input inputMode="numeric" value={value} aria-label="Cantidad" onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => onChange(Math.max(0, Number(e.target.value.replace(/\D/g, "")) || 0))}
-      style={{ width: 72, textAlign: "center", height: 38, borderRadius: 10, border: "1.5px solid var(--ds-color-gray-100)", background: "var(--ds-tint-base)", fontVariantNumeric: "tabular-nums", fontWeight: 600 }} />
+      style={{ width: 72, textAlign: "center", height: 40, borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", color: "var(--ds-color-yellow)", fontVariantNumeric: "tabular-nums", fontWeight: 700 }} />
   );
 }
 
 // ─── Buscar material (mismo dropdown en 2 etapas): material → (si tiene) variante ─
-function MaterialSearch({ items, resolveVariantes, onAdd }: {
-  items: Item[]; resolveVariantes: (id: string) => Promise<Variante[]>; onAdd: (id: string, vc?: string, vn?: string) => void;
+function MaterialSearch({ items, resolveVariantes, onAdd, compact }: {
+  items: Item[]; resolveVariantes: (id: string) => Promise<Variante[]>; onAdd: (id: string, vc?: string, vn?: string) => void; compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -288,14 +288,19 @@ function MaterialSearch({ items, resolveVariantes, onAdd }: {
     onAdd(id); reset();
   }
   const placeholder = stage ? `Variante de ${stage.label}…` : "Buscar material para agregar…";
+  // Inline (compact): al montar (tras tocar el +) abre el dropdown y enfoca de una vez.
+  // Sin chevron ni botón extra; se cierra solo al agregar un material.
+  useEffect(() => { if (compact) { setOpen(true); const t = setTimeout(() => inputRef.current?.focus(), 30); return () => clearTimeout(t); } }, [compact]);
   return (
     <div style={{ width: "100%" }}>
-      <div ref={boxRef} style={{ display: "flex", alignItems: "center", gap: 6, minHeight: 62, paddingLeft: 18, paddingRight: 8, background: "var(--ds-color-white)", borderRadius: 999, boxShadow: "var(--ds-shadow-01)", border: `1.5px solid ${stage ? "var(--ds-color-green-100)" : open ? "var(--ds-color-gray-300)" : "var(--ds-color-gray-100)"}` }}>
-        <input ref={inputRef} value={q} placeholder={placeholder} onFocus={() => setOpen(true)} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
-          style={{ flex: 1, minWidth: 0, border: 0, background: "transparent", outline: "none", fontSize: 15, color: "var(--ds-color-gray-500)" }} />
-        <span style={{ flexShrink: 0, transform: "scale(0.76)", transformOrigin: "center", display: "inline-flex" }}>
-          <ToggleCards size="small" visibility={open ? "open" : "close"} onClick={toggle} ariaLabel={open ? "Cerrar" : "Abrir"} />
-        </span>
+      <div ref={boxRef} style={{ display: "flex", alignItems: "center", gap: 6, minHeight: compact ? 46 : 62, paddingLeft: compact ? 16 : 18, paddingRight: compact ? 16 : 8, background: "var(--ds-color-white)", borderRadius: 999, boxShadow: "var(--ds-shadow-01)", border: `1.5px solid ${stage ? "var(--ds-color-green-100)" : open ? "var(--ds-color-gray-300)" : "var(--ds-color-gray-100)"}` }}>
+        <input ref={inputRef} value={q} placeholder={placeholder} onFocus={() => { if (compact || q.trim()) setOpen(true); }} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          style={{ flex: 1, minWidth: 0, border: 0, background: "transparent", outline: "none", fontSize: compact ? 14 : 15, color: "var(--ds-color-gray-500)" }} />
+        {!compact && (
+          <span style={{ flexShrink: 0, transform: "scale(0.76)", transformOrigin: "center", display: "inline-flex" }}>
+            <ToggleCards size="small" visibility={open ? "open" : "close"} onClick={toggle} ariaLabel={open ? "Cerrar" : "Abrir"} />
+          </span>
+        )}
       </div>
       <Popover anchorRef={boxRef} open={open} onClose={reset}>
         <div style={{ width: "100%", padding: 8, display: "flex", flexDirection: "column" }}>
@@ -344,10 +349,17 @@ function ObraChip({ obras, value, nombre, onPick }: {
           la misma línea (expansión inline con transición CSS, sin panel flotante). */}
       <button type="button" className="nsl-obrachip" data-empty={has ? undefined : "1"} aria-label={nombre || label}
         onClick={() => { const n = !open; setOpen(n); if (n) setTimeout(() => inputRef.current?.focus(), 0); }}>
-        <svg className="nsl-obrachip__ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 21h18M6 21V8l6-4 6 4v13M10 21v-5h4v5" /></svg>
-        <span className="nsl-obrachip__label">{label}</span>
-        {has && nombre && <span className="nsl-obrachip__more"><span className="nsl-obrachip__moreinner">{nombre}</span></span>}
-        <svg className="nsl-obrachip__chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s ease" }}><path d="M6 9l6 6 6-6" /></svg>
+        {has ? (
+          <>
+            <span className="nsl-obrachip__label">{value}</span>
+            {nombre && <span className="nsl-obrachip__more"><span className="nsl-obrachip__moreinner">{nombre}</span></span>}
+          </>
+        ) : (
+          <>
+            <span className="nsl-obrachip__label">OBRA</span>
+            <svg className="nsl-obrachip__plus" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
+          </>
+        )}
       </button>
       <Popover anchorRef={wrapRef} open={open} onClose={() => { setOpen(false); setQ(""); }} minWidth={320}>
         <div style={{ width: "100%", padding: 8, display: "flex", flexDirection: "column" }}>
@@ -360,6 +372,92 @@ function ObraChip({ obras, value, nombre, onPick }: {
                 className={`nsl-opt col${o.id === value ? " is-active" : ""}`} style={{ gap: 2, alignItems: "flex-start", width: "100%", textAlign: "left", padding: "10px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent" }}>
                 <span className="ds-body-sm ds-strong">{o.title}</span>
                 {o.sub && <span className="ds-muted ds-label">{o.sub}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
+// ─── Prioridad como BOTÓN de ícono (bandera con color) que abre sus opciones ──────
+function PrioridadBtn({ value, onChange }: { value: Pedido["prioridad"]; onChange: (v: Pedido["prioridad"]) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const colorOf = (v: Pedido["prioridad"]) => (v === "urgente" ? "var(--ds-color-red-200)" : v === "alta" ? "var(--ds-color-yellow)" : "var(--ds-color-gray-300)");
+  const sel = PRIORIDADES.find((p) => p.v === value)!;
+  return (
+    <div ref={ref} style={{ display: "inline-flex" }}>
+      <button type="button" className="nsl-toolbtn" data-tip="Prioridad" data-active={value !== "normal" ? "1" : undefined} onClick={() => setOpen((o) => !o)} aria-label={`Prioridad: ${sel.label}`}>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={colorOf(value)} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 21V4h13l-2 4 2 4H4" /></svg>
+      </button>
+      <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={190}>
+        <div style={{ padding: 6, display: "flex", flexDirection: "column", gap: 2 }}>
+          {PRIORIDADES.map((p) => (
+            <button key={p.v} type="button" onClick={() => { onChange(p.v); setOpen(false); }}
+              className={`nsl-opt row${p.v === value ? " is-active" : ""}`} style={{ gap: 10, alignItems: "center", width: "100%", textAlign: "left", padding: "10px 12px", border: 0, borderRadius: 10, cursor: "pointer", background: "transparent" }}>
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: colorOf(p.v), flexShrink: 0 }} />
+              <span className="ds-body-sm ds-strong">{p.label}</span>
+            </button>
+          ))}
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
+// ─── Comentario como BOTÓN de mensaje que abre el campo (popover). Activo si hay nota ─
+function ComentarioBtn({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const has = !!value.trim();
+  return (
+    <div ref={ref} style={{ display: "inline-flex" }}>
+      <button type="button" className="nsl-toolbtn" data-tip="Comentario" data-active={has ? "1" : undefined} onClick={() => setOpen((o) => !o)} aria-label="Comentario">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+      </button>
+      <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={400}>
+        <div style={{ padding: 14, width: "100%" }}>
+          <span className="ds-form-field__label" style={{ display: "block", marginBottom: 8 }}>Comentario para proveeduría</span>
+          <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={5} placeholder="Escribí una nota…"
+            style={{ display: "block", width: "100%", minWidth: 372, height: 128, resize: "vertical", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-color-white)", color: "var(--ds-color-ink)" }} />
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
+// ─── "USAR PLANTILLA": BOTÓN (verde pálido vacío / gris con borde verde con
+//     materiales) que abre el selector de plantillas. Igual que la referencia. ──────
+function UsarPlantillaBtn({ items, value, onPick, onClear, filterNode, hasMateriales }: {
+  items: Item[]; value?: string; onPick: (id: string) => void; onClear: () => void; filterNode?: React.ReactNode; hasMateriales?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const matches = useMemo(() => filtrar(items, q), [q, items]);
+  return (
+    <div ref={ref} style={{ width: "100%" }}>
+      <button type="button" className="nsl-plantbtn" data-has={hasMateriales ? "1" : undefined}
+        onClick={() => { const n = !open; setOpen(n); if (n) setTimeout(() => inputRef.current?.focus(), 0); }}>
+        <span className="nsl-plantbtn__label">Usar plantilla</span>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
+      </button>
+      <Popover anchorRef={ref} open={open} onClose={() => { setOpen(false); setQ(""); }}>
+        <div style={{ width: "100%", padding: 8, display: "flex", flexDirection: "column" }}>
+          {filterNode && <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}>{filterNode}</div>}
+          <input ref={inputRef} value={q} placeholder="Buscar plantilla…" onChange={(e) => setQ(e.target.value)}
+            style={{ margin: "2px 4px 8px", height: 40, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 14px", fontSize: 14, outline: "none" }} />
+          <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 280 }}>
+            {value && <button type="button" onClick={() => { onClear(); setOpen(false); setQ(""); }} className="nsl-opt" style={{ textAlign: "left", padding: "10px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent", color: "var(--ds-color-red-100)", fontWeight: 700 }}>Quitar plantilla</button>}
+            {matches.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin resultados.</div>}
+            {matches.map((i) => (
+              <button key={i.id} type="button" onClick={() => { onPick(i.id); setOpen(false); setQ(""); }}
+                className={`nsl-opt col${i.id === value ? " is-active" : ""}`} style={{ gap: 2, alignItems: "flex-start", width: "100%", textAlign: "left", padding: "10px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent" }}>
+                <span className="ds-body-sm ds-strong">{i.title}</span>
+                {i.sub && <span className="ds-muted ds-label">{i.sub}</span>}
               </button>
             ))}
           </div>
@@ -425,6 +523,7 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
+  const [confirmPedir, setConfirmPedir] = useState(false); // confirmación antes de enviar
   const varCache = useRef<Record<string, Variante[]>>({});
   const [varMap, setVarMap] = useState<Record<string, Variante[]>>({});
   const [fTipoPl, setFTipoPl] = useState<FTipo>("todas");
@@ -480,6 +579,10 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   const validLines = lineas.filter((l) => l.articuloId && l.cantidad > 0);
   // Para la vista previa (material): materiales agrupados por obra (una sección por obra).
   const gruposPreview = grupos.map((g) => ({ g, filas: validLines.filter((l) => l.grupoKey === g.key) })).filter((x) => x.filas.length > 0);
+  // Disclosure progresivo: al inicio solo Tipo + Plantilla + "Agregar obra". Prioridad y
+  // Comentario aparecen recién cuando hay materiales. La Plantilla se esconde apenas el
+  // usuario empieza a armar obras/materiales a mano (salvo que haya una elegida).
+  const hayMateriales = lineas.length > 0;
   const hasData = validLines.length > 0 || !!destino || notas.trim().length > 0;
   const variantesDe = (l: Row) => { const a = catArticulos.find((x) => x.id === l.articuloId); return a ? (varMap[a.code] ?? []) : []; };
   const necesitaVariante = (l: Row) => { const vs = variantesDe(l); return vs.length > 0 && !l.variantCode; };
@@ -490,9 +593,9 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
   function reset() {
     setStep(1); setTipo("material"); setDestino(""); setPrioridad("normal");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
-    setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]);
+    setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]); setConfirmPedir(false);
   }
-  function close() { setConfirmExit(false); setOpen(false); setTimeout(reset, 260); }
+  function close() { setConfirmExit(false); setConfirmPedir(false); setOpen(false); setTimeout(reset, 260); }
   function requestDismiss() { if (hasData && !saving) setConfirmExit(true); else close(); }
 
   // Cambia el tipo de solicitud y limpia lo dependiente (obra/almacén/materiales).
@@ -706,7 +809,10 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
               </span>
               <h2 className="ds-subtitle-lg" style={{ margin: 0 }}>{step === 1 ? "Nuevo pedido" : "Vista previa"}</h2>
             </div>
-            <button type="button" onClick={requestDismiss} aria-label="Cerrar" className="modal-close"><Icon name="close" size="sm" color="currentColor" /></button>
+            <button type="button" onClick={requestDismiss} aria-label="Cerrar"
+              style={{ width: 36, height: 36, borderRadius: 8, border: 0, background: "none", color: "var(--ds-color-gray-400)", cursor: "pointer", display: "grid", placeItems: "center" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 6h14M8 12l4 4 4-4" /></svg>
+            </button>
           </div>
 
           {/* Body */}
@@ -717,13 +823,11 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
                   <Segmented variant="pill" value={tipo} options={TIPOS.map((t) => ({ v: t.v, label: t.label }))} onChange={cambiarTipo} />
                 </Field>
 
-                {/* Plantilla (opcional) */}
-                <div className="col gap-2">
-                  <span className="ds-form-field__label">Plantilla (opcional)</span>
-                  <Dropdown placeholder="Buscar plantilla…" items={plantillaItems} value={plantillaSel} onPick={cargarPlantilla} badgeSub
-                    onClear={() => { setPlantillaSel(""); setLineas([]); setGrupos([]); }}
-                    filterNode={<Segmented size="sm" value={fTipoPl} options={F_TIPOS} onChange={setFTipoPl} />} />
-                </div>
+                {/* USAR PLANTILLA: botón (siempre visible, como la referencia). */}
+                <UsarPlantillaBtn items={plantillaItems} value={plantillaSel} hasMateriales={hayMateriales}
+                  onPick={cargarPlantilla}
+                  onClear={() => { setPlantillaSel(""); setLineas([]); setGrupos([]); }}
+                  filterNode={<Segmented size="sm" value={fTipoPl} options={F_TIPOS} onChange={setFTipoPl} />} />
 
                 {esMaterial ? (
                   /* MATERIAL: una TARJETA por obra; adentro, sus materiales. */
@@ -740,13 +844,24 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
                           <div key={g.key} className="col gap-0" style={{ position: "relative", borderRadius: 18, border: "1.5px solid var(--ds-color-gray-100)", background: "var(--ds-color-white)", overflow: "hidden" }}>
                             {/* Cabecera (franja): OBRA como chip prominente + agregar material (+) + menú (⋮) */}
                             <div className="row gap-2 nsl-obra-head" data-empty={g.obraCodigo ? undefined : "1"} style={{ alignItems: "center", padding: "10px 12px" }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
+                              {/* La OBRA queda SIEMPRE visible (nunca la tapa el buscador). */}
+                              <div style={{ flexShrink: 0, minWidth: 0, maxWidth: abierto ? "42%" : "100%" }}>
                                 <ObraChip obras={obraItems} value={g.obraCodigo} nombre={g.obraNombre} onPick={(code) => setGrupoObra(g.key, code)} />
                               </div>
+                              {abierto ? (
+                                /* Buscador INLINE en la misma línea, a la DERECHA de la obra (no encima).
+                                   Al elegir un material se agrega y el buscador se encoge de nuevo al +. */
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <MaterialSearch compact items={articuloItems} resolveVariantes={resolveVariantes}
+                                    onAdd={(id, vc, vn) => { addRow(g.key, id, vc, vn); setOpenMat((ks) => ks.filter((k) => k !== g.key)); }} />
+                                </div>
+                              ) : (
+                                <div style={{ flex: 1 }} />
+                              )}
                               <button type="button" onClick={() => setOpenMat((ks) => (ks.includes(g.key) ? [] : [g.key]))}
                                 aria-label="Agregar material" title="Agregar material a esta obra"
                                 style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 12, border: 0, background: "var(--ds-color-green-100)", color: "var(--ds-color-black)", cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "var(--ds-shadow-01)" }}>
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden style={{ transform: abierto ? "rotate(45deg)" : "none", transition: "transform .15s ease" }}><path d="M12 5v14M5 12h14" /></svg>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
                               </button>
                               <button type="button" onClick={() => setCardMenuKey((k) => (k === g.key ? null : g.key))} aria-label="Opciones de la obra"
                                 style={{ flexShrink: 0, background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
@@ -764,14 +879,6 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
                                 </>
                               )}
                             </div>
-
-                            {/* Buscador de material (se abre con el +) */}
-                            {abierto && (
-                              <div style={{ padding: "0 12px 10px" }}>
-                                <MaterialSearch items={articuloItems} resolveVariantes={resolveVariantes}
-                                  onAdd={(id, vc, vn) => addRow(g.key, id, vc, vn)} />
-                              </div>
-                            )}
 
                             {/* Materiales de esta obra */}
                             {filas.length === 0 ? (
@@ -869,10 +976,6 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
                   </div>
                 )}
 
-                <Field label="Prioridad"><Segmented variant="pill" value={prioridad} options={PRIORIDADES} onChange={setPrioridad} /></Field>
-                <Field label="Comentario (opcional)">
-                  <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} placeholder="Nota para proveeduría…" className="ds-form-field__input" style={{ width: "100%", resize: "vertical" }} />
-                </Field>
               </div>
             ) : (
               <div className="col gap-4">
@@ -948,28 +1051,27 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
             )}
           </div>
 
-          {/* Footer: navegación circular ‹ › + puntitos de paso (estilo DS) */}
-          <div className="row" style={{ alignItems: "center", justifyContent: "space-between", padding: "16px 22px", borderTop: "1.5px solid var(--ds-color-gray-100)", flexShrink: 0 }}>
-            <button type="button" onClick={step === 1 ? requestDismiss : () => setStep(1)} aria-label={step === 1 ? "Cancelar" : "Volver"}
-              style={{ width: 54, height: 54, borderRadius: "50%", border: "1.5px solid var(--ds-color-gray-100)", background: "var(--ds-color-white)", boxShadow: "var(--ds-shadow-01)", cursor: "pointer", display: "grid", placeItems: "center", color: "var(--ds-color-ink)" }}>
-              <Icon name="back" size="md" color="currentColor" />
+          {/* Footer (UNA SOLA PANTALLA): CANCELAR · barra de acciones · Solicitar */}
+          <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 12, padding: "16px 22px", borderTop: "1.5px solid var(--ds-color-gray-100)", flexShrink: 0 }}>
+            <button type="button" onClick={requestDismiss} aria-label="Cancelar"
+              style={{ height: 48, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", boxShadow: "var(--ds-shadow-01)", cursor: "pointer", padding: "0 20px", display: "inline-flex", alignItems: "center", gap: 8, color: "var(--ds-color-ink)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".03em", flexShrink: 0 }}>
+              <Icon name="back" size="sm" color="currentColor" /> Cancelar
             </button>
-            <div className="row gap-2" style={{ alignItems: "center" }}>
-              {[1, 2].map((s) => (
-                <span key={s} style={{ width: s === step ? 10 : 8, height: s === step ? 10 : 8, borderRadius: "50%", background: s === step ? "var(--ds-color-black)" : "var(--ds-color-gray-200)", transition: "all .2s ease" }} />
-              ))}
-            </div>
-            {step === 1 ? (
-              <button type="button" onClick={() => { if (canContinue) setStep(2); }} disabled={!canContinue} aria-label="Seguir"
-                style={{ width: 54, height: 54, borderRadius: "50%", border: 0, background: canContinue ? "var(--ds-color-green-100)" : "var(--ds-color-gray-100)", boxShadow: canContinue ? "var(--ds-shadow-01)" : "none", cursor: canContinue ? "pointer" : "not-allowed", display: "grid", placeItems: "center", color: canContinue ? "var(--ds-color-black)" : "var(--ds-color-gray-300)" }}>
-                <Icon name="arrow-right" size="md" color="currentColor" />
-              </button>
-            ) : (
-              <button type="button" onClick={pedir} disabled={saving} aria-label="Pedir"
-                style={{ height: 54, borderRadius: 999, border: 0, padding: "0 24px", background: "var(--ds-color-green-100)", boxShadow: "var(--ds-shadow-01)", cursor: saving ? "default" : "pointer", fontWeight: 700, fontSize: 15, color: "var(--ds-color-black)", display: "inline-flex", alignItems: "center", gap: 8 }}>
-                {saving ? "Enviando…" : "Pedir"} <Icon name="arrow-right" size="sm" color="currentColor" />
-              </button>
+            {/* Prioridad · Comentario · Guardar como plantilla — como botones de ícono */}
+            {hayMateriales && (
+              <div className="row gap-2" style={{ alignItems: "center" }}>
+                <PrioridadBtn value={prioridad} onChange={setPrioridad} />
+                <ComentarioBtn value={notas} onChange={setNotas} />
+                <button type="button" className="nsl-toolbtn" data-tip="Guardar como plantilla" onClick={() => { setNombrePlant(""); setGuardarPlantOpen(true); }} disabled={validLines.length === 0}
+                  aria-label="Guardar como plantilla">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 17l-5.2 2.6 1-5.75-4.2-4.1 5.8-.85L12 3.6z" /></svg>
+                </button>
+              </div>
             )}
+            <button type="button" onClick={() => { if (canContinue && !saving) setConfirmPedir(true); }} disabled={!canContinue || saving} aria-label="Solicitar"
+              style={{ height: 54, borderRadius: 999, border: 0, padding: "0 26px", background: canContinue ? "var(--ds-color-green-100)" : "var(--ds-color-gray-100)", boxShadow: canContinue ? "var(--ds-shadow-01)" : "none", cursor: (canContinue && !saving) ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 15, color: canContinue ? "var(--ds-color-black)" : "var(--ds-color-gray-300)", display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {saving ? "Enviando…" : "Solicitar"} <Icon name="arrow-right" size="sm" color="currentColor" />
+            </button>
           </div>
 
           {/* Guardar como plantilla: modal DENTRO del drawer */}
@@ -991,6 +1093,26 @@ export function NuevaSolicitudSheet({ open, setOpen }: { open: boolean; setOpen:
                     {savingPlant ? "Guardando…" : "Guardar plantilla"}
                   </Button>
                   <Button block variant="ghost" onClick={() => setGuardarPlantOpen(false)} disabled={savingPlant}>Cancelar</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Confirmación antes de enviar (al tocar Solicitar) */}
+          {confirmPedir && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(15,18,20,.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 6 }}>
+              <div style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 380, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }}>
+                <h3 className="ds-subtitle-lg" style={{ marginTop: 0, marginBottom: 8 }}>¿Enviar el pedido?</h3>
+                <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
+                  Se envía a proveeduría: <strong>{validLines.length} material(es)</strong>
+                  {esMaterial
+                    ? <> en <strong>{gruposPreview.length} obra{gruposPreview.length !== 1 ? "s" : ""}</strong></>
+                    : <> para <strong>{destinoNombre || tipoMeta.destino}</strong></>}
+                  {prioridad !== "normal" && <> · prioridad <strong>{PRIORIDADES.find((p) => p.v === prioridad)!.label}</strong></>}.
+                </p>
+                <div className="col gap-2" style={{ marginTop: 18 }}>
+                  <Button block onClick={pedir} disabled={saving}>{saving ? "Enviando…" : "Confirmar y enviar"}</Button>
+                  <Button block variant="ghost" onClick={() => setConfirmPedir(false)} disabled={saving}>Cancelar</Button>
                 </div>
               </div>
             </div>
