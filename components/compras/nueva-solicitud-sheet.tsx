@@ -20,7 +20,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { springs } from "@/components/ds/springs";
 import { ToggleCards } from "@/components/ds/ToggleCards/ToggleCards";
 import { Icon } from "@/components/ds/Icon/Icon";
-import { Badge, Button, Field, Textarea, useToast } from "@/components/compras/ui";
+import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
 
@@ -517,7 +517,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const catObras = bcObras ?? obras;
   const catAlm = bcAlm ?? almacenes;
 
-  const [step, setStep] = useState<1 | 2>(1);
   const [tipo, setTipo] = useState<TipoSolicitud>("material");
   const [destino, setDestino] = useState("");
   const [prioridad, setPrioridad] = useState<Pedido["prioridad"]>("normal");
@@ -602,7 +601,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const canContinue = validLines.length > 0 && destinoOk && validLines.every((l) => !necesitaVariante(l));
 
   function reset() {
-    setStep(1); setTipo("material"); setDestino(""); setPrioridad("normal");
+    setTipo("material"); setDestino(""); setPrioridad("normal");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
     setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]); setConfirmPedir(false);
   }
@@ -848,7 +847,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
               <span style={{ width: 40, height: 40, borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--ds-color-gray-100)" }}>
                 <Icon name="entrega" size="md" color="currentColor" />
               </span>
-              <h2 className="ds-subtitle-lg" style={{ margin: 0 }}>{step === 1 ? "Nuevo pedido" : "Vista previa"}</h2>
+              <h2 className="ds-subtitle-lg" style={{ margin: 0 }}>Nuevo pedido</h2>
             </div>
             <button type="button" onClick={requestDismiss} aria-label="Cerrar"
               style={{ width: 36, height: 36, borderRadius: 8, border: 0, background: "none", color: "var(--ds-color-gray-400)", cursor: "pointer", display: "grid", placeItems: "center" }}>
@@ -858,7 +857,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
 
           {/* Body */}
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 22px" }}>
-            {step === 1 ? (
               <div className="col gap-5">
                 <Field label="Tipo de solicitud">
                   <Segmented variant="pill" value={tipo} options={TIPOS.map((t) => ({ v: t.v, label: t.label }))} onChange={cambiarTipo} />
@@ -1018,78 +1016,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                 )}
 
               </div>
-            ) : (
-              <div className="col gap-4">
-                <div className="row gap-2 wrap">
-                  <Badge tone={esMaterial ? "green" : tipo === "repuesto" ? "yellow" : "gray"}>{tipoMeta.label}</Badge>
-                  {prioridad !== "normal" && <Badge tone={prioridad === "urgente" ? "red" : "yellow"}>{PRIORIDADES.find((p) => p.v === prioridad)!.label}</Badge>}
-                </div>
-                {esMaterial ? (
-                  /* Materiales SEPARADOS POR OBRA: una sección por obra, con su encabezado. */
-                  <div className="col gap-4">
-                    <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>
-                      Materiales ({validLines.length}) · {gruposPreview.length} obra{gruposPreview.length !== 1 ? "s" : ""}
-                    </span>
-                    {gruposPreview.map(({ g, filas }) => (
-                      <div key={g.key} className="col gap-0" style={{ border: "1.5px solid var(--ds-color-gray-200)", borderRadius: 14, overflow: "hidden", boxShadow: "var(--ds-shadow-01)" }}>
-                        <div className="row row--between" style={{ alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--ds-color-black)", color: "var(--ds-color-white)" }}>
-                          <span className="ds-strong" style={{ fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ds-color-white)" }}>{g.obraNombre || g.obraCodigo}</span>
-                          <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, letterSpacing: ".03em", color: "rgba(255,255,255,.65)" }}>{g.obraCodigo}</span>
-                        </div>
-                        {filas.map((l, i) => {
-                          const a = catArticulos.find((x) => x.id === l.articuloId)!;
-                          return (
-                            <div key={l.key} className="row row--between gap-3" style={{ alignItems: "center", padding: "10px 14px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0 }}>
-                              <div className="col" style={{ gap: 2, minWidth: 0 }}>
-                                <span className="ds-body-sm ds-strong">{l.variantNombre || a.descripcion}</span>
-                                <span className="ds-muted ds-label">{a.code}</span>
-                              </div>
-                              <span className="ds-strong" style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{l.cantidad} {a.unidad}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    <div className="col gap-1">
-                      <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>{tipoMeta.destino}</span>
-                      <span className="ds-subtitle">{destinoNombre || "—"}</span>
-                      {destino && <span className="ds-muted ds-body-sm">{destino}</span>}
-                    </div>
-                    <div className="col gap-2">
-                      <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>Materiales ({validLines.length})</span>
-                      <div className="col gap-0" style={{ border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 14, overflow: "hidden" }}>
-                        {validLines.map((l, i) => {
-                          const a = catArticulos.find((x) => x.id === l.articuloId)!;
-                          return (
-                            <div key={l.key} className="row row--between gap-3" style={{ alignItems: "center", padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0 }}>
-                              <div className="col" style={{ gap: 2, minWidth: 0 }}>
-                                <span className="ds-body-sm ds-strong">{l.variantNombre || a.descripcion}</span>
-                                <span className="ds-muted ds-label">{a.code}</span>
-                              </div>
-                              <span className="ds-strong" style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{l.cantidad} {a.unidad}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </>
-                )}
-                {notas.trim() && (
-                  <div className="col gap-1">
-                    <span className="ds-muted ds-label" style={{ textTransform: "uppercase", letterSpacing: ".04em" }}>Comentario</span>
-                    <span className="ds-body-sm">{notas.trim()}</span>
-                  </div>
-                )}
-                {validLines.length > 0 && (
-                  <Button variant="outline" block onClick={() => { setNombrePlant(""); setGuardarPlantOpen(true); }}>
-                    ☆ Guardar como plantilla
-                  </Button>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Footer (UNA SOLA PANTALLA): CANCELAR · barra de acciones · Solicitar */}
