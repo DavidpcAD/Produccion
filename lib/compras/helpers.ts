@@ -131,10 +131,6 @@ export function pedidoLineaPendiente(l: PedidoLinea): number {
   return Math.max(0, l.cantidad - l.cantidadOrdenada);
 }
 
-export function pedidoTieneSaldo(p: Pedido): boolean {
-  return p.lineas.some((l) => pedidoLineaPendiente(l) > 0);
-}
-
 // % de la solicitud que Proveeduría ya convirtió en órdenes de compra
 // (cantidadOrdenada / cantidad). Es el avance de COMPRA, distinto del de entrega.
 export function pedidoOrdenadoPct(p: Pedido): number {
