@@ -16,8 +16,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "motion/react";
-import { springs } from "@/components/ds/springs";
+import { motion } from "motion/react";
 import { ToggleCards } from "@/components/ds/ToggleCards/ToggleCards";
 import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";

@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import {
   useReactTable, getCoreRowModel, getFilteredRowModel, getSortedRowModel,
   getPaginationRowModel, getFacetedRowModel, getFacetedUniqueValues, flexRender,

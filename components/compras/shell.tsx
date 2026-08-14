@@ -1,15 +1,13 @@
 "use client";
 import { useSession } from "@/hooks/useSession";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/compras/store";
 import type { Role, Notificacion } from "@/lib/compras/types";
-import { formatDate } from "@/lib/compras/helpers";
 import {
-  IconBell, IconList, IconOptions, IconDuplicate, IconMatrix, IconTrack,
-  IconReceipt, IconCheck, IconDelivery, IconFolder, IconPlus, IconLogout,
+  IconList, IconOptions, IconDuplicate, IconMatrix, IconTrack,
+  IconReceipt, IconCheck, IconDelivery, IconFolder, IconPlus,
   IconBox, IconWarning, IconDashboard, IconEdit,
 } from "@/components/compras/icons";
 
