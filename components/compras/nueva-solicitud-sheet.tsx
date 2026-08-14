@@ -277,31 +277,29 @@ function Cantidad({ value, onChange }: { value: number; onChange: (n: number) =>
   );
 }
 
-// ─── Buscar material (mismo dropdown en 2 etapas): material → (si tiene) variante ─
-function MaterialSearch({ items, resolveVariantes, onAdd, compact }: {
-  items: Item[]; resolveVariantes: (id: string) => Promise<Variante[]>; onAdd: (id: string, vc?: string, vn?: string) => void; compact?: boolean;
+// ─── Buscar material: dropdown para elegir el artículo (la variante se elige en la línea) ─
+function MaterialSearch({ items, onAdd, compact }: {
+  items: Item[]; onAdd: (id: string, vc?: string, vn?: string) => void; compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
-  const [stage, setStage] = useState<{ id: string; label: string; variantes: Variante[] } | null>(null);
-  const list: Item[] = useMemo(() => (stage ? stage.variantes.map((v) => ({ id: v.code, title: v.descripcion || v.code })) : items), [stage, items]);
-  const matches = useMemo(() => filtrar(list, q), [q, list]);
-  function reset() { setOpen(false); setStage(null); setQ(""); }
+  const matches = useMemo(() => filtrar(items, q), [q, items]);
+  function reset() { setOpen(false); setQ(""); }
   const toggle = () => { if (open) { reset(); } else { setOpen(true); inputRef.current?.focus(); } };
   function clickItem(id: string) {
     // Se agrega el material directo. Si tiene variantes, se elige/cambia en el
     // botón de variante de la LÍNEA (no acá), para no llenar el buscador de pasos.
     onAdd(id); reset();
   }
-  const placeholder = stage ? `Variante de ${stage.label}…` : "Buscar material para agregar…";
+  const placeholder = "Buscar material para agregar…";
   // Inline (compact): al montar (tras tocar el +) abre el dropdown y enfoca de una vez.
   // Sin chevron ni botón extra; se cierra solo al agregar un material.
   useEffect(() => { if (compact) { setOpen(true); const t = setTimeout(() => inputRef.current?.focus(), 30); return () => clearTimeout(t); } }, [compact]);
   return (
     <div style={{ width: "100%" }}>
-      <div ref={boxRef} style={{ display: "flex", alignItems: "center", gap: 6, minHeight: compact ? 46 : 62, paddingLeft: compact ? 16 : 18, paddingRight: compact ? 16 : 8, background: "var(--ds-color-white)", borderRadius: 999, boxShadow: "var(--ds-shadow-01)", border: `1.5px solid ${stage ? "var(--ds-color-green-100)" : open ? "var(--ds-color-gray-300)" : "var(--ds-color-gray-100)"}` }}>
+      <div ref={boxRef} style={{ display: "flex", alignItems: "center", gap: 6, minHeight: compact ? 46 : 62, paddingLeft: compact ? 16 : 18, paddingRight: compact ? 16 : 8, background: "var(--ds-color-white)", borderRadius: 999, boxShadow: "var(--ds-shadow-01)", border: `1.5px solid ${open ? "var(--ds-color-gray-300)" : "var(--ds-color-gray-100)"}` }}>
         <input ref={inputRef} value={q} placeholder={placeholder} onFocus={() => { if (compact || q.trim()) setOpen(true); }} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           style={{ flex: 1, minWidth: 0, border: 0, background: "transparent", outline: "none", fontSize: compact ? 14 : 15, color: "var(--ds-color-gray-500)" }} />
         {!compact && (
@@ -312,13 +310,7 @@ function MaterialSearch({ items, resolveVariantes, onAdd, compact }: {
       </div>
       <Popover anchorRef={boxRef} open={open} onClose={reset}>
         <div style={{ width: "100%", padding: 8, display: "flex", flexDirection: "column" }}>
-          {stage && (
-            <button type="button" onClick={() => { setStage(null); setQ(""); inputRef.current?.focus(); }} className="row gap-2"
-              style={{ alignItems: "center", width: "100%", textAlign: "left", padding: "8px 12px", border: 0, borderBottom: "1.5px solid var(--ds-color-gray-100)", background: "none", cursor: "pointer", color: "var(--ds-color-gray-400)", flexShrink: 0 }}>
-              <Icon name="back" size="sm" color="currentColor" /> <span className="ds-label ds-strong">Volver a materiales</span>
-            </button>
-          )}
-          <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 300, marginTop: stage ? 6 : 0 }}>
+          <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 300 }}>
             {matches.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin resultados.</div>}
             {matches.map((i) => (
               <button key={i.id} type="button" onClick={() => clickItem(i.id)}
@@ -704,8 +696,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     // El material nuevo se agrega ARRIBA (primero) dentro de su obra.
     setLineas((ls) => [{ key: uid(), grupoKey, articuloId, variantCode, variantNombre, cantidad, obraCodigo, obraNombre }, ...ls]);
   }
-  // Variantes de un artículo (por id) para el drill-down del buscador de materiales.
-  const resolveVariantes = async (articuloId: string) => { const a = catArticulos.find((x) => x.id === articuloId); return a ? getVariantes(a.code) : []; };
 
   // ── Tarjetas de obra (grupos) ───────────────────────────────────────────────
   function addGrupo() { setGrupos((gs) => [...gs, { key: uid() }]); }
@@ -888,7 +878,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                 /* Buscador INLINE en la misma línea, a la DERECHA de la obra (no encima).
                                    Al elegir un material se agrega y el buscador se encoge de nuevo al +. */
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <MaterialSearch compact items={articuloItems} resolveVariantes={resolveVariantes}
+                                  <MaterialSearch compact items={articuloItems}
                                     onAdd={(id, vc, vn) => { addRow(g.key, id, vc, vn); setOpenMat((ks) => ks.filter((k) => k !== g.key)); }} />
                                 </div>
                               ) : (
@@ -975,7 +965,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                         <span className="ds-form-field__label">Materiales</span>
                         <span className="ds-muted ds-label">{validLines.length} línea(s)</span>
                       </div>
-                      <MaterialSearch items={articuloItems} resolveVariantes={resolveVariantes} onAdd={(id, vc, vn) => addRow(SOLO, id, vc, vn)} />
+                      <MaterialSearch items={articuloItems} onAdd={(id, vc, vn) => addRow(SOLO, id, vc, vn)} />
                       {lineas.length > 0 && (
                         <div className="col gap-2" style={{ marginTop: 4 }}>
                           {lineas.map((l) => {
