@@ -2,24 +2,14 @@
 import { useSession } from "@/hooks/useSession";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useStore } from "@/lib/compras/store";
-import type { Role, Notificacion } from "@/lib/compras/types";
+import type { Role } from "@/lib/compras/types";
 import {
   IconList, IconOptions, IconDuplicate, IconMatrix, IconTrack,
   IconReceipt, IconCheck, IconDelivery, IconFolder, IconPlus,
   IconBox, IconWarning, IconDashboard, IconEdit,
 } from "@/components/compras/icons";
-
-const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-
-// Ícono por tipo de notificación (el color lo da la clase notif-item__icon--<tipo>).
-const NOTIF_ICON: Record<Notificacion["tipo"], React.ReactNode> = {
-  pedido: <IconList size={18} />,
-  orden: <IconBox size={18} />,
-  factura: <IconReceipt size={18} />,
-  devuelto: <IconWarning size={18} />,
-};
 
 type IconCmp = React.ComponentType<{ size?: number }>;
 // alt: rutas extra que activan esta pestaña. Prefijo por defecto; sufijo "$" = ruta exacta.
@@ -82,18 +72,9 @@ const ROLE_META: Record<Role, { label: string; persona: string; home: string; na
 };
 
 export function AppShell({ role, children }: { role: Role; children: React.ReactNode }) {
-  const { role: current, setRole, usuario, setUsuario, notificaciones, marcarNotifsLeidas, marcarNotifLeida, hydrated } = useStore();
+  const { role: current, setRole, usuario, setUsuario, hydrated } = useStore();
   const router = useRouter();
   const pathname = usePathname();
-  const [notifOpen, setNotifOpen] = useState(false);
-  // Notificaciones relevantes para este rol (o sin rol específico).
-  const notifsRol = notificaciones.filter((n) => !n.rol || n.rol === role);
-  const noLeidas = notifsRol.filter((n) => !n.leida).length;
-  function toggleNotif() {
-    // Abrir el panel NO marca leídas: cada notificación queda resaltada (no leída)
-    // hasta que el usuario la abre (clic) o usa "Marcar todas como leídas".
-    setNotifOpen((o) => !o);
-  }
 
   // Embebido en Produccion: el acceso ya lo controla el layout (protected) de la base
   // (sesión JWT + roles). En vez de rebotar al login propio de OC, ADOPTAMOS el rol que
