@@ -162,6 +162,8 @@ export function ordenLineaPendiente(l: OrdenLinea): number {
 }
 
 export function ordenLineaCompleta(l: OrdenLinea): boolean {
+  // Los cargos (flete) no se reciben: cuentan como completos para no bloquear el cierre.
+  if (l.tipo === "cargo") return true;
   return l.cantidadRecibida >= l.cantidad - 1e-9;
 }
 
@@ -194,9 +196,11 @@ export function ordenTotalConIva(o: Orden): number {
 }
 
 export function ordenRecibidoPct(o: Orden): number {
-  const total = o.lineas.reduce((s, l) => s + l.cantidad, 0);
+  // Solo cuentan los artículos: los cargos (flete) no se reciben.
+  const arts = o.lineas.filter((l) => l.tipo === "articulo");
+  const total = arts.reduce((s, l) => s + l.cantidad, 0);
   if (total === 0) return 0;
-  const rec = o.lineas.reduce((s, l) => s + l.cantidadRecibida, 0);
+  const rec = arts.reduce((s, l) => s + l.cantidadRecibida, 0);
   return Math.round((rec / total) * 100);
 }
 

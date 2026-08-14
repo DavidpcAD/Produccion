@@ -46,10 +46,7 @@ export function OrdenesLista({
     { id: "total", header: "Total", accessorFn: (o) => ordenSubtotal(o), meta: { label: "Total", num: true }, cell: (c) => money(c.getValue(), c.row.original.currencyCode) },
     {
       id: "recibido", header: "Recibido", accessorFn: (o) => ordenRecibidoPct(o), meta: { label: "Recibido" }, enableColumnFilter: false,
-      cell: (c) => {
-        const o = c.row.original;
-        return <ProgressBar compact value={o.lineas.reduce((s, l) => s + l.cantidadRecibida, 0)} total={o.lineas.reduce((s, l) => s + l.cantidad, 0)} />;
-      },
+      cell: (c) => <ProgressBar compact value={ordenRecibidoPct(c.row.original)} total={100} />,
     },
     { id: "estado", header: "Estado", accessorFn: (o) => ordenBadge(o.estado).label, meta: { label: "Estado" }, cell: (c) => { const b = ordenBadge(c.row.original.estado); return <Badge tone={b.tone}>{b.label}</Badge>; } },
   ], [proveedores]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -87,8 +84,9 @@ export function OrdenesLista({
         for (const o of ords) {
           const cur = o.currencyCode || "CRC";
           totales.set(cur, (totales.get(cur) ?? 0) + ordenSubtotal(o));
-          rec += o.lineas.reduce((a, l) => a + l.cantidadRecibida, 0);
-          tot += o.lineas.reduce((a, l) => a + l.cantidad, 0);
+          const arts = o.lineas.filter((l) => l.tipo === "articulo");
+          rec += arts.reduce((a, l) => a + l.cantidadRecibida, 0);
+          tot += arts.reduce((a, l) => a + l.cantidad, 0);
           if (ordenRecibidoPct(o) >= 100) completas += 1;
         }
         const ordsSort = [...ords].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
@@ -149,7 +147,7 @@ export function OrdenesLista({
                               <td><div className="row gap-2 wrap">{dir && <Badge tone="yellow">Directa</Badge>}{peds.slice(0, 2).map((n) => <Badge key={n} tone="gray">{n}</Badge>)}{peds.length > 2 && <span className="ds-muted ds-body-sm">+{peds.length - 2}</span>}</div></td>
                               <td className="ds-body-sm">{formatDate(o.fecha)}</td>
                               <td className="ds-num ds-strong">{money(ordenSubtotal(o), o.currencyCode)}</td>
-                              <td><ProgressBar compact value={o.lineas.reduce((s, l) => s + l.cantidadRecibida, 0)} total={o.lineas.reduce((s, l) => s + l.cantidad, 0)} /></td>
+                              <td><ProgressBar compact value={ordenRecibidoPct(o)} total={100} /></td>
                               <td><Badge tone={b.tone}>{b.label}</Badge></td>
                             </tr>
                           );
