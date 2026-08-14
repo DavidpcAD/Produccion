@@ -446,7 +446,8 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       let created!: Recepcion;
       setData((d) => {
         const orden = d.ordenes.find((o) => o.id === input.ordenId)!;
-        const recibidoTotal = orden.lineas.reduce((s, l) => s + l.cantidad, 0);
+        // Solo artículos: los cargos (flete) no se reciben, no deben marcar la recepción como parcial.
+        const recibidoTotal = orden.lineas.filter((l) => l.tipo === "articulo").reduce((s, l) => s + l.cantidad, 0);
         const recibidoAhora = input.lineas.reduce((s, l) => s + l.cantidadRecibida, 0);
         created = {
           id: uid(), ordenId: input.ordenId, numeroFactura: input.numeroFactura,
