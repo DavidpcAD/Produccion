@@ -549,11 +549,6 @@ export async function bcVariantsEx(itemNo: string): Promise<BcVariantsResult> {
   return { variantes: [], disponible: false };
 }
 
-// Compatibilidad: versión que solo devuelve la lista (sin el flag).
-export async function bcVariants(itemNo: string): Promise<BcVariante[]> {
-  return (await bcVariantsEx(itemNo)).variantes;
-}
-
 // Resuelve el código de variante de un item a su itemVariantId (systemId GUID),
 // que es lo que exige la línea estándar de BC (igual que locationId). Cachea por
 // item+code. Usa la API estándar de itemVariants (devuelve id).
