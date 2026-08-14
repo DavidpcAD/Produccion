@@ -23,11 +23,6 @@ const SOLICITANTES = ["Laura Ureña", "Loana", "Michael Thames", "Roger Solano"]
 // ---- Plantillas (persistidas en SQL: dbo.PlantillaSolicitud) ----
 type PlantillaLinea = { code: string; cantidad: number; obraCodigo: string; variantCode?: string; variantNombre?: string };
 type Plantilla = { id: number; nombre: string; creadoPor: string; idClasificacion?: number | null; tipo?: "general" | "bodega"; lineas: PlantillaLinea[] };
-// WBS para filtrar plantillas por etapa/partida.
-type WbsNodo = { id: number; codigo: string; nombre: string };
-type WbsPartida = { id: number; codigo: string; nombre: string; etapaId: number | null };
-type WbsSubPartida = { id: number; codigo: string; nombre: string; partidaId: number | null };
-type WbsClasif = { id: number; nombre: string; partidaId: number | null; subPartidaId: number | null };
 const normTxt = (v: unknown) => String(v ?? "").trim().toUpperCase();
 
 export interface SolicitudInicial {
@@ -207,10 +202,6 @@ export function SolicitudForm({
   const [fTipoPl, setFTipoPl] = useState<"todas" | "general" | "bodega">("todas");
   const [plantillaCargada, setPlantillaCargada] = useState<string>("");
   const [obraTodas, setObraTodas] = useState("");
-  // Filtros de plantillas por etapa/partida (cuando hay muchas). Requiere el WBS.
-  const [fEtapaPl, setFEtapaPl] = useState("");
-  const [fPartidaPl, setFPartidaPl] = useState("");
-  const [wbs, setWbs] = useState<{ etapas: WbsNodo[]; partidas: WbsPartida[]; subpartidas: WbsSubPartida[]; clasificaciones: WbsClasif[] }>({ etapas: [], partidas: [], subpartidas: [], clasificaciones: [] });
   async function recargarPlantillas() {
     try {
       const r = await fetch("/api/compras/plantillas");
@@ -220,20 +211,6 @@ export function SolicitudForm({
     } catch { /* sin DB, queda vacío */ }
   }
   useEffect(() => { recargarPlantillas(); }, []);
-  useEffect(() => {
-    fetch("/api/compras/clasificaciones").then((r) => (r.ok ? r.json() : null)).then((d) => {
-      if (d) setWbs({ etapas: d.etapas ?? [], partidas: d.partidas ?? [], subpartidas: d.subpartidas ?? [], clasificaciones: d.clasificaciones ?? [] });
-    }).catch(() => { /* sin WBS, filtros vacíos */ });
-  }, []);
-  // clasificación -> partida/etapa (para filtrar y etiquetar plantillas).
-  const ctxDeClasPl = (idClas?: number | null) => {
-    const c = idClas != null ? wbs.clasificaciones.find((x) => x.id === idClas) : undefined;
-    const sub = c?.subPartidaId ? wbs.subpartidas.find((s) => s.id === c.subPartidaId) : undefined;
-    const partida = c ? wbs.partidas.find((p) => p.id === (c.partidaId ?? sub?.partidaId)) : undefined;
-    const etapa = wbs.etapas.find((e) => e.id === partida?.etapaId);
-    return { partida, etapa };
-  };
-  const partidasDeEtapaPl = useMemo(() => wbs.partidas.filter((p) => !fEtapaPl || String(p.etapaId) === fEtapaPl), [wbs.partidas, fEtapaPl]);
   // Prefill desde la Matriz: carga la plantilla de esa clasificación y fija la obra.
   useEffect(() => {
     if (!clasifParam || plantillas.length === 0 || !catalogoCargado) return;
@@ -467,16 +444,7 @@ export function SolicitudForm({
   const plantillasVisibles = plantillas
     // En contexto de una clasificación (Matriz), SOLO las plantillas de esa clasificación.
     .filter((p) => idClasificacion == null || Number(p.idClasificacion) === Number(idClasificacion))
-    .filter((p) => { if (fTipoPl === "todas") return true; const bod = p.tipo === "bodega" || (!p.tipo && p.idClasificacion == null); return (fTipoPl === "bodega") === bod; })
-    // Filtros por etapa/partida (para acotar cuando hay muchas plantillas).
-    .filter((p) => {
-      if (!fEtapaPl && !fPartidaPl) return true;
-      const { etapa, partida } = ctxDeClasPl(p.idClasificacion);
-      if (fEtapaPl && String(etapa?.id) !== fEtapaPl) return false;
-      if (fPartidaPl && String(partida?.id) !== fPartidaPl) return false;
-      return true;
-    })
-    ;
+    .filter((p) => { if (fTipoPl === "todas") return true; const bod = p.tipo === "bodega" || (!p.tipo && p.idClasificacion == null); return (fTipoPl === "bodega") === bod; });
   // Bodega = sin amarre a clasificación (compatibilidad con filas viejas sin tipo).
   const esBodegaPl = (p: Plantilla) => p.tipo === "bodega" || (!p.tipo && p.idClasificacion == null);
   function cambiarTipo(t: TipoSolicitud) {
