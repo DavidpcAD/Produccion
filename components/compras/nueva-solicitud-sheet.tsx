@@ -286,7 +286,6 @@ function MaterialSearch({ items, resolveVariantes, onAdd, compact }: {
   const inputRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<{ id: string; label: string; variantes: Variante[] } | null>(null);
-  const [busy, setBusy] = useState(false);
   const list: Item[] = useMemo(() => (stage ? stage.variantes.map((v) => ({ id: v.code, title: v.descripcion || v.code })) : items), [stage, items]);
   const matches = useMemo(() => filtrar(list, q), [q, list]);
   function reset() { setOpen(false); setStage(null); setQ(""); }
@@ -320,9 +319,8 @@ function MaterialSearch({ items, resolveVariantes, onAdd, compact }: {
             </button>
           )}
           <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 300, marginTop: stage ? 6 : 0 }}>
-            {busy && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Buscando variantes…</div>}
-            {!busy && matches.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin resultados.</div>}
-            {!busy && matches.map((i) => (
+            {matches.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin resultados.</div>}
+            {matches.map((i) => (
               <button key={i.id} type="button" onClick={() => clickItem(i.id)}
                 className="nsl-opt row row--between" style={{ gap: 8, alignItems: "center", width: "100%", textAlign: "left", padding: "11px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent" }}>
                 <span className="col" style={{ gap: 2, minWidth: 0 }}>
