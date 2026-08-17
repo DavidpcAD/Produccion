@@ -221,7 +221,7 @@ export function Modal({ title, onClose, children, footer, wide, full }: {
 }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className={`modal ${full ? "modal--full" : wide ? "modal--wide" : ""}`} onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={`modal ${full ? "modal--full" : wide ? "modal--wide" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="row row--between" style={{ marginBottom: 16 }}>
           <h3 className="ds-subtitle-lg">{title}</h3>
           <button className="modal-close" onClick={onClose} aria-label="Cerrar"><IconClose size={18} /></button>

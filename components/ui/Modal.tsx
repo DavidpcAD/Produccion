@@ -42,6 +42,9 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             onClick={onClose}
           />
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             className={`relative w-full ${sizes[size]} bg-ds-surface rounded-ds-lg shadow-ds-01 flex flex-col max-h-[90vh]`}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
