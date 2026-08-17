@@ -351,6 +351,7 @@ export function DataTable<T>({
                       return (
                         <th
                           key={h.id}
+                          aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : canSort ? "none" : undefined}
                           className={meta?.num ? "ds-num" : ""}
                           draggable
                           onDragStart={(e) => { setDragCol(h.column.id); e.dataTransfer.effectAllowed = "move"; }}
