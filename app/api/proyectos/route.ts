@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, sql } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
