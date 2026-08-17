@@ -272,7 +272,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           (position:fixed, fondo, variables --ds-*) están scopeados ahí. Si queda
           fuera, el toast sale sin estilo ni posición (texto pelón flotando). */}
       <div className="oc-scope">
-        <div className="toast-wrap">
+        <div className="toast-wrap" role="status" aria-live="polite">
           {toasts.map((t) => (
             <div key={t.id} className={`toast ${t.tone === "success" ? "toast--success" : t.tone === "error" ? "toast--error" : ""}`}>
               {t.text}
