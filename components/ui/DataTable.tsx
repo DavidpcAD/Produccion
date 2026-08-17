@@ -264,7 +264,7 @@ export function DataTable<T>({
 
         {/* Columnas */}
         <div className="relative" ref={colsRef}>
-          <button onClick={() => setColsOpen(o => !o)}
+          <button type="button" aria-expanded={colsOpen} onClick={() => setColsOpen(o => !o)}
             className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3.5 h-10 text-sm font-semibold text-ds-ink hover:bg-ds-gray-100 transition-colors">
             <Icon name="options" size="sm" color="currentColor" /> Columnas
           </button>
@@ -282,7 +282,7 @@ export function DataTable<T>({
 
         {/* Exportar */}
         <div className="relative" ref={exportRef}>
-          <button onClick={() => setExportOpen(o => !o)}
+          <button type="button" aria-expanded={exportOpen} onClick={() => setExportOpen(o => !o)}
             className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3.5 h-10 text-sm font-semibold text-ds-ink hover:bg-ds-gray-100 transition-colors">
             <Icon name="arrow-right" size="sm" color="currentColor" className="rotate-90" /> Exportar
           </button>
@@ -340,7 +340,7 @@ export function DataTable<T>({
                         </button>
                         {canFilter && (
                           <div className="relative" ref={filterOpen === h.column.id ? filterRef : undefined}>
-                            <button onClick={() => setFilterOpen(o => o === h.column.id ? null : h.column.id)}
+                            <button type="button" aria-expanded={filterOpen === h.column.id} onClick={() => setFilterOpen(o => o === h.column.id ? null : h.column.id)}
                               className={`p-0.5 rounded transition-colors ${h.column.getFilterValue() ? 'text-brand' : 'text-ds-gray-400 hover:text-white'}`}
                               title="Filtrar">
                               <Icon name="filter" size="sm" color="currentColor" />
