@@ -30,6 +30,7 @@ export function ConcretoNav() {
           <Link
             key={t.href}
             href={t.href}
+            aria-current={active ? 'page' : undefined}
             className={`inline-flex items-center gap-2 px-5 h-11 rounded-full text-sm font-semibold transition-all ${
               active ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-ds-ink'
             }`}
