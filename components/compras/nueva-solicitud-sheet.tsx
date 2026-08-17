@@ -1032,7 +1032,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
           {guardarPlantOpen && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(15,18,20,.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 6 }}
               onClick={() => !savingPlant && setGuardarPlantOpen(false)}>
-              <div style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 380, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }} onClick={(e) => e.stopPropagation()}>
+              <div role="dialog" aria-modal="true" aria-label="Guardar como plantilla" style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 380, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }} onClick={(e) => e.stopPropagation()}>
                 <h3 className="ds-subtitle-lg" style={{ marginTop: 0, marginBottom: 6 }}>Guardar como plantilla</h3>
                 <p className="ds-muted ds-body-sm" style={{ marginTop: 0, marginBottom: 14 }}>
                   Se guardan las {validLines.length} línea(s) como plantilla{" "}
@@ -1055,7 +1055,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
           {/* Confirmación antes de enviar (al tocar Solicitar) */}
           {confirmPedir && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(15,18,20,.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 6 }}>
-              <div style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 380, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }}>
+              <div role="dialog" aria-modal="true" aria-label="¿Enviar el pedido?" style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 380, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }}>
                 <h3 className="ds-subtitle-lg" style={{ marginTop: 0, marginBottom: 8 }}>¿Enviar el pedido?</h3>
                 <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
                   Se envía a proveeduría: <strong>{validLines.length} material(es)</strong>
@@ -1075,7 +1075,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
           {/* Confirmación de salida: DENTRO del drawer */}
           {confirmExit && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(15,18,20,.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 5 }}>
-              <div style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 360, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }}>
+              <div role="dialog" aria-modal="true" aria-label="¿Salir del pedido?" style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 360, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }}>
                 <h3 className="ds-subtitle-lg" style={{ marginTop: 0, marginBottom: 8 }}>¿Salir del pedido?</h3>
                 <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>Tenés cambios sin enviar. Podés guardarlo como <strong>borrador</strong> para seguir después, o descartarlo.</p>
                 <div className="col gap-2" style={{ marginTop: 18 }}>
