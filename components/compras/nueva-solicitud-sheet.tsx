@@ -145,7 +145,7 @@ function Segmented<T extends string>({ value, options, onChange, size = "md", va
         {options.map((o) => {
           const active = o.v === value;
           return (
-            <button key={o.v} type="button" onClick={() => onChange(o.v)} className="ds-body-sm ds-strong"
+            <button key={o.v} type="button" onClick={() => onChange(o.v)} aria-pressed={active} className="ds-body-sm ds-strong"
               style={{ flex: 1, padding: "11px 12px", borderRadius: 999, cursor: "pointer", border: 0, background: active ? "var(--ds-color-black)" : "transparent", color: active ? "var(--ds-color-white)" : "var(--ds-color-gray-500)", transition: "background .15s ease, color .15s ease" }}>
               {o.label}
             </button>
@@ -160,7 +160,7 @@ function Segmented<T extends string>({ value, options, onChange, size = "md", va
       {options.map((o) => {
         const active = o.v === value;
         return (
-          <button key={o.v} type="button" onClick={() => onChange(o.v)} className={size === "sm" ? "ds-label ds-strong" : "ds-body-sm ds-strong"}
+          <button key={o.v} type="button" onClick={() => onChange(o.v)} aria-pressed={active} className={size === "sm" ? "ds-label ds-strong" : "ds-body-sm ds-strong"}
             style={{ padding: pad, cursor: "pointer", border: 0, background: active ? "var(--ds-color-black)" : "transparent", color: active ? "var(--ds-color-white)" : "var(--ds-color-gray-400)" }}>
             {o.label}
           </button>

@@ -235,8 +235,8 @@ export function DataTable<T>({
         <Input value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} placeholder={buscarPlaceholder} style={{ flex: "1 1 340px", minWidth: 220, maxWidth: 560 }} />
         <div className="row gap-2" style={{ alignItems: "center" }}>
           <div className="segmented">
-            <button type="button" className={`segmented__btn ${modo === "tabla" ? "is-active" : ""}`} onClick={() => setModo("tabla")}><IconTable size={15} />Tabla</button>
-            <button type="button" className={`segmented__btn ${modo === "grid" ? "is-active" : ""}`} onClick={() => setModo("grid")}>
+            <button type="button" aria-pressed={modo === "tabla"} className={`segmented__btn ${modo === "tabla" ? "is-active" : ""}`} onClick={() => setModo("tabla")}><IconTable size={15} />Tabla</button>
+            <button type="button" aria-pressed={modo === "grid"} className={`segmented__btn ${modo === "grid" ? "is-active" : ""}`} onClick={() => setModo("grid")}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden><rect x="3" y="3" width="8" height="8" rx="1.5" /><rect x="13" y="3" width="8" height="8" rx="1.5" /><rect x="3" y="13" width="8" height="8" rx="1.5" /><rect x="13" y="13" width="8" height="8" rx="1.5" /></svg>
               Grid
             </button>
