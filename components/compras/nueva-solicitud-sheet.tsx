@@ -407,18 +407,22 @@ function PrioridadBtn({ value, onChange }: { value: Pedido["prioridad"]; onChang
 }
 
 // ─── Comentario como BOTÓN de mensaje que abre el campo (popover). Activo si hay nota ─
-function ComentarioBtn({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ComentarioBtn({ value, onChange, required }: { value: string; onChange: (v: string) => void; required?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const has = !!value.trim();
+  const falta = !!required && !has; // obligatorio y aún vacío
+  const label = falta ? "Comentario (obligatorio)" : "Comentario";
   return (
-    <div ref={ref} style={{ display: "inline-flex" }}>
-      <button type="button" className="nsl-toolbtn" data-tip="Comentario" data-active={has ? "1" : undefined} onClick={() => setOpen((o) => !o)} aria-label="Comentario">
+    <div ref={ref} style={{ display: "inline-flex", position: "relative" }}>
+      <button type="button" className="nsl-toolbtn" data-tip={label} data-active={has ? "1" : undefined} onClick={() => setOpen((o) => !o)} aria-label={label}
+        style={falta ? { boxShadow: "0 0 0 2px var(--ds-color-red-200)" } : undefined}>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+        {falta && <span aria-hidden style={{ position: "absolute", top: -2, right: -2, width: 9, height: 9, borderRadius: "50%", background: "var(--ds-color-red-200)", border: "1.5px solid var(--ds-color-white)" }} />}
       </button>
       <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={400}>
         <div style={{ padding: 14, width: "100%" }}>
-          <span className="ds-form-field__label" style={{ display: "block", marginBottom: 8 }}>Comentario para proveeduría</span>
+          <span className="ds-form-field__label" style={{ display: "block", marginBottom: 8 }}>Comentario para proveeduría{required ? " (obligatorio)" : ""}</span>
           <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={5} placeholder="Escribí una nota…"
             style={{ display: "block", width: "100%", minWidth: 372, height: 128, resize: "vertical", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-color-white)", color: "var(--ds-color-ink)" }} />
         </div>
@@ -587,7 +591,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const necesitaVariante = (l: Row) => { const vs = variantesDe(l); return vs.length > 0 && !l.variantCode; };
   // Material: cada línea debe tener obra (su tarjeta debe tener obra elegida).
   const destinoOk = esMaterial ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo)) : !!destino;
-  const canContinue = validLines.length > 0 && destinoOk && validLines.every((l) => !necesitaVariante(l));
+  const comentarioOk = notas.trim().length > 0; // comentario para proveeduría OBLIGATORIO al solicitar
+  const canContinue = validLines.length > 0 && destinoOk && comentarioOk && validLines.every((l) => !necesitaVariante(l));
 
   function reset() {
     setTipo("material"); setDestino(""); setPrioridad("normal");
@@ -1015,7 +1020,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
             {hayMateriales && (
               <div className="row gap-2" style={{ alignItems: "center" }}>
                 <PrioridadBtn value={prioridad} onChange={setPrioridad} />
-                <ComentarioBtn value={notas} onChange={setNotas} />
+                <ComentarioBtn value={notas} onChange={setNotas} required />
                 <button type="button" className="nsl-toolbtn" data-tip="Guardar como plantilla" onClick={() => { setNombrePlant(""); setGuardarPlantOpen(true); }} disabled={validLines.length === 0}
                   aria-label="Guardar como plantilla">
                   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 17l-5.2 2.6 1-5.75-4.2-4.1 5.8-.85L12 3.6z" /></svg>
