@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Card, Tile } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
-import { money, formatDate } from "@/lib/compras/helpers";
+import { formatDate } from "@/lib/compras/helpers";
 
 // Bodega (recibe): historial de lo que se recibió, con quién lo recibió.
 // Pensada para celular/tablet: tarjetas grandes, sin tablas anchas.

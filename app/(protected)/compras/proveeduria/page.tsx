@@ -9,7 +9,7 @@ import { DataTable } from "@/components/compras/data-table";
 import { VistaToggle } from "@/components/compras/vista-toggle";
 import { IconEye, IconReceipt, IconList } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, destinoCodigo, money, num, pedidoLineaPendiente, solicitudResumen, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { destinoLabel, destinoCodigo, num, pedidoLineaPendiente, solicitudResumen, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
 interface Row {
   pedidoId: string;
@@ -81,7 +81,6 @@ export default function ProveeduriaMaterialesPage() {
 
   const incluidas = rows.filter((r) => r.incluir && Number(r.cantidad) > 0);
   const seleccionPorPedido = (pid: string) => rows.filter((r) => r.pedidoId === pid && r.incluir).length;
-  const subtotal = incluidas.reduce((s, r) => s + Number(r.cantidad) * Number(r.precio), 0);
   const pedidosDistintos = new Set(incluidas.map((r) => r.pedidoNumero)).size;
 
   const dot = (tone: string) => (

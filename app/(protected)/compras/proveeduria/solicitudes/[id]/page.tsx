@@ -24,7 +24,6 @@ export default function ProveeduriaPedidoDetallePage() {
   const t = tipoSolicitudBadge(pedido.tipoSolicitud);
   const total = pedido.lineas.reduce((s, l) => s + l.cantidad, 0);
   const rec = pedido.lineas.reduce((s, l) => s + recibidoDeLineaPedido(ordenes, l.id), 0);
-  const pct = total > 0 ? Math.round(Math.min(100, (rec / total) * 100)) : 0;
   const hayPendiente = pedido.lineas.some((l) => pedidoLineaPendiente(l) > 0);
 
   function crearOC() {
