@@ -324,9 +324,10 @@ export function DataTable<T>({
                   const sorted = h.column.getIsSorted();
                   const align = h.column.columnDef.meta?.align;
                   return (
-                    <th key={h.id} className={`px-4 py-3 font-semibold text-white text-xs uppercase tracking-wide ${alignCls(align)}`}>
+                    <th key={h.id} aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : canSort ? 'none' : undefined} className={`px-4 py-3 font-semibold text-white text-xs uppercase tracking-wide ${alignCls(align)}`}>
                       <div className={`flex items-center gap-1.5 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
                         <button
+                          type="button"
                           onClick={canSort ? h.column.getToggleSortingHandler() : undefined}
                           className={`inline-flex items-center gap-1 ${canSort ? 'cursor-pointer hover:text-brand' : 'cursor-default'} transition-colors`}
                         >
