@@ -27,7 +27,7 @@ type Variante = { code: string; descripcion: string };
 // Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
 // varias obras (varias tarjetas). Para repuesto/bodega se usa un único grupo (SOLO).
 type Grupo = { key: string; obraCodigo?: string; obraNombre?: string };
-type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string };
+type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string; notas?: string };
 type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string };
 type Plantilla = { id: number; nombre: string; tipo?: "general" | "bodega"; idClasificacion?: number | null; lineas: PlantillaLinea[]; creadoPor?: string };
 // Semilla para "Copiar pedido": abre el drawer ya cargado con las líneas de un
@@ -431,6 +431,30 @@ function ComentarioBtn({ value, onChange, required }: { value: string; onChange:
   );
 }
 
+// ─── Comentario POR LÍNEA: ícono de nota en cada material; abre un popover para
+//     escribir una nota específica de esa línea (además del comentario del pedido). ──
+function LineaComentarioBtn({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const has = !!value.trim();
+  return (
+    <div ref={ref} style={{ display: "inline-flex" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} title={has ? value : "Comentario de la línea"}
+        aria-label={has ? "Editar comentario de la línea" : "Agregar comentario a la línea"}
+        style={{ background: "none", border: 0, cursor: "pointer", color: has ? "var(--ds-color-green-200)" : "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+      </button>
+      <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={300}>
+        <div style={{ padding: 12, width: "100%" }}>
+          <span className="ds-form-field__label" style={{ display: "block", marginBottom: 6 }}>Comentario de la línea</span>
+          <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} placeholder="Nota para esta línea…"
+            style={{ display: "block", width: "100%", minWidth: 276, height: 84, resize: "vertical", padding: "10px 12px", borderRadius: 10, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-color-white)", color: "var(--ds-color-ink)" }} />
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
 // ─── "USAR PLANTILLA": BOTÓN (verde pálido vacío / gris con borde verde con
 //     materiales) que abre el selector de plantillas. Igual que la referencia. ──────
 function UsarPlantillaBtn({ items, value, onPick, onClear, filterNode, hasMateriales }: {
@@ -777,7 +801,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
         const a = catArticulos.find((x) => x.id === l.articuloId)!;
         // Si se eligió variante, se guarda la descripción de la variante (más específica);
         // si no, la descripción base del material.
-        return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: esMaterial ? (l.obraCodigo || "") : "", variantCode: l.variantCode || undefined };
+        return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: esMaterial ? (l.obraCodigo || "") : "", variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined };
       }),
     };
   }
@@ -938,6 +962,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                       <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
                                         <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n })} />
                                         <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
+                                        <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                         <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
                                           style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
                                           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -993,6 +1018,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                 <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
                                   <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n })} />
                                   <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
+                                  <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                   <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
                                     style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
                                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
