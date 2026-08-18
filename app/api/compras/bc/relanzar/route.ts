@@ -11,8 +11,10 @@ export async function POST(req: Request) {
   try {
     const { orderNo, lineas, cargos, metodo } = await req.json();
     if (!orderNo) return NextResponse.json({ error: "Falta orderNo" }, { status: 400 });
+    let jobError: string | undefined;
     if (Array.isArray(lineas) && lineas.length) {
-      await bcResyncPedidoLines(orderNo, lineas);
+      const rs = await bcResyncPedidoLines(orderNo, lineas);
+      if (rs.jobError) jobError = rs.jobError;
     }
     // Cargos de producto: agregar la línea vía codeunit (idempotente por itemChargeNo),
     // así re-aprobar una orden que se creó sin el cargo lo completa. No debe tumbar,
@@ -36,7 +38,7 @@ export async function POST(req: Request) {
       try { await bcAssignItemCharges(orderNo, met); } catch { /* no debe tumbar el relanzamiento */ }
     }
     const status = await bcReleasePedido(orderNo);
-    return NextResponse.json({ ok: true, status, cargoError });
+    return NextResponse.json({ ok: true, status, cargoError, jobError });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 502 });
   }

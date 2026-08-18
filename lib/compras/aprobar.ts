@@ -17,7 +17,9 @@ export async function aprobarYLanzar(
 ): Promise<{ ok: boolean; message: string; tone: "success" | "error" }> {
   const lineasBc = orden.lineas
     .filter((l) => l.tipo === "articulo" && l.articuloId && l.cantidad > 0)
-    .map((l) => ({ itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0, descripcion: l.descripcion, variantCode: l.variantCode }));
+    // Consumo inmediato: proyecto (obra) + tarea. Stock: almacén. Repuesto: nada.
+    // (proyecto/taskNo se setean solo en líneas de material de consumo; en stock viaja el almacén.)
+    .map((l) => ({ itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0, descripcion: l.descripcion, variantCode: l.variantCode, jobNo: l.proyecto || undefined, jobTaskNo: l.taskNo || undefined, locationCode: l.proyecto ? undefined : (l.almacen || undefined) }));
   // Cargos de producto (Item Charge): TODAS las líneas tipo "cargo" con precio, cada
   // una con su tipo (chargeNo). El codeunit las distribuye por importe entre los
   // artículos al registrar.
@@ -66,7 +68,8 @@ export async function aprobarYLanzar(
     }
     await setOrdenEstado(orden.id, "lanzado", { bcNumber: orden.bcNumber });
     const avisoCargoRe = d.cargoError ? ` · ⚠️ el cargo NO se agregó a BC: ${d.cargoError}` : "";
-    return { ok: !d.cargoError, tone: d.cargoError ? "error" : "success", message: `${orden.bcNumber} aprobada y lanzada en BC${avisoCargoRe}` };
+    const avisoJobRe = d.jobError ? ` · ⚠️ la actividad/almacén NO se aplicó en BC: ${d.jobError}` : "";
+    return { ok: !d.cargoError && !d.jobError, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${orden.bcNumber} aprobada y lanzada en BC${avisoCargoRe}${avisoJobRe}` };
   }
 
   // Primer intento: crear el pedido en BC y lanzarlo.
@@ -93,8 +96,9 @@ export async function aprobarYLanzar(
       // El cargo de producto (flete) se crea por la API estándar; si BC lo rechaza,
       // NO tumbamos el lanzamiento pero AVISAMOS con el motivo real (antes se tragaba).
       const avisoCargo = d.cargoError ? ` · ⚠️ el cargo NO se agregó a BC: ${d.cargoError}` : "";
+      const avisoJob = d.jobError ? ` · ⚠️ la actividad/almacén NO se aplicó en BC: ${d.jobError}` : "";
       await setOrdenEstado(orden.id, "lanzado", { bcNumber: d.number, bcDeepLink: d.deepLink || undefined });
-      return { ok: true, tone: d.cargoError ? "error" : "success", message: `${d.number} aprobada y lanzada en BC${avisoLineas}${avisoCargo}` };
+      return { ok: true, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${d.number} aprobada y lanzada en BC${avisoLineas}${avisoCargo}${avisoJob}` };
     }
     // Creado pero no lanzado: persistimos el bcNumber sin cambiar el estado real.
     await setOrdenEstado(orden.id, orden.estado, { bcNumber: d.number, bcDeepLink: d.deepLink || undefined });

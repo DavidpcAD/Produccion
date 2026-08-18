@@ -572,7 +572,7 @@ async function getStdVariantId(itemNo: string, code: string): Promise<string | n
 }
 
 // ---- Escritura: crear Pedido de compra (Purchase Order) por la API ESTÁNDAR ----
-export type NuevaLineaBc = { itemNo: string; cantidad: number; precio?: number; descripcion?: string; variantCode?: string };
+export type NuevaLineaBc = { itemNo: string; cantidad: number; precio?: number; descripcion?: string; variantCode?: string; jobNo?: string; jobTaskNo?: string; jobLineType?: string; locationCode?: string };
 
 // La API estándar de purchaseOrderLine NO acepta `locationCode`; requiere
 // `locationId` (el systemId GUID del almacén). Lo resolvemos por código contra
@@ -599,7 +599,30 @@ async function getStdLocationId(cid: string, code: string): Promise<string | nul
 // BC), cantidad y precio unitario. Sin chargeNo cae al flete por defecto (env).
 export type CargoBc = { chargeNo?: string; descripcion?: string; cantidad?: number; precio: number };
 
-export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: string; locationCode?: string; lineas: NuevaLineaBc[]; cargos?: CargoBc[]; flete?: { monto: number; descripcion?: string } }): Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados: number }> {
+// Consumo inmediato / Stock: setea Job No. + Job Task No. (+ Job Line Type) y/o Location
+// Code por línea vía el codeunit custom AdelantePO_SetLineJob (la API estándar no expone
+// esos campos, igual que los cargos). El body manda assignmentsJson como STRING JSON
+// escapado (como PostInvoice), y el retorno `value` es a su vez un JSON string (doble
+// parseo). Idempotente y no tumba por línea: devuelve { updated, errors }.
+type AsignacionLineaBc = { lineNo: number; jobNo?: string; jobTaskNo?: string; jobLineType?: string; locationCode?: string };
+export async function bcSetLineJobs(orderNo: string, asignaciones: AsignacionLineaBc[]): Promise<{ updated: number; errors: string }> {
+  if (!orderNo || !asignaciones.length) return { updated: 0, errors: "" };
+  const cid = await getStdCompanyId();
+  const url = `${odataRoot()}/AdelantePO_SetLineJob?company=${encodeURIComponent(cid)}`;
+  const res = await bcFetch(url, {
+    method: "POST", cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderNo, assignmentsJson: JSON.stringify(asignaciones) }),
+  });
+  if (!res.ok) throw new Error(`BC setLineJob ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const d: any = await res.json().catch(() => ({}));
+  let inner: any = {};
+  if (typeof d?.value === "string") { try { inner = JSON.parse(d.value); } catch { inner = {}; } }
+  else if (d?.value && typeof d.value === "object") inner = d.value;
+  return { updated: Number(inner?.updated ?? 0) || 0, errors: String(inner?.errors ?? "") };
+}
+
+export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: string; locationCode?: string; lineas: NuevaLineaBc[]; cargos?: CargoBc[]; flete?: { monto: number; descripcion?: string } }): Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados: number; jobError?: string }> {
   if (!input?.vendorNo) throw new Error("Falta el proveedor (vendorNo).");
   const lineas = (input.lineas ?? []).filter((l) => l.itemNo && l.cantidad > 0);
   if (!lineas.length) throw new Error("No hay líneas de material válidas para el pedido.");
@@ -638,6 +661,7 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   // La línea estándar de BC requiere el GUID (locationId), no el código.
   const loc = input.locationCode || process.env.BC_RECEPCION_LOCATION;
   const locId = loc ? await getStdLocationId(cid, loc) : null;
+  const asignaciones: AsignacionLineaBc[] = [];
   for (const l of lineas) {
     const lineBody: Record<string, unknown> = { lineType: "Item", lineObjectNumber: l.itemNo, quantity: l.cantidad };
     if (l.precio && l.precio > 0) lineBody.directUnitCost = l.precio;
@@ -648,7 +672,21 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
       if (vId) lineBody.itemVariantId = vId;
     }
     const resL = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${po.id})/purchaseOrderLines`, { method: "POST", headers: jsonHeaders, body: JSON.stringify(lineBody), cache: "no-store" });
-    if (resL.ok) { creadas++; }
+    if (resL.ok) {
+      creadas++;
+      // Capturar el Line No. (sequence) para poder setear proyecto/tarea/almacén después.
+      const created: any = await resL.json().catch(() => ({}));
+      const lineNo = Number(created?.sequence);
+      const conJob = !!(l.jobNo && l.jobTaskNo); // consumo inmediato requiere ambos
+      const conLoc = !!l.locationCode;            // stock
+      if (lineNo && (conJob || conLoc)) asignaciones.push({
+        lineNo,
+        jobNo: conJob ? l.jobNo : undefined,
+        jobTaskNo: conJob ? l.jobTaskNo : undefined,
+        jobLineType: conJob ? (l.jobLineType || "Budget") : undefined,
+        locationCode: conLoc ? l.locationCode : undefined,
+      });
+    }
     else {
       omitidas.push(l.itemNo);
       if (!lineError) lineError = `${l.itemNo}: BC ${resL.status} ${(await resL.text()).slice(0, 400)}`;
@@ -683,7 +721,14 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
     try { await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${po.id})`, { method: "DELETE", cache: "no-store" }); } catch { /* best effort */ }
     throw new Error(`BC rechazó todas las líneas del pedido — ${lineError ?? "sin detalle"}`);
   }
-  return { number: po.number ?? "", id: po.id ?? "", omitidas, creadas, lineError, cargoError, cargosCreados };
+  // Consumo inmediato / Stock: proyecto+tarea o almacén por línea (codeunit custom, la API
+  // estándar no los expone). No tumba el lanzamiento; el motivo real se surface aparte.
+  let jobError: string | undefined;
+  if (asignaciones.length) {
+    try { const r = await bcSetLineJobs(po.number, asignaciones); if (r.errors) jobError = r.errors; }
+    catch (e: any) { jobError = String(e?.message ?? e); }
+  }
+  return { number: po.number ?? "", id: po.id ?? "", omitidas, creadas, lineError, cargoError, cargosCreados, jobError };
 }
 
 // Raíz OData V4 (para los web services de codeunit custom, p.ej. AdelantePO).
@@ -716,7 +761,7 @@ export async function bcReleasePedido(orderNo: string): Promise<string> {
 // orden y solo hace PATCH de lo que cambió.
 // OJO: no verificado aún contra un pedido real con release fallido — probar en
 // el Sandbox (CP-003833) antes de confiar en producción.
-export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[]): Promise<{ patched: number; sinMatch: string[] }> {
+export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[]): Promise<{ patched: number; sinMatch: string[]; jobError?: string }> {
   if (!orderNo) throw new Error("Falta el número de pedido de BC.");
   const items = (lineas ?? []).filter((l) => l.itemNo && l.cantidad > 0);
   if (!items.length) return { patched: 0, sinMatch: [] };
@@ -729,15 +774,21 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
   const poId = ((await resPo.json()).value ?? [])[0]?.id;
   if (!poId) throw new Error(`No se encontró el pedido ${orderNo} en BC.`);
   // 2) Líneas existentes en BC.
-  const resLines = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${poId})/purchaseOrderLines?$select=id,lineType,lineObjectNumber,quantity,directUnitCost,itemVariantId`, { cache: "no-store" });
+  const resLines = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${poId})/purchaseOrderLines?$select=id,sequence,lineType,lineObjectNumber,quantity,directUnitCost,itemVariantId`, { cache: "no-store" });
   if (!resLines.ok) throw new Error(`BC ${resLines.status} al leer las líneas de ${orderNo}.`);
   const bcLines: any[] = (await resLines.json()).value ?? [];
   const usados = new Set<string>();
+  const asignaciones: AsignacionLineaBc[] = [];
   let patched = 0; const sinMatch: string[] = [];
   for (const l of items) {
     const bc = bcLines.find((b) => !usados.has(b.id) && String(b.lineObjectNumber) === String(l.itemNo) && /item/i.test(String(b.lineType)));
     if (!bc) { sinMatch.push(l.itemNo); continue; }
     usados.add(bc.id);
+    // Consumo inmediato / Stock: recordar la asignación de proyecto+tarea / almacén (por Line No.).
+    const lineNo = Number(bc.sequence);
+    const conJob = !!(l.jobNo && l.jobTaskNo);
+    const conLoc = !!l.locationCode;
+    if (lineNo && (conJob || conLoc)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "Budget") : undefined, locationCode: conLoc ? l.locationCode : undefined });
     const patch: Record<string, unknown> = {};
     if (l.precio && l.precio > 0 && Number(bc.directUnitCost) !== l.precio) patch.directUnitCost = l.precio;
     if (l.variantCode) {
@@ -753,7 +804,13 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
     if (!resP.ok) throw new Error(`BC ${resP.status} al actualizar la línea ${l.itemNo}: ${(await resP.text()).slice(0, 200)}`);
     patched++;
   }
-  return { patched, sinMatch };
+  // Consumo inmediato / Stock: aplicar proyecto+tarea / almacén por línea (idempotente).
+  let jobError: string | undefined;
+  if (asignaciones.length) {
+    try { const r = await bcSetLineJobs(orderNo, asignaciones); if (r.errors) jobError = r.errors; }
+    catch (e: any) { jobError = String(e?.message ?? e); }
+  }
+  return { patched, sinMatch, jobError };
 }
 
 // Registra (Recibir + Facturar) una factura parcial del pedido en BC con todos sus
@@ -829,12 +886,12 @@ export async function bcFacturarRecibido(orderNo: string, vendorInvoiceNo: strin
 // Si el create funciona pero el release falla (p.ej. AdelantePO no publicado aún),
 // devuelve el pedido creado con released=false para que la UI avise sin romperse.
 export async function bcCrearYLanzarPedido(input: { vendorNo: string; currencyCode?: string; locationCode?: string; lineas: NuevaLineaBc[]; cargos?: CargoBc[]; metodo?: string; flete?: { monto: number; descripcion?: string } }):
-  Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados?: number; released: boolean; releaseError?: string }> {
-  const { number, id, omitidas, creadas, lineError, cargoError, cargosCreados } = await bcCrearPedido(input);
+  Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados?: number; jobError?: string; released: boolean; releaseError?: string }> {
+  const { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError } = await bcCrearPedido(input);
   // Si NINGUNA línea entró a BC, no tiene sentido intentar lanzar (BC responde
   // "nothing to release"). Devolvemos released=false con el motivo real de la línea.
   if (creadas === 0) {
-    return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, released: false, releaseError: lineError ?? "BC rechazó todas las líneas del pedido." };
+    return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError, released: false, releaseError: lineError ?? "BC rechazó todas las líneas del pedido." };
   }
   // FORZAR EL PRECIO DE LA APP: al insertar la línea, la API estándar valida el
   // N.º del artículo y autocompleta el "Direct Unit Cost" desde la ficha del ítem,
@@ -852,9 +909,9 @@ export async function bcCrearYLanzarPedido(input: { vendorNo: string; currencyCo
   }
   try {
     await bcReleasePedido(number);
-    return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, released: true };
+    return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError, released: true };
   } catch (e: any) {
-    return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, released: false, releaseError: String(e?.message ?? e) };
+    return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError, released: false, releaseError: String(e?.message ?? e) };
   }
 }
 
