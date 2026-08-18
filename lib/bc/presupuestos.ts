@@ -1,7 +1,7 @@
 import 'server-only';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import sql from 'mssql';
-import { bcConstructionConfigured, getWork, getWorkLines } from '@/lib/bc-construction';
+import { bcConstructionConfigured, bcCompanies, bcCompanyName, getWork, getWorkLines, type WorkLineBC } from '@/lib/bc-construction';
 
 /**
  * Presupuestos importados desde Business Central (pro_bi.fact_presupuesto, snapshot
@@ -99,30 +99,180 @@ export async function listarPresupuestos(worksNo?: string): Promise<PresupuestoR
   return result.recordset.map(mapResumen);
 }
 
+const nver = (v: string) => Number(v.replace(/\D/g, '')) || 0;
+
+/**
+ * Versión de las líneas de BC que hay que mostrar como "la vigente".
+ *
+ * OJO con `works.filterVersionCode`: NO es un dato de la obra, es el filtro de
+ * versión de la página de BC. Puede quedar apuntando a un reestudio que no tiene
+ * líneas (o que las tiene en ₡0) y entonces los importes de la cabecera —que son
+ * FlowFields filtrados por ese código— vienen todos en 0, aunque la obra sí tenga
+ * presupuesto en otra versión. Por eso acá manda lo que dicen las LÍNEAS: se toma
+ * la última versión con importes; el filtro solo se respeta si esa versión tiene
+ * importes. Versión '' o 'NO' = presupuesto base de BC (sin reestudio).
+ */
+export function versionVigente(lineas: WorkLineBC[], filtro = ''): string {
+  const post = lineas.filter((l) => l.taskType === 'Posting');
+  const conImporte = [...new Set(post.filter((l) => l.lineAmount !== 0).map((l) => l.versionCode))];
+  if (filtro && conImporte.includes(filtro)) return filtro;
+  if (conImporte.length > 0) return [...conImporte].sort((a, b) => nver(b) - nver(a))[0];
+  // Sin importes en ninguna versión: al menos devolver una que exista (estructura).
+  const todas = [...new Set(post.map((l) => l.versionCode))];
+  if (filtro && todas.includes(filtro)) return filtro;
+  return [...todas].sort((a, b) => nver(b) - nver(a))[0] ?? '';
+}
+
+/** 'NO'/'' (base de BC, sin reestudio) → null, para no mostrar "NO" como versión. */
+export const versionMostrable = (v: string | null | undefined): string | null => {
+  const s = (v ?? '').trim();
+  return s && s.toUpperCase() !== 'NO' ? s : null;
+};
+
+/** Resumen de importes de la obra (venta / costo / indirecto / resultado). */
+export interface PresupuestoObraResumen {
+  /**
+   * 'bc' = líneas de Business Central en vivo (compañía del app)
+   * 'bc-otra' = BC en vivo pero en otra compañía (la anterior, ver bcCompanies)
+   * 'bi' = snapshot ETL pro_bi.
+   */
+  fuente: 'bc' | 'bc-otra' | 'bi';
+  /** Nombre de la compañía de BC cuando fuente='bc-otra'. */
+  compania?: string | null;
+  /** Código de versión; null = presupuesto base de BC (sin reestudio). */
+  version: string | null;
+  venta: number;
+  coste: number;
+  indirecto: number;
+  resultado: number;
+  /** Partidas de costo (Posting) que respaldan el importe. 0 = solo cabecera. */
+  partidas: number;
+  /** Fecha del snapshot cuando fuente='bi' (ISO). */
+  fecha: string | null;
+}
+
+const tieneImportes = (r: PresupuestoObraResumen | null): boolean =>
+  !!r && !!(r.venta || r.coste || r.indirecto);
+
+/**
+ * Resumen de la obra desde BC EN VIVO, calculado sobre las LÍNEAS (no sobre los
+ * FlowFields de la cabecera, que dependen del filtro de versión — ver
+ * versionVigente). Si las líneas de la versión vigente no traen importes se cae a
+ * los totales de la cabecera. null si la obra no existe en BC.
+ */
+export async function resumenPresupuestoBC(obra: string, company?: string): Promise<PresupuestoObraResumen | null> {
+  if (!bcConstructionConfigured()) return null;
+  const [work, lineas] = await Promise.all([
+    getWork(obra, company).catch(() => null),
+    getWorkLines(obra, company).catch(() => []),
+  ]);
+  if (!work && lineas.length === 0) return null;
+
+  const version = versionVigente(lineas, (work?.filterVersionCode ?? '').trim());
+  const dela = (tipo: string) =>
+    lineas.filter((l) => l.versionCode === version && l.taskType === 'Posting' && l.lineType === tipo);
+  const suma = (tipo: string) => dela(tipo).reduce((s, l) => s + l.lineAmount, 0);
+
+  let venta = suma('Sales');
+  let coste = suma('Cost');
+  let indirecto = suma('Indirect Cost');
+  let resultado = venta - coste - indirecto;
+  if (!venta && !coste && !indirecto && work) {
+    venta = Number(work.salesLineAmount ?? 0);
+    coste = Number(work.costLineAmount ?? 0);
+    indirecto = Number(work.indirectCostLineAmount ?? 0);
+    resultado = Number(work.result ?? venta - coste - indirecto);
+  }
+  return {
+    fuente: 'bc',
+    version: versionMostrable(version),
+    venta, coste, indirecto, resultado,
+    partidas: dela('Cost').length,
+    fecha: null,
+  };
+}
+
+/** Resumen de la obra desde el snapshot ETL (versión vigente de pro_bi). */
+export async function resumenPresupuestoBI(obra: string): Promise<PresupuestoObraResumen | null> {
+  const pool = await getAdelanteDb();
+  const r = await pool.request().input('obra', sql.NVarChar(20), obra).query<{
+    version_code: string; fecha: Date | null; venta: number; coste: number;
+    indirecto: number; partidas: number;
+  }>(`
+    WITH v AS (
+      SELECT TOP 1 version_code FROM pro_bi.fact_presupuesto
+      WHERE works_no = @obra
+      ORDER BY CAST(es_ultima_version AS INT) DESC, etl_loaded_at DESC
+    )
+    SELECT fp.version_code, MAX(fp.etl_loaded_at) AS fecha,
+           SUM(CASE WHEN fp.tipo_costo = 'Sales'         THEN fp.line_amount ELSE 0 END) AS venta,
+           SUM(CASE WHEN fp.tipo_costo = 'Cost'          THEN fp.line_amount ELSE 0 END) AS coste,
+           SUM(CASE WHEN fp.tipo_costo = 'Indirect Cost' THEN fp.line_amount ELSE 0 END) AS indirecto,
+           SUM(CASE WHEN fp.tipo_costo = 'Cost'          THEN 1 ELSE 0 END) AS partidas
+    FROM pro_bi.fact_presupuesto fp
+    WHERE fp.works_no = @obra AND fp.task_type = 'Posting'
+      AND fp.version_code = (SELECT version_code FROM v)
+    GROUP BY fp.version_code
+  `);
+  const f = r.recordset[0];
+  if (!f) return null;
+  const venta = Number(f.venta) || 0, coste = Number(f.coste) || 0, indirecto = Number(f.indirecto) || 0;
+  return {
+    fuente: 'bi',
+    version: versionMostrable(f.version_code),
+    venta, coste, indirecto,
+    resultado: venta - coste - indirecto,
+    partidas: Number(f.partidas) || 0,
+    fecha: f.fecha instanceof Date ? f.fecha.toISOString() : null,
+  };
+}
+
+/**
+ * Resumen del presupuesto de la obra tomando la primera fuente que REALMENTE
+ * tenga importes, en este orden:
+ *
+ *   1. BC en vivo, compañía del app (BC_COMPANY_ID).
+ *   2. BC en vivo, compañías anteriores (BC_COMPANY_IDS_LEGACY) — hay obras cuyo
+ *      presupuesto quedó solo en la compañía vieja del environment.
+ *   3. Snapshot ETL pro_bi — obras que en BC quedaron con la estructura en ₡0.
+ *
+ * Si ninguna tiene importes se devuelve la que al menos tenga partidas, para que
+ * la UI pueda decir "hay partidas pero en ₡0" en vez de "sin presupuesto".
+ */
+export async function resumenPresupuestoObra(obra: string): Promise<PresupuestoObraResumen | null> {
+  const [principal, ...otras] = bcCompanies();
+  const bc = await resumenPresupuestoBC(obra, principal).catch(() => null);
+  if (tieneImportes(bc)) return bc;
+
+  for (const company of otras) {
+    const alt = await resumenPresupuestoBC(obra, company).catch(() => null);
+    if (tieneImportes(alt)) {
+      return { ...alt!, fuente: 'bc-otra', compania: await bcCompanyName(company) };
+    }
+  }
+
+  const bi = await resumenPresupuestoBI(obra).catch(() => null);
+  if (tieneImportes(bi)) return bi;
+  return (bc?.partidas ? bc : null) ?? (bi?.partidas ? bi : null) ?? bc ?? bi;
+}
+
 /**
  * Detalle por partida leído de BC EN VIVO (workLines), como fallback cuando el
  * snapshot ETL (pro_bi.fact_presupuesto) todavía no tiene la obra — p.ej. obras
  * administrativas o presupuestadas después de la última corrida del ETL. Toma la
- * versión vigente (works.filterVersionCode; si no, el mayor REESTUDIO) y el costo
- * directo (lineType 'Cost'). `fecha_carga` queda vacío (no viene del ETL).
+ * versión vigente (la última con importes, ver versionVigente) y el costo directo
+ * (lineType 'Cost'). `fecha_carga` queda vacío (no viene del ETL).
  */
-export async function detallePresupuestoBC(obra: string): Promise<PresupuestoDetalle | null> {
+export async function detallePresupuestoBC(obra: string, company?: string): Promise<PresupuestoDetalle | null> {
   if (!bcConstructionConfigured()) return null;
   const [work, lineas] = await Promise.all([
-    getWork(obra).catch(() => null),
-    getWorkLines(obra).catch(() => []),
+    getWork(obra, company).catch(() => null),
+    getWorkLines(obra, company).catch(() => []),
   ]);
   const cost = lineas.filter((l) => l.lineType === 'Cost');
   if (cost.length === 0) return null;
 
-  // Versión vigente: la de works; si no calza, el mayor REESTUDIO n de las líneas.
-  const versiones = [...new Set(cost.map((l) => l.versionCode).filter(Boolean))];
-  const nver = (v: string) => Number(v.replace(/\D/g, '')) || 0;
-  let version = work?.filterVersionCode?.trim() || '';
-  if (!version || !versiones.includes(version)) {
-    version = [...versiones].sort((a, b) => nver(b) - nver(a))[0] ?? '';
-  }
-  if (!version) return null;
+  const version = versionVigente(cost, (work?.filterVersionCode ?? '').trim());
 
   const vlines = cost.filter((l) => l.versionCode === version);
   const posting = vlines.filter((l) => l.taskType === 'Posting');
@@ -155,6 +305,24 @@ export async function detallePresupuestoBC(obra: string): Promise<PresupuestoDet
       peso_pct: pct(p.lineAmount),
     })),
   };
+}
+
+/**
+ * Detalle de BC recorriendo las compañías: la del app primero y después las
+ * anteriores (BC_COMPANY_IDS_LEGACY). Gana la primera que traiga importes; si
+ * ninguna los trae, se devuelve lo de la compañía del app (estructura en ₡0).
+ */
+export async function detallePresupuestoObraBC(
+  obra: string,
+): Promise<{ detalle: PresupuestoDetalle; compania: string | null } | null> {
+  const [principal, ...otras] = bcCompanies();
+  const propio = await detallePresupuestoBC(obra, principal).catch(() => null);
+  if (propio && propio.total_costo > 0) return { detalle: propio, compania: null };
+  for (const company of otras) {
+    const alt = await detallePresupuestoBC(obra, company).catch(() => null);
+    if (alt && alt.total_costo > 0) return { detalle: alt, compania: await bcCompanyName(company) };
+  }
+  return propio ? { detalle: propio, compania: null } : null;
 }
 
 /** Detalle de una versión de presupuesto (grupos + partidas). null si no existe. */

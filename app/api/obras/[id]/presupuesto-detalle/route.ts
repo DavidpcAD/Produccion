@@ -2,17 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, sql } from '@/lib/db';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
-import { detallePresupuestoBC } from '@/lib/bc/presupuestos';
+import { detallePresupuestoObraBC, versionMostrable } from '@/lib/bc/presupuestos';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+interface Partida { codigo: string; nombre: string; grupo: string; monto: number; peso: number }
+interface Grupo { nombre: string; monto: number; peso: number }
+
 /**
  * Detalle del presupuesto de la obra (versión vigente) desglosado por partida y
- * por grupo, tomado del snapshot ETL pro_bi.fact_presupuesto — la misma fuente
- * que usan los reportes y la app AD Obras Control ("Detalle del presupuesto").
- * Filtra costo directo a nivel Posting de la última versión (mismo criterio que
- * calcularObraAvance).
+ * por grupo. Se leen las fuentes y gana la que tenga importes:
+ *
+ *   · BC en vivo (workLines) de la compañía del app — la verdad; incluye lo
+ *     presupuestado hoy.
+ *   · BC en vivo de las compañías anteriores (BC_COMPANY_IDS_LEGACY).
+ *   · pro_bi.fact_presupuesto — snapshot ETL, con los nombres/grupos del catálogo
+ *     de partidas. Cubre obras que en BC quedaron con la estructura en ₡0.
+ *
+ * Antes se leía SOLO el ETL y BC era el fallback si el ETL venía vacío: una obra
+ * represupuestada después de la última corrida del ETL mostraba la versión vieja.
+ * Filtra costo directo a nivel Posting (mismo criterio que calcularObraAvance).
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -29,96 +39,125 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!worksNo) return NextResponse.json({ error: 'Obra no encontrada' }, { status: 404 });
 
   try {
-    const bi = await getAdelanteDb();
-    const [lineas, cat] = await Promise.all([
-      bi.request().input('o', sql.NVarChar(20), worksNo).query<{ taskNo: string; monto: number; descripcion: string | null; versionCode: string | null }>(`
-        SELECT fp.task_no AS taskNo, SUM(fp.line_amount) AS monto,
-               MAX(fp.description) AS descripcion, MAX(fp.version_code) AS versionCode
-        FROM pro_bi.fact_presupuesto fp
-        WHERE fp.works_no = @o AND fp.task_type = 'Posting' AND fp.tipo_costo = 'Cost'
-          AND CAST(fp.es_ultima_version AS INT) = 1
-        GROUP BY fp.task_no`),
-      bi.request().query<{ codigo: string; nombre: string; grupo: string | null; grupoOrden: number | null; partidaOrden: number | null }>(`
-        SELECT p.codigo, p.nombre, g.nombre AS grupo, g.orden AS grupoOrden, p.orden AS partidaOrden
-        FROM pro_obc.partidas p
-        LEFT JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id`),
+    const [enBC, etl] = await Promise.all([
+      detallePresupuestoObraBC(worksNo).catch(() => null),
+      detalleETL(worksNo).catch(() => null),
     ]);
+    const bc = enBC?.detalle ?? null;
 
-    // Catálogo de partidas (código → nombre/grupo/orden).
-    const catMap = new Map<string, { nombre: string; grupo: string; grupoOrden: number; partidaOrden: number }>();
-    for (const c of cat.recordset) {
-      catMap.set(c.codigo.toUpperCase(), {
-        nombre: c.nombre, grupo: c.grupo ?? 'Otros',
-        grupoOrden: c.grupoOrden ?? 999, partidaOrden: c.partidaOrden ?? 999,
+    // Gana la fuente con importes; si las dos tienen, manda BC (en vivo).
+    const elegido =
+      bc && bc.total_costo > 0 ? 'bc' :
+      etl && etl.total > 0 ? 'etl' :
+      bc && bc.partidas.length > 0 ? 'bc' :
+      etl && etl.partidas.length > 0 ? 'etl' : null;
+
+    if (elegido === 'bc' && bc) {
+      const grupoDe = (taskNo: string) =>
+        bc.grupos.find((g) => g.task_no === taskNo.split('.')[0])?.descripcion ?? 'Otros';
+      return NextResponse.json({
+        cargado: true,
+        fuente: enBC?.compania ? 'bc-otra' : 'bc',
+        compania: enBC?.compania ?? null,
+        worksNo,
+        version: versionMostrable(bc.version_code),
+        total: bc.total_costo,
+        grupos: bc.grupos.map((g) => ({ nombre: g.descripcion, monto: g.total, peso: g.peso_pct })),
+        partidas: bc.partidas.map((p) => ({
+          codigo: p.task_no,
+          nombre: p.descripcion,
+          grupo: grupoDe(p.task_no),
+          monto: p.importe,
+          peso: p.peso_pct,
+        })),
       });
     }
-
-    let total = 0;
-    let version: string | null = null;
-    const partidas = lineas.recordset.map((l) => {
-      const monto = Number(l.monto) || 0;
-      total += monto;
-      if (!version && l.versionCode) version = l.versionCode.trim();
-      const meta = catMap.get(l.taskNo.toUpperCase());
-      return {
-        codigo: l.taskNo,
-        nombre: meta?.nombre ?? l.descripcion ?? l.taskNo,
-        grupo: meta?.grupo ?? 'Otros',
-        grupoOrden: meta?.grupoOrden ?? 999,
-        partidaOrden: meta?.partidaOrden ?? 999,
-        monto,
-      };
-    });
-
-    // Sin filas en el snapshot ETL → fallback a BC en vivo (workLines). Cubre obras
-    // administrativas o presupuestadas después de la última corrida del ETL (que en
-    // BC ya tienen presupuesto pero aún no están en pro_bi.fact_presupuesto).
-    if (partidas.length === 0) {
-      const bc = await detallePresupuestoBC(worksNo).catch(() => null);
-      if (bc && bc.partidas.length > 0) {
-        const grupoDe = (taskNo: string) =>
-          bc.grupos.find((g) => g.task_no === taskNo.split('.')[0])?.descripcion ?? 'Otros';
-        return NextResponse.json({
-          cargado: true,
-          fuente: 'bc',
-          worksNo,
-          version: bc.version_code,
-          total: bc.total_costo,
-          grupos: bc.grupos.map((g) => ({ nombre: g.descripcion, monto: g.total, peso: g.peso_pct })),
-          partidas: bc.partidas.map((p) => ({
-            codigo: p.task_no,
-            nombre: p.descripcion,
-            grupo: grupoDe(p.task_no),
-            monto: p.importe,
-            peso: p.peso_pct,
-          })),
-        });
-      }
+    if (elegido === 'etl' && etl) {
+      return NextResponse.json({ cargado: true, fuente: 'bi', worksNo, ...etl });
     }
-
-    // peso% por partida + orden estable (grupo, código).
-    for (const p of partidas) (p as { peso?: number }).peso = total > 0 ? (p.monto / total) * 100 : 0;
-    partidas.sort((a, b) =>
-      a.grupoOrden - b.grupoOrden || a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
-
-    // Resumen por grupo.
-    const gmap = new Map<string, { nombre: string; orden: number; monto: number }>();
-    for (const p of partidas) {
-      const g = gmap.get(p.grupo) ?? { nombre: p.grupo, orden: p.grupoOrden, monto: 0 };
-      g.monto += p.monto;
-      gmap.set(p.grupo, g);
-    }
-    const grupos = Array.from(gmap.values())
-      .map((g) => ({ nombre: g.nombre, monto: g.monto, peso: total > 0 ? (g.monto / total) * 100 : 0 }))
-      .sort((a, b) => (gmap.get(a.nombre)!.orden - gmap.get(b.nombre)!.orden));
-
-    return NextResponse.json({
-      cargado: partidas.length > 0,
-      worksNo, version, total,
-      grupos,
-      partidas: partidas.map((p) => ({ codigo: p.codigo, nombre: p.nombre, grupo: p.grupo, monto: p.monto, peso: (p as { peso?: number }).peso ?? 0 })),
-    });
+    return NextResponse.json({ cargado: false, worksNo, total: 0, grupos: [], partidas: [] });
   } catch (e: unknown) {
     return NextResponse.json({ cargado: false, error: e instanceof Error ? e.message : 'Error' }, { status: 200 });
   }
+}
+
+/**
+ * Detalle desde el snapshot ETL (pro_bi.fact_presupuesto), enriquecido con el
+ * catálogo de partidas (nombre / grupo / orden) de pro_obc — la misma fuente que
+ * usan los reportes y AD Obras Control ("Detalle del presupuesto").
+ */
+async function detalleETL(worksNo: string): Promise<{
+  version: string | null; fecha: string | null; total: number; grupos: Grupo[]; partidas: Partida[];
+} | null> {
+  const bi = await getAdelanteDb();
+  const [lineas, cat] = await Promise.all([
+    bi.request().input('o', sql.NVarChar(20), worksNo).query<{
+      taskNo: string; monto: number; descripcion: string | null; versionCode: string | null; fecha: Date | null;
+    }>(`
+      SELECT fp.task_no AS taskNo, SUM(fp.line_amount) AS monto,
+             MAX(fp.description) AS descripcion, MAX(fp.version_code) AS versionCode,
+             MAX(fp.etl_loaded_at) AS fecha
+      FROM pro_bi.fact_presupuesto fp
+      WHERE fp.works_no = @o AND fp.task_type = 'Posting' AND fp.tipo_costo = 'Cost'
+        AND CAST(fp.es_ultima_version AS INT) = 1
+      GROUP BY fp.task_no`),
+    bi.request().query<{ codigo: string; nombre: string; grupo: string | null; grupoOrden: number | null; partidaOrden: number | null }>(`
+      SELECT p.codigo, p.nombre, g.nombre AS grupo, g.orden AS grupoOrden, p.orden AS partidaOrden
+      FROM pro_obc.partidas p
+      LEFT JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id`),
+  ]);
+  if (lineas.recordset.length === 0) return null;
+
+  // Catálogo de partidas (código → nombre/grupo/orden).
+  const catMap = new Map<string, { nombre: string; grupo: string; grupoOrden: number; partidaOrden: number }>();
+  for (const c of cat.recordset) {
+    catMap.set(c.codigo.toUpperCase(), {
+      nombre: c.nombre, grupo: c.grupo ?? 'Otros',
+      grupoOrden: c.grupoOrden ?? 999, partidaOrden: c.partidaOrden ?? 999,
+    });
+  }
+
+  let total = 0;
+  let version: string | null = null;
+  let fecha: Date | null = null;
+  const partidas = lineas.recordset.map((l) => {
+    const monto = Number(l.monto) || 0;
+    total += monto;
+    if (!version && l.versionCode) version = l.versionCode.trim();
+    if (l.fecha && (!fecha || l.fecha > fecha)) fecha = l.fecha;
+    const meta = catMap.get(l.taskNo.toUpperCase());
+    return {
+      codigo: l.taskNo,
+      nombre: meta?.nombre ?? l.descripcion ?? l.taskNo,
+      grupo: meta?.grupo ?? 'Otros',
+      grupoOrden: meta?.grupoOrden ?? 999,
+      partidaOrden: meta?.partidaOrden ?? 999,
+      monto,
+      peso: 0,
+    };
+  });
+
+  // peso% por partida + orden estable (grupo, código).
+  for (const p of partidas) p.peso = total > 0 ? (p.monto / total) * 100 : 0;
+  partidas.sort((a, b) =>
+    a.grupoOrden - b.grupoOrden || a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
+
+  // Resumen por grupo.
+  const gmap = new Map<string, { nombre: string; orden: number; monto: number }>();
+  for (const p of partidas) {
+    const g = gmap.get(p.grupo) ?? { nombre: p.grupo, orden: p.grupoOrden, monto: 0 };
+    g.monto += p.monto;
+    gmap.set(p.grupo, g);
+  }
+  const grupos = Array.from(gmap.values())
+    .map((g) => ({ nombre: g.nombre, monto: g.monto, peso: total > 0 ? (g.monto / total) * 100 : 0 }))
+    .sort((a, b) => (gmap.get(a.nombre)!.orden - gmap.get(b.nombre)!.orden));
+
+  return {
+    version: versionMostrable(version),
+    fecha: fecha ? (fecha as Date).toISOString() : null,
+    total,
+    grupos,
+    partidas: partidas.map((p) => ({ codigo: p.codigo, nombre: p.nombre, grupo: p.grupo, monto: p.monto, peso: p.peso })),
+  };
 }

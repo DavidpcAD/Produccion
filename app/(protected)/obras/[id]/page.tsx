@@ -54,10 +54,17 @@ const fmtMonto = (v: number | null) =>
 const fmtCRC = (v: number) =>
   v.toLocaleString('es-CR', { style: 'currency', currency: 'CRC', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Resumen de presupuesto de la obra en Business Central (lo que devuelve
-// /api/obras/[id]/presupuesto). cargado=false → aún no se ha presupuestado.
+// Resumen de presupuesto de la obra (lo que devuelve /api/obras/[id]/presupuesto).
+// cargado=false → no hay importes en ninguna fuente; estructura=true → la obra sí
+// tiene partidas cargadas pero todas en ₡0. fuente: 'bc' = Business Central en vivo,
+// 'bi' = snapshot de la réplica BI (con la fecha del snapshot en `fecha`).
 interface PresupBC {
   cargado: boolean;
+  estructura?: boolean;
+  partidas?: number;
+  fuente?: 'bc' | 'bc-otra' | 'bi';
+  compania?: string | null;
+  fecha?: string | null;
   version: string | null;
   venta: number;
   coste: number;
@@ -65,13 +72,38 @@ interface PresupBC {
   resultado: number;
 }
 
-// Detalle del presupuesto por partida/grupo (pro_bi.fact_presupuesto).
+// Detalle del presupuesto por partida/grupo (BC en vivo o snapshot pro_bi).
 interface PresupDetalle {
   cargado: boolean;
+  fuente?: 'bc' | 'bc-otra' | 'bi';
+  compania?: string | null;
+  fecha?: string | null;
   version: string | null;
   total: number;
   grupos: { nombre: string; monto: number; peso: number }[];
   partidas: { codigo: string; nombre: string; grupo: string; monto: number; peso: number }[];
+}
+
+// De dónde salió el dato: la compañía del app no necesita nota; la compañía
+// anterior de BC y el snapshot BI sí, para no hacerlos pasar por BC al día.
+function FuenteNota({ fuente, compania, fecha }: { fuente?: 'bc' | 'bc-otra' | 'bi'; compania?: string | null; fecha?: string | null }) {
+  if (fuente === 'bc-otra') {
+    return (
+      <p className="text-xs text-ds-gray-400">
+        El presupuesto de esta obra está en la compañía {compania ?? 'anterior'} de Business Central,
+        no en la que usa el app.
+      </p>
+    );
+  }
+  if (fuente === 'bi') {
+    return (
+      <p className="text-xs text-ds-gray-400">
+        Tomado de la réplica BI{fecha ? ` (datos al ${fmtFecha(fecha)})` : ''} porque en Business Central
+        esta obra no tiene importes.
+      </p>
+    );
+  }
+  return null;
 }
 
 // Chip de estado de la obra: relleno suave y en español (Abierta / Bloqueada).
@@ -257,17 +289,39 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
         <div className="px-4 py-3.5 text-ds-gray-400">Consultando Business Central…</div>
       ) : presup?.cargado ? (
         <>
-          <Campo label="Cód. versión" value={presup.version} />
+          <Campo label="Cód. versión" value={presup.version ?? 'Base (sin reestudio)'} />
           <Campo label="Importe venta" value={fmtCRC(presup.venta)} />
           <Campo label="Importe coste directo" value={fmtCRC(presup.coste)} />
           <Campo label="Importe coste indirecto" value={fmtCRC(presup.indirecto)} />
           <Campo label="Resultado" value={<span className={presup.resultado >= 0 ? 'text-ds-green-ink' : 'text-ds-red'}>{fmtCRC(presup.resultado)}</span>} />
-          <div className="px-4 py-3">
+          <div className="px-4 py-3 space-y-2">
             <Button size="sm" variant="outline" onClick={verDetallePresup} icon={<Icon name="boleta" size="sm" color="currentColor" />}>
               Ver detalle por partida
             </Button>
+            <FuenteNota fuente={presup.fuente} compania={presup.compania} fecha={presup.fecha} />
           </div>
         </>
+      ) : presup?.estructura ? (
+        // La obra sí tiene sus partidas en BC, pero todas en ₡0 (estructura migrada
+        // sin importes). Se dice tal cual y se deja abrir el detalle igual.
+        <div className="px-4 py-4 flex flex-col items-start gap-2.5">
+          <span className="text-ds-gray-500">
+            La obra tiene {presup.partidas} partida{presup.partidas === 1 ? '' : 's'} cargada
+            {presup.partidas === 1 ? '' : 's'} en BC{presup.version ? ` (${presup.version})` : ''}, pero
+            todas en ₡0 — el presupuesto no tiene importes.
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={verDetallePresup} icon={<Icon name="boleta" size="sm" color="currentColor" />}>
+              Ver detalle por partida
+            </Button>
+            {isAdmin && (
+              <Button size="sm" variant="outline" onClick={() => router.push(`/presupuesto?obra=${obra.idObra}`)}
+                icon={<Icon name="boleta" size="sm" color="currentColor" />}>
+                Cargar presupuesto
+              </Button>
+            )}
+          </div>
+        </div>
       ) : (
         <div className="px-4 py-4 flex flex-col items-start gap-2.5">
           <span className="text-ds-gray-500">Sin presupuesto cargado en BC.</span>
@@ -360,7 +414,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
         onSaved={load}
       />
 
-      {/* Modal: detalle del presupuesto por partida (pro_bi.fact_presupuesto) */}
+      {/* Modal: detalle del presupuesto por partida (BC en vivo o snapshot pro_bi) */}
       <Modal
         open={detalleOpen}
         onClose={() => setDetalleOpen(false)}
@@ -372,9 +426,12 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
           <div className="py-10 text-center text-ds-gray-400">Consultando el presupuesto…</div>
         ) : detalle?.cargado ? (
           <div className="space-y-5">
-            <div className="flex items-center justify-between rounded-ds bg-ds-gray-100 px-4 py-3">
-              <span className="text-sm text-ds-gray-500">Total presupuestado (costo directo)</span>
-              <span className="font-bold text-ds-ink">{fmtCRC(detalle.total)}</span>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between rounded-ds bg-ds-gray-100 px-4 py-3">
+                <span className="text-sm text-ds-gray-500">Total presupuestado (costo directo)</span>
+                <span className="font-bold text-ds-ink">{fmtCRC(detalle.total)}</span>
+              </div>
+              <FuenteNota fuente={detalle.fuente} compania={detalle.compania} fecha={detalle.fecha} />
             </div>
 
             <div>

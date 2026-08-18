@@ -9,10 +9,44 @@ import { getBCToken } from './bc-client';
 //   · workDecompBulks→ carga masiva del descompuesto (materiales) en payload1..40
 const BC_ROOT = process.env.BC_BASE_URL
   ?? `https://api.businesscentral.dynamics.com/v2.0/${process.env.BC_TENANT_ID}/${process.env.BC_ENVIRONMENT}`;
-const CONSTR = `${BC_ROOT}/api/adelante/construction/v1.0/companies(${process.env.BC_COMPANY_ID})`;
+const constrDe = (company: string) => `${BC_ROOT}/api/adelante/construction/v1.0/companies(${company})`;
+const CONSTR = constrDe(String(process.env.BC_COMPANY_ID));
 
 export function bcConstructionConfigured(): boolean {
   return !!(process.env.BC_TENANT_ID && process.env.BC_CLIENT_ID && process.env.BC_CLIENT_SECRET && process.env.BC_COMPANY_ID);
+}
+
+// Compañías de BC donde BUSCAR (solo lectura), en orden: primero la del app
+// (BC_COMPANY_ID) y después las que se listen en BC_COMPANY_IDS_LEGACY (ids
+// separados por coma). En el environment de Adelante conviven la compañía nueva y
+// la anterior, y hay obras cuyo presupuesto quedó únicamente en la anterior: sin
+// esto el app las muestra sin presupuesto aunque BC sí lo tenga.
+// OJO: todo lo que ESCRIBE (subir versión/descompuesto, área prorrateada) sigue
+// yendo solo a BC_COMPANY_ID.
+export function bcCompanies(): string[] {
+  const principal = String(process.env.BC_COMPANY_ID ?? '').trim();
+  const extra = String(process.env.BC_COMPANY_IDS_LEGACY ?? '')
+    .split(',').map((c) => c.trim()).filter(Boolean);
+  return [principal, ...extra].filter((c, i, a) => c && a.indexOf(c) === i);
+}
+
+// Nombre de una compañía (para decir de dónde salió el dato). Se cachea: el
+// listado de compañías no cambia entre requests.
+let companiasCache: Promise<Map<string, string>> | null = null;
+export async function bcCompanyName(companyId: string): Promise<string | null> {
+  if (!companiasCache) {
+    companiasCache = (async () => {
+      const token = await getBCToken();
+      const res = await fetch(`${BC_ROOT}/api/v2.0/companies`, {
+        headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+      });
+      if (!res.ok) throw new Error(`BC companies: ${res.status}`);
+      const body = await res.json();
+      return new Map<string, string>(((body?.value ?? []) as Array<{ id: string; name?: string; displayName?: string }>)
+        .map((c) => [c.id, (c.displayName || c.name || c.id).trim()]));
+    })().catch(() => { companiasCache = null; return new Map<string, string>(); });
+  }
+  return (await companiasCache).get(companyId) ?? null;
 }
 
 // Línea de presupuesto (misma forma que colPresupuesto de Power Apps).
@@ -49,9 +83,10 @@ export interface DecompLine {
   quantity?: number;
 }
 
-async function req(path: string, init: RequestInit) {
+async function req(path: string, init: RequestInit, company?: string) {
   const token = await getBCToken();
-  const res = await fetch(`${CONSTR}/${path}`, {
+  const raiz = company ? constrDe(company) : CONSTR;
+  const res = await fetch(`${raiz}/${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json', ...(init.headers ?? {}) },
     cache: 'no-store',
@@ -117,25 +152,40 @@ export interface WorkLineBC {
 
 // Lee TODAS las líneas de presupuesto de una obra desde BC en vivo (todas las versiones/tipos).
 // El filtrado (Cost, versión vigente, Total/Posting) lo hace quien la consume.
-export async function getWorkLines(worksNo: string): Promise<WorkLineBC[]> {
-  const body = await req(`workLines?$filter=${encodeURIComponent(`worksNo eq '${worksNo}'`)}&$top=2000`, { method: 'GET' });
-  return ((body?.value ?? []) as Array<Record<string, unknown>>).map((l) => ({
-    taskNo: String(l.taskNo ?? ''),
-    taskType: String(l.taskType ?? ''),
-    lineType: String(l.lineType ?? ''),
-    description: String(l.description ?? ''),
-    quantity: Number(l.quantity) || 0,
-    unitAmount: Number(l.unitAmount) || 0,
-    lineAmount: Number(l.lineAmount) || 0,
-    unitOfMeasure: (l.unitOfMeasure as string) ?? null,
-    versionCode: String(l.versionCode ?? ''),
-  }));
+// Pagina de 5000 en 5000: una obra con varios reestudios pasa fácil de 2000 líneas
+// (ej. 7 versiones × 356 líneas) y antes se truncaba silenciosamente.
+export async function getWorkLines(worksNo: string, company?: string): Promise<WorkLineBC[]> {
+  // Los enums del API vienen con el espacio escapado ("Indirect_x0020_Cost").
+  const enumStr = (v: unknown) => String(v ?? '').replace(/_x0020_/g, ' ');
+  const PAGINA = 5000;
+  const out: WorkLineBC[] = [];
+  for (let skip = 0; skip < 40000; skip += PAGINA) {
+    const body = await req(
+      `workLines?$filter=${encodeURIComponent(`worksNo eq '${worksNo}'`)}&$top=${PAGINA}&$skip=${skip}`,
+      { method: 'GET' }, company);
+    const page = (body?.value ?? []) as Array<Record<string, unknown>>;
+    for (const l of page) {
+      out.push({
+        taskNo: String(l.taskNo ?? ''),
+        taskType: enumStr(l.taskType),
+        lineType: enumStr(l.lineType),
+        description: String(l.description ?? ''),
+        quantity: Number(l.quantity) || 0,
+        unitAmount: Number(l.unitAmount) || 0,
+        lineAmount: Number(l.lineAmount) || 0,
+        unitOfMeasure: (l.unitOfMeasure as string) ?? null,
+        versionCode: String(l.versionCode ?? ''),
+      });
+    }
+    if (page.length < PAGINA) break;
+  }
+  return out;
 }
 
 export interface WorkTotals { salesLineAmount?: number; costLineAmount?: number; indirectCostLineAmount?: number; result?: number }
 
-export async function getWork(worksNo: string): Promise<(WorkTotals & { no: string; filterVersionCode?: string }) | null> {
-  const body = await req(`works?$filter=${encodeURIComponent(`no eq '${worksNo}'`)}&$top=1`, { method: 'GET' });
+export async function getWork(worksNo: string, company?: string): Promise<(WorkTotals & { no: string; filterVersionCode?: string }) | null> {
+  const body = await req(`works?$filter=${encodeURIComponent(`no eq '${worksNo}'`)}&$top=1`, { method: 'GET' }, company);
   return body?.value?.[0] ?? null;
 }
 
