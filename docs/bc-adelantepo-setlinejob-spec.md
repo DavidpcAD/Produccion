@@ -1,5 +1,25 @@
 # Spec — `AdelantePO_SetLineJob` (codeunit "Adelante PO Actions" / web service `AdelantePO`)
 
+> ## ✅ Estado: IMPLEMENTADO
+> - **BC**: publicado en Sandbox — **AdelanteAPI 1.2.3.9**. No hubo que registrar el web
+>   service (ya estaba por `AdelantePO_ReopenOrder`/etc.).
+> - **App**: cableado en `bc.ts` (`bcSetLineJobs`), `aprobar.ts` y el endpoint `relanzar`
+>   (commit `acc07be`). Verificado en vivo contra el codeunit (contrato OK).
+> - **Correcciones del dev de BC respecto al borrador de abajo** (no afectan al lado app):
+>   1. El procedure en AL se llama **`SetLineJob`** y **no** lleva `[ServiceEnabled]`; la
+>      acción OData sigue siendo **`AdelantePO_SetLineJob`**.
+>   2. **`assignmentsJson` viaja como STRING JSON escapado** dentro del body (igual que el
+>      `linesJson` de `PostInvoice`), NO como objeto anidado. Ej. de body real:
+>      ```json
+>      { "orderNo": "CP-003872", "assignmentsJson": "[{\"lineNo\":10000,\"jobNo\":\"VN-B.24\",\"jobTaskNo\":\"1.2\",\"jobLineType\":\"Budget\",\"locationCode\":\"\"},{\"lineNo\":20000,\"locationCode\":\"ALM-GRAL\"}]" }
+>      ```
+>   3. El **retorno `value` es a su vez un JSON string** → doble parseo: `{ "value": "{\"updated\":2,\"errors\":\"\"}" }`.
+>   4. Se agregó **`jobLineType`** por línea: `Budget` (default) | `Billable` | `Both` | `None`.
+>      Solo aplica si viene `jobNo`. Para material consumido en obra quedó default `Budget`.
+> - **Pendiente**: el round-trip end-to-end en Sandbox (checklist §6).
+>
+> _El resto de este documento es el borrador original de la spec, conservado como referencia._
+
 ## Objetivo
 Poder setear, por línea de un **Pedido de compra** en BC, los campos que la **API estándar
 v2.0 `purchaseOrderLines` NO expone**:
