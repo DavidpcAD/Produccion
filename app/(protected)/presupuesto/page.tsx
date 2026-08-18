@@ -8,12 +8,24 @@ import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { PresupuestoHorasCard } from '@/components/presupuesto/horas-card';
 
 interface Obra { idObra: number; numeroObra: string; nombreMostrado: string; areaProrrateadaM2?: number | null }
 // Resumen del presupuesto ya cargado en BC para la obra elegida (misma forma que
 // /api/obras/[id]/presupuesto). Sirve para avisar que la obra YA tiene presupuesto
 // y con qué versión (REESTUDIO…), antes de subir otro.
-interface PresupExistente { cargado: boolean; version: string | null; venta: number; coste: number; indirecto: number; resultado: number }
+interface PresupExistente {
+  cargado: boolean;
+  version: string | null;
+  venta: number; coste: number; indirecto: number; resultado: number;
+  // De dónde salió: 'bc' = compañía del app · 'bc-otra' = otra compañía de BC (la
+  // anterior) · 'bi' = réplica BI. Importa avisarlo: subir siempre escribe en la
+  // compañía del app, así que si el presupuesto vigente está en otra, la versión
+  // nueva NO continúa la numeración de esa.
+  fuente?: 'bc' | 'bc-otra' | 'bi';
+  compania?: string | null;
+  fecha?: string | null;
+}
 interface Linea { taskNo: string; taskType?: string; description: string; lineAmount?: number; unitCost?: number; no?: string }
 interface PlantillaParsed { archivo: string; porTipo: Record<string, Linea[]>; totales: Record<string, number>; hojas: string[] }
 interface DescParsed { archivo: string; hoja: string | null; lineas: Linea[] }
@@ -374,6 +386,18 @@ export default function PresupuestoPage() {
               <MetricBC label="Coste indirecto" value={crc.format(presupExistente.indirecto)} />
               <MetricBC label="Resultado" value={crc.format(presupExistente.resultado)} accent={presupExistente.resultado >= 0 ? 'pos' : 'neg'} />
             </div>
+            {presupExistente.fuente === 'bc-otra' && (
+              <p className="text-xs text-ds-yellow-ink">
+                Ojo: este presupuesto está en la compañía {presupExistente.compania ?? 'anterior'} de BC, no en la
+                que usa el app. Lo que subás acá se crea en la compañía del app y empieza su propia numeración de
+                versiones.
+              </p>
+            )}
+            {presupExistente.fuente === 'bi' && (
+              <p className="text-xs text-ds-yellow-ink">
+                Estos montos vienen de la réplica BI: en Business Central esta obra tiene las partidas en ₡0.
+              </p>
+            )}
             <p className="text-xs text-ds-yellow-ink">Subir un nuevo General crea otra versión (REESTUDIO+1). El descompuesto se agrega — ojo con duplicar materiales.</p>
           </div>
         )}
@@ -563,6 +587,9 @@ export default function PresupuestoPage() {
           {resultado && <DetalleBC r={resultado} />}
         </div>
       )}
+
+      {/* Presupuesto de Horas y Cantidades (h4) — flujo aparte del presupuesto de BC */}
+      <PresupuestoHorasCard />
 
       {/* Modal: guardar como plantilla */}
       <Modal open={modalGuardar} onClose={() => setModalGuardar(false)} title="Guardar como plantilla"

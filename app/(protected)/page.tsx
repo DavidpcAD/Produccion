@@ -213,7 +213,7 @@ export default async function DashboardPage() {
       quickActions.push(
         { href: '/avance', label: 'Ver avance de obra', icon: 'completado' },
         { href: '/cuadrillas', label: 'Gestionar cuadrillas', icon: 'cuadrillas' },
-        { href: '/compras/ingenieria/dashboard', label: 'Órdenes de compra', icon: 'entrega' },
+        { href: '/compras/ingenieria', label: 'Órdenes de compra', icon: 'entrega' },
       );
     }
     if (has('presupuesto')) {
