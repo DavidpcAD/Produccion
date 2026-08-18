@@ -67,9 +67,9 @@ function mergeDedup(rows: Row[]): { rows: Row[]; merged: number } {
   return { rows: [...byKey.values()], merged };
 }
 const TIPOS: { v: TipoSolicitud; label: string; destino: string }[] = [
-  { v: "material", label: "Material", destino: "Obra" },
+  { v: "material", label: "Consumo inmediato", destino: "Obra" },
   { v: "repuesto", label: "Repuesto", destino: "Máquina" },
-  { v: "stock", label: "Bodega", destino: "Almacén" },
+  { v: "stock", label: "Stock", destino: "Almacén" },
 ];
 const PRIORIDADES: { v: Pedido["prioridad"]; label: string }[] = [
   { v: "normal", label: "Normal" }, { v: "alta", label: "Alta" }, { v: "urgente", label: "Urgente" },
