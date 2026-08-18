@@ -1,4 +1,4 @@
-import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, TipoSolicitud } from "./types";
+import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
 
 // Badge del tipo de solicitud (Material / Repuesto / Stock).
 export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: string } {
@@ -222,6 +222,14 @@ export function ordenMaquinas(o: Orden, pedidos: Pedido[]): string[] {
   const out = new Set<string>();
   for (const p of pedidos) if (nums.has(p.numero) && p.maquinaNombre) out.add(p.maquinaNombre);
   return [...out];
+}
+
+// Devoluciones pendientes para un rol (misma lógica que DevolucionesView): solicitudes
+// devueltas (pedido "devuelto") + órdenes rechazadas por Aprobación ("rechazado").
+export function devolucionesCount(role: Role, pedidos: Pedido[], ordenes: Orden[]): number {
+  const solic = (role === "ingenieria" || role === "proveeduria") ? pedidos.filter((p) => p.estado === "devuelto").length : 0;
+  const ords = (role === "proveeduria" || role === "aprobacion" || role === "facturacion") ? ordenes.filter((o) => o.estado === "rechazado").length : 0;
+  return solic + ords;
 }
 
 // Orden "directa" = compra armada sin partir de una solicitud (ninguna línea

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useStore } from "@/lib/compras/store";
 import type { Role } from "@/lib/compras/types";
+import { devolucionesCount } from "@/lib/compras/helpers";
 import {
   IconList, IconOptions, IconDuplicate, IconMatrix, IconTrack,
   IconReceipt, IconCheck, IconDelivery, IconFolder, IconPlus,
@@ -72,7 +73,8 @@ const ROLE_META: Record<Role, { label: string; persona: string; home: string; na
 };
 
 export function AppShell({ role, children }: { role: Role; children: React.ReactNode }) {
-  const { role: current, setRole, usuario, setUsuario, hydrated } = useStore();
+  const { role: current, setRole, usuario, setUsuario, hydrated, pedidos, ordenes } = useStore();
+  const devolCount = devolucionesCount(role, pedidos, ordenes);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -134,6 +136,9 @@ export function AppShell({ role, children }: { role: Role; children: React.React
                   }
                 >
                   {n.label}
+                  {n.href.includes("/devoluciones") && devolCount > 0 && (
+                    <span aria-label={`${devolCount} devoluciones`} style={{ marginLeft: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "var(--ds-color-red-200)", color: "#fff", fontSize: 11, fontWeight: 700, verticalAlign: "middle" }}>{devolCount}</span>
+                  )}
                 </button>
               );
             })}
