@@ -26,7 +26,7 @@ import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compr
 type Variante = { code: string; descripcion: string };
 // Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
 // varias obras (varias tarjetas). Para repuesto/bodega se usa un único grupo (SOLO).
-type Grupo = { key: string; obraCodigo?: string; obraNombre?: string };
+type Grupo = { key: string; obraCodigo?: string; obraNombre?: string; taskNo?: string; taskNombre?: string };
 type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string; notas?: string; requerido?: number; autoPedir?: boolean };
 type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string };
 type Plantilla = { id: number; nombre: string; tipo?: "general" | "bodega"; idClasificacion?: number | null; lineas: PlantillaLinea[]; creadoPor?: string };
@@ -323,6 +323,58 @@ function MaterialSearch({ items, onAdd, compact }: {
               </button>
             ))}
           </div>
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
+// ─── Actividad (Job Task) de la obra — para Consumo inmediato. Trae las tareas de
+//     POSTEO del proyecto (jobNo = código de obra) desde BC. ──────────────────────
+function TareaPicker({ obra, value, valueNombre, onPick }: {
+  obra?: string; value?: string; valueNombre?: string; onPick: (taskNo: string, nombre: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const [tasks, setTasks] = useState<{ jobTaskNo: string; descripcion: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!obra) { setTasks([]); return; }
+    let cancel = false;
+    setLoading(true);
+    fetch(`/api/compras/bc/jobtasks?jobNo=${encodeURIComponent(obra)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancel) return;
+        const rows = (d?.jobTasks ?? []) as { jobTaskNo: string; descripcion: string; tipo: string }[];
+        setTasks(rows.filter((t) => t.tipo === "Posting").map((t) => ({ jobTaskNo: t.jobTaskNo, descripcion: t.descripcion })));
+      })
+      .catch(() => { if (!cancel) setTasks([]); })
+      .finally(() => { if (!cancel) setLoading(false); });
+    return () => { cancel = true; };
+  }, [obra]);
+  const has = !!value;
+  return (
+    <div ref={ref} style={{ display: "inline-flex", minWidth: 0, flex: 1 }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="ds-body-sm"
+        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 40, padding: "0 12px", borderRadius: 10, cursor: "pointer",
+          background: "var(--ds-color-white)", border: `1.5px solid ${has ? "var(--ds-color-green-100)" : "var(--ds-color-gray-200)"}`, color: has ? "var(--ds-color-ink)" : "var(--ds-color-gray-400)", textAlign: "left" }}>
+        <Icon name="calculator" size="sm" color="currentColor" />
+        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {has ? `${value} · ${valueNombre ?? ""}` : "Elegí actividad (tarea)…"}
+        </span>
+      </button>
+      <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={320}>
+        <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 300, padding: 6 }}>
+          {loading && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Cargando actividades…</div>}
+          {!loading && tasks.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin actividades para esta obra.</div>}
+          {!loading && tasks.map((t) => (
+            <button key={t.jobTaskNo} type="button" onClick={() => { onPick(t.jobTaskNo, t.descripcion); setOpen(false); }}
+              className="nsl-opt row" style={{ gap: 10, alignItems: "center", width: "100%", textAlign: "left", padding: "10px 12px", border: 0, borderRadius: 10, cursor: "pointer", background: t.jobTaskNo === value ? "var(--ds-color-gray-100)" : "transparent" }}>
+              <span className="ds-label ds-strong" style={{ minWidth: 36, flexShrink: 0 }}>{t.jobTaskNo}</span>
+              <span className="ds-body-sm">{t.descripcion}</span>
+            </button>
+          ))}
         </div>
       </Popover>
     </div>
@@ -771,6 +823,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
 
   // ── Tarjetas de obra (grupos) ───────────────────────────────────────────────
   function addGrupo() { setGrupos((gs) => [...gs, { key: uid() }]); }
+  function setGrupoTarea(grupoKey: string, taskNo: string, taskNombre: string) {
+    setGrupos((gs) => gs.map((g) => (g.key === grupoKey ? { ...g, taskNo: taskNo || undefined, taskNombre: taskNombre || undefined } : g)));
+  }
   function setGrupoObra(grupoKey: string, code: string) {
     // No se permiten dos tarjetas con la misma obra: los materiales de una obra van
     // todos en una sola tarjeta.
@@ -779,7 +834,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
       return;
     }
     const nombre = code ? obraNombreDe(code) : undefined;
-    setGrupos((gs) => gs.map((g) => (g.key === grupoKey ? { ...g, obraCodigo: code || undefined, obraNombre: nombre } : g)));
+    setGrupos((gs) => gs.map((g) => (g.key === grupoKey ? { ...g, obraCodigo: code || undefined, obraNombre: nombre, taskNo: undefined, taskNombre: undefined } : g)));
     // Sincroniza la obra en las líneas de esa tarjeta (para el resumen/plantilla/BC).
     setLineas((ls) => ls.map((l) => (l.grupoKey === grupoKey ? { ...l, obraCodigo: code || undefined, obraNombre: nombre } : l)));
   }
@@ -842,9 +897,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
       prioridad, notas: notas.trim() || undefined,
       lineas: validLines.map((l) => {
         const a = catArticulos.find((x) => x.id === l.articuloId)!;
+        // Consumo inmediato: la tarea (actividad) se elige por obra y se copia a cada línea.
+        const g = esMaterial ? grupos.find((x) => x.key === l.grupoKey) : undefined;
         // Si se eligió variante, se guarda la descripción de la variante (más específica);
         // si no, la descripción base del material.
-        return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: esMaterial ? (l.obraCodigo || "") : "", variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined };
+        return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: esMaterial ? (l.obraCodigo || "") : "", variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined, taskNo: g?.taskNo || undefined, taskDescr: g?.taskNombre || undefined };
       }),
     };
   }
@@ -978,6 +1035,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                               )}
                             </div>
 
+                            {/* Consumo inmediato: actividad (tarea) de la obra */}
+                            {g.obraCodigo && (
+                              <div className="row gap-2" style={{ alignItems: "center", padding: "0 12px 10px" }}>
+                                <span className="ds-muted ds-label" style={{ flexShrink: 0 }}>Actividad</span>
+                                <TareaPicker obra={g.obraCodigo} value={g.taskNo} valueNombre={g.taskNombre}
+                                  onPick={(no, nombre) => setGrupoTarea(g.key, no, nombre)} />
+                              </div>
+                            )}
                             {/* Materiales de esta obra */}
                             {filas.length === 0 ? (
                               <div className="ds-muted ds-body-sm" style={{ padding: "0 14px 14px" }}>
