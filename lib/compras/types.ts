@@ -95,6 +95,8 @@ export interface PedidoLinea {
   unidad: string;
   almacen: string;
   variantCode?: string;     // variante del item (si aplica)
+  taskNo?: string;          // N.º tarea proyecto (Job Task) — consumo inmediato
+  taskDescr?: string;       // descripción de la tarea (para mostrar / BC)
   cantidadOrdenada: number; // cuánto de esta línea ya pasó a una orden
   notas?: string;
 }

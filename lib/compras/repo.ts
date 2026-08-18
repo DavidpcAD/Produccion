@@ -102,6 +102,7 @@ function mapPedido(p: any, lineas: any[]): Pedido {
       id: String(l.idPedidoCompraDet), articuloId: l.itemNo ?? "", descripcion: l.descripcion ?? "",
       cantidad: Number(l.quantitySolicitado ?? 0), unidad: l.unitOfMeasureCode ?? "",
       almacen: l.locationCode ?? "", variantCode: l.variantCode ?? undefined, cantidadOrdenada: Number(l.quantityOrdenado ?? 0), notas: l.notaCreador ?? undefined,
+      taskNo: l.taskNo ?? undefined, taskDescr: l.taskDescr ?? undefined,
     })),
   };
 }
@@ -114,7 +115,7 @@ export interface NewPedidoDB {
    *  poder filtrar "mis solicitudes". Si no viene, cae al nombre (`usuario`). El
    *  movimiento sí conserva el nombre legible (`usuario`). */
   creadoPorId?: string;
-  lineas: { itemNo: string; descripcion: string; cantidad: number; unidad: string; almacen: string; variantCode?: string }[];
+  lineas: { itemNo: string; descripcion: string; cantidad: number; unidad: string; almacen: string; variantCode?: string; taskNo?: string; taskDescr?: string }[];
 }
 
 export async function createPedido(input: NewPedidoDB): Promise<number> {
@@ -156,9 +157,11 @@ export async function createPedido(input: NewPedidoDB): Promise<number> {
         .input("unitOfMeasureCode", sql.NVarChar(20), l.unidad)
         .input("locationCode", sql.NVarChar(20), l.almacen)
         .input("quantitySolicitado", sql.Decimal(18, 4), l.cantidad)
+        .input("taskNo", sql.NVarChar(15), l.taskNo ?? null)
+        .input("taskDescr", sql.NVarChar(150), l.taskDescr ?? null)
         .input("creadoPor", sql.NVarChar(100), input.usuario)
-        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,quantitySolicitado,quantityOrdenado,fechaCreacion,creadoPor)
-                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@quantitySolicitado,0,getdate(),@creadoPor)`);
+        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,quantitySolicitado,quantityOrdenado,taskNo,taskDescr,fechaCreacion,creadoPor)
+                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@quantitySolicitado,0,@taskNo,@taskDescr,getdate(),@creadoPor)`);
       line += 10000;
     }
     await logMov(tx, { entidad: "pedido", idEntidad: idPedido, documentoNo: numero, tipoMovimiento: "creado", estadoNuevo: "borrador", usuario: input.usuario, rol: input.rol });
@@ -213,9 +216,11 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
         .input("unitOfMeasureCode", sql.NVarChar(20), l.unidad)
         .input("locationCode", sql.NVarChar(20), l.almacen)
         .input("quantitySolicitado", sql.Decimal(18, 4), l.cantidad)
+        .input("taskNo", sql.NVarChar(15), l.taskNo ?? null)
+        .input("taskDescr", sql.NVarChar(150), l.taskDescr ?? null)
         .input("creadoPor", sql.NVarChar(100), input.usuario)
-        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,quantitySolicitado,quantityOrdenado,fechaCreacion,creadoPor)
-                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@quantitySolicitado,0,getdate(),@creadoPor)`);
+        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,quantitySolicitado,quantityOrdenado,taskNo,taskDescr,fechaCreacion,creadoPor)
+                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@quantitySolicitado,0,@taskNo,@taskDescr,getdate(),@creadoPor)`);
       line += 10000;
     }
     await logMov(tx, { entidad: "pedido", idEntidad: input.id, documentoNo: row.pedidoNo, tipoMovimiento: "editado", usuario: input.usuario, rol: input.rol });

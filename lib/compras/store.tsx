@@ -258,7 +258,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
           maquinaNo: input.maquinaNo, idClasificacion: input.idClasificacion ?? null,
           solicitante: input.solicitante, prioridad: input.prioridad,
           notas: input.notas, usuario: persona, rol: rolActual,
-          lineas: input.lineas.map((l) => ({ itemNo: l.articuloId, descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad, almacen: l.almacen, variantCode: l.variantCode })),
+          lineas: input.lineas.map((l) => ({ itemNo: l.articuloId, descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad, almacen: l.almacen, variantCode: l.variantCode, taskNo: l.taskNo, taskDescr: l.taskDescr })),
         });
         const p = await api.getPedido(String(idPedidoCompra));
         await refreshFromApi();
@@ -289,7 +289,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
           tipoSolicitud: input.tipoSolicitud, obra: input.obraCodigo, obraNombre: input.obraNombre,
           maquinaNo: input.maquinaNo, solicitante: input.solicitante, prioridad: input.prioridad,
           notas: input.notas, usuario: persona, rol: rolActual,
-          lineas: input.lineas.map((l) => ({ itemNo: l.articuloId, descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad, almacen: l.almacen, variantCode: l.variantCode })),
+          lineas: input.lineas.map((l) => ({ itemNo: l.articuloId, descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad, almacen: l.almacen, variantCode: l.variantCode, taskNo: l.taskNo, taskDescr: l.taskDescr })),
         });
         await refreshFromApi();
         return;
