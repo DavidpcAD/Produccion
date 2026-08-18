@@ -7,7 +7,7 @@ import { Badge, Button, Card, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, formatDate, num, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { destinoLabel, esConsumoInmediato, formatDate, num, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
 export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -34,8 +34,9 @@ export default function PedidoDetallePage() {
     tipo: pedido.tipoSolicitud,
     prioridad: pedido.prioridad,
     notas: pedido.notas,
-    destino: pedido.tipoSolicitud === "repuesto" ? pedido.maquinaNo
-      : pedido.tipoSolicitud === "stock" ? pedido.lineas[0]?.almacen : undefined,
+    // Consumo inmediato = las líneas traían tarea (Job Task) de la obra.
+    consumo: pedido.lineas.some((l) => !!l.taskNo),
+    destino: pedido.tipoSolicitud === "repuesto" ? pedido.maquinaNo : undefined,
     lineas: pedido.lineas.map((l) => ({
       code: l.articuloId, cantidad: l.cantidad,
       obraCodigo: pedido.tipoSolicitud === "material" ? l.almacen : undefined,
@@ -53,6 +54,11 @@ export default function PedidoDetallePage() {
             <div className="row gap-3">
               <h1 className="ds-heading">{pedido.numero}</h1>
               <Badge tone={t.tone}>{t.label}</Badge>
+              {pedido.tipoSolicitud === "material" && (
+                <Badge tone={esConsumoInmediato(pedido) ? "green" : "gray"}>
+                  {esConsumoInmediato(pedido) ? "Consumo inmediato" : "Al Almacén General"}
+                </Badge>
+              )}
               <Badge tone={b.tone}>{b.label}</Badge>
             </div>
             <p className="ds-muted">{destinoLabel(pedido)} · {pedido.solicitante} · {formatDate(pedido.fecha)}</p>

@@ -17,9 +17,21 @@ export async function aprobarYLanzar(
 ): Promise<{ ok: boolean; message: string; tone: "success" | "error" }> {
   const lineasBc = orden.lineas
     .filter((l) => l.tipo === "articulo" && l.articuloId && l.cantidad > 0)
-    // Consumo inmediato: proyecto (obra) + tarea. Stock: almacén. Repuesto: nada.
-    // (proyecto/taskNo se setean solo en líneas de material de consumo; en stock viaja el almacén.)
-    .map((l) => ({ itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0, descripcion: l.descripcion, variantCode: l.variantCode, jobNo: l.proyecto || undefined, jobTaskNo: l.taskNo || undefined, locationCode: l.proyecto ? undefined : (l.almacen || undefined) }));
+    // El discriminante es la TAREA, no el proyecto: consumo inmediato = proyecto +
+    // tarea (BC exige los dos para consumir contra el Job); cualquier otra línea va a
+    // ALMACÉN (locationCode). Antes bastaba con que hubiera proyecto para NO mandar
+    // almacén, y una línea con obra pero sin tarea terminaba sin job y sin almacén
+    // (caía en el almacén por defecto de BC).
+    .map((l) => {
+      const consumo = !!(l.proyecto && l.taskNo);
+      return {
+        itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0,
+        descripcion: l.descripcion, variantCode: l.variantCode,
+        jobNo: consumo ? l.proyecto : undefined,
+        jobTaskNo: consumo ? l.taskNo : undefined,
+        locationCode: consumo ? undefined : (l.almacen || undefined),
+      };
+    });
   // Cargos de producto (Item Charge): TODAS las líneas tipo "cargo" con precio, cada
   // una con su tipo (chargeNo). El codeunit las distribuye por importe entre los
   // artículos al registrar.

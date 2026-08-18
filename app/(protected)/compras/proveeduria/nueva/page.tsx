@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente } from "@/lib/compras/helpers";
+import { money, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, ALMACEN_GENERAL } from "@/lib/compras/helpers";
 import type { OrdenLinea } from "@/lib/compras/types";
 
 interface Row {
@@ -94,7 +94,16 @@ export default function ArmarOrdenPage() {
       let info = { pedidoNumero: "", articuloId: "", variantCode: "", descripcion: "", unidad: "", almacen: "", proyecto: "", tarea: "" };
       for (const p of pedidos) {
         const l = p.lineas.find((x) => x.id === b.pedidoLineaId);
-        if (l) { info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", descripcion: l.descripcion, unidad: l.unidad, almacen: l.almacen, proyecto: p.tipoSolicitud === "material" ? (l.almacen || p.obraCodigo || "") : "", tarea: l.taskNo ?? "" }; break; }
+        // Consumo inmediato = la línea trae TAREA: va contra proyecto (obra) + tarea.
+        // Material de obra SIN tarea = entra a inventario → Almacén General (la línea
+        // del pedido guarda la obra en `almacen`, no un almacén de recepción).
+        if (l) {
+          const consumo = p.tipoSolicitud === "material" && !!l.taskNo;
+          info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", descripcion: l.descripcion, unidad: l.unidad,
+            almacen: p.tipoSolicitud === "material" && !consumo ? ALMACEN_GENERAL : l.almacen,
+            proyecto: consumo ? (l.almacen || p.obraCodigo || "") : "", tarea: l.taskNo ?? "" };
+          break;
+        }
       }
       return {
         pedidoLineaId: b.pedidoLineaId, ...info,
@@ -148,9 +157,11 @@ export default function ArmarOrdenPage() {
     const hist = itemsBc.find((x) => x.code === l.articuloId)?.precioUltimo ?? bcPrices[l.articuloId] ?? 0;
     setRows((rs) => [...rs, {
       pedidoNumero: p.numero, pedidoLineaId: l.id, articuloId: l.articuloId, variantCode: l.variantCode ?? "",
-      descripcion: l.descripcion, unidad: l.unidad, almacen: l.almacen,
+      descripcion: l.descripcion, unidad: l.unidad,
+      // Mismo criterio que arriba: con tarea → proyecto+tarea; sin tarea → Almacén General.
+      almacen: p.tipoSolicitud === "material" && !l.taskNo ? ALMACEN_GENERAL : l.almacen,
       cantidad: String(pend), precio: String(hist || 0), iva: "13", descuento: "0",
-      proyecto: p.tipoSolicitud === "material" ? (l.almacen || p.obraCodigo || "") : "", tarea: l.taskNo ?? "",
+      proyecto: p.tipoSolicitud === "material" && l.taskNo ? (l.almacen || p.obraCodigo || "") : "", tarea: l.taskNo ?? "",
     }]);
   }
 

@@ -1,10 +1,23 @@
 import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
 
 // Badge del tipo de solicitud (Material / Repuesto / Stock).
+// Almacén de inventario general: destino del material de obra que NO es de consumo
+// inmediato. En BC cada obra tiene además su propio almacén (mismo código que la
+// obra), por eso la línea de pedido guarda la OBRA en `almacen` y el traspaso a la
+// orden decide el almacén real según haya tarea o no.
+export const ALMACEN_GENERAL = "ALM-GRAL";
+
 export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: string } {
   return t === "repuesto" ? { label: "Repuesto", tone: "yellow" }
     : t === "stock" ? { label: "Stock", tone: "gray" }
     : { label: "Material", tone: "green" };
+}
+
+// Consumo inmediato: el pedido de obra cuyo material se consume de una vez contra
+// el proyecto + la tarea, en vez de entrar al inventario del Almacén General. NO es
+// un tipo de solicitud aparte: es un tag del pedido, y vive en la TAREA de sus líneas.
+export function esConsumoInmediato(p: Pedido): boolean {
+  return p.tipoSolicitud === "material" && p.lineas.some((l) => !!l.taskNo);
 }
 
 export function destinoLabel(p: Pedido): string {

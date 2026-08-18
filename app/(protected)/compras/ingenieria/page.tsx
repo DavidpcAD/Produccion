@@ -12,7 +12,7 @@ import { HoverCard } from "@/components/compras/hover-card";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { devolucionInfo, formatDate, formatDiaMes, pedidoBadge, pedidoNumeroCorto, pedidoProgreso, tipoSolicitudBadge, type DevolucionInfo } from "@/lib/compras/helpers";
+import { devolucionInfo, esConsumoInmediato, formatDate, formatDiaMes, pedidoBadge, pedidoNumeroCorto, pedidoProgreso, tipoSolicitudBadge, type DevolucionInfo } from "@/lib/compras/helpers";
 import type { Pedido } from "@/lib/compras/types";
 
 type Filtro = "todas" | "material" | "repuesto" | "completado";
@@ -63,7 +63,7 @@ export default function IngenieriaPage() {
     // Pedido: en la UI solo los últimos dígitos (0025); el nº completo va en el tooltip.
     { id: "num", header: "Pedido", accessorFn: (p) => p.numero, meta: { label: "Pedido" }, cell: (c) => { const p = c.row.original; return <span className="ds-strong" style={{ whiteSpace: "nowrap" }} title={`Solicitud ${p.numero}`}>{pedidoNumeroCorto(p.numero)}</span>; } },
     // Destino: código de obra/máquina; el tipo y el nombre completo van en el tooltip.
-    { id: "destino", header: "Destino", accessorFn: (p) => `${destCodigo(p)} ${destNombre(p)}`.trim(), meta: { label: "Destino" }, cell: (c) => { const p = c.row.original; const tip = `${tipoSolicitudBadge(p.tipoSolicitud).label} · ${destCodigo(p)}${destNombre(p) ? ` — ${destNombre(p)}` : ""}`; return <span className="ds-strong ds-body-sm" style={{ whiteSpace: "nowrap" }} title={tip}>{destCodigo(p)}</span>; } },
+    { id: "destino", header: "Destino", accessorFn: (p) => `${destCodigo(p)} ${destNombre(p)}${esConsumoInmediato(p) ? " consumo inmediato" : ""}`.trim(), meta: { label: "Destino" }, cell: (c) => { const p = c.row.original; const ci = esConsumoInmediato(p); const tip = `${tipoSolicitudBadge(p.tipoSolicitud).label} · ${destCodigo(p)}${destNombre(p) ? ` — ${destNombre(p)}` : ""}${ci ? " · consumo inmediato" : p.tipoSolicitud === "material" ? " · al Almacén General" : ""}`; return <span className="row gap-2" style={{ alignItems: "center", whiteSpace: "nowrap" }} title={tip}><span className="ds-strong ds-body-sm">{destCodigo(p)}</span>{ci && <Badge tone="green">CI</Badge>}</span>; } },
     // Fecha: "8 Agosto"; el detalle dd/mm/aaaa va en el tooltip.
     { id: "fecha", header: "Fecha", accessorFn: (p) => p.fecha, meta: { label: "Fecha", date: true }, cell: (c) => { const p = c.row.original; return <span className="ds-body-sm" style={{ whiteSpace: "nowrap" }} title={formatDate(p.fecha)}>{formatDiaMes(p.fecha)}</span>; } },
     // Estado: barrita de progreso (5 pasos). El filtro sigue por el estado del pedido.

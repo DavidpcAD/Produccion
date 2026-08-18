@@ -22,6 +22,7 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
+import { ALMACEN_GENERAL } from "@/lib/compras/helpers";
 
 type Variante = { code: string; descripcion: string };
 // Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
@@ -37,7 +38,9 @@ export type NuevaSolicitudSeed = {
   tipo: TipoSolicitud;
   prioridad?: Pedido["prioridad"];
   notas?: string;
-  destino?: string;          // repuesto → máquina; stock → almacén
+  destino?: string;          // repuesto → máquina
+  /** true = el pedido copiado era de consumo inmediato (sus líneas traían tarea). */
+  consumo?: boolean;
   lineas: PlantillaLinea[];
 };
 type FTipo = "todas" | "mias" | "general" | "bodega";
@@ -66,11 +69,22 @@ function mergeDedup(rows: Row[]): { rows: Row[]; merged: number } {
   }
   return { rows: [...byKey.values()], merged };
 }
+// Tipos REALES de solicitud. Ojo: "Consumo inmediato" NO es un tipo, es el DESTINO
+// del material dentro de un pedido de obra (ver DESTINOS): el ingeniero pide material
+// para una obra y ese material o entra al Almacén General (inventario, se consume
+// después) o se consume de una vez contra el proyecto + la tarea de la obra.
 const TIPOS: { v: TipoSolicitud; label: string; destino: string }[] = [
-  { v: "material", label: "Consumo inmediato", destino: "Obra" },
+  { v: "material", label: "Material (obra)", destino: "Obra" },
   { v: "repuesto", label: "Repuesto", destino: "Máquina" },
-  { v: "stock", label: "Stock", destino: "Almacén" },
 ];
+// Destino del material de un pedido de obra (el "tag" del pedido).
+type DestinoMat = "almacen" | "consumo";
+const DESTINOS: { v: DestinoMat; label: string; ayuda: string }[] = [
+  { v: "almacen", label: "Al Almacén General", ayuda: "Entra a inventario del Almacén General; se consume después." },
+  { v: "consumo", label: "Consumo inmediato", ayuda: "Se consume de una vez contra el proyecto y la tarea de la obra." },
+];
+// Almacén de inventario al que entra el material que no es de consumo inmediato.
+const ALM_GENERAL = ALMACEN_GENERAL;
 const PRIORIDADES: { v: Pedido["prioridad"]; label: string }[] = [
   { v: "normal", label: "Normal" }, { v: "alta", label: "Alta" }, { v: "urgente", label: "Urgente" },
 ];
@@ -485,17 +499,32 @@ function ComentarioBtn({ value, onChange, required }: { value: string; onChange:
 
 // ─── Comentario POR LÍNEA: ícono de nota en cada material; abre un popover para
 //     escribir una nota específica de esa línea (además del comentario del pedido). ──
+// Comentario de UNA línea. Con texto se muestra el comentario en la fila (antes solo
+// vivía en el tooltip del ícono y se leía a medias); vacío queda solo el ícono.
 function LineaComentarioBtn({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const has = !!value.trim();
+  const ico = (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+  );
   return (
-    <div ref={ref} style={{ display: "inline-flex" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} title={has ? value : "Comentario de la línea"}
-        aria-label={has ? "Editar comentario de la línea" : "Agregar comentario a la línea"}
-        style={{ background: "none", border: 0, cursor: "pointer", color: has ? "var(--ds-color-green-200)" : "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
+    <div ref={ref} style={has
+      ? { display: "flex", flex: "1 1 150px", minWidth: 0 }
+      : { display: "inline-flex", flex: "0 0 auto" }}>
+      {has ? (
+        <button type="button" className="nsl-linenota" onClick={() => setOpen((o) => !o)}
+          aria-label="Editar comentario de la línea">
+          {ico}
+          <span className="nsl-linenota__txt">{value.trim()}</span>
+        </button>
+      ) : (
+      <button type="button" onClick={() => setOpen((o) => !o)} title="Comentario de la línea"
+        aria-label="Agregar comentario a la línea"
+        style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
       </button>
+      )}
       <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={300}>
         <div style={{ padding: 12, width: "100%" }}>
           <span className="ds-form-field__label" style={{ display: "block", marginBottom: 6 }}>Comentario de la línea</span>
@@ -587,6 +616,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const catAlm = bcAlm ?? almacenes;
 
   const [tipo, setTipo] = useState<TipoSolicitud>("material");
+  // Destino del material (tag del pedido): almacén general o consumo inmediato.
+  const [destinoMat, setDestinoMat] = useState<DestinoMat>("almacen");
   const [destino, setDestino] = useState("");
   const [prioridad, setPrioridad] = useState<Pedido["prioridad"]>("normal");
   const [lineas, setLineas] = useState<Row[]>([]);
@@ -626,23 +657,17 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     for (const l of lineas) { const a = catArticulos.find((x) => x.id === l.articuloId); if (a?.code) getVariantes(a.code); }
   }, [lineas, catArticulos]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Bodega (stock): por defecto el Almacén General mientras no se elija otro.
-  useEffect(() => {
-    if (tipo !== "stock" || destino) return;
-    const gen = catAlm.find((a) => a.codigo === "ALM-GRAL")
-      ?? catAlm.find((a) => /general/i.test((a as { nombre?: string }).nombre ?? "") || /general/i.test(a.codigo));
-    if (gen) setDestino(gen.codigo);
-  }, [tipo, destino, catAlm]);
-
-  // ── Bodega: stock del almacén elegido, para sugerir cuánto pedir ───────────────
-  // Existencias del almacén (una llamada), sumadas por artículo (itemNo = código).
+  // ── Stock del Almacén General, para sugerir cuánto pedir ──────────────────────
+  // Aplica al material de obra que va a inventario (no al de consumo inmediato):
+  // existencias del almacén (una llamada), sumadas por artículo (itemNo = código).
   const [stockPorCode, setStockPorCode] = useState<Record<string, number>>({});
   const [stockReady, setStockReady] = useState(false);
+  const verStock = tipo === "material" && destinoMat === "almacen";
   useEffect(() => {
-    if (tipo !== "stock" || !destino) { setStockReady(false); setStockPorCode({}); return; }
+    if (!verStock) { setStockReady(false); setStockPorCode({}); return; }
     let cancel = false;
     setStockReady(false);
-    fetch(`/api/compras/bc/existencias?locationCode=${encodeURIComponent(destino)}`)
+    fetch(`/api/compras/bc/existencias?locationCode=${encodeURIComponent(ALM_GENERAL)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (cancel) return;
@@ -655,13 +680,13 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
       })
       .catch(() => { if (!cancel) { setStockPorCode({}); setStockReady(true); } });
     return () => { cancel = true; };
-  }, [tipo, destino]);
+  }, [verStock]);
 
   // Con el stock listo, prellenar "pedir" = max(0, requerido − stock) en las líneas de
   // Bodega que vienen de plantilla. Una sola vez por línea (autoPedir → false al aplicar),
   // así no pisa lo que el usuario ajuste después.
   useEffect(() => {
-    if (tipo !== "stock" || !stockReady) return;
+    if (!verStock || !stockReady) return;
     setLineas((ls) => {
       let changed = false;
       const next = ls.map((l) => {
@@ -672,10 +697,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
       });
       return changed ? next : ls;
     });
-  }, [tipo, stockReady, stockPorCode, lineas, catArticulos]);
+  }, [verStock, stockReady, stockPorCode, lineas, catArticulos]);
 
   const tipoMeta = TIPOS.find((t) => t.v === tipo)!;
   const esMaterial = tipo === "material";
+  // Consumo inmediato: material de obra que se consume contra proyecto + tarea.
+  const esConsumo = esMaterial && destinoMat === "consumo";
   const obraItems: Item[] = useMemo(() => catObras.map((o) => ({ id: o.codigo, title: o.nombre, sub: o.codigo })), [catObras]);
   const destinoItems: Item[] = useMemo(() => {
     if (tipo === "repuesto") return maquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.no }));
@@ -708,10 +735,13 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   // Material: cada línea debe tener obra (su tarjeta debe tener obra elegida).
   const destinoOk = esMaterial ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo)) : !!destino;
   const comentarioOk = notas.trim().length > 0; // comentario para proveeduría OBLIGATORIO al solicitar
-  const canContinue = validLines.length > 0 && destinoOk && comentarioOk && validLines.every((l) => !necesitaVariante(l));
+  // Consumo inmediato: sin tarea BC no puede consumir contra el proyecto, así que la
+  // actividad es obligatoria en cada obra que tenga líneas.
+  const tareasOk = !esConsumo || grupos.every((g) => !lineas.some((l) => l.grupoKey === g.key) || !!g.taskNo);
+  const canContinue = validLines.length > 0 && destinoOk && comentarioOk && tareasOk && validLines.every((l) => !necesitaVariante(l));
 
   function reset() {
-    setTipo("material"); setDestino(""); setPrioridad("normal");
+    setTipo("material"); setDestinoMat("almacen"); setDestino(""); setPrioridad("normal");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
     setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]); setConfirmPedir(false);
   }
@@ -756,8 +786,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   // Carga una plantilla: agrupa sus materiales por obra → una tarjeta por obra.
   // Bodega: todo a un único grupo (SOLO), sin obra.
   function aplicarPlantilla(pl: Plantilla) {
+    // "Bodega" describe la plantilla (lista de reposición), NO el armado: hoy una
+    // plantilla de bodega es material de obra que va al Almacén General, así que sus
+    // líneas también van en una tarjeta de obra. Grupo único (sin obra) solo en repuesto.
     const bodega = esBodega(pl);
-    const { grupos: nuevosGrupos, rows, extras } = armarGruposFilas(pl.lineas, bodega);
+    const sinObra = tipo === "repuesto";
+    const { grupos: nuevosGrupos, rows, extras } = armarGruposFilas(pl.lineas, sinObra);
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
     // La plantilla puede traer el mismo material repetido en la misma obra: se
     // unifican (suma cantidades) para no cargar líneas duplicadas.
@@ -766,7 +800,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     // cuando llegue el stock del almacén, "pedir" arranque en max(0, requerido − stock).
     const finalRows = bodega ? dedup.map((l) => ({ ...l, requerido: l.cantidad, autoPedir: true })) : dedup;
     if (finalRows.length) {
-      setGrupos(bodega ? [] : nuevosGrupos);
+      setGrupos(sinObra ? [] : nuevosGrupos);
       setLineas(finalRows);
       toast(`Plantilla "${pl.nombre}" cargada (${finalRows.length} materiales)${merged ? ` · ${merged} repetido${merged > 1 ? "s" : ""} unificado${merged > 1 ? "s" : ""}` : ""}`, "success");
     } else toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
@@ -775,11 +809,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   // Copiar pedido: siembra el drawer con las líneas de un pedido existente. Mismo
   // armado que una plantilla; setea además tipo/prioridad/notas/destino del origen.
   function aplicarSeed(s: NuevaSolicitudSeed) {
-    const bodega = s.tipo !== "material"; // repuesto/stock: grupo único, sin obra (usa destino)
+    // repuesto: grupo único sin obra (usa destino). 'stock' es un tipo LEGADO de
+    // pedidos viejos: hoy eso es material de obra que va al Almacén General.
+    const bodega = s.tipo === "repuesto";
     const { grupos: gs, rows, extras } = armarGruposFilas(s.lineas, bodega);
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
     const { rows: dedup } = mergeDedup(rows);
-    setTipo(s.tipo);
+    setTipo(s.tipo === "repuesto" ? "repuesto" : "material");
+    setDestinoMat(s.consumo ? "consumo" : "almacen");
     if (s.destino) setDestino(s.destino);
     if (s.prioridad) setPrioridad(s.prioridad);
     if (s.notas) setNotas(s.notas);
@@ -797,8 +834,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     const pl = plantillas.find((p) => String(p.id) === id);
     if (!pl) return;
     setPlantillaSel(id);
-    if (esBodega(pl)) { setTipo("stock"); setDestino(""); }
-    else { setTipo("material"); }
+    // Las plantillas de Bodega son listas de reposición → material al Almacén General.
+    setTipo("material");
+    if (esBodega(pl)) setDestinoMat("almacen");
     aplicarPlantilla(pl);
   }
 
@@ -878,7 +916,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
 
   function headerObra(): { codigo?: string; nombre?: string } {
     if (tipo === "repuesto") return {};
-    if (tipo === "stock") return { codigo: destino, nombre: destinoNombre };
     const codes = Array.from(new Set(validLines.map((l) => l.obraCodigo).filter(Boolean))) as string[];
     if (codes.length === 1) return { codigo: codes[0], nombre: obraNombreDe(codes[0]) };
     if (codes.length === 0) return { codigo: destino || undefined, nombre: destino ? obraNombreDe(destino) : undefined };
@@ -898,7 +935,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
       lineas: validLines.map((l) => {
         const a = catArticulos.find((x) => x.id === l.articuloId)!;
         // Consumo inmediato: la tarea (actividad) se elige por obra y se copia a cada línea.
-        const g = esMaterial ? grupos.find((x) => x.key === l.grupoKey) : undefined;
+        const g = esConsumo ? grupos.find((x) => x.key === l.grupoKey) : undefined;
         // Si se eligió variante, se guarda la descripción de la variante (más específica);
         // si no, la descripción base del material.
         return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: esMaterial ? (l.obraCodigo || "") : "", variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined, taskNo: g?.taskNo || undefined, taskDescr: g?.taskNombre || undefined };
@@ -924,7 +961,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     const nombre = nombrePlant.trim();
     if (!nombre || validLines.length === 0) return;
     setSavingPlant(true);
-    const tipoPlant = tipo === "stock" ? "bodega" : "general";
+    const tipoPlant = esConsumo ? "general" : "bodega";
     // Plantilla REUSABLE: NO se guarda la casa (obraCodigo vacío); la obra se elige al
     // cargarla. Si el mismo material (+variante) estaba en varias obras, se unifica en
     // una sola línea sumando la cantidad, para que quede un set de materiales limpio.
@@ -977,6 +1014,19 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                 <Field label="Tipo de solicitud">
                   <Segmented variant="pill" value={tipo} options={TIPOS.map((t) => ({ v: t.v, label: t.label }))} onChange={cambiarTipo} />
                 </Field>
+
+                {/* Material de obra: ¿entra a inventario o se consume de una vez?
+                    Es el "tag" del pedido, no un tipo aparte. */}
+                {esMaterial && (
+                  <Field label="Destino del material">
+                    <div className="col gap-2">
+                      <Segmented variant="pill" value={destinoMat}
+                        options={DESTINOS.map((d) => ({ v: d.v, label: d.label }))}
+                        onChange={(v: DestinoMat) => setDestinoMat(v)} />
+                      <span className="ds-muted ds-label">{DESTINOS.find((d) => d.v === destinoMat)!.ayuda}</span>
+                    </div>
+                  </Field>
+                )}
 
                 {/* USAR PLANTILLA: botón (siempre visible, como la referencia). */}
                 <UsarPlantillaBtn items={plantillaItems} value={plantillaSel} hasMateriales={hayMateriales}
@@ -1035,8 +1085,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                               )}
                             </div>
 
-                            {/* Consumo inmediato: actividad (tarea) de la obra */}
-                            {g.obraCodigo && (
+                            {/* Consumo inmediato: actividad (tarea) de la obra. Sin
+                                tarea BC no puede consumir contra el proyecto, así que
+                                acá es obligatoria (y no se pide si va a inventario). */}
+                            {esConsumo && g.obraCodigo && (
                               <div className="row gap-2" style={{ alignItems: "center", padding: "0 12px 10px" }}>
                                 <span className="ds-muted ds-label" style={{ flexShrink: 0 }}>Actividad</span>
                                 <TareaPicker obra={g.obraCodigo} value={g.taskNo} valueNombre={g.taskNombre}
@@ -1060,6 +1112,17 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                       <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
                                         <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
                                         <span className="ds-muted ds-label">{a?.code}</span>
+                                        {verStock && (
+                                          /* Mientras BC no devuelve las existencias se muestra un
+                                             esqueleto: "En stock: 0" se lee como "no hay". */
+                                          <span className="row" style={{ alignItems: "center", gap: 6 }}>
+                                            <span className="ds-muted ds-label">En stock:</span>
+                                            {stockReady
+                                              ? <span className="ds-muted ds-label">{stockPorCode[a?.code ?? ""] ?? 0}</span>
+                                              : <span className="nsl-skel" style={{ width: 32 }} role="status" aria-label="Cargando stock" />}
+                                            {l.requerido != null && <span className="ds-muted ds-label">· plantilla pide {l.requerido}</span>}
+                                          </span>
+                                        )}
                                       </div>
                                       {variantes.length > 0 && (
                                         <div style={{ flex: "0 0 200px", minWidth: 0 }}>
@@ -1067,10 +1130,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                             onPick={(code, nombre) => setLinea(l.key, { variantCode: code, variantNombre: nombre })} />
                                         </div>
                                       )}
+                                      {/* Comentario de la línea: al centro y VISIBLE cuando hay texto. */}
+                                      <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                       <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
-                                        <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n })} />
+                                        <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n, autoPedir: false })} />
                                         <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
-                                        <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                         <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
                                           style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
                                           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -1092,7 +1156,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                     </button>
                   </div>
                 ) : (
-                  /* REPUESTO / BODEGA: un solo destino (máquina/almacén) + lista de materiales. */
+                  /* REPUESTO: una máquina + lista de repuestos. */
                   <div className="col gap-4">
                     <div className="col gap-2">
                       <span className="ds-form-field__label">{tipoMeta.destino}</span>
@@ -1116,9 +1180,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                 <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
                                   <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
                                   <span className="ds-muted ds-label">{a?.code}</span>
-                                  {tipo === "stock" && (
-                                    <span className="ds-muted ds-label">En stock: {stockPorCode[a?.code ?? ""] ?? 0}{l.requerido != null ? ` · plantilla pide ${l.requerido}` : ""}</span>
-                                  )}
                                 </div>
                                 {variantes.length > 0 && (
                                   <div style={{ flex: "0 0 200px", minWidth: 0 }}>
@@ -1126,10 +1187,13 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                       onPick={(code, nombre) => setLinea(l.key, { variantCode: code, variantNombre: nombre })} />
                                   </div>
                                 )}
+                                {/* Comentario de la línea: al centro y VISIBLE cuando hay texto. */}
+                                <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                 <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
-                                  <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n })} />
+                                  {/* autoPedir:false → si el usuario ya escribió, el prellenado
+                                      (requerido − stock) no le pisa el número al llegar el stock. */}
+                                  <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n, autoPedir: false })} />
                                   <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
-                                  <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                   <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
                                     style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
                                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -1178,7 +1242,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                 <h3 className="ds-subtitle-lg" style={{ marginTop: 0, marginBottom: 6 }}>Guardar como plantilla</h3>
                 <p className="ds-muted ds-body-sm" style={{ marginTop: 0, marginBottom: 14 }}>
                   Se guardan las {validLines.length} línea(s) como plantilla{" "}
-                  <strong>{tipo === "stock" ? "de Bodega" : "General"}</strong> a tu nombre.
+                  <strong>{esConsumo ? "General" : "de Bodega"}</strong> a tu nombre.
                 </p>
                 <input autoFocus value={nombrePlant} onChange={(e) => setNombrePlant(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && nombrePlant.trim()) guardarComoPlantilla(); }}
@@ -1202,7 +1266,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                 <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
                   Se envía a proveeduría: <strong>{validLines.length} material(es)</strong>
                   {esMaterial
-                    ? <> en <strong>{gruposPreview.length} obra{gruposPreview.length !== 1 ? "s" : ""}</strong></>
+                    ? <> en <strong>{gruposPreview.length} obra{gruposPreview.length !== 1 ? "s" : ""}</strong>, {esConsumo ? <strong>consumo inmediato (contra proyecto y tarea)</strong> : <>al <strong>Almacén General</strong></>}</>
                     : <> para <strong>{destinoNombre || tipoMeta.destino}</strong></>}
                   {prioridad !== "normal" && <> · prioridad <strong>{PRIORIDADES.find((p) => p.v === prioridad)!.label}</strong></>}.
                 </p>
