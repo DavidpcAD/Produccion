@@ -91,14 +91,14 @@ export default function ArmarOrdenPage() {
 
   const [rows, setRows] = useState<Row[]>(() =>
     borrador.map((b) => {
-      let info = { pedidoNumero: "", articuloId: "", variantCode: "", descripcion: "", unidad: "", almacen: "", proyecto: "" };
+      let info = { pedidoNumero: "", articuloId: "", variantCode: "", descripcion: "", unidad: "", almacen: "", proyecto: "", tarea: "" };
       for (const p of pedidos) {
         const l = p.lineas.find((x) => x.id === b.pedidoLineaId);
-        if (l) { info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", descripcion: l.descripcion, unidad: l.unidad, almacen: l.almacen, proyecto: p.tipoSolicitud === "material" ? (l.almacen || p.obraCodigo || "") : "" }; break; }
+        if (l) { info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", descripcion: l.descripcion, unidad: l.unidad, almacen: l.almacen, proyecto: p.tipoSolicitud === "material" ? (l.almacen || p.obraCodigo || "") : "", tarea: l.taskNo ?? "" }; break; }
       }
       return {
         pedidoLineaId: b.pedidoLineaId, ...info,
-        cantidad: String(b.cantidad), precio: String(b.precio), iva: String(b.iva), descuento: "0", tarea: "",
+        cantidad: String(b.cantidad), precio: String(b.precio), iva: String(b.iva), descuento: "0",
       };
     })
   );
@@ -150,7 +150,7 @@ export default function ArmarOrdenPage() {
       pedidoNumero: p.numero, pedidoLineaId: l.id, articuloId: l.articuloId, variantCode: l.variantCode ?? "",
       descripcion: l.descripcion, unidad: l.unidad, almacen: l.almacen,
       cantidad: String(pend), precio: String(hist || 0), iva: "13", descuento: "0",
-      proyecto: p.tipoSolicitud === "material" ? (l.almacen || p.obraCodigo || "") : "", tarea: "",
+      proyecto: p.tipoSolicitud === "material" ? (l.almacen || p.obraCodigo || "") : "", tarea: l.taskNo ?? "",
     }]);
   }
 
