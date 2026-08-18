@@ -7,7 +7,7 @@ import { IconChevronDown } from "@/components/compras/icons";
 import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { money, num, formatDate, ordenBadge, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenEsDirecta } from "@/lib/compras/helpers";
+import { money, num, formatDate, ordenBadge, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Vista de detalle de una orden, reutilizada por Proveeduría, Aprobación y Bodega.
@@ -25,7 +25,7 @@ export function OrdenDetalle({
   acciones?: React.ReactNode;
   solicitudHref?: (l: Orden["lineas"][number]) => string | null;
 }) {
-  const { proveedores, recepciones } = useStore();
+  const { proveedores, recepciones, pedidos } = useStore();
   const router = useRouter();
   const toast = useToast();
   const [verFactura, setVerFactura] = useState<string | null>(null);
@@ -70,6 +70,7 @@ export function OrdenDetalle({
   const prov = proveedores.find((p) => p.id === orden.proveedorId);
   const b = ordenBadge(orden.estado);
   const peds = ordenPedidos(orden);
+  const maquinas = ordenMaquinas(orden, pedidos);
   const esDirecta = ordenEsDirecta(orden);
   const recs = recepciones.filter((r) => r.ordenId === orden.id);
   const subtotal = orden.lineas.filter((l) => l.tipo === "articulo").reduce((s, l) => s + ordenLineaImporte(l), 0);
@@ -87,6 +88,7 @@ export function OrdenDetalle({
             {esDirecta && <Badge tone="yellow">Directa</Badge>}
           </div>
           <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · emitida {formatDate(orden.fecha)} · recibido {ordenRecibidoPct(orden)}%{orden.bcNumber ? ` · BC ${orden.bcNumber}` : ""}</p>
+          {maquinas.length > 0 && <p className="ds-body-sm ds-muted">Máquina: <span className="ds-strong">{maquinas.join(", ")}</span></p>}
           {orden.almacenRecepcion && <p className="ds-body-sm ds-muted">Recepción en almacén <span className="ds-strong">{orden.almacenRecepcion}</span></p>}
           <div className="row gap-2 wrap mt-2">
             {esDirecta ? (

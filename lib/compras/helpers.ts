@@ -215,6 +215,15 @@ export function ordenPedidos(o: Orden): string[] {
   return [...new Set(o.lineas.filter((l) => l.pedidoNumero && l.pedidoNumero !== "Manual").map((l) => l.pedidoNumero!))];
 }
 
+// Máquinas destino de una orden de repuestos. La orden no guarda la máquina; se deriva
+// de los pedidos origen (un pedido de repuesto sí lleva maquinaNombre).
+export function ordenMaquinas(o: Orden, pedidos: Pedido[]): string[] {
+  const nums = new Set(o.lineas.map((l) => l.pedidoNumero).filter(Boolean));
+  const out = new Set<string>();
+  for (const p of pedidos) if (nums.has(p.numero) && p.maquinaNombre) out.add(p.maquinaNombre);
+  return [...out];
+}
+
 // Orden "directa" = compra armada sin partir de una solicitud (ninguna línea
 // proviene de un pedido real). Las órdenes que nacen de solicitudes tienen al
 // menos una línea con su PED-… de origen.

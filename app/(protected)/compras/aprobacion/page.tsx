@@ -6,11 +6,11 @@ import { Badge, Button, Card, Modal, Textarea, Tile, useToast } from "@/componen
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
 import { AprobarControl } from "@/components/compras/aprobar-control";
-import { money, formatDate, num, ordenLineaImporte, ordenTotalConIva } from "@/lib/compras/helpers";
+import { money, formatDate, num, ordenLineaImporte, ordenMaquinas, ordenTotalConIva } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 export default function AprobacionPage() {
-  const { ordenes, proveedores, setOrdenEstado, devolverOrden } = useStore();
+  const { ordenes, proveedores, pedidos, setOrdenEstado, devolverOrden } = useStore();
   const toast = useToast();
   const prov = (id: string) => proveedores.find((p) => p.id === id);
   const [rechObj, setRechObj] = useState<{ id: string; numero: string } | null>(null);
@@ -115,6 +115,7 @@ export default function AprobacionPage() {
           {porAprobar.length === 0 && <Card><div className="empty" style={{ lineHeight: 1.6 }}>No hay órdenes pendientes de aprobación.<br /><span className="ds-muted ds-body-sm">Para ver las que ya aprobaste o se completaron, abrí la pestaña <strong>“Todas las órdenes”</strong> arriba.</span></div></Card>}
           {porAprobar.map((o) => {
             const articulos = o.lineas.filter((l) => l.tipo === "articulo");
+            const maquinas = ordenMaquinas(o, pedidos);
             const total = ordenTotalConIva(o);
             const open = abierto.has(o.id);
             return (
@@ -135,7 +136,7 @@ export default function AprobacionPage() {
                       <Badge tone="yellow">Pendiente de aprobación</Badge>
                     </div>
                     <span className="ds-muted ds-label">{o.proveedorNo ?? prov(o.proveedorId)?.code} · {o.proveedorNombre ?? prov(o.proveedorId)?.nombre} · {formatDate(o.fecha)}</span>
-                    <span className="ds-muted ds-body-sm">{articulos.length} línea(s)</span>
+                    <span className="ds-muted ds-body-sm">{articulos.length} línea(s){maquinas.length > 0 ? ` · Máquina: ${maquinas.join(", ")}` : ""}</span>
                   </button>
                   {/* Monto total, grande y a la derecha (para leerlo de un vistazo) */}
                   <div className="col" style={{ alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
