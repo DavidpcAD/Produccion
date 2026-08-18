@@ -138,10 +138,24 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
   const confirm = useConfirm();
   const logoutRef = useRef<HTMLFormElement>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [devol, setDevol] = useState<{ pedidosDevueltos: number; ordenesRechazadas: number } | null>(null);
 
   useEffect(() => {
     setTheme((document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light');
   }, []);
+
+  // Conteo de devoluciones para el badge de la nav (la Sidebar está fuera del store de
+  // Compras, así que lo pide por API). Solo si el usuario tiene acceso a Compras.
+  useEffect(() => {
+    const canCompras = !allowedModules || allowedModules.includes(getRouteModule('/compras/ingenieria/devoluciones'));
+    if (!canCompras) return;
+    let cancel = false;
+    fetch('/api/compras/devoluciones-count')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancel && d && typeof d.pedidosDevueltos === 'number') setDevol(d); })
+      .catch(() => {});
+    return () => { cancel = true; };
+  }, [allowedModules]);
   function toggleTheme() {
     setTheme((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
@@ -267,6 +281,9 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
                     const childActive = child.exact
                       ? pathname === child.href
                       : (pathname === child.href || pathname.startsWith(child.href + '/'));
+                    const devolN = devol && child.href.includes('/devoluciones')
+                      ? (child.href.includes('/proveeduria') ? devol.pedidosDevueltos + devol.ordenesRechazadas : devol.pedidosDevueltos)
+                      : 0;
                     return (
                       <Link
                         key={child.href}
@@ -276,6 +293,9 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
                         className={`app-nav__subitem${childActive ? ' is-active' : ''}`}
                       >
                         {child.label}
+                        {devolN > 0 && (
+                          <span aria-label={`${devolN} devoluciones`} style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, background: 'var(--ds-color-red-200)', color: '#fff', fontSize: 11, fontWeight: 700 }}>{devolN}</span>
+                        )}
                       </Link>
                     );
                   })}
