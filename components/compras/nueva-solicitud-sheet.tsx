@@ -27,7 +27,7 @@ type Variante = { code: string; descripcion: string };
 // Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
 // varias obras (varias tarjetas). Para repuesto/bodega se usa un único grupo (SOLO).
 type Grupo = { key: string; obraCodigo?: string; obraNombre?: string };
-type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string; notas?: string };
+type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string; notas?: string; requerido?: number; autoPedir?: boolean };
 type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string };
 type Plantilla = { id: number; nombre: string; tipo?: "general" | "bodega"; idClasificacion?: number | null; lineas: PlantillaLinea[]; creadoPor?: string };
 // Semilla para "Copiar pedido": abre el drawer ya cargado con las líneas de un
@@ -582,6 +582,46 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     if (gen) setDestino(gen.codigo);
   }, [tipo, destino, catAlm]);
 
+  // ── Bodega: stock del almacén elegido, para sugerir cuánto pedir ───────────────
+  // Existencias del almacén (una llamada), sumadas por artículo (itemNo = código).
+  const [stockPorCode, setStockPorCode] = useState<Record<string, number>>({});
+  const [stockReady, setStockReady] = useState(false);
+  useEffect(() => {
+    if (tipo !== "stock" || !destino) { setStockReady(false); setStockPorCode({}); return; }
+    let cancel = false;
+    setStockReady(false);
+    fetch(`/api/compras/bc/existencias?locationCode=${encodeURIComponent(destino)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancel) return;
+        const map: Record<string, number> = {};
+        for (const e of (d?.existencias ?? []) as { itemNo: string; cantidad: number }[]) {
+          map[e.itemNo] = (map[e.itemNo] ?? 0) + (Number(e.cantidad) || 0);
+        }
+        setStockPorCode(map);
+        setStockReady(true);
+      })
+      .catch(() => { if (!cancel) { setStockPorCode({}); setStockReady(true); } });
+    return () => { cancel = true; };
+  }, [tipo, destino]);
+
+  // Con el stock listo, prellenar "pedir" = max(0, requerido − stock) en las líneas de
+  // Bodega que vienen de plantilla. Una sola vez por línea (autoPedir → false al aplicar),
+  // así no pisa lo que el usuario ajuste después.
+  useEffect(() => {
+    if (tipo !== "stock" || !stockReady) return;
+    setLineas((ls) => {
+      let changed = false;
+      const next = ls.map((l) => {
+        if (!l.autoPedir || l.requerido == null) return l;
+        changed = true;
+        const code = catArticulos.find((x) => x.id === l.articuloId)?.code ?? l.articuloId;
+        return { ...l, cantidad: Math.max(0, l.requerido - (stockPorCode[code] ?? 0)), autoPedir: false };
+      });
+      return changed ? next : ls;
+    });
+  }, [tipo, stockReady, stockPorCode, lineas, catArticulos]);
+
   const tipoMeta = TIPOS.find((t) => t.v === tipo)!;
   const esMaterial = tipo === "material";
   const obraItems: Item[] = useMemo(() => catObras.map((o) => ({ id: o.codigo, title: o.nombre, sub: o.codigo })), [catObras]);
@@ -670,10 +710,13 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     // La plantilla puede traer el mismo material repetido en la misma obra: se
     // unifican (suma cantidades) para no cargar líneas duplicadas.
     const { rows: dedup, merged } = mergeDedup(rows);
-    if (dedup.length) {
+    // Bodega: guardamos el "requerido" de la plantilla y marcamos la línea para que,
+    // cuando llegue el stock del almacén, "pedir" arranque en max(0, requerido − stock).
+    const finalRows = bodega ? dedup.map((l) => ({ ...l, requerido: l.cantidad, autoPedir: true })) : dedup;
+    if (finalRows.length) {
       setGrupos(bodega ? [] : nuevosGrupos);
-      setLineas(dedup);
-      toast(`Plantilla "${pl.nombre}" cargada (${dedup.length} materiales)${merged ? ` · ${merged} repetido${merged > 1 ? "s" : ""} unificado${merged > 1 ? "s" : ""}` : ""}`, "success");
+      setLineas(finalRows);
+      toast(`Plantilla "${pl.nombre}" cargada (${finalRows.length} materiales)${merged ? ` · ${merged} repetido${merged > 1 ? "s" : ""} unificado${merged > 1 ? "s" : ""}` : ""}`, "success");
     } else toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
   }
 
@@ -1008,6 +1051,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                 <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
                                   <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
                                   <span className="ds-muted ds-label">{a?.code}</span>
+                                  {tipo === "stock" && (
+                                    <span className="ds-muted ds-label">En stock: {stockPorCode[a?.code ?? ""] ?? 0}{l.requerido != null ? ` · plantilla pide ${l.requerido}` : ""}</span>
+                                  )}
                                 </div>
                                 {variantes.length > 0 && (
                                   <div style={{ flex: "0 0 200px", minWidth: 0 }}>
