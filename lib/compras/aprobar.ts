@@ -4,6 +4,7 @@
 // rechaza las líneas, la orden queda como estaba (pendiente) y se devuelve el
 // motivo real, para que el estado en SQL/UI nunca mienta respecto a BC.
 import type { Orden } from "./types";
+import { ALMACEN_GENERAL } from "./helpers";
 
 type SetOrdenEstado = (
   id: string,
@@ -24,12 +25,17 @@ export async function aprobarYLanzar(
     // (caía en el almacén por defecto de BC).
     .map((l) => {
       const consumo = !!(l.proyecto && l.taskNo);
+      // Obra SIN tarea = material de obra que entra a inventario: va SIEMPRE al Almacén
+      // General, nunca al almacén de la obra. (La línea de pedido guarda la obra en
+      // `almacen`, y la app de proveeduría la copia tal cual a la orden; sin esto el
+      // material se recibe en el almacén de la obra.)
+      const materialABodega = !!l.proyecto && !l.taskNo;
       return {
         itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0,
         descripcion: l.descripcion, variantCode: l.variantCode,
         jobNo: consumo ? l.proyecto : undefined,
         jobTaskNo: consumo ? l.taskNo : undefined,
-        locationCode: consumo ? undefined : (l.almacen || undefined),
+        locationCode: consumo ? undefined : (materialABodega ? ALMACEN_GENERAL : (l.almacen || undefined)),
       };
     });
   // Cargos de producto (Item Charge): TODAS las líneas tipo "cargo" con precio, cada

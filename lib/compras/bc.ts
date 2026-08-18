@@ -656,13 +656,19 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   let cargoError: string | undefined;
   let cargosCreados = 0;
   let creadas = 0;
-  // Almacén de recepción fijo (p.ej. ALM-GRAL): aunque Ingeniería pida para una
-  // obra, el material entra siempre al almacén general. Configurable por env.
+  // Almacén de recepción POR LÍNEA. Regla del negocio (BC):
+  //   · Consumo inmediato → la línea lleva N.º proyecto + N.º tarea y NADA de almacén:
+  //     el material se consume contra la obra, no entra a inventario. Si se le pone
+  //     almacén, entra a bodega (es lo que pasó con CP-003873).
+  //   · Stock → la línea lleva almacén (el de la línea, el de la orden o el de env) y
+  //     ningún proyecto.
   // La línea estándar de BC requiere el GUID (locationId), no el código.
-  const loc = input.locationCode || process.env.BC_RECEPCION_LOCATION;
-  const locId = loc ? await getStdLocationId(cid, loc) : null;
+  const locFallback = input.locationCode || process.env.BC_RECEPCION_LOCATION || "";
   const asignaciones: AsignacionLineaBc[] = [];
   for (const l of lineas) {
+    const consumo = !!(l.jobNo && l.jobTaskNo); // consumo inmediato requiere ambos
+    const locCode = consumo ? "" : (l.locationCode || locFallback);
+    const locId = locCode ? await getStdLocationId(cid, locCode) : null;
     const lineBody: Record<string, unknown> = { lineType: "Item", lineObjectNumber: l.itemNo, quantity: l.cantidad };
     if (l.precio && l.precio > 0) lineBody.directUnitCost = l.precio;
     if (locId) lineBody.locationId = locId;
@@ -677,14 +683,14 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
       // Capturar el Line No. (sequence) para poder setear proyecto/tarea/almacén después.
       const created: any = await resL.json().catch(() => ({}));
       const lineNo = Number(created?.sequence);
-      const conJob = !!(l.jobNo && l.jobTaskNo); // consumo inmediato requiere ambos
-      const conLoc = !!l.locationCode;            // stock
-      if (lineNo && (conJob || conLoc)) asignaciones.push({
+      if (lineNo && (consumo || locCode)) asignaciones.push({
         lineNo,
-        jobNo: conJob ? l.jobNo : undefined,
-        jobTaskNo: conJob ? l.jobTaskNo : undefined,
-        jobLineType: conJob ? (l.jobLineType || "Budget") : undefined,
-        locationCode: conLoc ? l.locationCode : undefined,
+        jobNo: consumo ? l.jobNo : undefined,
+        jobTaskNo: consumo ? l.jobTaskNo : undefined,
+        jobLineType: consumo ? (l.jobLineType || "Budget") : undefined,
+        // El almacén solo viaja en las líneas de stock: el codeunit ignora el
+        // locationCode vacío, así que en consumo la línea queda sin almacén.
+        locationCode: consumo ? undefined : (locCode || undefined),
       });
     }
     else {
@@ -787,7 +793,7 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
     // Consumo inmediato / Stock: recordar la asignación de proyecto+tarea / almacén (por Line No.).
     const lineNo = Number(bc.sequence);
     const conJob = !!(l.jobNo && l.jobTaskNo);
-    const conLoc = !!l.locationCode;
+    const conLoc = !conJob && !!l.locationCode; // en consumo la línea NO lleva almacén
     if (lineNo && (conJob || conLoc)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "Budget") : undefined, locationCode: conLoc ? l.locationCode : undefined });
     const patch: Record<string, unknown> = {};
     if (l.precio && l.precio > 0 && Number(bc.directUnitCost) !== l.precio) patch.directUnitCost = l.precio;

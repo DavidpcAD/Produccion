@@ -265,7 +265,15 @@ export async function listOrdenes(): Promise<Orden[]> {
   await ensureEstados();
   const pool = await getPool();
   const h = await pool.request().query("SELECT * FROM dbo.OrdenCompra WHERE esEliminada = 0 ORDER BY idOrdenCompra DESC");
-  const d = await pool.request().query("SELECT * FROM dbo.OrdenCompraDet ORDER BY idOrdenCompraDet");
+  const d = await pool.request().query(`SELECT d.*,
+             -- Consumo inmediato: la TAREA (Job Task) puede venir en NULL si la orden se
+             -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
+             -- la tarea del pedido. Sin tarea, BC no puede consumir contra el proyecto y
+             -- el material entra a inventario. Se hereda de la línea de pedido origen.
+             COALESCE(d.taskNo, pd.taskNo) AS taskNoEfectivo
+      FROM dbo.OrdenCompraDet d
+      LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
+      ORDER BY d.idOrdenCompraDet`);
   return h.recordset.map((o) => mapOrden(o, d.recordset.filter((x) => x.idOrdenCompra === o.idOrdenCompra)));
 }
 
@@ -274,7 +282,16 @@ export async function getOrden(id: number): Promise<Orden | null> {
   const pool = await getPool();
   const h = await pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.OrdenCompra WHERE idOrdenCompra=@id");
   if (!h.recordset.length) return null;
-  const d = await pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.OrdenCompraDet WHERE idOrdenCompra=@id ORDER BY idOrdenCompraDet");
+  const d = await pool.request().input("id", sql.Int, id).query(`SELECT d.*,
+             -- Consumo inmediato: la TAREA (Job Task) puede venir en NULL si la orden se
+             -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
+             -- la tarea del pedido. Sin tarea, BC no puede consumir contra el proyecto y
+             -- el material entra a inventario. Se hereda de la línea de pedido origen.
+             COALESCE(d.taskNo, pd.taskNo) AS taskNoEfectivo
+      FROM dbo.OrdenCompraDet d
+      LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
+      WHERE d.idOrdenCompra = @id
+      ORDER BY d.idOrdenCompraDet`);
   return mapOrden(h.recordset[0], d.recordset);
 }
 
@@ -295,7 +312,7 @@ function mapOrden(o: any, lineas: any[]): Orden {
       pedidoNumero: undefined, descripcion: l.descripcion ?? "", cantidad: Number(l.quantity ?? 0),
       unidad: l.unitOfMeasureCode ?? "", almacen: l.locationCode ?? "", precioUnitario: Number(l.directUnitCost ?? 0),
       ivaPct: Number(l.vatPct ?? 0), descuentoPct: Number(l.lineDiscountPct ?? 0) || undefined,
-      proyecto: l.jobNo ?? undefined, taskNo: l.taskNo ?? undefined,
+      proyecto: l.jobNo ?? undefined, taskNo: (l.taskNoEfectivo ?? l.taskNo) ?? undefined,
       chargeNo: l.chargeNo ?? undefined, chargeMethod: l.chargeMethod ?? undefined,
       cantidadRecibida: Number(l.quantityRecibida ?? 0), cantidadFacturada: Number(l.quantityFacturada ?? 0),
     })),
