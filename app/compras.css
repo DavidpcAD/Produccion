@@ -1276,7 +1276,8 @@
   .oc-scope .grid-2, .oc-scope .grid-3 { grid-template-columns: 1fr; }
   .oc-scope .tiles { grid-template-columns: 1fr 1fr; }
   .oc-scope .topbar__nav { display: none; }
-  .oc-scope .page { padding: var(--ds-space-6) var(--ds-space-4) 64px; }
+  /* El aire de arriba ya lo pone la franja del FAB (.app-content en globals.css). */
+  .oc-scope .page { padding: var(--ds-space-2) var(--ds-space-4) 64px; }
 }
 
 /* ---- Plantillas: panel, tarjetas y filtro mini ---- */

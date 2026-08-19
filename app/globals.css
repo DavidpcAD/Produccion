@@ -234,16 +234,21 @@ body {
 
 /* ── App-level overrides para componentes del Design System ── */
 /* Los componentes del DS tienen anchos fijos (Figma). En layouts web
-   los queremos fluidos. */
-.ds-form-field { width: 100%; }
-.ds-search-shell { width: 100%; }
+   los queremos fluidos.
+   OJO con la especificidad: design-system.css se importa DESPUÉS de este archivo
+   (app/layout.tsx), así que una regla de una sola clase pierde contra la del DS
+   y el campo se quedaba en sus 370px de Figma — reventaba su columna del grid en
+   pantallas angostas (tablet). Por eso van con la clase repetida. */
+.ds-form-field.ds-form-field { width: 100%; min-width: 0; }
+.ds-form-field__input-wrap.ds-form-field__input-wrap { min-width: 0; }
+.ds-search-shell.ds-search-shell { width: 100%; }
 .ds-search--label,
 .ds-search--normal,
 .ds-search--expanded { min-width: 0; }
 
 /* ── Sidebar (barmenu) — riel binario 72px ↔ 264px, solo por botón, sin hover.
    Columna SIEMPRE oscura (#2a2a2a), no cambia con el tema. ── */
-.app-shell { --nav-w: 264px; height: 100dvh; display: flex; flex-direction: column; }
+.app-shell { --nav-w: 264px; height: 100dvh; display: flex; flex-direction: column; overflow-x: clip; }
 .topbar__logo { width: 32px; height: 32px; border-radius: var(--ds-radius-md); background: var(--ds-color-green-100); display: grid; place-items: center; font-weight: 700; color: #000; }
 .topbar__logo svg { color: #000; }
 .app-content { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; margin-left: 72px; }
@@ -252,7 +257,7 @@ body {
 
 /* FAB hamburguesa (solo móvil) */
 .fab { position: fixed; }
-.fab--menu { top: var(--ds-space-4); left: var(--ds-space-5); z-index: 51; width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--ds-color-black); color: var(--ds-color-green-100); display: grid; place-items: center; cursor: pointer; box-shadow: var(--ds-shadow-03-big); transition: transform .1s ease; }
+.fab--menu { top: var(--ds-space-2); left: var(--ds-space-4); z-index: 51; width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--ds-color-black); color: var(--ds-color-green-100); display: grid; place-items: center; cursor: pointer; box-shadow: var(--ds-shadow-03-big); transition: transform .1s ease; }
 .fab--menu:active { transform: scale(.95); }
 @media (min-width: 761px) { .fab--menu { display: none; } }
 .app-nav-overlay { display: none; }
@@ -341,9 +346,21 @@ body {
   .app-nav__item, .app-nav__label, .app-nav__section, .app-nav__brand-name { transition: none; }
 }
 
+/* ── Tablet (761–1024px): el riel de 72px se queda, pero ABIERTO flota sobre el
+   contenido en vez de empujarlo. En 820px (iPad vertical) un menú fijo de 264px
+   dejaba la página en ~550px y todo salía apretado / cortado. ── */
+@media (min-width: 761px) and (max-width: 1024px) {
+  .app-shell.pinned .app-content { margin-left: 72px; }
+  .app-shell.pinned .app-nav { box-shadow: 0 12px 44px rgba(0, 0, 0, .45); }
+  .app-shell.pinned .app-nav-overlay { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, .5); }
+}
+
 /* ── Móvil (≤760px): el riel se vuelve DRAWER off-canvas ── */
 @media (max-width: 760px) {
   .app-content, .app-shell.pinned .app-content { margin-left: 0; }
+  /* Franja libre arriba para el botón flotante del menú: antes se montaba encima
+     del título de la página (el FAB es fixed, el título no se corría solo). */
+  .app-content { padding-top: 56px; }
   .app-nav { width: 280px; max-width: 84vw; overflow-y: auto; padding: var(--ds-space-5) var(--ds-space-4); transform: translateX(-100%); }
   .app-shell.is-ready .app-nav { transition: transform .28s cubic-bezier(.34, 1.2, .5, 1), box-shadow .2s ease; }
   .app-nav.is-open { transform: translateX(0); box-shadow: 0 12px 44px rgba(0, 0, 0, .5); }

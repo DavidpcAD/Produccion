@@ -44,7 +44,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const rol = session?.rolLabel || rolPorNivel;
 
   const isMobile = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches;
-  const closeNavOnMobile = () => { if (isMobile()) setNavOpen(false); };
+  // Tablet (≤1024px): el menú abierto FLOTA sobre el contenido (ver globals.css),
+  // así que al navegar o tocar afuera se encoge, como el drawer del móvil.
+  const isTablet = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches;
+  const cerrarAlNavegar = () => {
+    if (isMobile()) setNavOpen(false);
+    else if (isTablet()) setPinned(false);
+  };
+  const cerrarMenu = () => { setNavOpen(false); if (isTablet()) setPinned(false); };
 
   // Hidratar el pin (el tema ya lo fijó el script no-flash del layout raíz).
   useEffect(() => {
@@ -66,8 +73,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   return (
     <div className={`app-shell${pinned ? ' pinned' : ''}${navOpen ? ' nav-open' : ''}${ready ? ' is-ready' : ''} bg-ds-bg`}>
-      {/* Overlay del drawer (solo móvil) */}
-      {navOpen && <div className="app-nav-overlay" onClick={() => setNavOpen(false)} aria-hidden />}
+      {/* Overlay: drawer en móvil, y menú flotante en tablet (en escritorio el CSS lo oculta) */}
+      {(navOpen || pinned) && <div className="app-nav-overlay" onClick={cerrarMenu} aria-hidden />}
 
       <Sidebar
         nivelAdmin={nivelAdmin}
@@ -78,7 +85,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         navOpen={navOpen}
         onTogglePinned={() => setPinned((p) => !p)}
         onCloseDrawer={() => setNavOpen(false)}
-        onNavigate={closeNavOnMobile}
+        onNavigate={cerrarAlNavegar}
         allowedModules={allowedModules}
       />
 
