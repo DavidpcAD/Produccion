@@ -157,12 +157,15 @@ async function getStats(mods: string[]) {
   return { cuadrillas, obras, obrasList, h4, utilidadNeta, presupuesto, concreto, desembolsos, obrasSinPresup };
 }
 
-type Card = { label: string; value: string | number; sub: string; icon: IconName; href: string; accent: string };
+// `href` opcional: si el módulo destino está apagado (Avance de obra), la
+// tarjeta muestra el dato pero no enlaza a ningún lado.
+type Card = { label: string; value: string | number; sub: string; icon: IconName; href?: string; accent: string };
 type Action = { href: string; label: string; icon: IconName };
 
 const SUBTITULO: Record<Modulo, string> = {
   admin: 'Resumen de producción: obra, jornada (H4) y utilidades.',
   ingenieria: 'Resumen de obra: ejecución y cuadrillas en campo.',
+  avance: 'Resumen de avance de obra: ejecución en campo.',
   presupuesto: 'Resumen de presupuesto: partidas, obras y proyectos.',
   concreto: 'Resumen de concreto: coladas, batches y laboratorio.',
   desembolsos: 'Resumen de desembolsos: casas y montos pendientes.',
@@ -181,6 +184,7 @@ export default async function DashboardPage() {
   const primary: Modulo =
     has('admin') ? 'admin' :
     has('ingenieria') ? 'ingenieria' :
+    has('avance') ? 'avance' :
     has('presupuesto') ? 'presupuesto' :
     has('concreto') ? 'concreto' :
     has('desembolsos') ? 'desembolsos' : 'admin';
@@ -192,26 +196,27 @@ export default async function DashboardPage() {
 
   if (has('admin')) {
     cards.push(
-      { label: 'Obras en ejecución', value: stats.obras.enEjecucion, sub: `${stats.obras.enEspera} en espera`, icon: 'place', href: '/avance', accent: 'bg-brand' },
+      { label: 'Obras en ejecución', value: stats.obras.enEjecucion, sub: `${stats.obras.enEspera} en espera`, icon: 'place', href: has('avance') ? '/avance' : '/obras', accent: 'bg-brand' },
       { label: 'Anomalías H4 (hoy)', value: stats.h4.anomalias, sub: `${stats.h4.sinMarcaje} sin marcaje hoy`, icon: 'reloj', href: '/reporte-h4', accent: stats.h4.anomalias > 0 ? 'bg-ds-red' : 'bg-ds-gray-500' },
       { label: 'Utilidad del mes', value: abreviarCRC(stats.utilidadNeta), sub: 'utilidad neta acumulada del mes', icon: 'boleta', href: '/utilidades', accent: 'bg-black' },
       { label: 'Cuadrillas activas', value: stats.cuadrillas, sub: 'en campo · acá se asignan colaboradores', icon: 'cuadrillas', href: '/cuadrillas', accent: 'bg-ds-gray-500' },
     );
     quickActions.push(
       { href: '/reporte-h4', label: 'Cerrar día (Reporte H4)', icon: 'reloj' },
-      { href: '/avance', label: 'Ver avance de obra', icon: 'completado' },
+      ...(has('avance') ? [{ href: '/avance', label: 'Ver avance de obra', icon: 'completado' as IconName }] : []),
       { href: '/utilidades', label: 'Ver utilidades', icon: 'boleta' },
       { href: '/cuadrillas', label: 'Gestionar cuadrillas', icon: 'cuadrillas' },
     );
   } else {
     if (has('ingenieria')) {
+      const hrefObras = has('avance') ? '/avance' : undefined;
       cards.push(
-        { label: 'Obras en ejecución', value: stats.obras.enEjecucion, sub: 'obras activas en campo', icon: 'place', href: '/avance', accent: 'bg-brand' },
-        { label: 'Obras en espera', value: stats.obras.enEspera, sub: 'por arrancar', icon: 'place', href: '/avance', accent: 'bg-ds-gray-500' },
+        { label: 'Obras en ejecución', value: stats.obras.enEjecucion, sub: 'obras activas en campo', icon: 'place', href: hrefObras, accent: 'bg-brand' },
+        { label: 'Obras en espera', value: stats.obras.enEspera, sub: 'por arrancar', icon: 'place', href: hrefObras, accent: 'bg-ds-gray-500' },
         { label: 'Cuadrillas activas', value: stats.cuadrillas, sub: 'en campo · acá se asignan colaboradores', icon: 'cuadrillas', href: '/cuadrillas', accent: 'bg-black' },
       );
       quickActions.push(
-        { href: '/avance', label: 'Ver avance de obra', icon: 'completado' },
+        ...(has('avance') ? [{ href: '/avance', label: 'Ver avance de obra', icon: 'completado' as IconName }] : []),
         { href: '/cuadrillas', label: 'Gestionar cuadrillas', icon: 'cuadrillas' },
         { href: '/compras/ingenieria', label: 'Órdenes de compra', icon: 'entrega' },
       );
@@ -278,21 +283,26 @@ export default async function DashboardPage() {
       {/* Stat cards */}
       {cards.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {cards.map(card => (
-            <Link key={card.label} href={card.href} className="group block">
-              <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-5 shadow-ds-01 hover:shadow-ds-03 transition-all duration-200 hover:-translate-y-0.5">
+          {cards.map(card => {
+            const cuerpo = (
+              <div className={`bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-5 shadow-ds-01 transition-all duration-200${card.href ? ' hover:shadow-ds-03 hover:-translate-y-0.5' : ''}`}>
                 <div className="flex items-start justify-between mb-4">
                   <div className={`w-10 h-10 rounded-ds ${card.accent} flex items-center justify-center shadow-ds-02`}>
                     <Icon name={card.icon} size="md" color="currentColor" className={card.accent === 'bg-brand' ? 'text-black' : 'text-white'} />
                   </div>
-                  <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 group-hover:text-ds-ink transition-colors mt-1" />
+                  {card.href && (
+                    <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 group-hover:text-ds-ink transition-colors mt-1" />
+                  )}
                 </div>
                 <div className="text-heading sm:text-4xl font-bold text-ds-ink mb-1">{card.value}</div>
                 <div className="text-sm font-semibold text-ds-ink">{card.label}</div>
                 <div className="text-xs text-ds-gray-400 mt-0.5">{card.sub}</div>
               </div>
-            </Link>
-          ))}
+            );
+            return card.href
+              ? <Link key={card.label} href={card.href} className="group block">{cuerpo}</Link>
+              : <div key={card.label} className="block">{cuerpo}</div>;
+          })}
         </div>
       )}
 
@@ -325,7 +335,9 @@ export default async function DashboardPage() {
           <div className="lg:col-span-2 bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
             <div className="flex items-center gap-2 mb-4">
               <h2 className="font-bold text-ds-ink text-sub-sm">Obras en ejecución</h2>
-              <Link href="/avance" className="ml-auto text-xs font-semibold text-ds-gray-400 hover:text-ds-ink transition-colors">Ver todas →</Link>
+              {has('avance') && (
+                <Link href="/avance" className="ml-auto text-xs font-semibold text-ds-gray-400 hover:text-ds-ink transition-colors">Ver todas →</Link>
+              )}
             </div>
             {stats.obrasList.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-ds-gray-300">
@@ -334,13 +346,21 @@ export default async function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-2.5">
-                {stats.obrasList.map((o) => (
-                  <Link key={o.codigo} href="/avance" className="flex items-center gap-3 px-2 -mx-2 py-1.5 rounded-ds hover:bg-ds-gray-100 transition-colors">
-                    <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.codigo}</span>
-                    <span className="flex-1" />
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-ds-gray-100 text-ds-gray-500 shrink-0">Sprint {o.sprint}</span>
-                  </Link>
-                ))}
+                {stats.obrasList.map((o) => {
+                  const fila = (
+                    <>
+                      <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.codigo}</span>
+                      <span className="flex-1" />
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-ds-gray-100 text-ds-gray-500 shrink-0">Sprint {o.sprint}</span>
+                    </>
+                  );
+                  // Sin Avance de obra publicado la lista es informativa (no navega).
+                  return has('avance') ? (
+                    <Link key={o.codigo} href="/avance" className="flex items-center gap-3 px-2 -mx-2 py-1.5 rounded-ds hover:bg-ds-gray-100 transition-colors">{fila}</Link>
+                  ) : (
+                    <div key={o.codigo} className="flex items-center gap-3 px-2 -mx-2 py-1.5 rounded-ds">{fila}</div>
+                  );
+                })}
               </div>
             )}
           </div>

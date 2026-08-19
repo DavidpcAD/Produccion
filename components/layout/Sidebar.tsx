@@ -9,7 +9,7 @@ import { AdelanteMark } from '@/components/ds/AdelanteMark/AdelanteMark';
 import { haptic } from '@/components/ds/haptic';
 import { springs } from '@/lib/springs';
 import { useConfirm } from '@/components/ui/Confirm';
-import { getRouteModule } from '@/lib/permissions';
+import { getRouteModule, moduloPublicado } from '@/lib/permissions';
 
 const THEME_KEY = 'adelante_oc_theme';
 
@@ -239,8 +239,12 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
       {/* Ítems */}
       {navItems
         .filter((item) => {
+          const modulo = getRouteModule(item.section ?? item.href);
+          // Módulo apagado (Avance de obra hasta que se actualice): fuera del
+          // menú para todos, con rol de Producción o sin él.
+          if (!moduloPublicado(modulo)) return false;
           // Con rol de Producción: filtrar por módulo. Sin él (null): por nivel.
-          if (allowedModules) return allowedModules.includes(getRouteModule(item.section ?? item.href));
+          if (allowedModules) return allowedModules.includes(modulo);
           return !item.minLevel || nivelAdmin >= item.minLevel;
         })
         .map((item) => {

@@ -55,7 +55,7 @@ const ROLE_LEVEL_BY_NAME: Record<string, number> = {
 // Nivel que exige cada módulo (la acción más alta que contiene). El nivel de un
 // rol de Producción se DERIVA de sus módulos, así no depende de calzar nombres.
 const MODULE_LEVEL: Record<string, number> = {
-  dashboard: 1, presupuesto: 4, ingenieria: 4, concreto: 4, desembolsos: 1, admin: 4,
+  dashboard: 1, presupuesto: 4, ingenieria: 4, avance: 2, concreto: 4, desembolsos: 1, admin: 4,
 };
 
 /** Calcula el nivelAdmin efectivo a partir de los roles del usuario.
@@ -118,10 +118,27 @@ export function getRouteLevel(pathname: string): number {
 // sin menú). Para ajustar qué ve cada rol, editá SOLO estos mapas.
 // ─────────────────────────────────────────────────────────────────────────
 export type Modulo =
-  | 'dashboard' | 'presupuesto' | 'ingenieria' | 'concreto' | 'desembolsos' | 'admin';
+  | 'dashboard' | 'presupuesto' | 'ingenieria' | 'avance' | 'concreto' | 'desembolsos' | 'admin';
 
+/** ── Interruptor de "Avance de obra" ──────────────────────────────────────
+ *  El módulo está incompleto, así que NO sale a producción todavía: en `false`
+ *  desaparece del menú, del dashboard y de sus rutas — nadie entra a /avance,
+ *  ni Super Admin. Los catálogos que viven bajo /avance (tipos de casa,
+ *  sprints, sub-partidas, pesos) son de Presupuesto y siguen abiertos.
+ *  Para volver a publicarlo: poner `true`. Nada más. */
+export const AVANCE_OBRA_ACTIVO = false;
+
+const MODULOS_BASE: Modulo[] =
+  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'admin'];
+
+/** Módulos publicados (los apagados no salen para nadie). */
 export const MODULOS_TODOS: Modulo[] =
-  ['dashboard', 'presupuesto', 'ingenieria', 'concreto', 'desembolsos', 'admin'];
+  MODULOS_BASE.filter((m) => m !== 'avance' || AVANCE_OBRA_ACTIVO);
+
+/** ¿El módulo está publicado? (respeta los interruptores de arriba). */
+export function moduloPublicado(m: Modulo): boolean {
+  return MODULOS_TODOS.includes(m);
+}
 
 const norm = (s?: string) => (s ?? '').trim().toLowerCase();
 
@@ -137,7 +154,9 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   if (n.startsWith('superadmin') || n === 'super admin' || n === 'administrador' ||
       t === 'super admin' || t === 'superadmin' || t === 'superadministrador') return '*';
   if (n === 'presupuestista') return ['presupuesto'];
-  if (n === 'ingenieria' || n === 'ingeniería' || n === 'ingeniero' || n.startsWith('ingeniero ')) return ['ingenieria'];
+  // Ingeniería = Órdenes de Compra + Cuadrillas ('ingenieria') y Avance de obra
+  // ('avance'). Si Avance está apagado, computeAllowedModules lo saca.
+  if (n === 'ingenieria' || n === 'ingeniería' || n === 'ingeniero' || n.startsWith('ingeniero ')) return ['ingenieria', 'avance'];
   if (n === 'administracion' || n === 'administración') {
     if (t === 'digitacion' || t === 'digitación') return ['concreto'];
     if (t === 'contabilidad' || t === 'contabilidad general') return ['desembolsos'];
@@ -172,7 +191,8 @@ export function computeAllowedModules(
     if (m === '*') return [...MODULOS_TODOS];
     for (const x of m) mods.add(x);
   }
-  return known ? [...mods] : null;
+  // Los módulos apagados (ver AVANCE_OBRA_ACTIVO) no se entregan a nadie.
+  return known ? [...mods].filter(moduloPublicado) : null;
 }
 
 /** Etiqueta de rol para mostrar en el pie del menú: el rol de Producción
@@ -199,11 +219,15 @@ export function getRouteModule(pathname: string): Modulo {
   // Business Central (integración de avance + presupuestos por obra) = dominio Presupuesto.
   if (p.startsWith('/bc') || p.startsWith('/api/bc') || p.startsWith('/api/presupuestos')) return 'presupuesto';
   // Catálogos que viven bajo /avance pero son del dominio de Partidas (Presupuesto).
-  if (p.startsWith('/avance/tipos-casa') || p.startsWith('/avance/sprints') || p.startsWith('/avance/sub-partidas')) return 'presupuesto';
+  // Catálogos de obra (pestañas de /partidas): viven bajo /avance pero son de
+  // Presupuesto, así que NO los apaga el interruptor de Avance de obra.
+  if (p.startsWith('/avance/tipos-casa') || p.startsWith('/avance/sprints') ||
+      p.startsWith('/avance/sub-partidas') || p.startsWith('/avance/pesos')) return 'presupuesto';
   if (p.startsWith('/obras') || p.startsWith('/proyectos') || p.startsWith('/partidas') || p.startsWith('/presupuesto')) return 'presupuesto';
   // Aprobación OC es solo de Super Admin (no de los ingenieros).
   if (p.startsWith('/compras/aprobacion')) return 'admin';
-  if (p.startsWith('/avance') || p.startsWith('/cuadrillas') || p.startsWith('/encargados') || p.startsWith('/compras')) return 'ingenieria';
+  if (p.startsWith('/avance')) return 'avance';
+  if (p.startsWith('/cuadrillas') || p.startsWith('/encargados') || p.startsWith('/compras')) return 'ingenieria';
   if (p.startsWith('/concreto')) return 'concreto';
   if (p.startsWith('/desembolsos')) return 'desembolsos';
   if (p.startsWith('/utilidades') || p.startsWith('/reporte-h4') || p.startsWith('/roles') || p.startsWith('/apps') || p.startsWith('/cuentas') || p.startsWith('/usuarios') || p.startsWith('/auditoria')) return 'admin';

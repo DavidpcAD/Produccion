@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './lib/auth';
-import { getRouteLevel } from './lib/permissions';
+import { getRouteLevel, getRouteModule, moduloPublicado } from './lib/permissions';
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,6 +28,13 @@ export function proxy(request: NextRequest) {
 
   if (session.nivelAdmin < requiredLevel) {
     return NextResponse.redirect(new URL('/?error=forbidden', request.url));
+  }
+
+  // Módulo apagado (Avance de obra, ver AVANCE_OBRA_ACTIVO): la ruta no existe
+  // para nadie, ni escribiéndola a mano. Los catálogos bajo /avance
+  // (tipos-casa, sprints, sub-partidas, pesos) son de Presupuesto y sí pasan.
+  if (!moduloPublicado(getRouteModule(pathname))) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   const res = NextResponse.next();
