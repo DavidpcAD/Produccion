@@ -1,25 +1,17 @@
 import type { JWTPayload } from './auth';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Modelo nuevo (AdelanteSBX): la tabla dbo.Rol NO tiene NivelAdmin, pero el
-// control de acceso de la app se basa en niveles (1=empleado, 2=admin,
-// 4=superadmin). Aquí se centraliza la correspondencia Rol→nivel.
-// Para ajustar permisos, edita SOLO este mapa.
-//   1 Administrador        -> 4 (superadmin: gestiona roles y apps)
-//   2 Maestro de Obras     -> 1
-//   3 Ingeniero Residente  -> 2 (admin: proyectos/cuadrillas/usuarios/auditoría)
-//   4 Jefe de Cuadrillas   -> 2
-//   5 Proveeduría          -> 1
-//   6 Facturador Bodega    -> 1
+// La tabla dbo.Rol NO tiene NivelAdmin, pero el control de acceso de la app se
+// basa en niveles (1=empleado, 2=admin, 4=superadmin). Acá se centraliza la
+// correspondencia Rol→nivel; para ajustar permisos, editá SOLO estos mapas.
+//
+// El nivel se resuelve por MÓDULOS (roles de Producción) o por NOMBRE (roles
+// legacy de otras apps), nunca por idRol. Antes había un `ROLE_LEVEL_BY_ID`
+// ({1:4, 2:1, 3:2, 4:2, 5:1, 6:1}) como último recurso, y un id no significa lo
+// mismo en cada base: en AdelantePRO los idRol 4 y 5 son "Digitacion general" y
+// "Digitacion maderas" (del app de Digitación), no "Jefe de Cuadrillas" y
+// "Proveeduría". Atar un permiso a ese número es atarlo a una coincidencia.
 // ─────────────────────────────────────────────────────────────────────────
-export const ROLE_LEVEL_BY_ID: Record<number, number> = {
-  1: 4,
-  2: 1,
-  3: 2,
-  4: 2,
-  5: 1,
-  6: 1,
-};
 
 // Fallback por nombre (por si los IDs cambian en otra instancia). Se compara en
 // minúsculas y sin espacios extra. Aquí se define qué rol da qué nivel.
@@ -29,20 +21,18 @@ const ROLE_LEVEL_BY_NAME: Record<string, number> = {
   'superadmin': 4,
   'super admin': 4,
   'administrador': 4,
-  // Roles de Producción: el nivel debe alcanzar las acciones de SUS módulos
-  // (Partidas, Concreto y Órdenes de Compra exigen N4; Desembolsos N1). El
-  // acceso a OTROS módulos lo bloquea el filtro por módulo (sidebar + layout).
-  'presupuestista': 4,
-  'ingeniero obra gris': 4,
-  'ingeniero acabados': 4,
-  'ingeniero electromecanico': 4,
-  'ingeniero electromecánico': 4,
-  'digitacion general': 4,
-  'digitación general': 4,
-  'digitacion maderas': 4,
-  'digitación maderas': 4,
-  'digitador': 4,
   'contabilidad': 1,
+  // OJO: acá NO van los roles de Producción (Ingenieria, Presupuestista,
+  // Administracion…). Su nivel se DERIVA de sus módulos en `nivelDeRol`, que es
+  // lo correcto, y listarlos por nombre además es peligroso: los nombres se
+  // repiten entre apps. Estaban 'digitacion general|maderas' y 'digitador' → 4
+  // pensando en el rol *Administracion·Digitacion* de Producción, pero esos son
+  // TAMBIÉN los nombres de los roles del app de Digitación (idApp 1). Desde que
+  // ambos padrones viven en AdelantePRO, seis usuarios de Digitación
+  // (mauricio, jessi, fabian, jerson, bryan, alessandra) quedaban con nivel 4
+  // en Producción —sin ningún rol de idApp 10— y con eso pasaban el nivel 4 que
+  // exige /compras. Se quitaron: ellos siguen igual en SU app, que no usa este
+  // archivo, y en Producción caen al nivel que les da su rol legacy.
   // Roles legacy (otras apps) que aún aparecen:
   'ingeniero residente': 2,
   'jefe de cuadrillas': 2,
@@ -61,21 +51,26 @@ const MODULE_LEVEL: Record<string, number> = {
 /** Calcula el nivelAdmin efectivo a partir de los roles del usuario.
  *  Para roles de Producción (idApp 10) el nivel se deriva de sus módulos
  *  (rol+tipo); para los legacy de otras apps se usa el mapa por nombre/ID. */
+/** Nivel de UN rol. Roles de Producción: se deriva de sus módulos (rol+tipo);
+ *  roles de otras apps: por nombre. Sin coincidencia, el mínimo (1). */
+export function nivelDeRol(r: { nombre?: string; idApp?: number; tipo?: string }): number {
+  const porNombre = r.nombre ? ROLE_LEVEL_BY_NAME[r.nombre.trim().toLowerCase()] : undefined;
+  if (r.idApp !== undefined && r.idApp !== PROD_APP_ID) {
+    // Rol de OTRA app: nivel legacy por nombre (no lo eleva el modelo nuevo).
+    return porNombre ?? 1;
+  }
+  const m = modulosDeRol(r.nombre, r.tipo);
+  if (m === '*') return 4;
+  if (m) return Math.max(...m.map((mod) => MODULE_LEVEL[mod] ?? 1));
+  return porNombre ?? 1;
+}
+
 export function computeNivelAdmin(
   roles: Array<{ idRol: number; nombre?: string; idApp?: number; tipo?: string }>,
 ): number {
   let max = 0;
   for (const r of roles) {
-    let lvl: number;
-    if (r.idApp === undefined || r.idApp === PROD_APP_ID) {
-      const m = modulosDeRol(r.nombre, r.tipo);
-      if (m === '*') lvl = 4;
-      else if (m) lvl = Math.max(...m.map((mod) => MODULE_LEVEL[mod] ?? 1));
-      else lvl = r.nombre ? (ROLE_LEVEL_BY_NAME[r.nombre.trim().toLowerCase()] ?? ROLE_LEVEL_BY_ID[r.idRol] ?? 1) : 1;
-    } else {
-      // Rol de OTRA app: nivel legacy por nombre/ID (no lo eleva el modelo nuevo).
-      lvl = (r.nombre ? ROLE_LEVEL_BY_NAME[r.nombre.trim().toLowerCase()] : undefined) ?? ROLE_LEVEL_BY_ID[r.idRol] ?? 1;
-    }
+    const lvl = nivelDeRol(r);
     if (lvl > max) max = lvl;
   }
   return max;

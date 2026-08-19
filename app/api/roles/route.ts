@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { ROLE_LEVEL_BY_ID } from '@/lib/permissions';
+import { nivelDeRol } from '@/lib/permissions';
 
 export async function GET() {
   const session = await getSession();
@@ -39,7 +39,7 @@ export async function GET() {
     idApp: r.idApp,
     appNombre: r.appNombre,
     appCodigo: r.appCodigo,
-    NivelAdmin: ROLE_LEVEL_BY_ID[r.idRol] ?? 0,
+    NivelAdmin: nivelDeRol({ nombre: r.nombre, idApp: r.idApp }),
     TotalUsuarios: r.totalUsuarios,
     Activo: true,
     tipos: tiposPorRol.get(r.idRol) ?? [],
