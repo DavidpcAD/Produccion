@@ -22,7 +22,7 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega } from "@/lib/compras/helpers";
 
 type Variante = { code: string; descripcion: string };
 // Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
@@ -92,7 +92,7 @@ const ayudaDestino = (tipo: TipoSolicitud, d: DestinoMat) =>
   d === "almacen"
     ? "ALM: entra a inventario del almacén elegido; se consume después."
     : tipo === "repuesto"
-      ? "CD (consumo directo): no entra a inventario, se lo lleva la máquina."
+      ? "CD (consumo directo): se lo lleva la máquina; en BC la línea entra al almacén de Maquinaria (MAQ)."
       : "CD (consumo directo): se consume de una vez contra el proyecto y la tarea de la obra.";
 // Almacén de inventario al que entra el material que no es de consumo inmediato.
 const ALM_GENERAL = ALMACEN_GENERAL;
@@ -764,15 +764,24 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     if (esRepuesto) return maquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.no }));
     return obraItems;
   }, [esRepuesto, obraItems, maquinas]);
-  // Almacenes REALES de BC (Almacén General, Agregados, Herramienta, Maquinaria,
-  // Fábrica Maderas…). Los ALM-* primero y el resto por código; el buscador del
-  // dropdown filtra por nombre o código.
+  // Almacenes de BC donde se puede pedir: por defecto SOLO las bodegas (Almacén
+  // General, Agregados, Maderas, Herramienta, Maquinaria, Generales…), que es lo que
+  // se compra. Con "Ver todos" salen también las ubicaciones de obra/casa, por si
+  // alguna vez hace falta una. Los ALM-* van primero.
+  const [verTodosAlm, setVerTodosAlm] = useState(false);
   const almacenItems: Item[] = useMemo(() => {
     const orden = (c: string) => (c.toUpperCase().startsWith("ALM-") ? 0 : 1);
     return [...catAlm]
+      .filter((a) => verTodosAlm || esAlmacenDeBodega(a.codigo) || a.codigo === almacenSel)
       .sort((a, b) => orden(a.codigo) - orden(b.codigo) || a.codigo.localeCompare(b.codigo))
       .map((a) => ({ id: a.codigo, title: (a.nombre ?? "").trim() || a.codigo, sub: a.codigo }));
-  }, [catAlm]);
+  }, [catAlm, verTodosAlm, almacenSel]);
+  // Filtro arriba de la lista del dropdown de almacenes.
+  const filtroAlm = (
+    <Segmented size="sm" value={verTodosAlm ? "todos" : "bodegas"}
+      options={[{ v: "bodegas", label: "Bodegas" }, { v: "todos", label: "Todos" }]}
+      onChange={(v: string) => setVerTodosAlm(v === "todos")} />
+  );
   const almacenNombre = almacenItems.find((a) => a.id === almacenSel)?.title ?? almacenSel;
   // La unidad NO va en la lista de búsqueda (solo el código); la unidad se muestra
   // en la línea ya agregada, junto a la cantidad.
@@ -1027,8 +1036,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
         // Almacén de la línea: en consumo directo de MATERIAL es el almacén de la obra
         // (en BC tiene el mismo código que el proyecto, y así lo consume contra la
         // tarea); con tag ALM o en Stock es el almacén elegido; en consumo directo de
-        // REPUESTO no hay almacén (no entra a inventario).
-        const almacenLinea = esConsumo ? (l.obraCodigo || "") : usaAlmacen ? almacenSel : "";
+        // REPUESTO va al almacén de MAQUINARIA (BC no puede dejar la línea fuera de
+        // inventario sin proyecto+tarea, y el repuesto va contra una máquina).
+        const almacenLinea = esConsumo ? (l.obraCodigo || "") : usaAlmacen ? almacenSel : ALMACEN_MAQUINARIA;
         // Si se eligió variante, se guarda la descripción de la variante (más específica);
         // si no, la descripción base del material.
         return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: almacenLinea, obraCodigo: esMaterial ? (l.obraCodigo || undefined) : undefined, variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined, taskNo: g?.taskNo || undefined, taskDescr: g?.taskNombre || undefined };
@@ -1130,7 +1140,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                       <Segmented size="sm" value={destinoMat} options={DESTINOS} onChange={(v: DestinoMat) => setDestinoMat(v)} />
                       {usaAlmacen && (
                         <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                          <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} />
+                          <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} filterNode={filtroAlm} />
                         </div>
                       )}
                     </div>
@@ -1144,7 +1154,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                   <div className="row gap-3 wrap" style={{ alignItems: "flex-end" }}>
                     <div className="col gap-2" style={{ flex: "1 1 220px", minWidth: 0 }}>
                       <span className="ds-form-field__label">Almacén</span>
-                      <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} />
+                      <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} filterNode={filtroAlm} />
                     </div>
                     <div style={{ flex: "1 1 220px", minWidth: 0 }}>{plantillaBtn}</div>
                   </div>

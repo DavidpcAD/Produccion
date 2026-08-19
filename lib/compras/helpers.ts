@@ -6,6 +6,21 @@ import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSoli
 // almacén (pedidos viejos, donde `almacen` guardaba la OBRA — ver `obraDeLinea`).
 export const ALMACEN_GENERAL = "ALM-GRAL";
 
+// Almacén de MAQUINARIA: destino en BC del repuesto de consumo directo. BC no puede
+// "no ingresar a inventario" sin proyecto+tarea (o cuenta contable), y el repuesto va
+// contra una máquina, no contra una obra → la línea entra a MAQ.
+export const ALMACEN_MAQUINARIA = "MAQ";
+
+// Almacenes de BODEGA: los que se pueden elegir como destino de un pedido. Son los
+// ALM-* (General, Barani, Salud Ocupacional), las fábricas F-* (Agregados, Maderas,
+// Metales, Muebles, Prefabricados), los generales GEN-* de cada proyecto, y
+// Herramienta / Maquinaria. Todo lo demás que hay en BC son ubicaciones de obra o de
+// casa (VB-*, CS-*, INF-*, …), que no son destino de compra: se ofrecen aparte.
+export function esAlmacenDeBodega(codigo: string): boolean {
+  const c = (codigo ?? "").trim().toUpperCase();
+  return c.startsWith("ALM-") || c.startsWith("F-") || c.startsWith("GEN-") || c === "HER" || c === "MAQ";
+}
+
 // ─── Obra vs almacén de una línea de pedido ─────────────────────────────────────
 // Hasta 2026-08 la línea guardaba la OBRA en `almacen` (no se usaba la columna
 // `obra` de la tabla) y el almacén real se decidía después, siempre el General.
