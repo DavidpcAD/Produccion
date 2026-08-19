@@ -37,6 +37,15 @@ export async function POST(req: Request) {
     if (met && met.toLowerCase() !== "amount") {
       try { await bcAssignItemCharges(orderNo, met); } catch { /* no debe tumbar el relanzamiento */ }
     }
+    // Igual que en el alta: si el proyecto/tarea/almacén no se aplicó, NO se lanza —
+    // se registraría material sin su obra y entraría a inventario en silencio.
+    if (jobError) {
+      return NextResponse.json({
+        ok: false,
+        error: `No se aplicó el proyecto/tarea/almacén en BC (${jobError}). El pedido ${orderNo} quedó ABIERTO en BC sin lanzar.`,
+        jobError,
+      }, { status: 502 });
+    }
     const status = await bcReleasePedido(orderNo);
     return NextResponse.json({ ok: true, status, cargoError, jobError });
   } catch (e: any) {

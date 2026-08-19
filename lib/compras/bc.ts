@@ -657,18 +657,35 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   let cargosCreados = 0;
   let creadas = 0;
   // Almacén de recepción POR LÍNEA. Regla del negocio (BC):
-  //   · Consumo inmediato → la línea lleva N.º proyecto + N.º tarea y NADA de almacén:
-  //     el material se consume contra la obra, no entra a inventario. Si se le pone
-  //     almacén, entra a bodega (es lo que pasó con CP-003873).
-  //   · Stock → la línea lleva almacén (el de la línea, el de la orden o el de env) y
-  //     ningún proyecto.
+  //   · Consumo inmediato → N.º proyecto + N.º tarea + el almacén DE LA OBRA (en BC el
+  //     almacén de una obra tiene el MISMO código que el proyecto). BC exige almacén en
+  //     las líneas de artículo inventariable: sin él el Release falla con "Location Code
+  //     must have a value" (pasó con CP-003876). Y el almacén NO impide el consumo: al
+  //     registrar, BC genera el par Purchase + Negative Adjmt. en ese almacén (neto 0)
+  //     y el Job Ledger Entry de uso contra la tarea. Comprobado en BC: 91 de 97 líneas
+  //     de compra con proyecto llevan almacén = proyecto, y los consumos históricos por
+  //     compra están todos en el almacén de la obra (ninguno en ALM-GRAL).
+  //   · Stock → almacén (el de la línea, el de la orden o el de env) y ningún proyecto.
   // La línea estándar de BC requiere el GUID (locationId), no el código.
   const locFallback = input.locationCode || process.env.BC_RECEPCION_LOCATION || "";
+  const esConsumo = (l: NuevaLineaBc) => !!(l.jobNo && l.jobTaskNo); // consumo requiere ambos
+  const almacenDe = (l: NuevaLineaBc) => (esConsumo(l) ? (l.locationCode || l.jobNo!) : (l.locationCode || locFallback));
+  // Se resuelven ANTES de crear nada en BC: si a una línea de consumo le falta el
+  // almacén de su obra, abortamos sin dejar un pedido a medias en BC (y NUNCA se cae a
+  // ALM-GRAL: mandaría a la bodega central material que no pasa por ahí).
+  const locIds = new Map<string, string | null>();
+  for (const l of lineas) {
+    const code = almacenDe(l);
+    if (code && !locIds.has(code)) locIds.set(code, await getStdLocationId(cid, code));
+    if (esConsumo(l) && !locIds.get(code)) {
+      throw new Error(`Consumo inmediato: la obra ${l.jobNo} no tiene almacén propio en Business Central (se buscó el código "${code}"). Creá el almacén de la obra en BC, o pedí el material a inventario.`);
+    }
+  }
   const asignaciones: AsignacionLineaBc[] = [];
   for (const l of lineas) {
-    const consumo = !!(l.jobNo && l.jobTaskNo); // consumo inmediato requiere ambos
-    const locCode = consumo ? "" : (l.locationCode || locFallback);
-    const locId = locCode ? await getStdLocationId(cid, locCode) : null;
+    const consumo = esConsumo(l);
+    const locCode = almacenDe(l);
+    const locId = locCode ? locIds.get(locCode) ?? null : null;
     const lineBody: Record<string, unknown> = { lineType: "Item", lineObjectNumber: l.itemNo, quantity: l.cantidad };
     if (l.precio && l.precio > 0) lineBody.directUnitCost = l.precio;
     if (locId) lineBody.locationId = locId;
@@ -687,10 +704,13 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
         lineNo,
         jobNo: consumo ? l.jobNo : undefined,
         jobTaskNo: consumo ? l.jobTaskNo : undefined,
-        jobLineType: consumo ? (l.jobLineType || "Budget") : undefined,
-        // El almacén solo viaja en las líneas de stock: el codeunit ignora el
-        // locationCode vacío, así que en consumo la línea queda sin almacén.
-        locationCode: consumo ? undefined : (locCode || undefined),
+        // "None" = Job Line Type en blanco, que es como están 95 de las 97 líneas con
+        // proyecto hechas en BC. Con "Budget" BC crea una Job Planning Line de
+        // presupuesto que —al estar Apply Usage Link apagado en las obras— NO se liga
+        // al consumo: el presupuesto de la obra crece con cada compra y los reportes
+        // Actual vs Budget cuentan doble.
+        jobLineType: consumo ? (l.jobLineType || "None") : undefined,
+        locationCode: locCode || undefined,
       });
     }
     else {
@@ -727,11 +747,20 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
     try { await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${po.id})`, { method: "DELETE", cache: "no-store" }); } catch { /* best effort */ }
     throw new Error(`BC rechazó todas las líneas del pedido — ${lineError ?? "sin detalle"}`);
   }
-  // Consumo inmediato / Stock: proyecto+tarea o almacén por línea (codeunit custom, la API
-  // estándar no los expone). No tumba el lanzamiento; el motivo real se surface aparte.
+  // Consumo inmediato / Stock: proyecto+tarea + almacén por línea (codeunit custom, la
+  // API estándar no expone esos campos).
+  // Esto NO puede quedar como advertencia: si la asignación falla (obra bloqueada, tarea
+  // que no existe o no es de Registro, codeunit caído), la línea se queda sin proyecto y
+  // el material termina sumado a inventario en silencio — que es justo lo que pasó con
+  // CP-003873. Por eso se exige que BC confirme TODAS las asignaciones; si no, quien
+  // llama NO debe lanzar el pedido (queda Abierto en BC con el motivo real).
   let jobError: string | undefined;
   if (asignaciones.length) {
-    try { const r = await bcSetLineJobs(po.number, asignaciones); if (r.errors) jobError = r.errors; }
+    try {
+      const r = await bcSetLineJobs(po.number, asignaciones);
+      if (r.errors) jobError = r.errors;
+      else if (r.updated < asignaciones.length) jobError = `BC aplicó ${r.updated} de ${asignaciones.length} asignaciones de proyecto/almacén.`;
+    }
     catch (e: any) { jobError = String(e?.message ?? e); }
   }
   return { number: po.number ?? "", id: po.id ?? "", omitidas, creadas, lineError, cargoError, cargosCreados, jobError };
@@ -792,9 +821,12 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
     usados.add(bc.id);
     // Consumo inmediato / Stock: recordar la asignación de proyecto+tarea / almacén (por Line No.).
     const lineNo = Number(bc.sequence);
+    // Mismo criterio que al crear: consumo = proyecto + tarea + almacén de la OBRA
+    // (código = proyecto), y jobLineType en blanco ("None"). Esto es lo que arregla el
+    // relanzamiento de un pedido que quedó Abierto en BC por falta de almacén.
     const conJob = !!(l.jobNo && l.jobTaskNo);
-    const conLoc = !conJob && !!l.locationCode; // en consumo la línea NO lleva almacén
-    if (lineNo && (conJob || conLoc)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "Budget") : undefined, locationCode: conLoc ? l.locationCode : undefined });
+    const locCode = conJob ? (l.locationCode || l.jobNo!) : (l.locationCode || "");
+    if (lineNo && (conJob || locCode)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "None") : undefined, locationCode: locCode || undefined });
     const patch: Record<string, unknown> = {};
     if (l.precio && l.precio > 0 && Number(bc.directUnitCost) !== l.precio) patch.directUnitCost = l.precio;
     if (l.variantCode) {
@@ -811,9 +843,14 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
     patched++;
   }
   // Consumo inmediato / Stock: aplicar proyecto+tarea / almacén por línea (idempotente).
+  // Si NO se aplicaron todas, es un error DURO (ver nota en bcCrearPedido).
   let jobError: string | undefined;
   if (asignaciones.length) {
-    try { const r = await bcSetLineJobs(orderNo, asignaciones); if (r.errors) jobError = r.errors; }
+    try {
+      const r = await bcSetLineJobs(orderNo, asignaciones);
+      if (r.errors) jobError = r.errors;
+      else if (r.updated < asignaciones.length) jobError = `BC aplicó ${r.updated} de ${asignaciones.length} asignaciones de proyecto/almacén.`;
+    }
     catch (e: any) { jobError = String(e?.message ?? e); }
   }
   return { patched, sinMatch, jobError };
@@ -912,6 +949,16 @@ export async function bcCrearYLanzarPedido(input: { vendorNo: string; currencyCo
   const hayCargos = (input.cargos && input.cargos.length) || (input.flete && input.flete.monto > 0);
   if (hayCargos && met && met.toLowerCase() !== "amount") {
     try { await bcAssignItemCharges(number, met); } catch (e) { console.warn(`BC asignar cargo (${met}) en ${number} falló:`, e); }
+  }
+  // Proyecto/tarea/almacén sin aplicar → NO se lanza. Si se lanzara, el pedido se
+  // registraría con la línea sin proyecto y el material entraría a inventario sin que
+  // nadie se enterara. Queda Abierto en BC y la orden pendiente en la app, con el motivo.
+  if (jobError) {
+    return {
+      number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError,
+      released: false,
+      releaseError: `No se aplicó el proyecto/tarea/almacén en BC (${jobError}). El pedido ${number} quedó ABIERTO en BC sin lanzar, para no registrar material sin su obra.`,
+    };
   }
   try {
     await bcReleasePedido(number);

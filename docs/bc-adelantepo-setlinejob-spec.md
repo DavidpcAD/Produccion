@@ -194,3 +194,38 @@ que recorre las Purchase Lines del pedido (por `Line No.`) y hace `Validate` de
 `Job No.` → `Job Task No.` → `Job Line Type` (consumo) y/o `Location Code` (stock), idempotente
 y sin tumbar por línea. Republicar la extensión "adelante" en el Sandbox. Con eso, la app cierra
 el último hop del feature de Consumo inmediato.
+
+---
+
+## 7. Ajustes tras el primer round-trip real en Sandbox (2026-08-18)
+
+Lo que se aprendió lanzando CP-003873 → CP-003876 y verificando los movimientos en BC:
+
+1. **La línea de consumo inmediato SÍ lleva `Location Code`** — el almacén de la OBRA (en BC
+   su código es el mismo que el del proyecto). Sin almacén, el **Release falla**:
+   `Location Code must have a value in Purchase Line … CP-003876`. Aplica a artículos
+   inventariables (las líneas de servicio/cuenta sí pueden ir sin almacén).
+   El almacén NO impide el consumo: al registrar, BC genera el par
+   `Purchase (+)` + `Negative Adjmt. (−)` en ese almacén (neto 0) y el
+   **Job Ledger Entry `Usage`** contra la tarea. Verificado con CR-006777 (movs. 185537 /
+   185538 → JLE 87908) y con 28/28 pares revisados: el almacén es siempre el de la obra.
+2. **`jobLineType` por defecto = `None`, no `Budget`.** En BC, 95 de las 97 líneas de compra
+   con proyecto tienen el Job Line Type en blanco, y `Apply Usage Link` está apagado en las
+   228 obras: con `Budget` se crea una Job Planning Line de presupuesto que no se liga al
+   consumo → el presupuesto de la obra crece con cada compra y los reportes Actual vs Budget
+   cuentan doble.
+3. **Señal correcta de éxito**: el par `Purchase` + `Negative Adjmt.` (misma recepción, mismo
+   almacén, `open=false`) **más** el Job Ledger Entry `Usage` con su `JobTaskNo`.
+   El campo `jobTaskNo` del Item Ledger viene VACÍO incluso en un consumo correcto — no sirve
+   como prueba.
+4. **El fallo de la asignación es FATAL**: si `updated < asignaciones` o `errors ≠ ''`, la app
+   ya NO lanza el pedido (queda Abierto en BC con el motivo). Antes era solo una advertencia y
+   el pedido se lanzaba igual, registrando el material sin su obra (caso CP-003873).
+5. **Pendiente de comprobar en Sandbox**: los 2.190 consumos por compra del histórico vienen
+   todos de la FACTURA registrada (`CFR-…`), ninguno de una recepción (`CR-…`). Si la app
+   registra solo la recepción, el material de consumo inmediato podría quedar como inventario
+   abierto en el almacén de la obra hasta que se facture. Hay que probar recepción sola y ver
+   si aparece el `Negative Adjmt.`.
+6. **Obras bloqueadas**: 59 de las 228 obras abiertas tienen `Blocked = All`; en ellas el
+   `Validate("Job No.")` del codeunit falla. La API custom `project/jobs` no expone `Blocked`,
+   así que el selector de obra las sigue ofreciendo: conviene exponerlo.

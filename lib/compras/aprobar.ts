@@ -35,7 +35,9 @@ export async function aprobarYLanzar(
         descripcion: l.descripcion, variantCode: l.variantCode,
         jobNo: consumo ? l.proyecto : undefined,
         jobTaskNo: consumo ? l.taskNo : undefined,
-        locationCode: consumo ? undefined : (materialABodega ? ALMACEN_GENERAL : (l.almacen || undefined)),
+        // Consumo inmediato: el almacén de la OBRA (en BC tiene el mismo código que el
+        // proyecto). BC lo exige en las líneas de artículo y no impide el consumo.
+        locationCode: consumo ? l.proyecto : (materialABodega ? ALMACEN_GENERAL : (l.almacen || undefined)),
       };
     });
   // Cargos de producto (Item Charge): TODAS las líneas tipo "cargo" con precio, cada
