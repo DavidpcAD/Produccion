@@ -9,7 +9,7 @@ import { DataTable } from "@/components/compras/data-table";
 import { VistaToggle } from "@/components/compras/vista-toggle";
 import { IconEye, IconReceipt, IconList } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, destinoCodigo, num, pedidoLineaPendiente, solicitudResumen, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { destinoLabel, destinoCodigo, num, pedidoLineaPendiente, solicitudResumen, tipoSolicitudBadge, destinoDeLinea } from "@/lib/compras/helpers";
 
 interface Row {
   pedidoId: string;
@@ -50,7 +50,7 @@ export default function ProveeduriaMaterialesPage() {
         rows.push({
           pedidoId: p.id, pedidoNumero: p.numero, destino: destinoLabel(p), tipo: p.tipoSolicitud,
           pedidoLineaId: l.id, articuloId: l.articuloId, descripcion: l.descripcion,
-          unidad: l.unidad, almacen: l.almacen, pendiente: pend,
+          unidad: l.unidad, almacen: destinoDeLinea(l, p), pendiente: pend,
           incluir: false, cantidad: String(pend), precio: "0", iva: "13",
         });
       });
@@ -242,7 +242,7 @@ export default function ProveeduriaMaterialesPage() {
                 {preview.lineas.map((l) => (
                   <tr key={l.id}>
                     <td><div className="ds-truncate" title={l.descripcion}>{l.descripcion}</div></td>
-                    <td className="ds-muted ds-body-sm">{l.almacen}</td>
+                    <td className="ds-muted ds-body-sm">{destinoDeLinea(l, preview) || "—"}</td>
                     <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                     <td className="ds-num">{pedidoLineaPendiente(l) > 0 ? <span className="ds-pending-text">{num.format(pedidoLineaPendiente(l))}</span> : "0"}</td>
                   </tr>

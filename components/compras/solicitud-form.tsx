@@ -14,7 +14,11 @@ import { Combobox } from "@/components/compras/combobox";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
 
-interface DraftLine { key: string; articuloId: string; obraCodigo: string; obraNombre: string; variantCode: string; variantNombre: string; cantidad: string; cantidadPlantilla?: number; }
+interface DraftLine { key: string; articuloId: string; obraCodigo: string; obraNombre: string; variantCode: string; variantNombre: string; cantidad: string; cantidadPlantilla?: number;
+  /** Almacén real de la línea (viene del pedido que se está editando/copiando).
+   *  Esta pantalla no lo elige — el drawer nuevo sí —, pero lo conserva para no
+   *  mandar el material al Almacén General al guardar. */
+  almacenLinea?: string; }
 type Variante = { code: string; descripcion: string };
 
 // Personas que pueden solicitar material (rol Ingeniería).
@@ -32,8 +36,10 @@ export interface SolicitudInicial {
   solicitante: string;
   prioridad: Pedido["prioridad"];
   notas?: string;
-  // En material, `almacen` de cada línea guarda el código de obra de esa línea.
-  lineas: { articuloId: string; almacen: string; cantidad: number; variantCode?: string }[];
+  // En material, `almacen` de cada línea guarda el código de OBRA de esa línea (así
+  // nació el modelo). `almacenLinea` es el almacén real, que esta pantalla solo
+  // conserva.
+  lineas: { articuloId: string; almacen: string; almacenLinea?: string; cantidad: number; variantCode?: string }[];
 }
 
 export function SolicitudForm({
@@ -120,6 +126,7 @@ export function SolicitudForm({
       key: Math.random().toString(36).slice(2),
       articuloId: l.articuloId,
       obraCodigo: l.almacen, // en material, almacen = código de obra
+      almacenLinea: l.almacenLinea,
       obraNombre: "",
       variantCode: l.variantCode ?? "",
       variantNombre: "",
@@ -503,7 +510,13 @@ export function SolicitudForm({
         loteRef: planContexto?.lote,
         lineas: lineas.map((l) => {
           const a = catArticulos.find((x) => x.id === l.articuloId)!;
-          return { articuloId: a.id, descripcion: a.descripcion, cantidad: Number(l.cantidad), unidad: a.unidad, almacen: tipo === "material" ? l.obraCodigo : "", variantCode: l.variantCode || undefined };
+          // La OBRA de la línea va en su campo; el almacén es el que traía el pedido
+          // (o la bodega elegida en Stock). Si no hay, queda vacío y el traspaso a la
+          // orden cae al Almacén General, como siempre.
+          return { articuloId: a.id, descripcion: a.descripcion, cantidad: Number(l.cantidad), unidad: a.unidad,
+            almacen: tipo === "stock" ? almacenStock : (l.almacenLinea ?? ""),
+            obraCodigo: tipo === "material" ? (l.obraCodigo || undefined) : undefined,
+            variantCode: l.variantCode || undefined };
         }),
       });
       setPlanContexto(null);

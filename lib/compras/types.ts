@@ -21,6 +21,10 @@ export type Role = "ingenieria" | "proveeduria" | "aprobacion" | "facturacion" |
 
 export type LineType = "articulo" | "cargo"; // 'cargo' = flete / cargo de producto
 export type TipoSolicitud = "material" | "repuesto" | "stock"; // stock = compra para bodega/inventario
+// Destino del material/repuesto pedido (el "tag" ALM/CD del pedido):
+//   'almacen' → entra a inventario de un almacén REAL elegido (ALM-GRAL, F-AGREGADO, …)
+//   'consumo' → consumo directo: no entra a inventario (material: contra obra + tarea)
+export type DestinoPedido = "almacen" | "consumo";
 
 // ---- Catálogos (espejo de Business Central) ----
 export interface Proveedor {
@@ -93,7 +97,14 @@ export interface PedidoLinea {
   descripcion: string;
   cantidad: number;
   unidad: string;
+  /** Almacén REAL de destino (ALM-GRAL, F-AGREGADO, …). En consumo directo de
+   *  material es el almacén de la obra (mismo código que el proyecto en BC).
+   *  Histórico: en pedidos viejos de material acá venía la OBRA (ver `obraCodigo`). */
   almacen: string;
+  /** Obra de la línea (dbo.PedidoCompraDet.obra). Un pedido de material puede
+   *  tener varias obras, una por tarjeta. En pedidos viejos la obra venía dentro
+   *  de `almacen`; el mapeo la recupera acá para que el resto no cambie. */
+  obraCodigo?: string;
   variantCode?: string;     // variante del item (si aplica)
   taskNo?: string;          // N.º tarea proyecto (Job Task) — consumo inmediato
   taskDescr?: string;       // descripción de la tarea (para mostrar / BC)

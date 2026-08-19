@@ -30,6 +30,11 @@ export async function aprobarYLanzar(
       // `almacen`, y la app de proveeduría la copia tal cual a la orden; sin esto el
       // material se recibe en el almacén de la obra.)
       const materialABodega = !!l.proyecto && !l.taskNo;
+      // Almacén REAL de la línea: el que eligió el pedido (tag ALM / Stock: Almacén
+      // General, Agregados, Herramienta…). Si viene el código de la OBRA (pedidos
+      // viejos, donde la obra viajaba en el almacén) no sirve como almacén de
+      // recepción → se descarta y cae al General.
+      const almacenReal = l.almacen && l.almacen !== l.proyecto ? l.almacen : "";
       return {
         itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0,
         descripcion: l.descripcion, variantCode: l.variantCode,
@@ -37,7 +42,7 @@ export async function aprobarYLanzar(
         jobTaskNo: consumo ? l.taskNo : undefined,
         // Consumo inmediato: el almacén de la OBRA (en BC tiene el mismo código que el
         // proyecto). BC lo exige en las líneas de artículo y no impide el consumo.
-        locationCode: consumo ? l.proyecto : (materialABodega ? ALMACEN_GENERAL : (l.almacen || undefined)),
+        locationCode: consumo ? l.proyecto : (materialABodega ? (almacenReal || ALMACEN_GENERAL) : (almacenReal || undefined)),
       };
     });
   // Cargos de producto (Item Charge): TODAS las líneas tipo "cargo" con precio, cada

@@ -1,11 +1,31 @@
 import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
 
-// Badge del tipo de solicitud (Material / Repuesto / Stock).
-// Almacén de inventario general: destino del material de obra que NO es de consumo
-// inmediato. En BC cada obra tiene además su propio almacén (mismo código que la
-// obra), por eso la línea de pedido guarda la OBRA en `almacen` y el traspaso a la
-// orden decide el almacén real según haya tarea o no.
+// Almacén de inventario por defecto (el General). El pedido puede elegir OTRO
+// almacén real (Agregados, Herramienta, Maquinaria…): eso viaja en `almacen` de la
+// línea. Este código es solo el default / el respaldo de las líneas que no traen
+// almacén (pedidos viejos, donde `almacen` guardaba la OBRA — ver `obraDeLinea`).
 export const ALMACEN_GENERAL = "ALM-GRAL";
+
+// ─── Obra vs almacén de una línea de pedido ─────────────────────────────────────
+// Hasta 2026-08 la línea guardaba la OBRA en `almacen` (no se usaba la columna
+// `obra` de la tabla) y el almacén real se decidía después, siempre el General.
+// Hoy la línea trae obra Y almacén por separado; estas dos funciones leen las dos
+// generaciones de pedidos sin que cada pantalla tenga que saberlo.
+
+/** Obra de la línea (vacío si el pedido no es de obra). */
+export function obraDeLinea(l: Pick<PedidoLinea, "obraCodigo" | "almacen">, p?: Pick<Pedido, "tipoSolicitud" | "obraCodigo">): string {
+  if (l.obraCodigo) return l.obraCodigo;
+  // Compat: pedido viejo de material → la obra venía en `almacen`.
+  if (!p || p.tipoSolicitud === "material") return l.almacen || p?.obraCodigo || "";
+  return "";
+}
+
+/** Destino que se le muestra a la gente: la OBRA si es material, el ALMACÉN si es
+ *  repuesto o stock. */
+export function destinoDeLinea(l: Pick<PedidoLinea, "obraCodigo" | "almacen">, p?: Pick<Pedido, "tipoSolicitud" | "obraCodigo">): string {
+  if (p && p.tipoSolicitud !== "material") return l.almacen || p.obraCodigo || "";
+  return obraDeLinea(l, p);
+}
 
 export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: string } {
   return t === "repuesto" ? { label: "Repuesto", tone: "yellow" }

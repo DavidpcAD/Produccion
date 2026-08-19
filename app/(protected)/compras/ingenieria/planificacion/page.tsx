@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Button, Card, Input } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
+import { obraDeLinea } from "@/lib/compras/helpers";
 
 // Planificación = matriz OBRA × PARTIDA que se llena SOLA con las solicitudes de
 // material. Las columnas (partidas) salen de la CATEGORÍA del ítem en Business
@@ -44,7 +45,7 @@ export default function PlanificacionPage() {
     for (const p of pedidos) {
       if (p.tipoSolicitud !== "material") continue;
       for (const l of p.lineas) {
-        const obra = l.almacen || (p.obraCodigo && p.obraCodigo !== "(varias)" ? p.obraCodigo : "");
+        const obra = obraDeLinea(l) || (p.obraCodigo && p.obraCodigo !== "(varias)" ? p.obraCodigo : "");
         if (!obra) continue;
         const cat = (itemCat[l.articuloId] || "").trim() || SIN_CAT;
         setObras.add(obra); setPart.add(cat);

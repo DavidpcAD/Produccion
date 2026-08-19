@@ -7,7 +7,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, num, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { destinoLabel, num, recibidoDeLineaPedido, tipoSolicitudBadge, destinoDeLinea } from "@/lib/compras/helpers";
 import type { TipoSolicitud } from "@/lib/compras/types";
 
 type Fila = {
@@ -23,7 +23,7 @@ export default function SeguimientoPage() {
     const recibido = recibidoDeLineaPedido(ordenes, l.id);
     return {
       key: l.id, proyecto: destinoLabel(p), pedidoId: p.id, pedidoNumero: p.numero, tipo: p.tipoSolicitud,
-      articulo: l.descripcion, unidad: l.unidad, almacen: l.almacen, solicitado: l.cantidad, recibido,
+      articulo: l.descripcion, unidad: l.unidad, almacen: destinoDeLinea(l, p), solicitado: l.cantidad, recibido,
       pendiente: Math.max(0, l.cantidad - recibido), comentario: p.notas ?? "",
     };
   })), [pedidos, ordenes]);

@@ -5,6 +5,7 @@ import { AppShell } from "@/components/compras/shell";
 import { useToast } from "@/components/compras/ui";
 import { SolicitudForm, type SolicitudInicial } from "@/components/compras/solicitud-form";
 import { useStore } from "@/lib/compras/store";
+import { obraDeLinea } from "@/lib/compras/helpers";
 
 export default function EditarSolicitudPage() {
   const { id } = useParams<{ id: string }>();
@@ -38,7 +39,9 @@ export default function EditarSolicitudPage() {
     solicitante: pedido.solicitante,
     prioridad: pedido.prioridad,
     notas: pedido.notas,
-    lineas: pedido.lineas.map((l) => ({ articuloId: l.articuloId, almacen: l.almacen, cantidad: l.cantidad, variantCode: l.variantCode })),
+    // El formulario viejo espera la OBRA en `almacen`; el almacén real de la línea
+    // viaja en `almacenLinea` para no perderlo al guardar.
+    lineas: pedido.lineas.map((l) => ({ articuloId: l.articuloId, almacen: obraDeLinea(l, pedido), almacenLinea: l.almacen, cantidad: l.cantidad, variantCode: l.variantCode })),
   };
 
   return (

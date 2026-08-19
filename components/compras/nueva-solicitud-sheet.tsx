@@ -39,7 +39,9 @@ export type NuevaSolicitudSeed = {
   prioridad?: Pedido["prioridad"];
   notas?: string;
   destino?: string;          // repuesto → máquina
-  /** true = el pedido copiado era de consumo inmediato (sus líneas traían tarea). */
+  /** almacén real del pedido copiado (tag ALM / pedido de Stock). */
+  almacen?: string;
+  /** true = el pedido copiado era de consumo directo (sus líneas traían tarea). */
   consumo?: boolean;
   lineas: PlantillaLinea[];
 };
@@ -76,13 +78,22 @@ function mergeDedup(rows: Row[]): { rows: Row[]; merged: number } {
 const TIPOS: { v: TipoSolicitud; label: string; destino: string }[] = [
   { v: "material", label: "Material (obra)", destino: "Obra" },
   { v: "repuesto", label: "Repuesto", destino: "Máquina" },
+  { v: "stock", label: "Stock", destino: "Almacén" },
 ];
-// Destino del material de un pedido de obra (el "tag" del pedido).
+// TAG del pedido (chiquito, al lado del tipo): ALM = entra a inventario del almacén
+// REAL elegido · CD = consumo directo, no entra a inventario. Stock siempre es a un
+// almacén (es justamente la compra para inventario), así que no lleva tag.
 type DestinoMat = "almacen" | "consumo";
-const DESTINOS: { v: DestinoMat; label: string; ayuda: string }[] = [
-  { v: "almacen", label: "Al Almacén General", ayuda: "Entra a inventario del Almacén General; se consume después." },
-  { v: "consumo", label: "Consumo inmediato", ayuda: "Se consume de una vez contra el proyecto y la tarea de la obra." },
+const DESTINOS: { v: DestinoMat; label: string }[] = [
+  { v: "almacen", label: "ALM" },
+  { v: "consumo", label: "CD" },
 ];
+const ayudaDestino = (tipo: TipoSolicitud, d: DestinoMat) =>
+  d === "almacen"
+    ? "ALM: entra a inventario del almacén elegido; se consume después."
+    : tipo === "repuesto"
+      ? "CD (consumo directo): no entra a inventario, se lo lleva la máquina."
+      : "CD (consumo directo): se consume de una vez contra el proyecto y la tarea de la obra.";
 // Almacén de inventario al que entra el material que no es de consumo inmediato.
 const ALM_GENERAL = ALMACEN_GENERAL;
 const PRIORIDADES: { v: Pedido["prioridad"]; label: string }[] = [
@@ -288,6 +299,41 @@ function Cantidad({ value, onChange }: { value: number; onChange: (n: number) =>
     <input inputMode="numeric" value={value} aria-label="Cantidad" onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => onChange(Math.max(0, Number(e.target.value.replace(/\D/g, "")) || 0))}
       style={{ width: 72, textAlign: "center", height: 40, borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", color: "var(--ds-color-yellow)", fontVariantNumeric: "tabular-nums", fontWeight: 700 }} />
+  );
+}
+
+// ─── Columnas de STOCK de la línea: existencias en el almacén elegido y cuánto
+//     pide la plantilla. Van pegadas a la cantidad (grupo anclado a la derecha), así
+//     quedan alineadas como columnas en todas las filas. ────────────────────────────
+const W_COL = 58;
+function StockCols({ stock, ready, requerido }: { stock: number; ready: boolean; requerido?: number }) {
+  return (
+    <>
+      <span className="ds-muted ds-label" style={{ width: W_COL, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+        title="Existencias en el almacén elegido">
+        {ready ? stock.toLocaleString("es-CR") : <span className="nsl-skel" style={{ width: 30, display: "inline-block" }} role="status" aria-label="Cargando stock" />}
+      </span>
+      <span className="ds-muted ds-label" style={{ width: W_COL, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}
+        title="Cuánto pide la plantilla">
+        {requerido != null ? requerido.toLocaleString("es-CR") : "—"}
+      </span>
+    </>
+  );
+}
+// Encabezado de esas columnas. `inset` = la lista son tarjetas con borde (repuesto/
+// stock) y hay que compensar el padding para que calce con las filas.
+function StockHead({ inset }: { inset?: boolean }) {
+  return (
+    <div className="row gap-3" style={{ alignItems: "center", padding: inset ? "2px 14px" : "6px 12px" }}>
+      <span className="ds-muted ds-label" style={{ flex: "1 1 60px", minWidth: 0 }}>Material</span>
+      <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
+        <span className="ds-muted ds-label" style={{ width: W_COL, textAlign: "right" }}>En stock</span>
+        <span className="ds-muted ds-label" style={{ width: W_COL, textAlign: "right" }}>Plantilla</span>
+        <span className="ds-muted ds-label" style={{ width: 72, textAlign: "center" }}>Pedir</span>
+        <span style={{ minWidth: 26 }} aria-hidden />
+        <span style={{ width: 29 }} aria-hidden />
+      </div>
+    </div>
   );
 }
 
@@ -616,9 +662,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const catAlm = bcAlm ?? almacenes;
 
   const [tipo, setTipo] = useState<TipoSolicitud>("material");
-  // Destino del material (tag del pedido): almacén general o consumo inmediato.
+  // Tag del pedido: ALM (a inventario de un almacén real) o CD (consumo directo).
   const [destinoMat, setDestinoMat] = useState<DestinoMat>("almacen");
-  const [destino, setDestino] = useState("");
+  // Almacén REAL de BC elegido (ALM-GRAL, Agregados, Herramienta, Maquinaria…).
+  // Se usa con el tag ALM (material/repuesto) y en el pedido de Stock.
+  const [almacenSel, setAlmacenSel] = useState<string>(ALM_GENERAL);
+  const [destino, setDestino] = useState(""); // repuesto → máquina
   const [prioridad, setPrioridad] = useState<Pedido["prioridad"]>("normal");
   const [lineas, setLineas] = useState<Row[]>([]);
   // Tarjetas de obra (material). Arranca con una vacía para elegir obra + materiales.
@@ -662,12 +711,15 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   // existencias del almacén (una llamada), sumadas por artículo (itemNo = código).
   const [stockPorCode, setStockPorCode] = useState<Record<string, number>>({});
   const [stockReady, setStockReady] = useState(false);
-  const verStock = tipo === "material" && destinoMat === "almacen";
+  // Con almacén (tag ALM o pedido de Stock) se muestran las columnas de existencias
+  // del almacén ELEGIDO; en consumo directo no hay inventario que mirar.
+  const usaAlmacen = tipo === "stock" || destinoMat === "almacen";
+  const verStock = usaAlmacen && !!almacenSel;
   useEffect(() => {
     if (!verStock) { setStockReady(false); setStockPorCode({}); return; }
     let cancel = false;
     setStockReady(false);
-    fetch(`/api/compras/bc/existencias?locationCode=${encodeURIComponent(ALM_GENERAL)}`)
+    fetch(`/api/compras/bc/existencias?locationCode=${encodeURIComponent(almacenSel)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (cancel) return;
@@ -680,7 +732,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
       })
       .catch(() => { if (!cancel) { setStockPorCode({}); setStockReady(true); } });
     return () => { cancel = true; };
-  }, [verStock]);
+  }, [verStock, almacenSel]);
 
   // Con el stock listo, prellenar "pedir" = max(0, requerido − stock) en las líneas de
   // Bodega que vienen de plantilla. Una sola vez por línea (autoPedir → false al aplicar),
@@ -701,14 +753,27 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
 
   const tipoMeta = TIPOS.find((t) => t.v === tipo)!;
   const esMaterial = tipo === "material";
-  // Consumo inmediato: material de obra que se consume contra proyecto + tarea.
+  const esRepuesto = tipo === "repuesto";
+  const esStock = tipo === "stock";
+  // Repuesto y Stock no llevan obra: una sola lista de materiales (grupo SOLO).
+  const sinObra = esRepuesto || esStock;
+  // Consumo directo de material: se consume contra proyecto + tarea de la obra.
   const esConsumo = esMaterial && destinoMat === "consumo";
   const obraItems: Item[] = useMemo(() => catObras.map((o) => ({ id: o.codigo, title: o.nombre, sub: o.codigo })), [catObras]);
   const destinoItems: Item[] = useMemo(() => {
-    if (tipo === "repuesto") return maquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.no }));
-    if (tipo === "stock") return catAlm.map((a) => ({ id: a.codigo, title: (a as any).nombre || a.codigo, sub: a.codigo }));
+    if (esRepuesto) return maquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.no }));
     return obraItems;
-  }, [tipo, obraItems, maquinas, catAlm]);
+  }, [esRepuesto, obraItems, maquinas]);
+  // Almacenes REALES de BC (Almacén General, Agregados, Herramienta, Maquinaria,
+  // Fábrica Maderas…). Los ALM-* primero y el resto por código; el buscador del
+  // dropdown filtra por nombre o código.
+  const almacenItems: Item[] = useMemo(() => {
+    const orden = (c: string) => (c.toUpperCase().startsWith("ALM-") ? 0 : 1);
+    return [...catAlm]
+      .sort((a, b) => orden(a.codigo) - orden(b.codigo) || a.codigo.localeCompare(b.codigo))
+      .map((a) => ({ id: a.codigo, title: (a.nombre ?? "").trim() || a.codigo, sub: a.codigo }));
+  }, [catAlm]);
+  const almacenNombre = almacenItems.find((a) => a.id === almacenSel)?.title ?? almacenSel;
   // La unidad NO va en la lista de búsqueda (solo el código); la unidad se muestra
   // en la línea ya agregada, junto a la cantidad.
   const articuloItems: Item[] = useMemo(() => catArticulos.map((a) => ({ id: a.id, title: a.descripcion, sub: a.code })), [catArticulos]);
@@ -733,24 +798,44 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const variantesDe = (l: Row) => { const a = catArticulos.find((x) => x.id === l.articuloId); return a ? (varMap[a.code] ?? []) : []; };
   const necesitaVariante = (l: Row) => { const vs = variantesDe(l); return vs.length > 0 && !l.variantCode; };
   // Material: cada línea debe tener obra (su tarjeta debe tener obra elegida).
-  const destinoOk = esMaterial ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo)) : !!destino;
+  // Repuesto: máquina. Stock: almacén.
+  const destinoOk = esMaterial ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo))
+    : esRepuesto ? !!destino : !!almacenSel;
+  // Con tag ALM (o en Stock) hace falta el almacén real elegido.
+  const almacenOk = !usaAlmacen || !!almacenSel;
   const comentarioOk = notas.trim().length > 0; // comentario para proveeduría OBLIGATORIO al solicitar
   // Consumo inmediato: sin tarea BC no puede consumir contra el proyecto, así que la
   // actividad es obligatoria en cada obra que tenga líneas.
   const tareasOk = !esConsumo || grupos.every((g) => !lineas.some((l) => l.grupoKey === g.key) || !!g.taskNo);
-  const canContinue = validLines.length > 0 && destinoOk && comentarioOk && tareasOk && validLines.every((l) => !necesitaVariante(l));
+  const canContinue = validLines.length > 0 && destinoOk && almacenOk && comentarioOk && tareasOk && validLines.every((l) => !necesitaVariante(l));
 
   function reset() {
-    setTipo("material"); setDestinoMat("almacen"); setDestino(""); setPrioridad("normal");
+    setTipo("material"); setDestinoMat("almacen"); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
     setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]); setConfirmPedir(false);
   }
   function close() { setConfirmExit(false); setConfirmPedir(false); setOpen(false); setTimeout(reset, 260); }
   function requestDismiss() { if (hasData && !saving) setConfirmExit(true); else close(); }
 
+  // Cambiar el almacén re-arma el sugerido de las líneas que vienen de plantilla:
+  // "pedir" vuelve a ser plantilla − stock, pero del almacén NUEVO.
+  function cambiarAlmacen(code: string) {
+    if (code === almacenSel) return;
+    setAlmacenSel(code);
+    // stockReady=false ACÁ (no solo en el fetch): si no, el prellenado corre en el
+    // mismo commit con las existencias del almacén VIEJO y se quema el autoPedir.
+    setStockReady(false);
+    setLineas((ls) => ls.map((l) => (l.requerido != null ? { ...l, autoPedir: true } : l)));
+  }
+
   // Cambia el tipo de solicitud y limpia lo dependiente (obra/almacén/materiales).
   function cambiarTipo(v: TipoSolicitud) {
     setTipo(v); setDestino(""); setPlantillaSel("");
+    // Cambiar de tipo arranca de nuevo: destino ALM (a inventario). Stock ADEMÁS es
+    // siempre a un almacén y sus plantillas son las de Bodega → el filtro del
+    // selector arranca ahí.
+    setDestinoMat("almacen");
+    setFTipoPl(v === "stock" ? "bodega" : "todas");
     setLineas([]); setGrupos([]); setOpenMat([]); setCardMenuKey(null);
   }
 
@@ -790,7 +875,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     // plantilla de bodega es material de obra que va al Almacén General, así que sus
     // líneas también van en una tarjeta de obra. Grupo único (sin obra) solo en repuesto.
     const bodega = esBodega(pl);
-    const sinObra = tipo === "repuesto";
     const { grupos: nuevosGrupos, rows, extras } = armarGruposFilas(pl.lineas, sinObra);
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
     // La plantilla puede traer el mismo material repetido en la misma obra: se
@@ -809,18 +893,19 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   // Copiar pedido: siembra el drawer con las líneas de un pedido existente. Mismo
   // armado que una plantilla; setea además tipo/prioridad/notas/destino del origen.
   function aplicarSeed(s: NuevaSolicitudSeed) {
-    // repuesto: grupo único sin obra (usa destino). 'stock' es un tipo LEGADO de
-    // pedidos viejos: hoy eso es material de obra que va al Almacén General.
-    const bodega = s.tipo === "repuesto";
-    const { grupos: gs, rows, extras } = armarGruposFilas(s.lineas, bodega);
+    // Repuesto y Stock: grupo único sin obra (el destino es la máquina / el almacén).
+    const soloUno = s.tipo === "repuesto" || s.tipo === "stock";
+    const { grupos: gs, rows, extras } = armarGruposFilas(s.lineas, soloUno);
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
     const { rows: dedup } = mergeDedup(rows);
-    setTipo(s.tipo === "repuesto" ? "repuesto" : "material");
+    setTipo(s.tipo);
     setDestinoMat(s.consumo ? "consumo" : "almacen");
     if (s.destino) setDestino(s.destino);
+    if (s.almacen) setAlmacenSel(s.almacen);
+    if (s.tipo === "stock") setFTipoPl("bodega");
     if (s.prioridad) setPrioridad(s.prioridad);
     if (s.notas) setNotas(s.notas);
-    setGrupos(bodega ? [] : gs);
+    setGrupos(soloUno ? [] : gs);
     setLineas(dedup);
   }
 
@@ -834,8 +919,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     const pl = plantillas.find((p) => String(p.id) === id);
     if (!pl) return;
     setPlantillaSel(id);
-    // Las plantillas de Bodega son listas de reposición → material al Almacén General.
-    setTipo("material");
+    // La plantilla NO cambia el tipo que eligió la persona: antes forzaba "material" y
+    // con el tipo Stock eso devolvía el pedido a material. Las de Bodega (listas de
+    // reposición) sí fijan el destino en ALM: van a inventario, no a consumo directo.
     if (esBodega(pl)) setDestinoMat("almacen");
     aplicarPlantilla(pl);
   }
@@ -915,10 +1001,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const delLinea = (key: string) => setLineas((ls) => ls.filter((l) => l.key !== key));
 
   function headerObra(): { codigo?: string; nombre?: string } {
-    if (tipo === "repuesto") return {};
+    if (!esMaterial) return {};
     const codes = Array.from(new Set(validLines.map((l) => l.obraCodigo).filter(Boolean))) as string[];
     if (codes.length === 1) return { codigo: codes[0], nombre: obraNombreDe(codes[0]) };
-    if (codes.length === 0) return { codigo: destino || undefined, nombre: destino ? obraNombreDe(destino) : undefined };
+    if (codes.length === 0) return {};
     return { codigo: "(varias)", nombre: "Varias obras" };
   }
 
@@ -926,19 +1012,26 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     const h = headerObra();
     return {
       tipoSolicitud: tipo,
-      obraCodigo: tipo === "repuesto" ? undefined : h.codigo,
-      obraNombre: tipo === "repuesto" ? undefined : h.nombre,
-      maquinaNo: tipo === "repuesto" ? destino : undefined,
-      maquinaNombre: tipo === "repuesto" ? destinoNombre : undefined,
+      // Stock: el encabezado guarda el ALMACÉN en el campo de obra (misma convención
+      // que la pantalla vieja de pedidos a bodega). Material: la obra, o "(varias)".
+      obraCodigo: esMaterial ? h.codigo : esStock ? almacenSel : undefined,
+      obraNombre: esMaterial ? h.nombre : esStock ? almacenNombre : undefined,
+      maquinaNo: esRepuesto ? destino : undefined,
+      maquinaNombre: esRepuesto ? destinoNombre : undefined,
       solicitante: usuario ?? "",
       prioridad, notas: notas.trim() || undefined,
       lineas: validLines.map((l) => {
         const a = catArticulos.find((x) => x.id === l.articuloId)!;
         // Consumo inmediato: la tarea (actividad) se elige por obra y se copia a cada línea.
         const g = esConsumo ? grupos.find((x) => x.key === l.grupoKey) : undefined;
+        // Almacén de la línea: en consumo directo de MATERIAL es el almacén de la obra
+        // (en BC tiene el mismo código que el proyecto, y así lo consume contra la
+        // tarea); con tag ALM o en Stock es el almacén elegido; en consumo directo de
+        // REPUESTO no hay almacén (no entra a inventario).
+        const almacenLinea = esConsumo ? (l.obraCodigo || "") : usaAlmacen ? almacenSel : "";
         // Si se eligió variante, se guarda la descripción de la variante (más específica);
         // si no, la descripción base del material.
-        return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: esMaterial ? (l.obraCodigo || "") : "", variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined, taskNo: g?.taskNo || undefined, taskDescr: g?.taskNombre || undefined };
+        return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: almacenLinea, obraCodigo: esMaterial ? (l.obraCodigo || undefined) : undefined, variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined, taskNo: g?.taskNo || undefined, taskDescr: g?.taskNombre || undefined };
       }),
     };
   }
@@ -987,6 +1080,15 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     finally { setSavingPlant(false); }
   }
 
+  // Botón "Usar plantilla": a lo ancho en material/repuesto, o en columna al lado del
+  // almacén en Stock. Se arma una vez para no repetir props.
+  const plantillaBtn = (
+    <UsarPlantillaBtn items={plantillaItems} value={plantillaSel} hasMateriales={hayMateriales}
+      onPick={cargarPlantilla}
+      onClear={() => { setPlantillaSel(""); setLineas([]); setGrupos([]); }}
+      filterNode={<Segmented size="sm" value={fTipoPl} options={F_TIPOS} onChange={setFTipoPl} />} />
+  );
+
   return (
     <>
       <div aria-hidden={!open} style={{ position: "fixed", inset: 0, zIndex: 1000, pointerEvents: open ? "auto" : "none" }}>
@@ -1015,24 +1117,38 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                   <Segmented variant="pill" value={tipo} options={TIPOS.map((t) => ({ v: t.v, label: t.label }))} onChange={cambiarTipo} />
                 </Field>
 
-                {/* Material de obra: ¿entra a inventario o se consume de una vez?
-                    Es el "tag" del pedido, no un tipo aparte. */}
-                {esMaterial && (
-                  <Field label="Destino del material">
-                    <div className="col gap-2">
-                      <Segmented variant="pill" value={destinoMat}
-                        options={DESTINOS.map((d) => ({ v: d.v, label: d.label }))}
-                        onChange={(v: DestinoMat) => setDestinoMat(v)} />
-                      <span className="ds-muted ds-label">{DESTINOS.find((d) => d.v === destinoMat)!.ayuda}</span>
+                {/* Material / Repuesto: TAG chico ALM|CD. Con ALM se elige el almacén
+                    REAL (Almacén General, Agregados, Herramienta, Maquinaria…), en la
+                    misma fila. Stock no lleva tag: siempre es a un almacén. */}
+                {!esStock && (
+                  /* Sin <Field>: el DS le fija 370px de ancho y el almacén quedaba
+                     angosto. Rótulo propio + fila (el tag y el almacén en la misma
+                     línea, centrados por .row) a lo ancho del panel. */
+                  <div className="col gap-2">
+                    <span className="ds-form-field__label">{esRepuesto ? "Destino del repuesto" : "Destino del material"}</span>
+                    <div className="row gap-3 wrap">
+                      <Segmented size="sm" value={destinoMat} options={DESTINOS} onChange={(v: DestinoMat) => setDestinoMat(v)} />
+                      {usaAlmacen && (
+                        <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+                          <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} />
+                        </div>
+                      )}
                     </div>
-                  </Field>
+                    <span className="ds-muted ds-label">{ayudaDestino(tipo, destinoMat)}</span>
+                  </div>
                 )}
 
-                {/* USAR PLANTILLA: botón (siempre visible, como la referencia). */}
-                <UsarPlantillaBtn items={plantillaItems} value={plantillaSel} hasMateriales={hayMateriales}
-                  onPick={cargarPlantilla}
-                  onClear={() => { setPlantillaSel(""); setLineas([]); setGrupos([]); }}
-                  filterNode={<Segmented size="sm" value={fTipoPl} options={F_TIPOS} onChange={setFTipoPl} />} />
+                {/* USAR PLANTILLA. En Stock va EN COLUMNAS con el almacén (y el filtro
+                    de plantillas arranca en "Bodega", que son las de reposición). */}
+                {esStock ? (
+                  <div className="row gap-3 wrap" style={{ alignItems: "flex-end" }}>
+                    <div className="col gap-2" style={{ flex: "1 1 220px", minWidth: 0 }}>
+                      <span className="ds-form-field__label">Almacén</span>
+                      <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} />
+                    </div>
+                    <div style={{ flex: "1 1 220px", minWidth: 0 }}>{plantillaBtn}</div>
+                  </div>
+                ) : plantillaBtn}
 
                 {esMaterial ? (
                   /* MATERIAL: una TARJETA por obra; adentro, sus materiales. */
@@ -1102,6 +1218,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                               </div>
                             ) : (
                               <div className="col gap-0" style={{ borderTop: "1.5px solid var(--ds-color-gray-100)" }}>
+                                {/* Con almacén: columnas En stock · Plantilla · Pedir. */}
+                                {verStock && <StockHead />}
                                 {filas.map((l, i) => {
                                   const a = catArticulos.find((x) => x.id === l.articuloId);
                                   const variantes = variantesDe(l);
@@ -1112,17 +1230,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                       <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
                                         <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
                                         <span className="ds-muted ds-label">{a?.code}</span>
-                                        {verStock && (
-                                          /* Mientras BC no devuelve las existencias se muestra un
-                                             esqueleto: "En stock: 0" se lee como "no hay". */
-                                          <span className="row" style={{ alignItems: "center", gap: 6 }}>
-                                            <span className="ds-muted ds-label">En stock:</span>
-                                            {stockReady
-                                              ? <span className="ds-muted ds-label">{stockPorCode[a?.code ?? ""] ?? 0}</span>
-                                              : <span className="nsl-skel" style={{ width: 32 }} role="status" aria-label="Cargando stock" />}
-                                            {l.requerido != null && <span className="ds-muted ds-label">· plantilla pide {l.requerido}</span>}
-                                          </span>
-                                        )}
                                       </div>
                                       {variantes.length > 0 && (
                                         <div style={{ flex: "0 0 200px", minWidth: 0 }}>
@@ -1133,6 +1240,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                       {/* Comentario de la línea: al centro y VISIBLE cuando hay texto. */}
                                       <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                       <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
+                                        {verStock && <StockCols stock={stockPorCode[a?.code ?? ""] ?? 0} ready={stockReady} requerido={l.requerido} />}
                                         <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n, autoPedir: false })} />
                                         <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
                                         <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
@@ -1156,12 +1264,16 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                     </button>
                   </div>
                 ) : (
-                  /* REPUESTO: una máquina + lista de repuestos. */
+                  /* REPUESTO: una máquina + sus repuestos. STOCK: solo la lista de
+                     materiales que se le piden al almacén (el almacén ya se eligió
+                     arriba, en columna con la plantilla). */
                   <div className="col gap-4">
-                    <div className="col gap-2">
-                      <span className="ds-form-field__label">{tipoMeta.destino}</span>
-                      <Dropdown placeholder={`Elegí ${tipoMeta.destino.toLowerCase()}…`} items={destinoItems} value={destino} onPick={setDestino} />
-                    </div>
+                    {esRepuesto && (
+                      <div className="col gap-2">
+                        <span className="ds-form-field__label">{tipoMeta.destino}</span>
+                        <Dropdown placeholder={`Elegí ${tipoMeta.destino.toLowerCase()}…`} items={destinoItems} value={destino} onPick={setDestino} />
+                      </div>
+                    )}
                     <div className="col gap-2">
                       <div className="row row--between" style={{ alignItems: "center" }}>
                         <span className="ds-form-field__label">Materiales</span>
@@ -1170,6 +1282,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                       <MaterialSearch items={articuloItems} onAdd={(id, vc, vn) => addRow(SOLO, id, vc, vn)} />
                       {lineas.length > 0 && (
                         <div className="col gap-2" style={{ marginTop: 4 }}>
+                          {verStock && <StockHead inset />}
                           {lineas.map((l) => {
                             const a = catArticulos.find((x) => x.id === l.articuloId);
                             const variantes = variantesDe(l);
@@ -1190,6 +1303,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                                 {/* Comentario de la línea: al centro y VISIBLE cuando hay texto. */}
                                 <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                 <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
+                                  {verStock && <StockCols stock={stockPorCode[a?.code ?? ""] ?? 0} ready={stockReady} requerido={l.requerido} />}
                                   {/* autoPedir:false → si el usuario ya escribió, el prellenado
                                       (requerido − stock) no le pisa el número al llegar el stock. */}
                                   <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n, autoPedir: false })} />
@@ -1266,8 +1380,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                 <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
                   Se envía a proveeduría: <strong>{validLines.length} material(es)</strong>
                   {esMaterial
-                    ? <> en <strong>{gruposPreview.length} obra{gruposPreview.length !== 1 ? "s" : ""}</strong>, {esConsumo ? <strong>consumo inmediato (contra proyecto y tarea)</strong> : <>al <strong>Almacén General</strong></>}</>
-                    : <> para <strong>{destinoNombre || tipoMeta.destino}</strong></>}
+                    ? <> en <strong>{gruposPreview.length} obra{gruposPreview.length !== 1 ? "s" : ""}</strong>, {esConsumo ? <strong>consumo directo (contra proyecto y tarea)</strong> : <>a <strong>{almacenNombre}</strong></>}</>
+                    : esStock
+                      ? <> para <strong>{almacenNombre}</strong></>
+                      : <> para <strong>{destinoNombre || tipoMeta.destino}</strong>{usaAlmacen ? <> · a <strong>{almacenNombre}</strong></> : <> · <strong>consumo directo</strong></>}</>}
                   {prioridad !== "normal" && <> · prioridad <strong>{PRIORIDADES.find((p) => p.v === prioridad)!.label}</strong></>}.
                 </p>
                 <div className="col gap-2" style={{ marginTop: 18 }}>

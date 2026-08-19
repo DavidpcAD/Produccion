@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, ALMACEN_GENERAL } from "@/lib/compras/helpers";
+import { money, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, ALMACEN_GENERAL, obraDeLinea, destinoDeLinea } from "@/lib/compras/helpers";
 import type { OrdenLinea } from "@/lib/compras/types";
 
 interface Row {
@@ -94,14 +94,15 @@ export default function ArmarOrdenPage() {
       let info = { pedidoNumero: "", articuloId: "", variantCode: "", descripcion: "", unidad: "", almacen: "", proyecto: "", tarea: "" };
       for (const p of pedidos) {
         const l = p.lineas.find((x) => x.id === b.pedidoLineaId);
-        // Consumo inmediato = la línea trae TAREA: va contra proyecto (obra) + tarea.
-        // Material de obra SIN tarea = entra a inventario → Almacén General (la línea
-        // del pedido guarda la obra en `almacen`, no un almacén de recepción).
+        // Consumo directo = la línea trae TAREA: va contra proyecto (obra) + tarea.
+        // Si no, la línea entra a inventario del ALMACÉN que eligió ingeniería (tag
+        // ALM / pedido de Stock); si no trae almacén (pedido viejo, donde `almacen`
+        // era la obra), cae al Almacén General — nunca al almacén de la obra.
         if (l) {
           const consumo = p.tipoSolicitud === "material" && !!l.taskNo;
           info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", descripcion: l.descripcion, unidad: l.unidad,
-            almacen: p.tipoSolicitud === "material" && !consumo ? ALMACEN_GENERAL : l.almacen,
-            proyecto: consumo ? (l.almacen || p.obraCodigo || "") : "", tarea: l.taskNo ?? "" };
+            almacen: consumo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
+            proyecto: consumo ? obraDeLinea(l, p) : "", tarea: l.taskNo ?? "" };
           break;
         }
       }
@@ -150,7 +151,7 @@ export default function ArmarOrdenPage() {
       .map((l) => ({ p, l, pend: pedidoLineaPendiente(l) })));
   const inc = (v: string, q: string) => !q || v.toLowerCase().includes(q.toLowerCase());
   const lineasDispFiltradas = lineasDisponibles.filter(({ p, l }) =>
-    inc(p.numero, addF.pedido) && inc(l.descripcion, addF.articulo) && inc(l.almacen || p.obraCodigo || "", addF.destino));
+    inc(p.numero, addF.pedido) && inc(l.descripcion, addF.articulo) && inc(destinoDeLinea(l, p), addF.destino));
   function agregarDeSolicitud(p: (typeof pedidos)[number], l: (typeof pedidos)[number]["lineas"][number], pend: number) {
     // Precio inicial = último precio de compra real (BC); si no hay historial, 0
     // para que proveeduría escriba lo acordado con el proveedor.
@@ -158,10 +159,11 @@ export default function ArmarOrdenPage() {
     setRows((rs) => [...rs, {
       pedidoNumero: p.numero, pedidoLineaId: l.id, articuloId: l.articuloId, variantCode: l.variantCode ?? "",
       descripcion: l.descripcion, unidad: l.unidad,
-      // Mismo criterio que arriba: con tarea → proyecto+tarea; sin tarea → Almacén General.
-      almacen: p.tipoSolicitud === "material" && !l.taskNo ? ALMACEN_GENERAL : l.almacen,
+      // Mismo criterio que arriba: con tarea → proyecto + tarea (almacén de la obra);
+      // sin tarea → el almacén elegido en el pedido, o el General si no trae.
+      almacen: p.tipoSolicitud === "material" && l.taskNo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
       cantidad: String(pend), precio: String(hist || 0), iva: "13", descuento: "0",
-      proyecto: p.tipoSolicitud === "material" && l.taskNo ? (l.almacen || p.obraCodigo || "") : "", tarea: l.taskNo ?? "",
+      proyecto: p.tipoSolicitud === "material" && l.taskNo ? obraDeLinea(l, p) : "", tarea: l.taskNo ?? "",
     }]);
   }
 
@@ -467,7 +469,7 @@ export default function ArmarOrdenPage() {
                     <tr key={l.id}>
                       <td className="ds-body-sm ds-strong">{p.numero}</td>
                       <td><div className="ds-truncate" style={{ maxWidth: 260 }} title={`${l.articuloId} — ${l.descripcion}`}><span className="ds-strong ds-body-sm">{l.articuloId}</span> <span className="ds-muted">— {l.descripcion}</span></div></td>
-                      <td className="ds-muted ds-body-sm">{l.almacen || p.obraCodigo || "—"}</td>
+                      <td className="ds-muted ds-body-sm">{destinoDeLinea(l, p) || "—"}</td>
                       <td className="ds-num">{pend} {l.unidad}</td>
                       <td className="ds-num"><Button variant="outline" size="sm" onClick={() => agregarDeSolicitud(p, l, pend)}>Agregar</Button></td>
                     </tr>

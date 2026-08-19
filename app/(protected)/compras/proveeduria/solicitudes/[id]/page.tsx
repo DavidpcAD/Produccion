@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Modal, Textarea, useToast, QtyRing } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { formatDate, num, pedidoBadge, pedidoLineaPendiente, recibidoDeLineaPedido, destinoCodigo, destinoLabel, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { formatDate, num, pedidoBadge, pedidoLineaPendiente, recibidoDeLineaPedido, destinoCodigo, destinoLabel, tipoSolicitudBadge, destinoDeLinea } from "@/lib/compras/helpers";
 
 export default function ProveeduriaPedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -77,7 +77,7 @@ export default function ProveeduriaPedidoDetallePage() {
                 {pedido.lineas.map((l) => (
                   <tr key={l.id}>
                     <td><div className="ds-truncate" title={l.descripcion} style={{ maxWidth: 260 }}>{l.descripcion}</div></td>
-                    <td className="ds-muted ds-body-sm">{l.almacen || "—"}</td>
+                    <td className="ds-muted ds-body-sm">{destinoDeLinea(l, pedido) || "—"}</td>
                     <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                     <td className="ds-num">{num.format(l.cantidadOrdenada)}</td>
                     <td className="ds-num">{pedidoLineaPendiente(l) > 0 ? <span className="ds-pending-text">{num.format(pedidoLineaPendiente(l))}</span> : "0"}</td>

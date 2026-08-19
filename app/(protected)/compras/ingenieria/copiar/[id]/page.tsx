@@ -5,6 +5,7 @@ import { AppShell } from "@/components/compras/shell";
 import { useToast } from "@/components/compras/ui";
 import { SolicitudForm, type SolicitudInicial } from "@/components/compras/solicitud-form";
 import { useStore } from "@/lib/compras/store";
+import { obraDeLinea } from "@/lib/compras/helpers";
 
 // Copiar una solicitud existente: precarga el form con las mismas líneas/destino y
 // crea una solicitud NUEVA (addPedido). Se permite desde cualquier estado.
@@ -26,7 +27,9 @@ export default function CopiarSolicitudPage() {
     solicitante: pedido.solicitante,
     prioridad: pedido.prioridad,
     notas: pedido.notas,
-    lineas: pedido.lineas.map((l) => ({ articuloId: l.articuloId, almacen: l.almacen, cantidad: l.cantidad, variantCode: l.variantCode })),
+    // El formulario viejo espera la OBRA en `almacen` (así nació el modelo); el
+    // almacén real de la línea viaja aparte en `almacenLinea`.
+    lineas: pedido.lineas.map((l) => ({ articuloId: l.articuloId, almacen: obraDeLinea(l, pedido), almacenLinea: l.almacen, cantidad: l.cantidad, variantCode: l.variantCode })),
   };
 
   return (

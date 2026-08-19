@@ -7,7 +7,7 @@ import { Badge, Button, Card, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, esConsumoInmediato, formatDate, num, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { destinoLabel, esConsumoInmediato, formatDate, num, obraDeLinea, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
 export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -34,12 +34,14 @@ export default function PedidoDetallePage() {
     tipo: pedido.tipoSolicitud,
     prioridad: pedido.prioridad,
     notas: pedido.notas,
-    // Consumo inmediato = las líneas traían tarea (Job Task) de la obra.
+    // Consumo directo (CD) = las líneas traían tarea (Job Task) de la obra.
     consumo: pedido.lineas.some((l) => !!l.taskNo),
     destino: pedido.tipoSolicitud === "repuesto" ? pedido.maquinaNo : undefined,
+    // Almacén elegido (tag ALM / pedido de Stock): se copia tal cual.
+    almacen: pedido.lineas.find((l) => !!l.almacen && !l.taskNo)?.almacen || undefined,
     lineas: pedido.lineas.map((l) => ({
       code: l.articuloId, cantidad: l.cantidad,
-      obraCodigo: pedido.tipoSolicitud === "material" ? l.almacen : undefined,
+      obraCodigo: pedido.tipoSolicitud === "material" ? (obraDeLinea(l, pedido) || undefined) : undefined,
       variantCode: l.variantCode, descripcion: l.descripcion, unidad: l.unidad,
     })),
   };
@@ -54,9 +56,11 @@ export default function PedidoDetallePage() {
             <div className="row gap-3">
               <h1 className="ds-heading">{pedido.numero}</h1>
               <Badge tone={t.tone}>{t.label}</Badge>
-              {pedido.tipoSolicitud === "material" && (
+              {pedido.tipoSolicitud !== "stock" && (
                 <Badge tone={esConsumoInmediato(pedido) ? "green" : "gray"}>
-                  {esConsumoInmediato(pedido) ? "Consumo inmediato" : "Al Almacén General"}
+                  {esConsumoInmediato(pedido)
+                    ? "CD · consumo directo"
+                    : `ALM · ${pedido.lineas.find((l) => !!l.almacen)?.almacen || "ALM-GRAL"}`}
                 </Badge>
               )}
               <Badge tone={b.tone}>{b.label}</Badge>
@@ -100,7 +104,9 @@ export default function PedidoDetallePage() {
             <table className="ds-table ds-table--center-num">
               <thead>
                 <tr>
-                  <th>Artículo</th><th>Almacén</th><th className="ds-num">Solicitado</th>
+                  <th>Artículo</th>
+                  {pedido.tipoSolicitud === "material" && <th>Obra</th>}
+                  <th>Almacén</th><th className="ds-num">Solicitado</th>
                   <th className="ds-num">En orden</th><th className="ds-num">Recibido</th><th className="ds-num">Por recibir</th>
                 </tr>
               </thead>
@@ -111,7 +117,8 @@ export default function PedidoDetallePage() {
                   return (
                     <tr key={l.id}>
                       <td>{l.descripcion}</td>
-                      <td className="ds-muted">{l.almacen}</td>
+                      {pedido.tipoSolicitud === "material" && <td className="ds-muted">{obraDeLinea(l, pedido) || "—"}</td>}
+                      <td className="ds-muted">{l.almacen || (l.taskNo ? obraDeLinea(l, pedido) : "—")}</td>
                       <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                       <td className="ds-num">{num.format(l.cantidadOrdenada)}</td>
                       <td className="ds-num ds-strong">{num.format(recibido)}</td>
