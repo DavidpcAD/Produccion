@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Button, Card, Input } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
+import { NuevaSolicitudSheet } from "@/components/compras/nueva-solicitud-sheet";
 import { obraDeLinea } from "@/lib/compras/helpers";
 
 // Planificación = matriz OBRA × PARTIDA que se llena SOLA con las solicitudes de
@@ -19,6 +19,7 @@ export default function PlanificacionPage() {
   const [obraNombre, setObraNombre] = useState<Record<string, string>>({});
   const [cargandoBc, setCargandoBc] = useState(true);
   const [buscar, setBuscar] = useState("");
+  const [nuevoOpen, setNuevoOpen] = useState(false);
 
   useEffect(() => {
     let cancel = false;
@@ -66,13 +67,15 @@ export default function PlanificacionPage() {
 
   return (
     <AppShell role="ingenieria">
+      {/* El pedido se crea en el mismo drawer de "Nueva solicitud". */}
+      <NuevaSolicitudSheet open={nuevoOpen} setOpen={setNuevoOpen} />
       <main className="page page--wide">
         <div className="page__head">
           <div className="page__title">
             <h1 className="ds-heading">Planificación</h1>
             <p className="ds-muted">Se llena sola con las solicitudes de material: filas = obra, columnas = partida (categoría del ítem en Business Central). Cada celda muestra cuántos ítems se pidieron y cuántos faltan por comprar.</p>
           </div>
-          <Link href="/compras/ingenieria/nuevo"><Button>+ Nueva solicitud</Button></Link>
+          <Button onClick={() => setNuevoOpen(true)}>+ Nueva solicitud</Button>
         </div>
 
         <Card className="mt-2">

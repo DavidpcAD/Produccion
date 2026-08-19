@@ -29,7 +29,10 @@ type Variante = { code: string; descripcion: string };
 // varias obras (varias tarjetas). Para repuesto/bodega se usa un único grupo (SOLO).
 type Grupo = { key: string; obraCodigo?: string; obraNombre?: string; taskNo?: string; taskNombre?: string };
 type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string; notas?: string; requerido?: number; autoPedir?: boolean };
-type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string };
+type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string;
+  // Tarea de la obra (consumo directo). Viaja al copiar/editar un pedido para no
+  // perder la actividad; en las plantillas guardadas no existe.
+  taskNo?: string; taskDescr?: string };
 type Plantilla = { id: number; nombre: string; tipo?: "general" | "bodega"; idClasificacion?: number | null; lineas: PlantillaLinea[]; creadoPor?: string };
 // Semilla para "Copiar pedido": abre el drawer ya cargado con las líneas de un
 // pedido existente. Las líneas usan el MISMO shape que una plantilla (code/obra/
@@ -43,8 +46,15 @@ export type NuevaSolicitudSeed = {
   almacen?: string;
   /** true = el pedido copiado era de consumo directo (sus líneas traían tarea). */
   consumo?: boolean;
+  /** clasificación WBS del pedido (celda de la Matriz), para no perder el amarre. */
+  idClasificacion?: number | null;
   lineas: PlantillaLinea[];
 };
+
+/** Editar un pedido existente con este mismo drawer (en vez del formulario viejo). */
+export type NuevaSolicitudEdicion = { id: string; numero: string; seed: NuevaSolicitudSeed };
+/** Contexto de la Matriz: obra fija + clasificación a la que se liga el pedido. */
+export type NuevaSolicitudPreset = { obraCodigo?: string; idClasificacion?: number };
 type FTipo = "todas" | "mias" | "general" | "bodega";
 type Item = { id: string; title: string; sub?: string };
 
@@ -621,8 +631,18 @@ function UsarPlantillaBtn({ items, value, onPick, onClear, filterNode, hasMateri
   );
 }
 
-export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; setOpen: (v: boolean) => void; seed?: NuevaSolicitudSeed | null }) {
-  const { articulos, obras, maquinas, almacenes, usuario, addPedido, setPedidoEstado } = useStore();
+export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGuardado }: {
+  open: boolean; setOpen: (v: boolean) => void;
+  /** "Copiar pedido": arranca con las líneas de otro pedido, pero crea uno nuevo. */
+  seed?: NuevaSolicitudSeed | null;
+  /** "Editar": el mismo drawer edita un pedido existente (guarda con editPedido). */
+  editar?: NuevaSolicitudEdicion | null;
+  /** Matriz: obra fija + clasificación de la celda. */
+  preset?: NuevaSolicitudPreset | null;
+  /** Aviso al crear/enviar/guardar (la Matriz marca la celda con esto). */
+  onGuardado?: (info: { numero: string; enviado: boolean }) => void;
+}) {
+  const { articulos, obras, maquinas, almacenes, usuario, addPedido, editPedido, setPedidoEstado } = useStore();
   const toast = useToast();
 
   // Catálogo REAL de Business Central (respaldo al store si BC no responde).
@@ -671,7 +691,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const [prioridad, setPrioridad] = useState<Pedido["prioridad"]>("normal");
   const [lineas, setLineas] = useState<Row[]>([]);
   // Tarjetas de obra (material). Arranca con una vacía para elegir obra + materiales.
-  const [grupos, setGrupos] = useState<Grupo[]>([]); // vacío al inicio: solo se ve "Agregar obra"
+  // Vacío al inicio (solo se ve "Agregar obra"). Con obra de contexto (Matriz) se
+  // arranca con SU tarjeta, así el pedido ya viene apuntado a esa obra.
+  const [grupos, setGrupos] = useState<Grupo[]>(() => (preset?.obraCodigo ? [{ key: uid(), obraCodigo: preset.obraCodigo }] : []));
   const [openMat, setOpenMat] = useState<string[]>([]); // grupos con el buscador de material abierto (independiente por tarjeta)
   const [cardMenuKey, setCardMenuKey] = useState<string | null>(null); // menú ⋮ de una tarjeta de obra
   const [flashKey, setFlashKey] = useState<string | null>(null); // resalta una línea ya existente
@@ -683,7 +705,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   const [confirmExit, setConfirmExit] = useState(false);
   const [confirmPedir, setConfirmPedir] = useState(false); // confirmación antes de enviar
   const varCache = useRef<Record<string, Variante[]>>({});
-  const seedApplied = useRef(false); // "Copiar pedido": aplicar la semilla una sola vez por apertura
+  const seedApplied = useRef(false); // copiar/editar: aplicar la semilla una sola vez por apertura
+  const plantAuto = useRef(false);   // Matriz: cargar la plantilla de la clasificación una sola vez
+  // Editando un pedido existente (mismo drawer, botón "Guardar cambios").
+  const editandoId = editar?.id ?? null;
+  const semilla = editar?.seed ?? seed ?? null;
+  // Clasificación WBS (celda de la Matriz): del preset o del pedido que se edita/copia.
+  const idClasificacion = preset?.idClasificacion ?? semilla?.idClasificacion ?? null;
+  const obraPreset = preset?.obraCodigo ?? undefined;
   const [varMap, setVarMap] = useState<Record<string, Variante[]>>({});
   const [fTipoPl, setFTipoPl] = useState<FTipo>("todas");
   const [plantillaSel, setPlantillaSel] = useState("");                          // plantilla elegida (para mostrarla en el campo)
@@ -791,10 +820,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
 
   const esBodega = (p: Plantilla) => p.tipo === "bodega" || (!p.tipo && p.idClasificacion == null);
   const plantillaItems: Item[] = useMemo(() => plantillas
+    // En contexto de una clasificación (Matriz), SOLO las plantillas de esa celda.
+    .filter((p) => idClasificacion == null || Number(p.idClasificacion) === Number(idClasificacion))
     .filter((p) => fTipoPl === "mias" ? (p.creadoPor ?? "") === (usuario ?? "")
       : fTipoPl === "bodega" ? esBodega(p)
       : fTipoPl === "general" ? !esBodega(p) : true)
-    .map((p) => ({ id: String(p.id), title: p.nombre, sub: esBodega(p) ? "Bodega" : "General" })), [plantillas, fTipoPl, usuario]);
+    .map((p) => ({ id: String(p.id), title: p.nombre, sub: esBodega(p) ? "Bodega" : "General" })), [plantillas, fTipoPl, usuario, idClasificacion]);
 
   const validLines = lineas.filter((l) => l.articuloId && l.cantidad > 0);
   // Para la vista previa (material): materiales agrupados por obra (una sección por obra).
@@ -822,6 +853,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     setTipo("material"); setDestinoMat("almacen"); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
     setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]); setConfirmPedir(false);
+    plantAuto.current = false;
   }
   function close() { setConfirmExit(false); setConfirmPedir(false); setOpen(false); setTimeout(reset, 260); }
   function requestDismiss() { if (hasData && !saving) setConfirmExit(true); else close(); }
@@ -865,12 +897,18 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
         a = { id: pl2.code, code: pl2.code, descripcion: pl2.descripcion || pl2.code, unidad: pl2.unidad || "UND", almacenDefault: "", precioReferencia: 0, tipo: "inventario" };
         extras.push(a);
       }
-      const oc = bodega ? "" : (pl2.obraCodigo || "");
+      // Obra de la línea: la que traiga, o la del contexto (Matriz).
+      const oc = bodega ? "" : (pl2.obraCodigo || obraPreset || "");
       let gKey: string;
       if (bodega) gKey = SOLO;
       else {
         gKey = porObra.get(oc) ?? "";
-        if (!gKey) { gKey = uid(); porObra.set(oc, gKey); nuevosGrupos.push({ key: gKey, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined }); }
+        if (!gKey) {
+          gKey = uid(); porObra.set(oc, gKey);
+          // La tarea (consumo directo) viene con la línea al copiar/editar.
+          nuevosGrupos.push({ key: gKey, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined,
+            taskNo: pl2.taskNo || undefined, taskNombre: pl2.taskDescr || undefined });
+        }
       }
       rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: pl2.variantCode, variantNombre: pl2.variantNombre, cantidad: pl2.cantidad || 1, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
     }
@@ -918,10 +956,19 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
     setLineas(dedup);
   }
 
-  // Al abrir el drawer con una semilla (botón "Copiar" del detalle), precargar una
-  // sola vez. Al cerrar se limpia el flag para la próxima apertura.
+  // Matriz: al abrir con una clasificación, cargar SU plantilla una sola vez.
   useEffect(() => {
-    if (open && seed && !seedApplied.current) { aplicarSeed(seed); seedApplied.current = true; }
+    if (!open || idClasificacion == null || plantAuto.current || semilla) return;
+    const pl = plantillas.find((p) => Number(p.idClasificacion) === Number(idClasificacion));
+    if (!pl) return;
+    plantAuto.current = true;
+    cargarPlantilla(String(pl.id));
+  }, [open, idClasificacion, plantillas]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Al abrir el drawer con una semilla (botón "Copiar" o "Editar" del detalle),
+  // precargar una sola vez. Al cerrar se limpia el flag para la próxima apertura.
+  useEffect(() => {
+    if (open && semilla && !seedApplied.current) { aplicarSeed(semilla); seedApplied.current = true; }
     if (!open) seedApplied.current = false;
   }, [open, seed]); // eslint-disable-line react-hooks/exhaustive-deps
   function cargarPlantilla(id: string) {
@@ -1027,6 +1074,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
       obraNombre: esMaterial ? h.nombre : esStock ? almacenNombre : undefined,
       maquinaNo: esRepuesto ? destino : undefined,
       maquinaNombre: esRepuesto ? destinoNombre : undefined,
+      // Amarre a la celda de la Matriz (se conserva al editar).
+      idClasificacion,
       solicitante: usuario ?? "",
       prioridad, notas: notas.trim() || undefined,
       lineas: validLines.map((l) => {
@@ -1049,14 +1098,39 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
   async function pedir() {
     if (!canContinue || saving) return;
     setSaving(true);
-    try { const p = await addPedido(buildInput()); await setPedidoEstado(p.id, "aprobado"); toast(`Pedido ${p.numero} enviado a proveeduría`, "success"); close(); }
-    catch { toast("No se pudo enviar el pedido. Intentá de nuevo.", "error"); setSaving(false); }
+    try {
+      const p = await addPedido(buildInput());
+      await setPedidoEstado(p.id, "aprobado");
+      toast(`Pedido ${p.numero} enviado a proveeduría`, "success");
+      onGuardado?.({ numero: p.numero, enviado: true });
+      close();
+    } catch { toast("No se pudo enviar el pedido. Intentá de nuevo.", "error"); setSaving(false); }
   }
   async function guardarBorrador() {
     if (validLines.length === 0) { close(); return; }
     setSaving(true);
-    try { const p = await addPedido(buildInput()); toast(`Borrador ${p.numero} guardado`, "info"); close(); }
-    catch { toast("No se pudo guardar el borrador.", "error"); setSaving(false); }
+    try {
+      const p = await addPedido(buildInput());
+      toast(`Borrador ${p.numero} guardado`, "info");
+      onGuardado?.({ numero: p.numero, enviado: false });
+      close();
+    } catch { toast("No se pudo guardar el borrador.", "error"); setSaving(false); }
+  }
+  // Editar: mismo formulario, pero reemplaza las líneas del pedido existente. El
+  // repo lo rechaza si proveeduría ya ordenó algo (por eso Editar solo aparece en
+  // borrador/devuelto), así que el error se muestra tal cual viene.
+  async function guardarEdicion() {
+    if (!editandoId || !canContinue || saving) return;
+    setSaving(true);
+    try {
+      await editPedido(editandoId, buildInput());
+      toast(`Pedido ${editar?.numero ?? ""} actualizado`.trim(), "success");
+      onGuardado?.({ numero: editar?.numero ?? "", enviado: false });
+      close();
+    } catch (e: unknown) {
+      toast(`No se pudieron guardar los cambios: ${String((e as Error)?.message ?? e)}`, "error");
+      setSaving(false);
+    }
   }
 
   // Guarda las líneas actuales como una plantilla (General o Bodega según el tipo).
@@ -1112,7 +1186,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
               <span style={{ width: 40, height: 40, borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--ds-color-gray-100)" }}>
                 <Icon name="entrega" size="md" color="currentColor" />
               </span>
-              <h2 className="ds-subtitle-lg" style={{ margin: 0 }}>Nuevo pedido</h2>
+              <h2 className="ds-subtitle-lg" style={{ margin: 0 }}>{editandoId ? `Editar ${editar?.numero ?? "pedido"}` : "Nuevo pedido"}</h2>
             </div>
             <button type="button" onClick={requestDismiss} aria-label="Cerrar"
               style={{ width: 36, height: 36, borderRadius: 8, border: 0, background: "none", color: "var(--ds-color-gray-400)", cursor: "pointer", display: "grid", placeItems: "center" }}>
@@ -1352,9 +1426,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
                 </button>
               </div>
             )}
-            <button type="button" onClick={() => { if (canContinue && !saving) setConfirmPedir(true); }} disabled={!canContinue || saving} aria-label="Solicitar"
+            {/* Editando: guarda los cambios del pedido. Nuevo: confirma y envía. */}
+            <button type="button" onClick={() => { if (!canContinue || saving) return; if (editandoId) guardarEdicion(); else setConfirmPedir(true); }}
+              disabled={!canContinue || saving} aria-label={editandoId ? "Guardar cambios" : "Solicitar"}
               style={{ height: 54, borderRadius: 999, border: 0, padding: "0 26px", background: canContinue ? "var(--ds-color-green-100)" : "var(--ds-color-gray-100)", boxShadow: canContinue ? "var(--ds-shadow-01)" : "none", cursor: (canContinue && !saving) ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 15, color: canContinue ? "var(--ds-color-black)" : "var(--ds-color-gray-300)", display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              {saving ? "Enviando…" : "Solicitar"} <Icon name="arrow-right" size="sm" color="currentColor" />
+              {saving ? (editandoId ? "Guardando…" : "Enviando…") : (editandoId ? "Guardar cambios" : "Solicitar")} <Icon name="arrow-right" size="sm" color="currentColor" />
             </button>
           </div>
 
@@ -1409,9 +1485,15 @@ export function NuevaSolicitudSheet({ open, setOpen, seed }: { open: boolean; se
             <div style={{ position: "absolute", inset: 0, background: "rgba(15,18,20,.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 5 }}>
               <div role="dialog" aria-modal="true" aria-label="¿Salir del pedido?" style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 360, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }}>
                 <h3 className="ds-subtitle-lg" style={{ marginTop: 0, marginBottom: 8 }}>¿Salir del pedido?</h3>
-                <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>Tenés cambios sin enviar. Podés guardarlo como <strong>borrador</strong> para seguir después, o descartarlo.</p>
+                <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
+                  {editandoId
+                    ? <>Tenés cambios sin guardar en este pedido. Podés <strong>guardarlos</strong> o descartarlos.</>
+                    : <>Tenés cambios sin enviar. Podés guardarlo como <strong>borrador</strong> para seguir después, o descartarlo.</>}
+                </p>
                 <div className="col gap-2" style={{ marginTop: 18 }}>
-                  {validLines.length > 0 && <Button block onClick={guardarBorrador} disabled={saving}>Guardar en borrador</Button>}
+                  {validLines.length > 0 && (editandoId
+                    ? <Button block onClick={guardarEdicion} disabled={saving || !canContinue}>Guardar cambios</Button>
+                    : <Button block onClick={guardarBorrador} disabled={saving}>Guardar en borrador</Button>)}
                   <Button block variant="outline" onClick={close}>Descartar</Button>
                   <Button block variant="ghost" onClick={() => setConfirmExit(false)}>Seguir editando</Button>
                 </div>

@@ -15,6 +15,7 @@ export default function PedidoDetallePage() {
   const toast = useToast();
   const { pedidos, ordenes, setPedidoEstado, deletePedido } = useStore();
   const [copiarOpen, setCopiarOpen] = useState(false);
+  const [editarOpen, setEditarOpen] = useState(false);
 
   const pedido = pedidos.find((p) => p.id === id);
   if (!pedido) {
@@ -28,9 +29,10 @@ export default function PedidoDetallePage() {
   const t = tipoSolicitudBadge(pedido.tipoSolicitud);
   const ordenado = pedido.lineas.some((l) => l.cantidadOrdenada > 0);
 
-  // "Copiar": abre el drawer nuevo ya cargado con las líneas de este pedido (mismo
-  // material/obra/variante/cantidad) en vez de la pantalla completa vieja.
-  const seedCopia: NuevaSolicitudSeed = {
+  // Semilla del pedido: la usa "Copiar" (crea uno nuevo con las mismas líneas) y
+  // "Editar" (el MISMO drawer, guardando sobre este pedido). La pantalla completa
+  // vieja ya no existe.
+  const seedPedido: NuevaSolicitudSeed = {
     tipo: pedido.tipoSolicitud,
     prioridad: pedido.prioridad,
     notas: pedido.notas,
@@ -39,16 +41,22 @@ export default function PedidoDetallePage() {
     destino: pedido.tipoSolicitud === "repuesto" ? pedido.maquinaNo : undefined,
     // Almacén elegido (tag ALM / pedido de Stock): se copia tal cual.
     almacen: pedido.lineas.find((l) => !!l.almacen && !l.taskNo)?.almacen || undefined,
+    idClasificacion: pedido.idClasificacion ?? null,
     lineas: pedido.lineas.map((l) => ({
       code: l.articuloId, cantidad: l.cantidad,
       obraCodigo: pedido.tipoSolicitud === "material" ? (obraDeLinea(l, pedido) || undefined) : undefined,
       variantCode: l.variantCode, descripcion: l.descripcion, unidad: l.unidad,
+      // La actividad (tarea) del consumo directo viaja con la línea.
+      taskNo: l.taskNo, taskDescr: l.taskDescr,
     })),
   };
 
   return (
     <AppShell role="ingenieria">
-      <NuevaSolicitudSheet open={copiarOpen} setOpen={setCopiarOpen} seed={seedCopia} />
+      <NuevaSolicitudSheet open={copiarOpen} setOpen={setCopiarOpen} seed={seedPedido} />
+      {/* Editar = el mismo drawer, sobre este pedido. */}
+      <NuevaSolicitudSheet open={editarOpen} setOpen={setEditarOpen}
+        editar={{ id: pedido.id, numero: pedido.numero, seed: seedPedido }} />
       <main className="page">
         <div className="back-link" onClick={() => router.push("/compras/ingenieria")}>Volver a pedidos</div>
         <div className="page__head">
@@ -76,7 +84,7 @@ export default function PedidoDetallePage() {
                 <Button variant="outline" onClick={async () => { await deletePedido(pedido.id); toast("Pedido eliminado"); router.push("/compras/ingenieria"); }}>
                   Eliminar
                 </Button>
-                <Button variant="outline" onClick={() => router.push(`/compras/ingenieria/${pedido.id}/editar`)}>
+                <Button variant="outline" onClick={() => setEditarOpen(true)}>
                   Editar
                 </Button>
                 <Button onClick={async () => { await setPedidoEstado(pedido.id, "aprobado"); toast(`${pedido.numero} enviado a proveeduría`, "success"); }}>

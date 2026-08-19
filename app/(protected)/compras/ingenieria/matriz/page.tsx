@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, Skeleton, useToast } from "@/components/compras/ui";
-import { SolicitudForm } from "@/components/compras/solicitud-form";
+import { NuevaSolicitudSheet } from "@/components/compras/nueva-solicitud-sheet";
 import { IconPlus } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { pedidoBadge } from "@/lib/compras/helpers";
@@ -22,9 +22,12 @@ const LABEL: Record<string, string> = { ENTREGADO: "Entregado", COMPRADO: "Compr
 export default function MatrizPage() {
   const toast = useToast();
   const router = useRouter();
-  const { addPedido, pedidos, setPedidoEstado, usuario } = useStore();
+  const { pedidos, setPedidoEstado, usuario } = useStore();
   // Armar/ver el pedido SIN salir de la matriz: modal con el formulario prellenado.
   const [armar, setArmar] = useState<{ idObra: number; obra: string; clasif: number; nombre: string } | null>(null);
+  // El pedido se arma en el MISMO drawer de "Nueva solicitud" (con la obra y la
+  // clasificación de la celda), no en un formulario aparte.
+  const [armarOpen, setArmarOpen] = useState(false);
   const [etapas, setEtapas] = useState<Etapa[]>([]); const [partidas, setPartidas] = useState<Partida[]>([]);
   const [subpartidas, setSubpartidas] = useState<SubPartida[]>([]); const [clasifs, setClasifs] = useState<Clasif[]>([]);
   const [obras, setObras] = useState<Obra[]>([]); const [celdas, setCeldas] = useState<Celda[]>([]);
@@ -206,6 +209,17 @@ export default function MatrizPage() {
           </Card>
         )}
 
+        {/* Drawer de pedido con el contexto de la celda: obra fija + clasificación.
+            Al guardar/enviar marca la celda, igual que antes. */}
+        {armar && (
+          <NuevaSolicitudSheet open={armarOpen} setOpen={setArmarOpen}
+            preset={{ obraCodigo: armar.obra, idClasificacion: armar.clasif }}
+            onGuardado={({ enviado }) => {
+              setCeldas((cs) => [...cs, { idObra: armar.idObra, idClasificacion: armar.clasif, estado: enviado ? "PEDIDO" : "BORRADOR" }]);
+              setArmar(null);
+            }} />
+        )}
+
         {armar && (() => {
           const pedidosCelda = pedidos.filter((p) => p.obraCodigo === armar.obra && p.idClasificacion === armar.clasif);
           return (
@@ -240,30 +254,9 @@ export default function MatrizPage() {
                 </Card>
               )}
 
-              <div className="ds-body-sm ds-strong" style={{ marginBottom: 8 }}>{pedidosCelda.length > 0 ? "Armar otro pedido" : "Armar pedido"}</div>
-              <SolicitudForm
-                compact
-                obraPreset={armar.obra}
-                clasifPreset={armar.clasif}
-                textoBoton="Crear y enviar a proveeduría"
-                onCancelar={() => setArmar(null)}
-                guardar={async (input) => {
-                  // Primario: crear el pedido y enviarlo a proveeduría de una vez.
-                  const p = await addPedido(input);
-                  await setPedidoEstado(p.id, "aprobado");
-                  setCeldas((cs) => [...cs, { idObra: armar.idObra, idClasificacion: armar.clasif, estado: "PEDIDO" }]);
-                  toast(`Solicitud ${p.numero} creada y enviada a proveeduría`, "success");
-                  setArmar(null);
-                }}
-                textoBotonSecundario="Guardar borrador"
-                guardarSecundario={async (input) => {
-                  // Secundario: dejarlo en borrador (aún sin enviar).
-                  const p = await addPedido(input);
-                  setCeldas((cs) => [...cs, { idObra: armar.idObra, idClasificacion: armar.clasif, estado: "BORRADOR" }]);
-                  toast(`Borrador ${p.numero} guardado`, "success");
-                  setArmar(null);
-                }}
-              />
+              <Button block onClick={() => setArmarOpen(true)}>
+                {pedidosCelda.length > 0 ? "Armar otro pedido" : "Armar pedido"}
+              </Button>
             </Modal>
           );
         })()}
