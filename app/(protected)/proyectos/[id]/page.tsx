@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
@@ -24,7 +24,7 @@ interface Asignacion {
   Activo: boolean;
   FechaAsignacion: string;
 }
-interface ObraProy { IDObra: number; NumeroObra: string; Nombre: string | null; Estado: string | null; Activo: boolean; AreaCosteo: string | null; }
+interface ObraProy { IDObra: number; NumeroObra: string; Nombre: string | null; Estado: string | null; AreaCosteo: string | null; }
 interface Proyecto { IDProyecto: number; CodigoBC: string; Nombre: string; Estado: string; Ubicacion: string; Activo: boolean; EsProductivo: boolean; asignaciones: Asignacion[]; obras: ObraProy[]; }
 interface Colaborador { IDCol: number; NombreCompleto: string; Cedula: string; }
 
@@ -36,25 +36,48 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [loading, setLoading] = useState(true);
+  // Si el detalle falla hay que DECIRLO: antes el error dejaba `proyecto` en null
+  // y la página se quedaba con el skeleton puesto para siempre.
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [form, setForm] = useState({ idCol: '' });
   const [saving, setSaving] = useState(false);
 
+  // Trae el detalle o lanza con el mensaje del API (nunca deja pasar un {error} como
+  // si fuera un proyecto: eso reventaba después, al hacer proyecto.asignaciones).
+  const traerProyecto = useCallback(async (): Promise<Proyecto> => {
+    const res = await fetch(`/api/proyectos/${id}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) throw new Error(data?.error || `Error ${res.status} cargando el proyecto`);
+    return data as Proyecto;
+  }, [id]);
+
   async function load() {
-    const data = await fetch(`/api/proyectos/${id}`).then(r => r.json());
-    setProyecto(data);
+    try {
+      setProyecto(await traerProyecto());
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/proyectos/${id}`).then(r => r.json()),
-      fetch('/api/usuarios?activo=1&porPagina=5000').then(r => r.json()),
+      traerProyecto(),
+      // La lista de colaboradores es para el modal de asignar: si falla (p. ej. sin
+      // permiso de usuarios) el detalle debe cargar igual.
+      fetch('/api/usuarios?activo=1&porPagina=5000')
+        .then(r => (r.ok ? r.json() : { data: [] }))
+        .catch(() => ({ data: [] })),
     ]).then(([p, u]) => {
       setProyecto(p);
       setColaboradores(u.data ?? []);
+      setError(null);
+    }).catch((e: unknown) => {
+      setError(e instanceof Error ? e.message : String(e));
     }).finally(() => setLoading(false));
-  }, [id]);
+  }, [id, traerProyecto]);
 
   async function handleAsignar() {
     if (!form.idCol) { toast('Selecciona un colaborador', 'warning'); return; }
@@ -133,11 +156,32 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
     } finally { setSavingInfo(false); }
   }
 
-  if (loading || !proyecto) return (
+  if (loading) return (
     <PageShell width="narrow">
       <Skeleton className="h-8 w-1/3" rounded="rounded-full" />
       <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 p-6">
         <Skeleton className="h-4 w-1/2" rounded="rounded-full" />
+      </div>
+    </PageShell>
+  );
+
+  if (!proyecto) return (
+    <PageShell width="narrow">
+      <PageHeader
+        back={
+          <button onClick={() => router.back()} className="p-2 rounded-ds hover:bg-ds-gray-100 transition-colors text-ds-gray-400 hover:text-ds-ink mt-1 shrink-0">
+            <Icon name="chevron-left" size="sm" color="currentColor" />
+          </button>
+        }
+        title={<h1 className="text-heading font-bold text-ds-ink">Proyecto</h1>}
+      />
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-14 text-center">
+        <Icon name="warning" size="lg" color="currentColor" className="mx-auto mb-3 text-ds-gray-300" />
+        <p className="font-semibold text-ds-ink">No se pudo cargar el proyecto</p>
+        <p className="text-sm mt-1 text-ds-gray-400">{error ?? 'Proyecto no encontrado.'}</p>
+        <Button variant="outline" className="mt-5" onClick={() => { setLoading(true); load().finally(() => setLoading(false)); }}>
+          Reintentar
+        </Button>
       </div>
     </PageShell>
   );
@@ -210,12 +254,15 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
           <div className="divide-y divide-ds-gray-100 max-h-[50vh] overflow-y-auto">
             {obrasProy.map(o => (
               <button key={o.IDObra} onClick={() => router.push(`/obras/${o.IDObra}`)}
-                className={'w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-ds-gray-100/60 transition-colors ' + (o.Activo ? '' : 'opacity-60')}>
+                className={'w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-ds-gray-100/60 transition-colors ' + (o.Estado === 'Blocked' ? 'opacity-60' : '')}>
                 <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.NumeroObra}</span>
                 <span className="text-sm text-ds-ink flex-1 min-w-0 truncate">{o.Nombre || '—'}</span>
                 {o.AreaCosteo && <span className="hidden sm:inline text-xs text-ds-gray-400 shrink-0">{o.AreaCosteo}</span>}
-                {o.Estado && <Badge variant={o.Estado === 'Open' || o.Estado === 'Activo' ? 'green' : 'gray'}>{o.Estado}</Badge>}
-                {!o.Activo && <Badge variant="red">Inactiva</Badge>}
+                {o.Estado && (
+                  <Badge variant={o.Estado === 'Open' || o.Estado === 'Activo' ? 'green' : 'gray'}>
+                    {o.Estado === 'Open' ? 'Abierta' : o.Estado === 'Blocked' ? 'Bloqueada' : o.Estado}
+                  </Badge>
+                )}
                 <Icon name="arrow-right" size="sm" color="currentColor" className="text-ds-gray-300 shrink-0" />
               </button>
             ))}

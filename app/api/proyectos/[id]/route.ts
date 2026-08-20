@@ -43,11 +43,14 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     `);
 
   // Obras del proyecto (para ver más información del proyecto en el detalle).
+  // dbo.Obra NO tiene columna `activo`: una obra vendida se BLOQUEA (estado =
+  // 'Blocked'), no se inactiva. Pedirla hacía que este GET diera 500 y que el
+  // detalle del proyecto se quedara cargando para siempre.
   const obrasRes = await db.request()
     .input('id', sql.Int, parseInt(id))
     .query(`
       SELECT o.idObra AS IDObra, o.numeroObra AS NumeroObra, o.nombreMostrado AS Nombre,
-             o.estado AS Estado, o.activo AS Activo, o.areaCosteo AS AreaCosteo
+             o.estado AS Estado, o.areaCosteo AS AreaCosteo
       FROM dbo.Obra o
       WHERE o.idProyecto = @id
       ORDER BY o.numeroObra

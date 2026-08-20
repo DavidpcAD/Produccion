@@ -25,9 +25,12 @@
                                           fechaFin, fechaCreacionObra, esBC=1,
                                           areaProrrateadaM2 (solo si BC > 0),
                                           idEncargado / gerenteProyecto (solo si
-                                          BC los trae no vacíos)
-     Campos de la app (NUNCA los pisa)... centroCosto, areaCosteo, proyectoPadre,
-                                          idProyecto, ubicacion, descripcion,
+                                          BC los trae no vacíos),
+                                          areaCosteo / centroCosto (dimensiones
+                                          AC y CC — BC es el dueño; la app solo
+                                          las pone al CREAR la obra)
+     Campos de la app (NUNCA los pisa)... proyectoPadre, idProyecto, ubicacion,
+                                          descripcion,
                                           precioNormalMaquinaria,
                                           precioConcretoMaquinaria, esProcore,
                                           origenPrincipal (solo se pone al insertar)
@@ -37,6 +40,10 @@
    Notas:
      - `areaProrrateadaM2` también la escribe /api/presupuesto, por eso solo se
        pisa cuando BC manda un valor > 0 (BC devuelve 0 cuando no la tiene).
+     - AC/CC salen de la acción OData AdelanteObra_GetObrasDimensions (Default
+       Dimension de la obra). Si el entorno tiene publicada una versión anterior
+       de la extensión, la acción no existe: el script AVISA y sigue sin tocar
+       esos dos campos (no los borra).
      - BC usa `0001-01-01` como "sin fecha" → se guarda NULL.
      - El entorno sale de BC_BASE_URL (o BC_TENANT_ID + BC_ENVIRONMENT). Acá el
        parseo SÍ tolera la URL sin `/api` al final, a diferencia de
@@ -102,17 +109,50 @@ async function bcJobs() {
   return { jobs: out, environment, cid };
 }
 
+/**
+ * AC/CC de todas las obras según BC (acción OData del codeunit AdelanteObra).
+ * Devuelve Map<numeroObra, {areaCosteo, centroCosto}>. Estos dos datos NO están en
+ * el API `jobs`/`works`: viven en la Default Dimension de la obra.
+ */
+async function bcDimensiones() {
+  const { tenant, environment } = tenantYEntorno();
+  const token = await bcToken();
+  const url = `https://api.businesscentral.dynamics.com/v2.0/${tenant}/${environment}`
+    + `/ODataV4/AdelanteObra_GetObrasDimensions?company=${process.env.BC_COMPANY_ID}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify({ obraNo: '' }),   // '' = todas las obras
+  });
+  const txt = await res.text();
+  if (!res.ok) throw new Error(`BC ${res.status}: ${txt.slice(0, 200)}`);
+  const d = txt ? JSON.parse(txt) : {};
+  const filas = typeof d.value === 'string' ? JSON.parse(d.value) : [];
+  const map = new Map();
+  for (const f of filas) {
+    const no = String(f?.no ?? '').trim();
+    if (no) map.set(no, { areaCosteo: texto(f?.areaCosteo), centroCosto: texto(f?.centroCosto) });
+  }
+  return map;
+}
+
 // ------------------------------------------------------------------ helpers
 const SENTINELA = /^0001-01-01/;                       // "sin fecha" en BC
 const fecha = (v) => (!v || SENTINELA.test(String(v)) ? null : String(v).slice(0, 10));
 const texto = (v) => { const s = String(v ?? '').trim(); return s === '' ? null : s; };
 const mismaFecha = (a, b) => (a instanceof Date ? a.toISOString().slice(0, 10) : a ? String(a).slice(0, 10) : null) === b;
 
-/** Campos de BC que el sync mantiene, ya normalizados a la forma de dbo.Obra. */
-function deBC(j) {
+/** Campos de BC que el sync mantiene, ya normalizados a la forma de dbo.Obra.
+ *  `dims` = Map<numeroObra,{areaCosteo,centroCosto}> de bcDimensiones() (vacío si BC
+ *  no pudo darlas: ahí AC/CC quedan null = no pisar). */
+function deBC(j, dims) {
   const area = Number(j.areaProrrateada ?? 0);
+  const dim = dims.get(String(j.no ?? '').trim()) ?? {};
   return {
     numeroObra: texto(j.no),
+    areaCosteo: dim.areaCosteo ?? null,
+    centroCosto: dim.centroCosto ?? null,
     nombreMostrado: texto(j.description),
     estado: texto(j.status),
     fechaInicio: fecha(j.startingDate),
@@ -130,6 +170,18 @@ console.log(`\nBC       = ${environment}  ·  compañía ${cid}`);
 console.log(`DESTINO  = ${DESTINO}`);
 console.log(`MODO     = ${CONFIRM ? '*** ESCRITURA REAL ***' : 'dry-run (agregá --confirm para escribir)'}${SOLO_NUEVAS ? '  ·  solo inserta' : ''}`);
 console.log(`\nJobs en BC: ${jobs.length}`);
+
+// AC/CC: si la extensión publicada no tiene la acción, se avisa y se sigue sin
+// tocar esos campos (jamás borrarlos por no poder leerlos).
+let dims = new Map();
+try {
+  dims = await bcDimensiones();
+  console.log(`Obras con AC/CC en BC: ${[...dims.values()].filter((d) => d.areaCosteo).length} de ${dims.size}`);
+} catch (e) {
+  console.warn(`\n⚠ No se pudieron leer AC/CC de BC: ${e.message}`);
+  console.warn('  → Republicá la extensión "adelante" (acción AdelanteObra_GetObrasDimensions).');
+  console.warn('  Esta corrida NO toca areaCosteo ni centroCosto.\n');
+}
 
 // Guarda: nunca meter obras del Sandbox de BC en la base de producción. Es
 // justo el error silencioso que ya nos mordió con BC_ENVIRONMENT.
@@ -149,13 +201,13 @@ const pool = await new sql.ConnectionPool({
 const existentes = new Map();
 for (const r of (await pool.request().query(`
   SELECT idObra, numeroObra, nombreMostrado, estado, fechaInicio, fechaFin, fechaCreacionObra,
-         areaProrrateadaM2, idEncargado, gerenteProyecto, esBC
+         areaProrrateadaM2, idEncargado, gerenteProyecto, areaCosteo, centroCosto, esBC
   FROM dbo.Obra`)).recordset) existentes.set(String(r.numeroObra).trim(), r);
 
 const nuevas = [], cambios = [];
 const vistos = new Set();
 for (const j of jobs) {
-  const b = deBC(j);
+  const b = deBC(j, dims);
   if (!b.numeroObra) continue;
   vistos.add(b.numeroObra);
   const cur = existentes.get(b.numeroObra);
@@ -170,6 +222,8 @@ for (const j of jobs) {
   if (b.areaProrrateadaM2 !== null && Number(cur.areaProrrateadaM2 ?? 0) !== b.areaProrrateadaM2) diff.push(['areaProrrateadaM2', cur.areaProrrateadaM2, b.areaProrrateadaM2]);
   if (b.idEncargado !== null && b.idEncargado !== cur.idEncargado) diff.push(['idEncargado', cur.idEncargado, b.idEncargado]);
   if (b.gerenteProyecto !== null && b.gerenteProyecto !== cur.gerenteProyecto) diff.push(['gerenteProyecto', cur.gerenteProyecto, b.gerenteProyecto]);
+  if (b.areaCosteo !== null && b.areaCosteo !== cur.areaCosteo) diff.push(['areaCosteo', cur.areaCosteo, b.areaCosteo]);
+  if (b.centroCosto !== null && b.centroCosto !== cur.centroCosto) diff.push(['centroCosto', cur.centroCosto, b.centroCosto]);
   if (!cur.esBC) diff.push(['esBC', cur.esBC, true]);
   if (diff.length) cambios.push({ id: cur.idObra, numeroObra: b.numeroObra, b, diff });
 }
@@ -201,14 +255,16 @@ try {
       .input('areaProrrateadaM2', sql.Decimal(20, 5), b.areaProrrateadaM2)
       .input('idEncargado', sql.NVarChar(100), b.idEncargado)
       .input('gerenteProyecto', sql.NVarChar(100), b.gerenteProyecto)
+      .input('areaCosteo', sql.NVarChar(50), b.areaCosteo)
+      .input('centroCosto', sql.NVarChar(50), b.centroCosto)
       .input('origenPrincipal', sql.NVarChar(20), ORIGEN)
       .query(`INSERT INTO dbo.Obra
         (numeroObra, nombreMostrado, estado, fechaInicio, fechaFin, fechaCreacionObra,
-         areaProrrateadaM2, idEncargado, gerenteProyecto, origenPrincipal, esBC, esProcore,
-         fechaCreacion, creadoPor)
+         areaProrrateadaM2, idEncargado, gerenteProyecto, areaCosteo, centroCosto,
+         origenPrincipal, esBC, esProcore, fechaCreacion, creadoPor)
         VALUES (@numeroObra, @nombreMostrado, @estado, @fechaInicio, @fechaFin, @fechaCreacionObra,
-         @areaProrrateadaM2, @idEncargado, @gerenteProyecto, @origenPrincipal, 1, 0,
-         SYSUTCDATETIME(), N'sync-bc')`);
+         @areaProrrateadaM2, @idEncargado, @gerenteProyecto, @areaCosteo, @centroCosto,
+         @origenPrincipal, 1, 0, SYSUTCDATETIME(), N'sync-bc')`);
   }
   for (const c of cambios) {
     const set = [];

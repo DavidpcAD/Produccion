@@ -137,6 +137,38 @@ export async function getDimensionValues(dimensionCode: string): Promise<Dimensi
   }
 }
 
+export interface ObraDimensiones {
+  /** N° de obra en BC (= numeroObra en dbo.Obra). */
+  no: string;
+  /** Área de costo (dimensión AC), ej. 'PRO VIVIENDA'. '' si la obra no la tiene. */
+  areaCosteo: string;
+  /** Centro de costo (dimensión CC), por regla del sistema = N° de obra. */
+  centroCosto: string;
+}
+
+/**
+ * AC/CC de las obras SEGÚN BC (dueño del dato: la app solo los manda al crear la
+ * obra). Sin `obraNo` devuelve todas las obras en una sola llamada — así lo usa el
+ * sync. Viven en Default Dimension de la obra, por eso no salen en el API `works`.
+ * Requiere la acción AdelanteObra_GetObrasDimensions de la extensión; si el entorno
+ * tiene una versión anterior publicada, BC responde 404 y esto lanza.
+ */
+export async function getObrasDimensiones(obraNo = ''): Promise<ObraDimensiones[]> {
+  const data = await odataAction('AdelanteObra_GetObrasDimensions', { obraNo });
+  const raw = data.value;
+  if (typeof raw !== 'string') return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<{ no?: string; areaCosteo?: string; centroCosto?: string }>;
+    return parsed.map((r) => ({
+      no: (r.no ?? '').trim(),
+      areaCosteo: (r.areaCosteo ?? '').trim(),
+      centroCosto: (r.centroCosto ?? '').trim(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Grupos de registro de inventario (MATERIALES, SUMINISTROS, MAQUINARIA…) para
  * el multi-select del wizard. La acción devuelve `value` como string JSON.

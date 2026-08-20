@@ -171,8 +171,17 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
 
   // Render de un campo de dimensión (AC/CC): Combobox si BC dio valores, si no
   // texto libre. Mantiene el valor actual aunque BC no lo ofrezca.
+  // En obras de BC va SOLO LECTURA: el AC/CC de la obra se define al crearla y de
+  // ahí en adelante BC es el dueño (el sync los vuelve a traer en cada corrida),
+  // así que editarlos acá solo crearía diferencias que se pierden.
   function renderDim(key: 'areaCosteo' | 'centroCosto', label: string, base: ComboOption[]) {
     const actual = String(form[key] ?? '');
+    if (obra?.esBC) {
+      return (
+        <Input label={label} value={actual} disabled
+          hint="Lo administra Business Central — se cambia en la obra de BC" />
+      );
+    }
     const opts = opcionesDim(base, actual);
     if (opts.length > 0) {
       return (
