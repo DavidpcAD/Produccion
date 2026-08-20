@@ -430,6 +430,10 @@ export async function setOrdenEstado(id: number, estado: string, usuario: string
   const req = pool.request().input("id", sql.Int, id).input("e", sql.Int, idEstado).input("u", sql.NVarChar(100), usuario);
   let setBc = "";
   if (bcNumber) { req.input("bcno", sql.NVarChar(20), bcNumber); setBc = ", bcNo=@bcno, syncedToBc=1"; }
+  // bcNumber = "" (string vacío, no undefined) = DESLIGAR el pedido de BC: se usa
+  // cuando BC ya no tiene ese pedido (eliminado/archivado/registrado), para que el
+  // próximo "Aprobar y lanzar" cree uno nuevo en vez de relanzar un fantasma.
+  else if (bcNumber === "") setBc = ", bcNo=NULL, syncedToBc=0";
   await req.query(`UPDATE dbo.OrdenCompra SET idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u${setBc} WHERE idOrdenCompra=@id`);
   const tipo = estado === "pendiente_aprobacion" ? "enviado_aprobacion" : estado === "lanzado" ? "aprobado_lanzado" : estado === "abierto" ? "reabierto" : estado;
   const tx = new sql.Transaction(pool); await tx.begin();

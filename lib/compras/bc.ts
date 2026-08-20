@@ -825,6 +825,72 @@ function odataRoot(): string {
   return `https://api.businesscentral.dynamics.com/v2.0/${tenant}/${environment}/ODataV4`;
 }
 
+// ─── Errores de BC en algo legible (y accionable) ─────────────────────────────
+// BC responde {"error":{"code":"Application_DialogException","message":"…  CorrelationId: …"}}
+// y ese JSON crudo terminaba tal cual en el toast del usuario. Acá se saca el
+// `message`, se le quita el CorrelationId y se traducen los casos conocidos a lo
+// que hay que HACER.
+export function mensajeBcLegible(raw: string): string {
+  let msg = String(raw ?? "");
+  const m = msg.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (m) { try { msg = JSON.parse(`"${m[1]}"`); } catch { msg = m[1]; } }
+  msg = msg.replace(/\s*CorrelationId:\s*[0-9a-fA-F-]+\.?/, "").trim();
+  const l = msg.toLowerCase();
+  // El codeunit de lanzamiento intenta APROBAR una solicitud de aprobación que no
+  // existe para ese pedido (flujo de aprobación de compras de BC).
+  if (l.includes("no approval request to approve"))
+    return "BC no tiene una solicitud de aprobación abierta para este pedido, así que no lo puede aprobar ni lanzar. Liberalo desde BC (o desactivá el flujo de aprobación de pedidos de compra) y reintentá.";
+  if (l.includes("approval process") || l.includes("pending approval") || l.includes("pendiente de aprobación"))
+    return "El pedido está pendiente de aprobación en BC. Aprobalo ahí y reintentá el lanzamiento.";
+  if (l.includes("location code must have a value"))
+    return `A una línea le falta el almacén en BC: ${msg}`;
+  return msg || "BC no dio detalle del error.";
+}
+
+// ─── Estado de un pedido en BC ────────────────────────────────────────────────
+// El `status` de la API v2.0 NO se lee como en la pantalla de BC. Verificado
+// contra BC Production (20/08/2026, pedidos reales):
+//   · "Draft"           = Abierto, sin lanzar
+//   · "In_x0020_Review" = Pendiente de aprobación
+//   · "Open"            = LANZADO (Released)  ← ojo, "Open" no es "abierto"
+// `existe:false` = ya no está en Pedidos de compra: lo registraron, lo eliminaron
+// o lo archivaron (BC archiva una copia al eliminar/registrar; un pedido de compra
+// archivado NO se puede restaurar, hay que crearlo de nuevo).
+// `desconocido:true` = no se pudo preguntar (BC caído / sin permiso): NO concluir nada.
+export type BcEstadoPedido = { existe: boolean; status?: string; lanzado: boolean; enAprobacion: boolean; desconocido?: boolean };
+export async function bcEstadoPedido(orderNo: string): Promise<BcEstadoPedido> {
+  const nada: BcEstadoPedido = { existe: false, lanzado: false, enAprobacion: false };
+  if (!orderNo) return { ...nada, desconocido: true };
+  try {
+    const cid = await getStdCompanyId();
+    const filtro = `$filter=${encodeURIComponent(`number eq '${odataStr(orderNo)}'`)}&$select=number,status`;
+    const res = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders?${filtro}`, { cache: "no-store" });
+    if (!res.ok) return { ...nada, desconocido: true };
+    const row = ((await res.json())?.value ?? [])[0];
+    if (!row) return nada; // no está en Pedidos de compra
+    const status = String(row.status ?? "");
+    const n = status.replace(/_x0020_/g, " ").toLowerCase();
+    return { existe: true, status, lanzado: n === "open" || n === "released", enAprobacion: n.includes("review") || n.includes("approval") };
+  } catch { return { ...nada, desconocido: true }; }
+}
+
+// ¿El pedido tiene RECEPCIONES registradas en BC? Es lo que distingue las dos
+// razones por las que un pedido desaparece de Pedidos de compra:
+//   · con recepción  → se REGISTRÓ (recibido/facturado): el pedido cumplió su ciclo.
+//   · sin recepción  → lo ELIMINARON o ARCHIVARON sin registrar nada.
+// Sin esta consulta, la app trataría los dos casos igual y podría duplicar una
+// compra ya registrada. `null` = no se pudo saber (no concluir nada).
+export async function bcPedidoTieneRecepciones(orderNo: string): Promise<boolean | null> {
+  if (!orderNo) return null;
+  try {
+    const cid = await getStdCompanyId();
+    const filtro = `$filter=${encodeURIComponent(`orderNumber eq '${odataStr(orderNo)}'`)}&$select=number&$top=1`;
+    const res = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseReceipts?${filtro}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (((await res.json())?.value ?? []).length > 0);
+  } catch { return null; }
+}
+
 // Lanza (Release) un Pedido de compra en BC -> estado "Lanzado".
 // La API estándar v2.0 NO puede liberar un pedido; se hace por el web service
 // del codeunit custom "Adelante PO Actions" (publicado como "AdelantePO").
@@ -838,7 +904,7 @@ export async function bcReleasePedido(orderNo: string): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ orderNo }),
   });
-  if (!res.ok) throw new Error(`BC release ${res.status}: ${(await res.text()).slice(0, 250)}`);
+  if (!res.ok) throw new Error(mensajeBcLegible((await res.text()).slice(0, 600)));
   const d: any = await res.json().catch(() => ({}));
   return d?.value ?? "Released";
 }

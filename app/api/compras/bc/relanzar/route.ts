@@ -1,15 +1,54 @@
 import { NextResponse } from "next/server";
-import { bcResyncPedidoLines, bcReleasePedido, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo } from "@/lib/compras/bc";
+import { bcResyncPedidoLines, bcReleasePedido, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo } from "@/lib/compras/bc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Cuando algo falla, le PREGUNTAMOS a BC cómo quedó el pedido antes de contestar.
+// Si no, la orden se queda colgada en "pendiente" para siempre: aunque en BC ya esté
+// lanzada (alguien la liberó a mano) o aunque el pedido ya no exista, cada reintento
+// volvía a fallar con el mismo error crudo de BC.
+async function respuestaDelFallo(orderNo: string, e: unknown) {
+  const est = await bcEstadoPedido(orderNo);
+  // Ya está lanzado en BC: para la app es un éxito (no hay nada que reintentar).
+  if (est.lanzado) return NextResponse.json({ ok: true, status: "Released", yaLanzado: true });
+  // Ya no está en Pedidos de compra. Son DOS casos muy distintos y hay que
+  // separarlos: si tiene recepciones registradas, el pedido se registró y cumplió
+  // su ciclo (recrearlo duplicaría la compra); si no tiene ninguna, lo eliminaron o
+  // lo archivaron sin registrar nada y la única salida es crearlo de nuevo (BC no
+  // permite restaurar un pedido de compra archivado).
+  if (!est.desconocido && !est.existe) {
+    const registrado = await bcPedidoTieneRecepciones(orderNo);
+    if (registrado === true) return NextResponse.json({ ok: true, status: "Posted", yaLanzado: true, yaRegistrado: true });
+    if (registrado === false) {
+      return NextResponse.json({
+        ok: false, bcInexistente: true,
+        error: `El pedido ${orderNo} ya no está en Pedidos de compra de BC y no tiene recepciones registradas: lo eliminaron o lo archivaron. Un pedido de compra archivado no se puede restaurar en BC.`,
+      }, { status: 502 });
+    }
+    return NextResponse.json({
+      ok: false,
+      error: `El pedido ${orderNo} ya no está en Pedidos de compra de BC y no se pudo confirmar si se registró. Revisalo en BC antes de reintentar.`,
+    }, { status: 502 });
+  }
+  if (est.enAprobacion) {
+    return NextResponse.json({
+      ok: false, bcEnAprobacion: true,
+      error: `El pedido ${orderNo} está pendiente de aprobación en BC. Aprobalo ahí y reintentá.`,
+    }, { status: 502 });
+  }
+  return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 502 });
+}
 
 // Re-sincroniza (precio + variante) las líneas de un pedido YA creado en BC y luego
 // lo lanza. Se usa al REINTENTAR "Aprobar y lanzar": si la orden se corrigió en la
 // app después de crearse en BC, esas correcciones viajan a BC antes del release.
 export async function POST(req: Request) {
+  let orderNo = "";
   try {
-    const { orderNo, lineas, cargos, metodo } = await req.json();
+    const body = await req.json();
+    const { lineas, cargos, metodo } = body;
+    orderNo = body.orderNo ?? "";
     if (!orderNo) return NextResponse.json({ error: "Falta orderNo" }, { status: 400 });
     let jobError: string | undefined;
     if (Array.isArray(lineas) && lineas.length) {
@@ -46,9 +85,15 @@ export async function POST(req: Request) {
         jobError,
       }, { status: 502 });
     }
-    const status = await bcReleasePedido(orderNo);
-    return NextResponse.json({ ok: true, status, cargoError, jobError });
+    try {
+      const status = await bcReleasePedido(orderNo);
+      return NextResponse.json({ ok: true, status, cargoError, jobError });
+    } catch (e) {
+      return respuestaDelFallo(orderNo, e);
+    }
   } catch (e: any) {
+    // Incluye el "No se encontró el pedido … en BC" del resync: mismo tratamiento.
+    if (orderNo) return respuestaDelFallo(orderNo, e);
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 502 });
   }
 }

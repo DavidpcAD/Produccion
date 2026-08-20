@@ -89,9 +89,21 @@ export async function aprobarYLanzar(
       return { ok: false, tone: "error", message: `No se pudo contactar BC: ${String(e?.message ?? e)}. La orden queda pendiente.` };
     }
     if (!(res.ok && d.ok)) {
+      // El pedido ya no existe en BC (lo registraron, lo eliminaron o lo archivaron):
+      // soltamos el bcNumber para que el próximo intento CREE uno nuevo en vez de
+      // relanzar para siempre un pedido fantasma. Un pedido de compra archivado no se
+      // puede restaurar en BC, así que crear de nuevo es la única salida.
+      if (d.bcInexistente) {
+        await setOrdenEstado(orden.id, orden.estado, { bcNumber: "" });
+        return { ok: false, tone: "error", message: `${d.error} Ya desligamos ${orden.bcNumber} de esta orden: dale "Aprobar y lanzar" otra vez y se crea de nuevo en BC.` };
+      }
       return { ok: false, tone: "error", message: `No se lanzó ${orden.bcNumber} en BC: ${d.error || `HTTP ${res.status}`}. La orden queda pendiente.` };
     }
     await setOrdenEstado(orden.id, "lanzado", { bcNumber: orden.bcNumber });
+    // Ya estaba lanzada en BC (la liberaron a mano): la app se pone al día en vez de
+    // dejarla pendiente para siempre.
+    if (d.yaRegistrado) return { ok: true, tone: "success", message: `${orden.bcNumber} ya se registró en Business Central (tiene recepción); la orden queda como lanzada.` };
+    if (d.yaLanzado) return { ok: true, tone: "success", message: `${orden.bcNumber} ya estaba lanzada en Business Central; la orden queda como lanzada.` };
     const avisoCargoRe = d.cargoError ? ` · ⚠️ el cargo NO se agregó a BC: ${d.cargoError}` : "";
     const avisoJobRe = d.jobError ? ` · ⚠️ la actividad/almacén NO se aplicó en BC: ${d.jobError}` : "";
     return { ok: !d.cargoError && !d.jobError, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${orden.bcNumber} aprobada y lanzada en BC${avisoCargoRe}${avisoJobRe}` };
