@@ -8,6 +8,7 @@ import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
 import { money, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, ALMACEN_GENERAL, obraDeLinea, destinoDeLinea } from "@/lib/compras/helpers";
 import type { OrdenLinea } from "@/lib/compras/types";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 interface Row {
   pedidoNumero: string;
@@ -149,7 +150,7 @@ export default function ArmarOrdenPage() {
     .flatMap((p) => p.lineas
       .filter((l) => pedidoLineaPendiente(l) > 0 && !yaEnOrden.has(l.id))
       .map((l) => ({ p, l, pend: pedidoLineaPendiente(l) })));
-  const inc = (v: string, q: string) => !q || v.toLowerCase().includes(q.toLowerCase());
+  const inc = (v: string, q: string) => !q || coincideBusqueda(v, q);
   const lineasDispFiltradas = lineasDisponibles.filter(({ p, l }) =>
     inc(p.numero, addF.pedido) && inc(l.descripcion, addF.articulo) && inc(destinoDeLinea(l, p), addF.destino));
   function agregarDeSolicitud(p: (typeof pedidos)[number], l: (typeof pedidos)[number]["lineas"][number], pend: number) {

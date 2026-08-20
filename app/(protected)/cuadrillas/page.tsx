@@ -13,6 +13,7 @@ import { Skeleton, SkeletonCards } from '@/components/ui/Skeleton';
 import { Stagger, StaggerItem, listStagger, listItem } from '@/components/ui/Motion';
 import { motion } from 'motion/react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 interface ObraLite { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null; }
 interface SubLite { idSubPartida: number; codigo: string; nombre: string; idPartida: number; partidaCodigo: string | null; partidaNombre: string | null; idProyecto?: number | null; }
@@ -88,7 +89,7 @@ function ObrasPicker({ obras, selected, onChange }: {
   const [q, setQ] = useState('');
   const term = q.trim().toLowerCase();
   const filtered = term
-    ? obras.filter(o => o.numeroObra.toLowerCase().includes(term) || (o.nombreMostrado ?? '').toLowerCase().includes(term))
+    ? obras.filter(o => coincideBusqueda([o.numeroObra, o.nombreMostrado ?? ''].join(' '), term))
     : obras;
   const sel = new Set(selected);
   const toggle = (id: number) => onChange(sel.has(id) ? selected.filter(x => x !== id) : [...selected, id]);
@@ -167,7 +168,7 @@ function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas
   const term = q.trim().toLowerCase();
   const filtered = subpartidas.filter(s => {
     if (filtroPartida && String(s.idPartida) !== filtroPartida) return false;
-    if (term && !`${s.codigo} ${s.nombre}`.toLowerCase().includes(term)) return false;
+    if (term && !coincideBusqueda(`${s.codigo} ${s.nombre}`, term)) return false;
     return true;
   });
   const sel = new Set(selected);
@@ -488,11 +489,7 @@ export default function CuadrillasPage() {
     const orden = [...cuadrillas].sort((a, b) => a.Nombre.localeCompare(b.Nombre));
     if (!term) return orden;
     return orden.filter(c =>
-      c.Nombre.toLowerCase().includes(term) ||
-      (c.Encargado ?? '').toLowerCase().includes(term) ||
-      (c.Proyecto ?? '').toLowerCase().includes(term) ||
-      (c.Obras ?? '').toLowerCase().includes(term) ||
-      (c.Subpartidas ?? '').toLowerCase().includes(term),
+      coincideBusqueda([c.Nombre, c.Encargado ?? '', c.Proyecto ?? '', c.Obras ?? '', c.Subpartidas ?? ''].join(' '), term),
     );
   }, [cuadrillas, q]);
 
@@ -527,8 +524,8 @@ export default function CuadrillasPage() {
       const hay = [
         row.p.codigo, row.p.nombre,
         ...row.subs.flatMap(x => [x.sub.codigo, x.sub.nombre, x.encargado?.encargado ?? '']),
-      ].join(' ').toLowerCase();
-      return hay.includes(term);
+      ].join(' ');
+      return coincideBusqueda(hay, term);
     });
   }, [partidas, subpartidas, directos, q]);
 

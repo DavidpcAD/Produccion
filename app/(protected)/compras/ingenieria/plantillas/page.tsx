@@ -6,6 +6,7 @@ import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, Select, useToa
 import { Combobox } from "@/components/compras/combobox";
 import { IconEdit } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 type Etapa = { id: number; codigo: string; nombre: string };
 type Partida = { id: number; codigo: string; nombre: string; etapaId: number | null };
@@ -85,7 +86,7 @@ export default function PlantillasPage() {
       const c = clasDe(pl.idClasificacion); const { partida } = ctxDeClas(c);
       if (fPartida && String(partida?.id) !== fPartida) return false;
       if (!q) return true;
-      return pl.nombre.toLowerCase().includes(q) || (c?.nombre.toLowerCase().includes(q) ?? false);
+      return coincideBusqueda([pl.nombre, c?.nombre ?? ''].join(' '), q);
     }).sort((a, b) => {
       // Ordenar por partida (código) → clasificación → nombre; sin clasificación al final.
       const pa = ctxDeClas(clasDe(a.idClasificacion)).partida?.codigo ?? "￿";

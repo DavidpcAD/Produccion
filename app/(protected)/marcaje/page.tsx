@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 interface Zona { idZona: number; nombre: string; ubicacion: string | null; }
 type Estado = 'sin_dispositivos' | 'esperando_biometria' | 'redistribuyendo' | 'lista' | null;
@@ -62,10 +63,7 @@ export default function MarcajePage() {
     const base = colabs ?? [];
     if (!t) return base;
     return base.filter(c =>
-      c.nombre.toLowerCase().includes(t) ||
-      c.cedula.toLowerCase().includes(t) ||
-      (c.puesto ?? '').toLowerCase().includes(t) ||
-      (c.departamento ?? '').toLowerCase().includes(t));
+      coincideBusqueda([c.nombre, c.cedula, c.puesto ?? '', c.departamento ?? ''].join(' '), t));
   }, [colabs, q]);
 
   const pendientes = useMemo(() => filtrados.filter(c => !c.enZona), [filtrados]);

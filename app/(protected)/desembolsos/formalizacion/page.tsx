@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/Confirm';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { CasoParaFormalizar, NivelConfianza } from '@/lib/desembolsos/formalizacion';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 /**
  * Formalización — proyección de fecha de firma para casos reservados.
@@ -47,8 +48,7 @@ export default function FormalizacionPage() {
     return casos.filter((c) => {
       if (soloSinProyectar && c.IDProyeccion != null) return false;
       if (!t) return true;
-      return [c.Cliente, c.CodigoLote, c.CodigoCaso, c.AbreviaturaProyecto, c.AbrevBanco]
-        .some((v) => (v ?? '').toLowerCase().includes(t));
+      return coincideBusqueda([c.Cliente, c.CodigoLote, c.CodigoCaso, c.AbreviaturaProyecto, c.AbrevBanco].map((v) => v ?? '').join(' '), t);
     });
   }, [casos, q, soloSinProyectar]);
 

@@ -23,6 +23,7 @@ import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
 import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega } from "@/lib/compras/helpers";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
 // Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
@@ -113,8 +114,9 @@ const F_TIPOS: { v: FTipo; label: string }[] = [
   { v: "todas", label: "Todas" }, { v: "mias", label: "Mías" }, { v: "general", label: "General" }, { v: "bodega", label: "Bodega" },
 ];
 const filtrar = (items: Item[], q: string, max = 40) => {
-  const s = q.trim().toLowerCase();
-  return (s ? items.filter((i) => `${i.title} ${i.sub ?? ""}`.toLowerCase().includes(s)) : items).slice(0, max);
+  const s = q.trim();
+  // Busca por palabras: "tubo 3\"" encuentra «TUBO PVC … 3"». Ver lib/utilidades/buscar.
+  return (s ? items.filter((i) => coincideBusqueda(`${i.title} ${i.sub ?? ""}`, s)) : items).slice(0, max);
 };
 
 // ─── Popover flotante: se muestra encima (portal + fixed), no empuja ni recorta ─

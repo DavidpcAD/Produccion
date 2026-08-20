@@ -11,9 +11,16 @@ import {
 import { Button, Card, ConfirmDialog, Input, Select } from "@/components/compras/ui";
 import { IconTable } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 // Texto plano de un valor de celda (para opciones y comparación de filtro).
 const asText = (v: unknown): string => v == null ? "" : String(v);
+
+// Búsqueda global por PALABRAS (sin tildes): "tubo 3\"" encuentra «TUBO … 3"».
+// Reemplaza el "includesString" de tanstack (comparaba la frase completa). Ver
+// lib/utilidades/buscar.
+const globalTextFilter: FilterFn<any> = (row, colId, value) =>
+  coincideBusqueda(asText(row.getValue(colId)), String(value));
 
 // Filtro multi-selección: el valor del filtro es un arreglo de valores permitidos.
 // Vacío/undefined = sin filtro (todas). Coincide si el texto de la celda está en el set.
@@ -90,7 +97,7 @@ export function DataTable<T>({
     state: { sorting, columnFilters, columnVisibility, columnOrder, globalFilter, pagination },
     onSortingChange: setSorting, onColumnFiltersChange: setColumnFilters, onColumnVisibilityChange: setColumnVisibility,
     onColumnOrderChange: setColumnOrder, onGlobalFilterChange: setGlobalFilter, onPaginationChange: setPagination,
-    globalFilterFn: "includesString",
+    globalFilterFn: globalTextFilter,
     getRowId: getRowId ? (row) => getRowId(row) : undefined,
     getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(), getPaginationRowModel: getPaginationRowModel(),
@@ -543,7 +550,7 @@ function ColumnFilterPopover<T>({ col, label, anchor, onClose }: {
 
   // Columna normal: buscador ARRIBA (sobre el header), luego ordenar, luego opciones.
   const sel = new Set((col.getFilterValue() as string[] | undefined) ?? []);
-  const visibles = opciones.filter((o) => o.toLowerCase().includes(q.toLowerCase()));
+  const visibles = opciones.filter((o) => coincideBusqueda(o, q));
   const todos = sel.size === 0;
   const toggle = (val: string) => {
     const next = new Set(sel);

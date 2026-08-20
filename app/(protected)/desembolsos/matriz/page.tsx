@@ -14,6 +14,7 @@ import type {
   RespuestaDesembolsos,
   SemanaInfo,
 } from '@/lib/desembolsos/matriz';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 /**
  * Matriz de desembolsos — cartera semanal banco × hito × semana. Portado de
@@ -82,9 +83,12 @@ export default function MatrizPage() {
   const filtro = q.trim().toLowerCase();
   const coincide = (d: DesembolsoProyectado) =>
     !filtro ||
-    [d.Cliente, d.CodigoLote, d.CodigoCaso, d.AbreviaturaProyecto, d.NombreBloque, d.NombreModelo]
-      .filter(Boolean)
-      .some((x) => String(x).toLowerCase().includes(filtro));
+    coincideBusqueda(
+      [d.Cliente, d.CodigoLote, d.CodigoCaso, d.AbreviaturaProyecto, d.NombreBloque, d.NombreModelo]
+        .filter(Boolean)
+        .join(' '),
+      filtro,
+    );
 
   // Agrupar desembolsos en rango por banco.
   const porBanco = useMemo(() => {

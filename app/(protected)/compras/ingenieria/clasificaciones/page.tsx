@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Button, Card, Field, Input, Modal, Select, Skeleton, useToast } from "@/components/compras/ui";
 import { IconEdit } from "@/components/compras/icons";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 type Etapa = { id: number; codigo: string; nombre: string };
 type Partida = { id: number; codigo: string; nombre: string; etapaId: number | null };
@@ -46,7 +47,7 @@ export default function ClasificacionesPage() {
       if (!partida || !etapa) continue;
       if (fEtapa && String(etapa.id) !== fEtapa) continue;
       if (fPartida && String(partida.id) !== fPartida) continue;
-      if (q && !c.nombre.toLowerCase().includes(q)) continue;
+      if (q && !coincideBusqueda(c.nombre, q)) continue;
       if (!byEtapa.has(etapa.id)) byEtapa.set(etapa.id, new Map());
       const pm = byEtapa.get(etapa.id)!;
       if (!pm.has(partida.id)) pm.set(partida.id, []);

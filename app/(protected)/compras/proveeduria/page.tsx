@@ -10,6 +10,7 @@ import { VistaToggle } from "@/components/compras/vista-toggle";
 import { IconEye, IconReceipt, IconList } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { destinoLabel, destinoCodigo, num, pedidoLineaPendiente, solicitudResumen, tipoSolicitudBadge, destinoDeLinea } from "@/lib/compras/helpers";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 interface Row {
   pedidoId: string;
@@ -171,7 +172,7 @@ export default function ProveeduriaMaterialesPage() {
               <span className="ds-body-sm ds-muted">Ver todas las líneas pendientes</span>
             </button>
             {pedidosConSaldo
-              .filter((p) => { const q = pedFiltro.trim().toLowerCase(); if (!q) return true; const r = solicitudResumen(p); return [p.numero, destinoCodigo(p), r.principal, r.secundaria ?? "", p.notas ?? ""].some((t) => t.toLowerCase().includes(q)); })
+              .filter((p) => { const q = pedFiltro.trim(); if (!q) return true; const r = solicitudResumen(p); return coincideBusqueda([p.numero, destinoCodigo(p), r.principal, r.secundaria ?? "", p.notas ?? ""].join(" "), q); })
               .map((p) => {
               const n = p.lineas.filter((l) => pedidoLineaPendiente(l) > 0).length;
               const sel = seleccionPorPedido(p.id);

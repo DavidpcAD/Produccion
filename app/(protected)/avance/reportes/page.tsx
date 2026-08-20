@@ -7,6 +7,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 import type { FiltroVenta, ResumenMes, ReporteSemanal, ReporteObra, ReporteTotales } from '@/lib/avance/reportes';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 /**
  * Reportes de avance — Resumen del Mes (general + financiero). Portado de
@@ -421,7 +422,7 @@ function DetallePorObra({ obras }: { obras: ReporteObra[] }) {
   const lista = useMemo(() => {
     const term = q.trim().toLowerCase();
     const arr = [...obras].sort((a, b) => a.codigo.localeCompare(b.codigo, 'es', { numeric: true }));
-    return term ? arr.filter((o) => o.codigo.toLowerCase().includes(term) || (o.tipo_casa ?? '').toLowerCase().includes(term)) : arr;
+    return term ? arr.filter((o) => coincideBusqueda([o.codigo, o.tipo_casa ?? ''].join(' '), term)) : arr;
   }, [obras, q]);
 
   const g = (o: ReporteObra) => ({

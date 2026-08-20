@@ -9,6 +9,7 @@ import {
 import { Input } from '@/components/ui/Input';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Pagination } from '@/components/ui/Table';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 // Metadata opcional por columna: etiqueta legible (para "Columnas" y export) y
 // cómo obtener el texto plano al exportar a CSV.
@@ -47,18 +48,16 @@ const facetedFilter: FilterFn<any> = (row, columnId, filterValue) => {
   return filterValue.includes(v == null ? '' : String(v));
 };
 
-// Normaliza para comparar sin tildes ni mayúsculas.
-const normTxt = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-
 // Búsqueda global robusta: compara el valor (string O número) de la columna
 // contra el término, sin tildes. Reemplaza a 'includesString' de tanstack, cuyo
 // "qué columnas son buscables" depende del TIPO de la primera fila (si el primer
 // valor es null la columna deja de buscarse — rompía buscar por obra en muestras).
+// Busca por palabras: "tubo 3\"" encuentra «TUBO PVC … 3"». Ver lib/utilidades/buscar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const globalTextFilter: FilterFn<any> = (row, columnId, filterValue) => {
   const v = row.getValue(columnId);
   if (v == null) return false;
-  return normTxt(String(v)).includes(normTxt(String(filterValue)));
+  return coincideBusqueda(String(v), String(filterValue));
 };
 
 // Panel de filtro por columna: buscador + "Todos" + lista de valores con checkbox.
@@ -71,8 +70,8 @@ function ColumnFilterPanel({ column, label }: { column: Column<unknown, unknown>
     .map(([value, count]) => ({ value: value == null ? '' : String(value), count }))
     .filter(o => o.value !== '')
     .sort((a, b) => a.value.localeCompare(b.value, 'es'));
-  const ql = q.trim().toLowerCase();
-  const filtered = ql ? options.filter(o => o.value.toLowerCase().includes(ql)) : options;
+  const ql = q.trim();
+  const filtered = ql ? options.filter(o => coincideBusqueda(o.value, ql)) : options;
 
   function toggle(val: string) {
     const next = new Set(selected);

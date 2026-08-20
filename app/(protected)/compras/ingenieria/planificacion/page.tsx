@@ -6,6 +6,7 @@ import { Button, Card, Input } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
 import { NuevaSolicitudSheet } from "@/components/compras/nueva-solicitud-sheet";
 import { obraDeLinea } from "@/lib/compras/helpers";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 // Planificación = matriz OBRA × PARTIDA que se llena SOLA con las solicitudes de
 // material. Las columnas (partidas) salen de la CATEGORÍA del ítem en Business
@@ -63,7 +64,7 @@ export default function PlanificacionPage() {
     return { obras, partidas, matriz: m };
   }, [pedidos, itemCat]);
 
-  const obrasVis = obras.filter((o) => { const q = buscar.trim().toLowerCase(); return !q || o.toLowerCase().includes(q) || (obraNombre[o] ?? "").toLowerCase().includes(q); });
+  const obrasVis = obras.filter((o) => { const q = buscar.trim(); return !q || coincideBusqueda([o, obraNombre[o] ?? ""].join(" "), q); });
 
   return (
     <AppShell role="ingenieria">

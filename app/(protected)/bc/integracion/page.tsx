@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { formatCRC } from '@/lib/utilidades/format';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 interface ResumenObra {
   obra: string;
@@ -79,7 +80,7 @@ export default function IntegracionBcPage() {
   const filas = useMemo(() => {
     let arr = resumen?.obras ?? [];
     const f = filtro.trim().toLowerCase();
-    if (f) arr = arr.filter((o) => o.obra.toLowerCase().includes(f));
+    if (f) arr = arr.filter((o) => coincideBusqueda(o.obra, f));
     if (estadoFiltro !== 'todas') arr = arr.filter((o) => estadoReg(o) === estadoFiltro);
     const { col, dir } = orden;
     return [...arr].sort((a, b) => {

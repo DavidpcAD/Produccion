@@ -7,6 +7,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { Icon } from '@/components/ds/Icon/Icon';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 import type { HistoricoReporte, HistoricoObra, HistoricoSub } from '@/lib/avance/reporte-historico';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 type Vista = 'sprint' | 'partida' | 'kanban';
 
@@ -59,7 +60,7 @@ export default function ReporteHistoricoPage() {
   const obras = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     const lista = [...(data?.obras ?? [])].sort((a, b) => a.codigo.localeCompare(b.codigo, 'es', { numeric: true }));
-    return q ? lista.filter((o) => o.codigo.toLowerCase().includes(q) || (o.tipo_casa ?? '').toLowerCase().includes(q)) : lista;
+    return q ? lista.filter((o) => coincideBusqueda([o.codigo, o.tipo_casa ?? ''].join(' '), q)) : lista;
   }, [data, busqueda]);
 
   const subs = useMemo(

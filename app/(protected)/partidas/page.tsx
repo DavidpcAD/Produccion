@@ -12,6 +12,7 @@ import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CatalogoTabs } from '@/components/layout/CatalogoTabs';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 const TIPOS_CASA = ['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea'] as const;
 
@@ -203,7 +204,7 @@ export default function PartidasPage() {
 
   const grupos = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const match = (...vals: (string | null | undefined)[]) => !term || vals.some(v => (v ?? '').toLowerCase().includes(term));
+    const match = (...vals: (string | null | undefined)[]) => !term || coincideBusqueda(vals.map(v => v ?? '').join(' '), term);
     const byPartida = new Map<number, SubPartida[]>();
     for (const s of subpartidas) {
       if (!byPartida.has(s.idPartida)) byPartida.set(s.idPartida, []);

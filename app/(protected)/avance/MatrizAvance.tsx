@@ -5,6 +5,7 @@ import { Icon } from '@/components/ds/Icon/Icon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { VENTA_META } from '@/lib/avance/venta';
 import type { EstadoVenta, MatrizAvance as MatrizAvanceData } from '@/lib/avance/types';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 /** Heatmap del % de avance: brand (lime) suave → fuerte. 0% gris, "no aplica" casi blanco. */
 function estiloCelda(v: number | null): CSSProperties {
@@ -97,7 +98,7 @@ export function MatrizAvance({ proyecto, semana = null }: Props) {
 
   const { partidas, obras } = data;
   const q = busqueda.trim().toLowerCase();
-  const obrasTexto = q ? obras.filter((o) => o.codigo.toLowerCase().includes(q)) : obras;
+  const obrasTexto = q ? obras.filter((o) => coincideBusqueda(o.codigo, q)) : obras;
   const conteos: Record<EstadoVenta, number> = {
     formalizada: 0,
     reservada: 0,

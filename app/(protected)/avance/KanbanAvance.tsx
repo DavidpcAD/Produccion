@@ -32,6 +32,7 @@ import { AvanceRapidoDialog, type SubRapido } from './kanban/AvanceRapidoDialog'
 import { RegistrarNCDialog } from './kanban/RegistrarNCDialog';
 import { CongelarObraDialog } from './kanban/CongelarObraDialog';
 import { HabilitarLoteDialog } from './kanban/HabilitarLoteDialog';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 const VENTAS: EstadoVenta[] = ['formalizada', 'reservada', 'disponible', 'entregada'];
 const SPRING = { type: 'spring' as const, stiffness: 420, damping: 34, mass: 0.8 };
@@ -254,7 +255,7 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
     const q = busqueda.trim().toLowerCase();
     return obras.filter((o) => {
       if (ventaFiltro && o.estado_venta !== ventaFiltro) return false;
-      if (q && !`${o.codigo} ${o.tipo_casa ?? ''}`.toLowerCase().includes(q)) return false;
+      if (q && !coincideBusqueda(`${o.codigo} ${o.tipo_casa ?? ''}`, q)) return false;
       return true;
     });
   }, [obras, busqueda, ventaFiltro]);
@@ -263,7 +264,7 @@ export function KanbanAvance({ proyecto }: { proyecto: string | null }) {
     const c: Record<EstadoVenta, number> = { formalizada: 0, reservada: 0, disponible: 0, entregada: 0 };
     const q = busqueda.trim().toLowerCase();
     for (const o of obras) {
-      if (q && !`${o.codigo} ${o.tipo_casa ?? ''}`.toLowerCase().includes(q)) continue;
+      if (q && !coincideBusqueda(`${o.codigo} ${o.tipo_casa ?? ''}`, q)) continue;
       if (o.estado_venta) c[o.estado_venta]++;
     }
     return c;

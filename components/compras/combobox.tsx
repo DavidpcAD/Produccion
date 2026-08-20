@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 // Selector con buscador (un solo valor). El menú se renderiza en un PORTAL con
 // posición fija, así NUNCA lo recorta un contenedor con overflow (paneles, cards,
@@ -42,10 +43,11 @@ export function Combobox<T>({
   const [pos, setPos] = useState<{ left: number; top: number; bottom: number; width: number; up: boolean } | null>(null);
 
   const sel = items.find((i) => getKey(i) === value) ?? null;
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
   const below = q.length < minChars;
   const matched = useMemo(
-    () => (below ? [] : q ? items.filter((i) => (getSearch ? getSearch(i) : getLabel(i)).toLowerCase().includes(q)) : items),
+    // Busca por palabras: "tubo 3\"" encuentra «TUBO PVC … 3"». Ver lib/utilidades/buscar.
+    () => (below ? [] : q ? items.filter((i) => coincideBusqueda(getSearch ? getSearch(i) : getLabel(i), q)) : items),
     [items, q, below] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const filtered = matched.slice(0, max);

@@ -6,6 +6,7 @@ import { Table } from '@/components/ui/Table';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { formatCRC } from '@/lib/utilidades/format';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 interface Resumen {
   works_no: string;
@@ -66,7 +67,7 @@ export default function PresupuestosPage() {
     const f = filtro.trim().toLowerCase();
     return filas
       .filter((r) => r.es_ultima_version)
-      .filter((r) => !f || r.works_no.toLowerCase().includes(f))
+      .filter((r) => !f || coincideBusqueda(r.works_no, f))
       .sort((a, b) => b.total_costo - a.total_costo);
   }, [filas, filtro]);
 

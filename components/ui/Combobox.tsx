@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { CaretDown, MagnifyingGlass, Check } from '@phosphor-icons/react';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 export type ComboWeight = 'bold' | 'normal' | 'light';
 
@@ -36,10 +37,6 @@ const weightClass: Record<ComboWeight, string> = {
   normal: 'font-normal text-ds-gray-500',
   light: 'font-light text-ds-gray-400',
 };
-
-// Normaliza para buscar sin tildes ni mayúsculas
-const norm = (s: string) =>
-  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
 function OptionLabel({ opt }: { opt: ComboOption }) {
   if (!opt.parts?.length) return <span className="text-ds-ink">{opt.label}</span>;
@@ -86,9 +83,10 @@ export function Combobox({
   const selected = useMemo(() => options.find(o => o.value === value), [options, value]);
 
   const filtered = useMemo(() => {
-    const q = norm(query);
+    const q = query.trim();
     if (!q) return options;
-    return options.filter(o => norm(`${o.label} ${o.search ?? ''}`).includes(q));
+    // Busca por palabras: "tubo 3\"" encuentra «TUBO PVC … 3"». Ver lib/utilidades/buscar.
+    return options.filter(o => coincideBusqueda(`${o.label} ${o.search ?? ''}`, q));
   }, [options, query]);
 
   // Cerrar al hacer click fuera (contempla el panel en portal)

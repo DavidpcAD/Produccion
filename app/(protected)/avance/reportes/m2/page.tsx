@@ -6,6 +6,7 @@ import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
 import { Combobox } from '@/components/ui/Combobox';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 import type { M2Partida, M2Reporte } from '@/lib/avance/reporte-m2';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 /**
  * Reporte de m² producidos por partida / sub-partida (semana + acumulado) —
@@ -371,7 +372,7 @@ function M2Matriz({
     const q = busqueda.trim().toLowerCase();
     return m.obras
       .filter((o) => !soloAvance || o.m2_semana > EPS)
-      .filter((o) => (q ? o.codigo.toLowerCase().includes(q) : true));
+      .filter((o) => (q ? coincideBusqueda(o.codigo, q) : true));
   }, [m.obras, soloAvance, busqueda]);
 
   const celda = (obra: string, sub: number) => m.celdas[`${obra}|${sub}`];

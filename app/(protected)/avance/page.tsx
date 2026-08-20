@@ -11,6 +11,7 @@ import { KanbanAvance } from './KanbanAvance';
 import { SemanasOperativas } from '@/components/avance/SemanasOperativas';
 import { VENTA_META } from '@/lib/avance/venta';
 import type { EstadoVenta, ObraAvance, Proyecto } from '@/lib/avance/types';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 type Vista = 'lista' | 'matriz' | 'kanban';
 const VISTAS: Vista[] = ['lista', 'matriz', 'kanban'];
@@ -94,7 +95,7 @@ export default function AvancePage() {
   const obrasTexto = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     if (!q) return obras;
-    return obras.filter((o) => [o.codigo, o.tipo_casa ?? ''].join(' ').toLowerCase().includes(q));
+    return obras.filter((o) => coincideBusqueda([o.codigo, o.tipo_casa ?? ''].join(' '), q));
   }, [obras, busqueda]);
 
   const conteos = useMemo(() => {

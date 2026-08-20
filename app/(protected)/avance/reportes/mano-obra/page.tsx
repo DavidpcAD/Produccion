@@ -9,6 +9,7 @@ import { formatCRC } from '@/lib/utilidades/format';
 import type { SemanaOperativa } from '@/lib/avance/mano-obra';
 import type { FiltroVenta } from '@/lib/avance/reportes';
 import type { ManoObraFila, ReporteMO, ResumenMesMO } from '@/lib/avance/reporte-mo';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 /**
  * Reporte de Mano de Obra por semana — portado de obrascontrol
@@ -187,7 +188,7 @@ function Distribucion({ obras }: { obras: ManoObraFila[] }) {
 
   const filtro = busqueda.trim().toLowerCase();
   const vista = obras
-    .filter((o) => !filtro || o.codigo.toLowerCase().includes(filtro))
+    .filter((o) => !filtro || coincideBusqueda(o.codigo, filtro))
     .sort((a, b) => {
       const av = a[orden.col];
       const bv = b[orden.col];

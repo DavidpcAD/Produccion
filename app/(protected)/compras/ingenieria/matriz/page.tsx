@@ -8,6 +8,7 @@ import { NuevaSolicitudSheet } from "@/components/compras/nueva-solicitud-sheet"
 import { IconPlus } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { pedidoBadge } from "@/lib/compras/helpers";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 type Etapa = { id: number; codigo: string; nombre: string };
 type Partida = { id: number; codigo: string; nombre: string; etapaId: number | null };
@@ -107,7 +108,7 @@ export default function MatrizPage() {
   const obrasVis = useMemo(() => {
     const q = buscar.trim().toLowerCase();
     return obras.filter((o) => (!fArea || o.areaCosteo === fArea) && (!fProy || o.proyecto === fProy)
-      && (!q || o.numeroObra.toLowerCase().includes(q) || (o.nombreMostrado ?? "").toLowerCase().includes(q)));
+      && (!q || coincideBusqueda([o.numeroObra, o.nombreMostrado ?? ""].join(" "), q)));
   }, [obras, fArea, fProy, buscar]);
 
   return (

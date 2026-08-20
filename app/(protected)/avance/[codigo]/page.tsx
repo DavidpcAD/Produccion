@@ -10,6 +10,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import type { AvanceSprint, AvanceSubPartida, Causa, EstadoAvance } from '@/lib/avance/types';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 const PRESETS = [0, 25, 50, 75, 100] as const;
 
@@ -101,7 +102,7 @@ export default function AvanceCapturaPage() {
     return porPartida
       .filter(([cod]) => !partidaFoco || cod === partidaFoco)
       .map(([cod, g]) => {
-        const subs = q ? g.subs.filter((s) => `${s.codigo} ${s.nombre}`.toLowerCase().includes(q)) : g.subs;
+        const subs = q ? g.subs.filter((s) => coincideBusqueda(`${s.codigo} ${s.nombre}`, q)) : g.subs;
         return [cod, { ...g, subs }] as const;
       })
       .filter(([, g]) => g.subs.length > 0);
