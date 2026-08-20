@@ -27,10 +27,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const db = await getAdelanteDb();
   try {
+    // Único DENTRO del tipo de obra (infraestructura repite los códigos de
+    // vivienda a propósito: son catálogos aparte).
     const dup = await db.request()
       .input('cod', sql.VarChar(20), codigo)
       .input('id', sql.Int, idPartida)
-      .query('SELECT 1 AS ok FROM pro_obc.partidas WHERE codigo = @cod AND id <> @id');
+      .input('idE', sql.Int, idEtapa)
+      .query(`SELECT 1 AS ok
+              FROM pro_obc.partidas p
+              JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+              WHERE p.codigo = @cod AND p.id <> @id
+                AND g.tipo_obra = (SELECT tipo_obra FROM pro_obc.grupos_partida WHERE id = @idE)`);
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe otra partida con el código "${codigo}"` }, { status: 409 });
     }

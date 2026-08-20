@@ -11,25 +11,33 @@ export const dynamic = 'force-dynamic';
 // (catálogo duplicado); se unificó a pro_obc — mismos IDs, sin migrar datos.
 // Se exponen con alias a la forma que ya espera el frontend (idEtapa/idPartida/
 // idSubPartida/numSprint/esCritica) y se agregan tiposCasa[] y activo.
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 1) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
+  // El catálogo está partido por TIPO DE OBRA (grupos_partida.tipo_obra):
+  // 'VIVIENDA' (casas, el de siempre) e 'INFRA' (infraestructura). Sin `tipo` se
+  // devuelve VIVIENDA para no cambiarle nada a quien ya consumía este endpoint.
+  const tipo = (new URL(req.url).searchParams.get('tipo') ?? 'VIVIENDA').toUpperCase();
+
   const db = await getAdelanteDb();
   const [etapas, partidas, subpartidas] = await Promise.all([
-    db.request().query(`
-      SELECT id AS idEtapa, codigo, nombre
+    db.request().input('tipo', sql.VarChar(20), tipo).query(`
+      SELECT id AS idEtapa, codigo, nombre, tipo_obra AS tipoObra
       FROM pro_obc.grupos_partida
+      WHERE tipo_obra = @tipo
       ORDER BY orden, codigo
     `),
-    db.request().query(`
-      SELECT id AS idPartida, codigo, nombre, grupo_id AS idEtapa, activo
-      FROM pro_obc.partidas
-      ORDER BY orden, codigo
+    db.request().input('tipo', sql.VarChar(20), tipo).query(`
+      SELECT p.id AS idPartida, p.codigo, p.nombre, p.grupo_id AS idEtapa, p.activo
+      FROM pro_obc.partidas p
+      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+      WHERE g.tipo_obra = @tipo
+      ORDER BY p.orden, p.codigo
     `),
-    db.request().query(`
+    db.request().input('tipo', sql.VarChar(20), tipo).query(`
       SELECT
         sp.id AS idSubPartida, sp.codigo, sp.nombre, sp.partida_id AS idPartida,
         sp.sprint_numero AS numSprint, sp.es_critica AS esCritica, sp.descripcion,
@@ -42,6 +50,9 @@ export async function GET() {
           FOR XML PATH('')
         ), 1, 1, '') AS tiposCasaStr
       FROM pro_obc.sub_partidas sp
+      JOIN pro_obc.partidas p ON p.id = sp.partida_id
+      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+      WHERE g.tipo_obra = @tipo
       ORDER BY sp.codigo
     `),
   ]);
@@ -87,14 +98,19 @@ export async function POST(req: NextRequest) {
   try {
     const e = await db.request()
       .input('idE', sql.Int, idEtapa)
-      .query('SELECT id FROM pro_obc.grupos_partida WHERE id = @idE');
+      .query('SELECT id, tipo_obra FROM pro_obc.grupos_partida WHERE id = @idE');
     if (e.recordset.length === 0) {
       return NextResponse.json({ error: 'La etapa no existe' }, { status: 400 });
     }
 
+    // Los códigos son únicos DENTRO del tipo de obra: infraestructura repite a
+    // propósito los códigos de vivienda (1.1, 2.1, 3.1…), son catálogos aparte.
     const dup = await db.request()
       .input('cod', sql.VarChar(20), codigo)
-      .query('SELECT 1 AS ok FROM pro_obc.partidas WHERE codigo = @cod');
+      .input('tipo', sql.VarChar(20), e.recordset[0].tipo_obra)
+      .query(`SELECT 1 AS ok FROM pro_obc.partidas p
+              JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+              WHERE p.codigo = @cod AND g.tipo_obra = @tipo`);
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe una partida con el código "${codigo}"` }, { status: 409 });
     }

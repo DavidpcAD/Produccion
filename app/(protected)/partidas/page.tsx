@@ -45,6 +45,10 @@ export default function PartidasPage() {
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState('');
   const [selPartida, setSelPartida] = useState<number | null>(null);
+  // Catálogo que se está viendo: vivienda (casas) o infraestructura. Son catálogos
+  // aparte en pro_obc (grupos_partida.tipo_obra) y repiten códigos entre sí.
+  const [tipoObra, setTipoObra] = useState<'VIVIENDA' | 'INFRA'>('VIVIENDA');
+  const esVivienda = tipoObra === 'VIVIENDA';
   const puede = mounted && isSuperAdmin;
 
   // Modal subpartida (crear/editar)
@@ -60,16 +64,23 @@ export default function PartidasPage() {
   const [partForm, setPartForm] = useState({ ...EMPTY_PART });
   const setPart = (k: keyof typeof partForm, v: string) => setPartForm(p => ({ ...p, [k]: v }));
 
+  function cambiarTipo(t: 'VIVIENDA' | 'INFRA') {
+    if (t === tipoObra) return;
+    setSelPartida(null);
+    setQ('');
+    setTipoObra(t);
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
-    const d = await fetch('/api/partidas').then(r => (r.ok ? r.json() : null)).catch(() => null);
+    const d = await fetch(`/api/partidas?tipo=${tipoObra}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
     if (d) {
       setEtapas(d.etapas ?? []);
       setPartidas(d.partidas ?? []);
       setSubpartidas(d.subpartidas ?? []);
     }
     setLoading(false);
-  }, []);
+  }, [tipoObra]);
   useEffect(() => { load(); }, [load]);
 
   // Catálogo de sprints (para validar/elegir el N° de sprint de una subpartida).
@@ -263,10 +274,26 @@ export default function PartidasPage() {
     <PageShell>
       <PageHeader
         title="Partidas y subpartidas"
-        subtitle={`${subpartidas.length} subpartidas en ${partidas.length} partidas`}
-        actions={puede && (
-          <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
-        )}
+        subtitle={
+          esVivienda
+            ? `${subpartidas.length} subpartidas en ${partidas.length} partidas · vivienda`
+            : `${partidas.length} partidas en ${etapas.length} capítulos · infraestructura`
+        }
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
+              {([['Vivienda', 'VIVIENDA'], ['Infraestructura', 'INFRA']] as const).map(([label, val]) => (
+                <button key={val} onClick={() => cambiarTipo(val)}
+                  className={'px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (tipoObra === val ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {puede && (
+              <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
+            )}
+          </div>
+        }
       />
 
       <CatalogoTabs />
@@ -334,13 +361,19 @@ export default function PartidasPage() {
                   {puede && (
                     <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                       <Button size="sm" variant="outline" onClick={() => abrirEditarPart(sel)} icon={<Icon name="edit" size="sm" color="currentColor" />}>Editar</Button>
-                      <Button size="sm" onClick={() => abrirNuevaSub(sel.idPartida)} icon={<Icon name="plus" size="sm" color="currentColor" />}>Agregar subpartida</Button>
+                      {/* Las subpartidas llevan sprint y tipo de casa: hoy eso solo
+                          aplica a vivienda (es lo que consume Avance). */}
+                      {esVivienda && (
+                        <Button size="sm" onClick={() => abrirNuevaSub(sel.idPartida)} icon={<Icon name="plus" size="sm" color="currentColor" />}>Agregar subpartida</Button>
+                      )}
                     </div>
                   )}
                 </div>
                 {selSubs.length === 0 ? (
                   <div className="p-12 text-center text-ds-gray-300 text-sm">
-                    Esta partida no tiene subpartidas.{puede && ' Agregá la primera con el botón de arriba.'}
+                    {esVivienda
+                      ? `Esta partida no tiene subpartidas.${puede ? ' Agregá la primera con el botón de arriba.' : ''}`
+                      : 'Infraestructura todavía no maneja subpartidas: las subpartidas llevan sprint y tipo de casa, que son del catálogo de vivienda.'}
                   </div>
                 ) : (
                   <ul className="divide-y divide-ds-gray-100 max-h-[62vh] overflow-y-auto no-scrollbar">

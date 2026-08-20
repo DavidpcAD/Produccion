@@ -271,9 +271,11 @@ export async function calcularReporteM2(
     `);
   const partidasQ = await db
     .request()
-    .query<{ id: number; codigo: string; nombre: string }>(
-      'SELECT id, codigo, nombre FROM pro_obc.partidas',
-    );
+    // Solo el catálogo de VIVIENDA (ver nota en reportes.ts).
+    .query<{ id: number; codigo: string; nombre: string }>(`
+      SELECT p.id, p.codigo, p.nombre FROM pro_obc.partidas p
+      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+      WHERE g.tipo_obra = 'VIVIENDA'`);
   const codigoPorPartida = new Map<number, string>();
   const partidaMeta = new Map<number, { codigo: string; nombre: string }>();
   for (const p of partidasQ.recordset) {

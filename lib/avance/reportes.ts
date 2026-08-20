@@ -449,7 +449,12 @@ export async function calcularReporteSemanal(
     `);
   const partidasQ = await db
     .request()
-    .query<{ id: number; codigo: string }>('SELECT id, codigo FROM pro_obc.partidas');
+    // Avance es de casas: solo el catálogo de VIVIENDA (pro_obc también tiene el
+    // de infraestructura, que repite los códigos 1.1, 2.1, …).
+    .query<{ id: number; codigo: string }>(`
+      SELECT p.id, p.codigo FROM pro_obc.partidas p
+      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+      WHERE g.tipo_obra = 'VIVIENDA'`);
   const codigoPorPartida = new Map<number, string>();
   for (const p of partidasQ.recordset) codigoPorPartida.set(p.id, p.codigo.toUpperCase());
   const presupPorObra = new Map<string, { partidas: Map<string, number>; total: number }>();
@@ -947,7 +952,12 @@ export async function calcularObraAvance(
   }
   const codPartQ = await db
     .request()
-    .query<{ id: number; codigo: string }>('SELECT id, codigo FROM pro_obc.partidas');
+    // Avance es de casas: solo el catálogo de VIVIENDA (pro_obc también tiene el
+    // de infraestructura, que repite los códigos 1.1, 2.1, …).
+    .query<{ id: number; codigo: string }>(`
+      SELECT p.id, p.codigo FROM pro_obc.partidas p
+      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+      WHERE g.tipo_obra = 'VIVIENDA'`);
   const codigoPorPartida = new Map<number, string>();
   for (const p of codPartQ.recordset) codigoPorPartida.set(p.id, p.codigo.toUpperCase());
 
