@@ -9,7 +9,7 @@ import { AdelanteMark } from '@/components/ds/AdelanteMark/AdelanteMark';
 import { haptic } from '@/components/ds/haptic';
 import { springs } from '@/lib/springs';
 import { useConfirm } from '@/components/ui/Confirm';
-import { getRouteModule, moduloPublicado } from '@/lib/permissions';
+import { getRouteModule, moduloPublicado, modulosDeRuta } from '@/lib/permissions';
 
 const THEME_KEY = 'adelante_oc_theme';
 
@@ -147,7 +147,7 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
   // Conteo de devoluciones para el badge de la nav (la Sidebar está fuera del store de
   // Compras, así que lo pide por API). Solo si el usuario tiene acceso a Compras.
   useEffect(() => {
-    const canCompras = !allowedModules || allowedModules.includes(getRouteModule('/compras/ingenieria/devoluciones'));
+    const canCompras = !allowedModules || modulosDeRuta('/compras/ingenieria/devoluciones').some((m) => allowedModules.includes(m));
     if (!canCompras) return;
     let cancel = false;
     fetch('/api/compras/devoluciones-count')
@@ -239,12 +239,14 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
       {/* Ítems */}
       {navItems
         .filter((item) => {
-          const modulo = getRouteModule(item.section ?? item.href);
+          const ruta = item.section ?? item.href;
           // Módulo apagado (Avance de obra hasta que se actualice): fuera del
           // menú para todos, con rol de Producción o sin él.
-          if (!moduloPublicado(modulo)) return false;
+          if (!moduloPublicado(getRouteModule(ruta))) return false;
           // Con rol de Producción: filtrar por módulo. Sin él (null): por nivel.
-          if (allowedModules) return allowedModules.includes(modulo);
+          // Una ruta puede abrirla más de un módulo (Órdenes de Compra la
+          // comparten Ingeniería y Bodega), de ahí modulosDeRuta.
+          if (allowedModules) return modulosDeRuta(ruta).some((m) => allowedModules.includes(m));
           return !item.minLevel || nivelAdmin >= item.minLevel;
         })
         .map((item) => {
@@ -281,7 +283,13 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
               </Link>
               {item.children && item.section && openSections.has(item.section) && expanded && (
                 <div className="app-nav__sub">
-                  {item.children.map((child) => {
+                  {item.children
+                    // Los submenús también se filtran por módulo: Bodega entra a
+                    // "Mis solicitudes" (crear/ver pedidos) pero no a Matriz,
+                    // Plantillas, Inventarios ni las otras etapas del flujo.
+                    .filter((child) => !allowedModules
+                      || modulosDeRuta(child.href).some((m) => allowedModules.includes(m)))
+                    .map((child) => {
                     const childActive = child.exact
                       ? pathname === child.href
                       : (pathname === child.href || pathname.startsWith(child.href + '/'));

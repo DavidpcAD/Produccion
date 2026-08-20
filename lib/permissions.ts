@@ -45,7 +45,11 @@ const ROLE_LEVEL_BY_NAME: Record<string, number> = {
 // Nivel que exige cada módulo (la acción más alta que contiene). El nivel de un
 // rol de Producción se DERIVA de sus módulos, así no depende de calzar nombres.
 const MODULE_LEVEL: Record<string, number> = {
-  dashboard: 1, presupuesto: 4, ingenieria: 4, avance: 2, concreto: 4, desembolsos: 1, admin: 4,
+  dashboard: 1, presupuesto: 4, ingenieria: 4, avance: 2, concreto: 4, desembolsos: 1,
+  // Bodega solo crea y ve SUS pedidos: no aprueba ni registra en BC, así que su
+  // rol no debe elevar el nivel del usuario (con 4 entraría a todo lo demás).
+  bodega: 1,
+  admin: 4,
 };
 
 /** Calcula el nivelAdmin efectivo a partir de los roles del usuario.
@@ -113,7 +117,8 @@ export function getRouteLevel(pathname: string): number {
 // sin menú). Para ajustar qué ve cada rol, editá SOLO estos mapas.
 // ─────────────────────────────────────────────────────────────────────────
 export type Modulo =
-  | 'dashboard' | 'presupuesto' | 'ingenieria' | 'avance' | 'concreto' | 'desembolsos' | 'admin';
+  | 'dashboard' | 'presupuesto' | 'ingenieria' | 'avance' | 'concreto' | 'desembolsos'
+  | 'bodega' | 'admin';
 
 /** ── Interruptor de "Avance de obra" ──────────────────────────────────────
  *  El módulo está incompleto, así que NO sale a producción todavía: en `false`
@@ -124,7 +129,7 @@ export type Modulo =
 export const AVANCE_OBRA_ACTIVO = false;
 
 const MODULOS_BASE: Modulo[] =
-  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'admin'];
+  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'admin'];
 
 /** Módulos publicados (los apagados no salen para nadie). */
 export const MODULOS_TODOS: Modulo[] =
@@ -157,6 +162,9 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
     if (t === 'contabilidad' || t === 'contabilidad general') return ['desembolsos'];
     return undefined; // "Administracion" sin tipo reconocido → no scopea (fallback)
   }
+  // Bodega: crea pedidos al stock de bodega. Entra SOLO a esa parte de Órdenes
+  // de Compra (ver modulosDeRuta), no a proveeduría, facturación ni aprobación.
+  if (n === 'bodega' || n === 'bodeguero') return ['bodega'];
   // Legacy / nombres explícitos
   if (n.startsWith('digitacion') || n.startsWith('digitación') || n === 'digitador') return ['concreto'];
   if (n === 'contabilidad') return ['desembolsos'];
@@ -227,6 +235,38 @@ export function getRouteModule(pathname: string): Modulo {
   if (p.startsWith('/desembolsos')) return 'desembolsos';
   if (p.startsWith('/utilidades') || p.startsWith('/reporte-h4') || p.startsWith('/roles') || p.startsWith('/apps') || p.startsWith('/cuentas') || p.startsWith('/usuarios') || p.startsWith('/auditoria')) return 'admin';
   return 'dashboard';
+}
+
+// Subsecciones de Órdenes de Compra que son SOLO de Ingeniería (Bodega no entra):
+// las otras etapas del flujo y las herramientas del ingeniero.
+const COMPRAS_SOLO_INGENIERIA =
+  /^\/(?:api\/)?compras\/(?:proveeduria|facturacion)/;
+const COMPRAS_INGENIERIA_INTERNO =
+  /^\/compras\/ingenieria\/(?:matriz|clasificaciones|plantillas|inventarios|seguimiento|devoluciones)/;
+
+/**
+ * Módulos que ABREN una ruta. Casi todas tienen uno solo (`getRouteModule`); las
+ * de Órdenes de Compra se comparten:
+ *   · /compras/ingenieria y las APIs del módulo → 'ingenieria' + 'bodega'
+ *     (crear y ver pedidos; es lo único que hace Bodega)
+ *   · proveeduría, facturación y las herramientas del ingeniero → 'ingenieria'
+ *   · aprobación → 'admin' (como ya definía getRouteModule)
+ * Se usa para gatear en el proxy y para armar el menú.
+ */
+export function modulosDeRuta(pathname: string): Modulo[] {
+  if (pathname.startsWith('/compras') || pathname.startsWith('/api/compras')) {
+    if (pathname.startsWith('/compras/aprobacion')) return ['admin'];
+    if (COMPRAS_SOLO_INGENIERIA.test(pathname) || COMPRAS_INGENIERIA_INTERNO.test(pathname)) return ['ingenieria'];
+    return ['ingenieria', 'bodega'];
+  }
+  return [getRouteModule(pathname)];
+}
+
+/** ¿Los módulos de un usuario abren esta ruta? `modules` undefined = sin rol de
+ *  Producción (quien llama decide el fallback, normalmente el nivel). */
+export function rutaPermitida(pathname: string, modules: string[] | undefined): boolean {
+  if (!modules) return false;
+  return modulosDeRuta(pathname).some((m) => modules.includes(m));
 }
 
 export function getInitials(nombre: string): string {

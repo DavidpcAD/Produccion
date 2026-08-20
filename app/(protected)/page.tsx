@@ -169,6 +169,7 @@ const SUBTITULO: Record<Modulo, string> = {
   presupuesto: 'Resumen de presupuesto: partidas, obras y proyectos.',
   concreto: 'Resumen de concreto: coladas, batches y laboratorio.',
   desembolsos: 'Resumen de desembolsos: casas y montos pendientes.',
+  bodega: 'Resumen de bodega: pedidos al stock.',
   dashboard: 'Resumen de producción.',
 };
 
@@ -187,7 +188,8 @@ export default async function DashboardPage() {
     has('avance') ? 'avance' :
     has('presupuesto') ? 'presupuesto' :
     has('concreto') ? 'concreto' :
-    has('desembolsos') ? 'desembolsos' : 'admin';
+    has('desembolsos') ? 'desembolsos' :
+    has('bodega') ? 'bodega' : 'admin';
 
   // Tarjetas por módulo. Super Admin ve el resumen global de producción; cada rol
   // funcional ve solo lo suyo.
@@ -219,6 +221,12 @@ export default async function DashboardPage() {
         ...(has('avance') ? [{ href: '/avance', label: 'Ver avance de obra', icon: 'completado' as IconName }] : []),
         { href: '/cuadrillas', label: 'Gestionar cuadrillas', icon: 'cuadrillas' },
         { href: '/compras/ingenieria', label: 'Órdenes de compra', icon: 'entrega' },
+      );
+    }
+    // Bodega: no tiene tablero propio, solo la puerta a sus pedidos.
+    if (has('bodega') && !has('ingenieria')) {
+      quickActions.push(
+        { href: '/compras/ingenieria', label: 'Hacer un pedido a bodega', icon: 'entrega' },
       );
     }
     if (has('presupuesto')) {

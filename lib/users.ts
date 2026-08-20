@@ -1,6 +1,6 @@
 import { getDb, sql } from './db';
 import { JWTPayload } from './auth';
-import { computeNivelAdmin, rolLabelDeUsuario } from './permissions';
+import { computeNivelAdmin, computeAllowedModules, rolLabelDeUsuario } from './permissions';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Acceso al modelo nuevo de AdelanteSBX (dbo):
@@ -97,6 +97,11 @@ export async function buildSessionPayload(idUsuario: number): Promise<JWTPayload
     roles: roles.map(r => r.idRol),
     roleNames: roles.map(r => r.nombre ?? ''),
     rolLabel: rolLabelDeUsuario(roles),
+    // Los módulos van EN EL TOKEN porque el proxy (middleware) no puede tocar la
+    // base: es lo único que tiene para gatear Órdenes de Compra por rol. En las
+    // páginas y APIs manda lo que recalcula getSession(), así que un cambio de
+    // rol se refleja al instante ahí y en el token en el siguiente login.
+    modules: computeAllowedModules(roles) ?? undefined,
     nivelAdmin: computeNivelAdmin(roles),
   };
 }
