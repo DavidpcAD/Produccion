@@ -50,6 +50,12 @@ export default function PartidasPage() {
   const [tipoObra, setTipoObra] = useState<'VIVIENDA' | 'INFRA'>('VIVIENDA');
   const esVivienda = tipoObra === 'VIVIENDA';
   const puede = mounted && isSuperAdmin;
+  // El grupo del catálogo se llama "Etapa" en vivienda y "Sistema" en infra
+  // (mismo objeto pro_obc.grupos_partida, distinto rótulo por tipo de obra).
+  const termEtapa = esVivienda ? 'Etapa' : 'Sistema';
+  const termEtapaLow = esVivienda ? 'etapa' : 'sistema';
+  const termEtapasPlural = esVivienda ? 'etapas' : 'sistemas';
+  const nuevaEtapaLabel = esVivienda ? 'Nueva etapa' : 'Nuevo sistema';
 
   // Modal subpartida (crear/editar)
   const [subOpen, setSubOpen] = useState(false);
@@ -63,6 +69,11 @@ export default function PartidasPage() {
   const [partEditId, setPartEditId] = useState<number | null>(null);
   const [partForm, setPartForm] = useState({ ...EMPTY_PART });
   const setPart = (k: keyof typeof partForm, v: string) => setPartForm(p => ({ ...p, [k]: v }));
+
+  // Modal etapa/sistema (crear) — grupo del catálogo
+  const [etapaOpen, setEtapaOpen] = useState(false);
+  const [etapaForm, setEtapaForm] = useState({ codigo: '', nombre: '' });
+  const setEt = (k: keyof typeof etapaForm, v: string) => setEtapaForm(p => ({ ...p, [k]: v }));
 
   function cambiarTipo(t: 'VIVIENDA' | 'INFRA') {
     if (t === tipoObra) return;
@@ -182,7 +193,7 @@ export default function PartidasPage() {
     setPartOpen(true);
   }
   async function guardarPart() {
-    if (!partForm.idEtapa) { toast('Elegí la etapa', 'warning'); return; }
+    if (!partForm.idEtapa) { toast(`Elegí ${esVivienda ? 'la etapa' : 'el sistema'}`, 'warning'); return; }
     if (!partForm.codigo.trim()) { toast('El código es requerido', 'warning'); return; }
     if (!partForm.nombre.trim()) { toast('El nombre es requerido', 'warning'); return; }
     setSaving(true);
@@ -211,6 +222,29 @@ export default function PartidasPage() {
     toast('Partida eliminada', 'success');
     setPartOpen(false);
     await load();
+  }
+
+  // ---- Etapa / Sistema (grupo del catálogo) ----
+  function abrirNuevaEtapa() {
+    setEtapaForm({ codigo: '', nombre: '' });
+    setEtapaOpen(true);
+  }
+  async function guardarEtapa() {
+    if (!etapaForm.codigo.trim()) { toast('El código es requerido', 'warning'); return; }
+    if (!etapaForm.nombre.trim()) { toast('El nombre es requerido', 'warning'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/etapas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo: etapaForm.codigo.trim(), nombre: etapaForm.nombre.trim(), tipoObra }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(data.error || `No se pudo crear ${esVivienda ? 'la etapa' : 'el sistema'}`, 'error'); return; }
+      toast(esVivienda ? 'Etapa creada' : 'Sistema creado', 'success');
+      setEtapaOpen(false);
+      await load();
+    } finally { setSaving(false); }
   }
 
   const grupos = useMemo(() => {
@@ -277,7 +311,7 @@ export default function PartidasPage() {
         subtitle={
           esVivienda
             ? `${subpartidas.length} subpartidas en ${partidas.length} partidas · vivienda`
-            : `${partidas.length} partidas en ${etapas.length} capítulos · infraestructura`
+            : `${partidas.length} partidas en ${etapas.length} ${termEtapasPlural} · infraestructura`
         }
         actions={
           <div className="flex items-center gap-2 flex-wrap">
@@ -289,6 +323,9 @@ export default function PartidasPage() {
                 </button>
               ))}
             </div>
+            {puede && (
+              <Button variant="outline" onClick={abrirNuevaEtapa} icon={<Icon name="plus" size="sm" color="currentColor" />}>{nuevaEtapaLabel}</Button>
+            )}
             {puede && (
               <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
             )}
@@ -323,7 +360,7 @@ export default function PartidasPage() {
                         <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono">{etapa.codigo}</span>
                         <span className="font-bold text-ds-ink text-xs uppercase tracking-wide truncate flex-1">{etapa.nombre}</span>
                         {puede && (
-                          <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-400 hover:text-brand shrink-0" title="Nueva partida en esta etapa">
+                          <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-400 hover:text-brand shrink-0" title={`Nueva partida en ${esVivienda ? 'esta etapa' : 'este sistema'}`}>
                             <Icon name="plus" size="sm" color="currentColor" />
                           </button>
                         )}
@@ -436,10 +473,10 @@ export default function PartidasPage() {
       >
         <div className="space-y-4">
           <Combobox
-            label="Etapa" required
+            label={termEtapa} required
             value={partForm.idEtapa}
             onChange={v => setPart('idEtapa', v)}
-            placeholder="Seleccionar etapa"
+            placeholder={`Seleccionar ${termEtapaLow}`}
             options={etapas.map(e => ({ value: String(e.idEtapa), label: e.nombre, parts: [{ text: e.codigo, weight: 'bold' as const }, { text: e.nombre, weight: 'light' as const }], search: e.codigo }))}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -554,6 +591,31 @@ export default function PartidasPage() {
             </div>
           </div>
           <Input label="Descripción (opcional)" value={subForm.descripcion} onChange={e => setSub('descripcion', e.target.value)} maxLength={4000} />
+        </div>
+      </Modal>
+
+      {/* Modal: etapa / sistema (crear) */}
+      <Modal
+        open={etapaOpen}
+        onClose={() => setEtapaOpen(false)}
+        title={nuevaEtapaLabel}
+        footer={
+          <div className="flex items-center gap-2 w-full">
+            <div className="ml-auto flex items-center gap-2">
+              <Button variant="outline" onClick={() => setEtapaOpen(false)}>Cancelar</Button>
+              <Button loading={saving} disabled={!etapaForm.codigo.trim() || !etapaForm.nombre.trim()} onClick={guardarEtapa}>{`Crear ${termEtapaLow}`}</Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-body-sm text-ds-gray-500">
+            Se crea en el catálogo de <span className="font-semibold text-ds-ink">{esVivienda ? 'vivienda' : 'infraestructura'}</span>.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="Código" placeholder={esVivienda ? 'Ej. gris, acabados' : 'Ej. pavimento, piscina'} value={etapaForm.codigo} onChange={e => setEt('codigo', e.target.value)} required maxLength={20} />
+            <Input label="Nombre" placeholder={esVivienda ? 'Ej. Obra Gris' : 'Ej. Estructura de Pavimento'} value={etapaForm.nombre} onChange={e => setEt('nombre', e.target.value)} required maxLength={100} />
+          </div>
         </div>
       </Modal>
     </PageShell>

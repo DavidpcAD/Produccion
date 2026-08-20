@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       SELECT p.id AS idPartida, p.codigo, p.nombre, p.grupo_id AS idEtapa, p.activo
       FROM pro_obc.partidas p
       JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
-      WHERE g.tipo_obra = @tipo
+      WHERE g.tipo_obra = @tipo AND p.activo = 1
       ORDER BY p.orden, p.codigo
     `),
     db.request().input('tipo', sql.VarChar(20), tipo).query(`
