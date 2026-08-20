@@ -14,16 +14,19 @@ async function respuestaDelFallo(orderNo: string, e: unknown) {
   if (est.lanzado) return NextResponse.json({ ok: true, status: "Released", yaLanzado: true });
   // Ya no está en Pedidos de compra. Son DOS casos muy distintos y hay que
   // separarlos: si tiene recepciones registradas, el pedido se registró y cumplió
-  // su ciclo (recrearlo duplicaría la compra); si no tiene ninguna, lo eliminaron o
-  // lo archivaron sin registrar nada y la única salida es crearlo de nuevo (BC no
-  // permite restaurar un pedido de compra archivado).
+  // su ciclo (recrearlo duplicaría la compra); si no tiene ninguna, lo ELIMINARON
+  // sin registrar nada y la única salida es crearlo de nuevo. Ojo: que aparezca en
+  // "Archivos pedido compra" NO alcanza para saberlo — BC archiva una copia también
+  // al cambiar de estado o con la acción "Archivar documento", y esos pedidos siguen
+  // vivos; lo que manda es que no esté en Pedidos de compra. Y un pedido de compra
+  // archivado no se puede restaurar en BC (solo copiarlo a uno nuevo).
   if (!est.desconocido && !est.existe) {
     const registrado = await bcPedidoTieneRecepciones(orderNo);
     if (registrado === true) return NextResponse.json({ ok: true, status: "Posted", yaLanzado: true, yaRegistrado: true });
     if (registrado === false) {
       return NextResponse.json({
         ok: false, bcInexistente: true,
-        error: `El pedido ${orderNo} ya no está en Pedidos de compra de BC y no tiene recepciones registradas: lo eliminaron o lo archivaron. Un pedido de compra archivado no se puede restaurar en BC.`,
+        error: `El pedido ${orderNo} ya no está en Pedidos de compra de BC y no tiene recepciones registradas: lo eliminaron (BC guarda una copia en "Archivos pedido compra", pero un pedido de compra archivado no se puede restaurar).`,
       }, { status: 502 });
     }
     return NextResponse.json({
