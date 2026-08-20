@@ -51,7 +51,10 @@ export async function GET(req: NextRequest) {
                sp.sprint_numero AS sprintNumero, pa.orden AS orden
         FROM pro_obc.sub_partidas sp
         JOIN pro_obc.partidas pa ON pa.id = sp.partida_id
-        WHERE sp.activo = 1`),
+        JOIN pro_obc.grupos_partida g ON g.id = pa.grupo_id
+        -- Solo vivienda: los pesos son por sprint/tipo de casa y las subpartidas
+        -- de infraestructura no llevan ni lo uno ni lo otro.
+        WHERE sp.activo = 1 AND g.tipo_obra = 'VIVIENDA'`),
       db.request().query<{ sub_partida_id: number; tipo_casa: string }>(
         'SELECT sub_partida_id, tipo_casa FROM pro_obc.sub_partida_tipos'),
       ambito === 'sprint'

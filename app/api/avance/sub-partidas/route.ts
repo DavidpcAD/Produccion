@@ -40,7 +40,10 @@ export async function GET(req: NextRequest) {
     const db = await getAdelanteDb();
 
     const listReq = db.request();
-    const where: string[] = [];
+    // Avance es un módulo de vivienda (sprints + tipos de casa). El catálogo
+    // también tiene partidas de INFRAESTRUCTURA (grupos_partida.tipo_obra), que
+    // no llevan sprint: no tienen nada que hacer en esta pantalla.
+    const where: string[] = ["g.tipo_obra = 'VIVIENDA'"];
     if (partidaId > 0) {
       where.push('sp.partida_id = @partida_id');
       listReq.input('partida_id', sql.Int, partidaId);
@@ -109,7 +112,7 @@ export async function GET(req: NextRequest) {
              g.id AS grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
       FROM pro_obc.partidas p
       JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
-      WHERE p.activo = 1
+      WHERE p.activo = 1 AND g.tipo_obra = 'VIVIENDA'
       ORDER BY p.orden, p.codigo
     `);
 

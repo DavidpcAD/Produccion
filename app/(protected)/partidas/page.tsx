@@ -20,7 +20,9 @@ interface Etapa { idEtapa: number; codigo: string; nombre: string }
 interface Partida { idPartida: number; codigo: string; nombre: string; idEtapa: number | null; activo?: boolean }
 interface SubPartida {
   idSubPartida: number; codigo: string; nombre: string; idPartida: number;
-  numSprint: number; esCritica: boolean; descripcion: string | null;
+  // En infraestructura no hay sprint ni tipos de casa: esas dos cosas son del
+  // catálogo de vivienda (es lo que consume Avance), así que vienen null/vacío.
+  numSprint: number | null; esCritica: boolean; descripcion: string | null;
   activo: boolean; tiposCasa: string[];
 }
 
@@ -132,7 +134,7 @@ export default function PartidasPage() {
     setSubEditId(s.idSubPartida);
     setSubForm({
       idEtapa: p?.idEtapa != null ? String(p.idEtapa) : '', idPartida: String(s.idPartida),
-      codigo: s.codigo, nombre: s.nombre, numSprint: String(s.numSprint),
+      codigo: s.codigo, nombre: s.nombre, numSprint: s.numSprint != null ? String(s.numSprint) : '',
       esCritica: s.esCritica, descripcion: s.descripcion ?? '',
       activo: s.activo ?? true, tiposCasa: s.tiposCasa ?? [],
     });
@@ -142,12 +144,15 @@ export default function PartidasPage() {
     if (!subForm.idPartida) { toast('Elegí la partida', 'warning'); return; }
     if (!subForm.codigo.trim()) { toast('El código es requerido', 'warning'); return; }
     if (!subForm.nombre.trim()) { toast('El nombre es requerido', 'warning'); return; }
-    if (subForm.tiposCasa.length === 0) { toast('Elegí al menos un tipo de casa', 'warning'); return; }
-    // El sprint debe existir en el catálogo (si el catálogo pudo cargarse).
-    const nSprint = Number(subForm.numSprint) || 0;
-    if (sprintsValidos.size > 0 && !sprintsValidos.has(nSprint)) {
-      toast(`El sprint ${nSprint} no existe en el catálogo. Elegí un sprint válido.`, 'error');
-      return;
+    // Sprint y tipos de casa solo se piden en vivienda; infra no los usa.
+    if (esVivienda) {
+      if (subForm.tiposCasa.length === 0) { toast('Elegí al menos un tipo de casa', 'warning'); return; }
+      // El sprint debe existir en el catálogo (si el catálogo pudo cargarse).
+      const nSprint = Number(subForm.numSprint) || 0;
+      if (sprintsValidos.size > 0 && !sprintsValidos.has(nSprint)) {
+        toast(`El sprint ${nSprint} no existe en el catálogo. Elegí un sprint válido.`, 'error');
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -158,9 +163,10 @@ export default function PartidasPage() {
         body: JSON.stringify({
           idPartida: Number(subForm.idPartida),
           codigo: subForm.codigo.trim(), nombre: subForm.nombre.trim(),
-          numSprint: Number(subForm.numSprint) || 1, esCritica: subForm.esCritica,
+          numSprint: esVivienda ? Number(subForm.numSprint) || 1 : null,
+          esCritica: subForm.esCritica,
           descripcion: subForm.descripcion.trim() || null,
-          tiposCasa: subForm.tiposCasa, activo: subForm.activo,
+          tiposCasa: esVivienda ? subForm.tiposCasa : [], activo: subForm.activo,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -311,7 +317,7 @@ export default function PartidasPage() {
         subtitle={
           esVivienda
             ? `${subpartidas.length} subpartidas en ${partidas.length} partidas · vivienda`
-            : `${partidas.length} partidas en ${etapas.length} ${termEtapasPlural} · infraestructura`
+            : `${partidas.length} partidas en ${etapas.length} ${termEtapasPlural} · ${subpartidas.length} subpartidas · infraestructura`
         }
         actions={
           <div className="flex items-center gap-2 flex-wrap">
@@ -398,19 +404,13 @@ export default function PartidasPage() {
                   {puede && (
                     <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                       <Button size="sm" variant="outline" onClick={() => abrirEditarPart(sel)} icon={<Icon name="edit" size="sm" color="currentColor" />}>Editar</Button>
-                      {/* Las subpartidas llevan sprint y tipo de casa: hoy eso solo
-                          aplica a vivienda (es lo que consume Avance). */}
-                      {esVivienda && (
-                        <Button size="sm" onClick={() => abrirNuevaSub(sel.idPartida)} icon={<Icon name="plus" size="sm" color="currentColor" />}>Agregar subpartida</Button>
-                      )}
+                      <Button size="sm" onClick={() => abrirNuevaSub(sel.idPartida)} icon={<Icon name="plus" size="sm" color="currentColor" />}>Agregar subpartida</Button>
                     </div>
                   )}
                 </div>
                 {selSubs.length === 0 ? (
                   <div className="p-12 text-center text-ds-gray-300 text-sm">
-                    {esVivienda
-                      ? `Esta partida no tiene subpartidas.${puede ? ' Agregá la primera con el botón de arriba.' : ''}`
-                      : 'Infraestructura todavía no maneja subpartidas: las subpartidas llevan sprint y tipo de casa, que son del catálogo de vivienda.'}
+                    {`Esta partida no tiene subpartidas.${puede ? ' Agregá la primera con el botón de arriba.' : ''}`}
                   </div>
                 ) : (
                   <ul className="divide-y divide-ds-gray-100 max-h-[62vh] overflow-y-auto no-scrollbar">
@@ -418,7 +418,7 @@ export default function PartidasPage() {
                       <li
                         key={s.idSubPartida}
                         onClick={puede ? () => abrirEditarSub(s) : undefined}
-                        title={puede ? 'Editar subpartida (sprint y tipos de casa)' : undefined}
+                        title={puede ? (esVivienda ? 'Editar subpartida (sprint y tipos de casa)' : 'Editar subpartida') : undefined}
                         className={'px-5 py-3 flex items-start gap-3 ' + (puede ? 'cursor-pointer hover:bg-ds-gray-100 transition-colors' : '')}
                       >
                         <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 pt-0.5">{s.codigo}</span>
@@ -428,17 +428,22 @@ export default function PartidasPage() {
                             {s.esCritica && <Badge variant="red">Crítica</Badge>}
                             {!s.activo && <Badge variant="gray">Inactiva</Badge>}
                           </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-1">
-                            {s.tiposCasa.length > 0
-                              ? s.tiposCasa.map(tc => (
-                                  <span key={tc} className="rounded bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-500">{tc}</span>
-                                ))
-                              : <span className="text-[10px] font-semibold text-ds-red">Sin tipos de casa — clic para asignar</span>}
-                          </div>
+                          {/* Tipos de casa: solo vivienda (en infra no aplican). */}
+                          {esVivienda && (
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              {s.tiposCasa.length > 0
+                                ? s.tiposCasa.map(tc => (
+                                    <span key={tc} className="rounded bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-500">{tc}</span>
+                                  ))
+                                : <span className="text-[10px] font-semibold text-ds-red">Sin tipos de casa — clic para asignar</span>}
+                            </div>
+                          )}
                         </div>
-                        <span className="rounded-full bg-ds-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ds-gray-500 shrink-0 whitespace-nowrap" title={`Sprint ${s.numSprint}`}>
-                          Sprint {s.numSprint}
-                        </span>
+                        {s.numSprint != null && (
+                          <span className="rounded-full bg-ds-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ds-gray-500 shrink-0 whitespace-nowrap" title={`Sprint ${s.numSprint}`}>
+                            Sprint {s.numSprint}
+                          </span>
+                        )}
                         {puede && (
                           <span className="text-ds-gray-400 p-1 shrink-0" aria-hidden>
                             <Icon name="edit" size="sm" color="currentColor" />
@@ -516,22 +521,22 @@ export default function PartidasPage() {
           ) : (
             <>
               <p className="text-body-sm text-ds-gray-500">
-                La subpartida queda amarrada a una <span className="font-semibold text-ds-ink">partida</span> existente (y a su etapa).
+                La subpartida queda amarrada a una <span className="font-semibold text-ds-ink">partida</span> existente (y a su {termEtapaLow}).
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Combobox
-                  label="Etapa" required
+                  label={termEtapa} required
                   value={subForm.idEtapa}
                   onChange={v => { setSub('idEtapa', v); setSub('idPartida', ''); }}
-                  placeholder="Seleccionar etapa"
+                  placeholder={`Seleccionar ${termEtapaLow}`}
                   options={etapas.map(e => ({ value: String(e.idEtapa), label: e.nombre, parts: [{ text: e.codigo, weight: 'bold' as const }, { text: e.nombre, weight: 'light' as const }], search: e.codigo }))}
                 />
                 <Combobox
                   label="Partida" required
                   value={subForm.idPartida}
                   onChange={v => setSub('idPartida', v)}
-                  placeholder={subForm.idEtapa ? 'Seleccionar partida' : 'Elegí una etapa primero'}
-                  emptyText="Esta etapa no tiene partidas"
+                  placeholder={subForm.idEtapa ? 'Seleccionar partida' : `Elegí ${esVivienda ? 'una etapa' : 'un sistema'} primero`}
+                  emptyText={`Este ${termEtapaLow} no tiene partidas`}
                   options={partidasDeEtapa.map(p => ({ value: String(p.idPartida), label: p.nombre, parts: [{ text: p.codigo, weight: 'bold' as const }, { text: p.nombre, weight: 'light' as const }], search: p.codigo }))}
                 />
               </div>
@@ -542,7 +547,8 @@ export default function PartidasPage() {
             <Input label="Nombre" value={subForm.nombre} onChange={e => setSub('nombre', e.target.value)} required maxLength={50} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {sprintsCat.length > 0 ? (
+            {/* Sprint: solo vivienda. Infraestructura no se planifica por sprint. */}
+            {!esVivienda ? null : sprintsCat.length > 0 ? (
               <Combobox
                 label="Sprint"
                 value={subForm.numSprint}
@@ -575,21 +581,29 @@ export default function PartidasPage() {
               </label>
             </div>
           </div>
-          {/* Tipos de casa a los que aplica la subpartida (mismo modelo que Avance). */}
-          <div>
-            <label className="block text-body-sm font-medium text-ds-ink mb-1.5">Tipos de casa <span className="text-ds-red">*</span></label>
-            <div className="flex flex-wrap gap-2">
-              {TIPOS_CASA.map(tc => {
-                const on = subForm.tiposCasa.includes(tc);
-                return (
-                  <button key={tc} type="button" onClick={() => toggleTipo(tc)}
-                    className={'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ' + (on ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-400 hover:border-ds-gray-400 hover:text-ds-ink')}>
-                    {tc}
-                  </button>
-                );
-              })}
+          {/* Tipos de casa a los que aplica la subpartida (mismo modelo que Avance).
+              Solo vivienda: en infra la subpartida aplica a la obra completa. */}
+          {esVivienda && (
+            <div>
+              <label className="block text-body-sm font-medium text-ds-ink mb-1.5">Tipos de casa <span className="text-ds-red">*</span></label>
+              <div className="flex flex-wrap gap-2">
+                {TIPOS_CASA.map(tc => {
+                  const on = subForm.tiposCasa.includes(tc);
+                  return (
+                    <button key={tc} type="button" onClick={() => toggleTipo(tc)}
+                      className={'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ' + (on ? 'border-brand bg-brand/15 text-ds-green-ink' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-400 hover:border-ds-gray-400 hover:text-ds-ink')}>
+                      {tc}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
+          {!esVivienda && (
+            <p className="text-body-sm text-ds-gray-400">
+              En infraestructura la subpartida no lleva sprint ni tipo de casa: aplica a la obra completa.
+            </p>
+          )}
           <Input label="Descripción (opcional)" value={subForm.descripcion} onChange={e => setSub('descripcion', e.target.value)} maxLength={4000} />
         </div>
       </Modal>

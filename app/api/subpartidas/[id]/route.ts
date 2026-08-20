@@ -7,6 +7,9 @@ const TIPOS_CASA = new Set(['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea']);
 
 // Editar una subpartida del catálogo unificado (pro_obc.sub_partidas +
 // sub_partida_tipos). Solo Super Admin (nivel 4).
+//
+// Como en el POST, el tipo de obra sale de la partida a la que ya está amarrada:
+// vivienda exige sprint + tipos de casa; infra los guarda vacíos (no aplican).
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 4) {
@@ -31,15 +34,38 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!nombre) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 });
   if (codigo.length > 50) return NextResponse.json({ error: 'El código no puede superar 50 caracteres' }, { status: 400 });
   if (nombre.length > 150) return NextResponse.json({ error: 'El nombre no puede superar 150 caracteres' }, { status: 400 });
-  if (numSprint < 1 || numSprint > 50) return NextResponse.json({ error: 'Sprint inválido (1–50)' }, { status: 400 });
-  if (tiposCasa.length === 0) return NextResponse.json({ error: 'Elegí al menos un tipo de casa' }, { status: 400 });
 
   const db = await getAdelanteDb();
   try {
+    const act = await db.request()
+      .input('id', sql.Int, idSubPartida)
+      .query(`SELECT g.tipo_obra AS tipoObra
+              FROM pro_obc.sub_partidas sp
+              JOIN pro_obc.partidas p ON p.id = sp.partida_id
+              JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+              WHERE sp.id = @id`);
+    if (act.recordset.length === 0) {
+      return NextResponse.json({ error: 'La subpartida no existe' }, { status: 404 });
+    }
+    const tipoObra = String(act.recordset[0].tipoObra ?? 'VIVIENDA').toUpperCase();
+    const esInfra = tipoObra === 'INFRA';
+
+    if (!esInfra) {
+      if (numSprint < 1 || numSprint > 50) return NextResponse.json({ error: 'Sprint inválido (1–50)' }, { status: 400 });
+      if (tiposCasa.length === 0) return NextResponse.json({ error: 'Elegí al menos un tipo de casa' }, { status: 400 });
+    }
+    const sprintGuardado = esInfra ? null : numSprint;
+    const tiposGuardados = esInfra ? [] : tiposCasa;
+
+    // Duplicados de código: únicos dentro del mismo tipo de obra.
     const dup = await db.request()
       .input('cod', sql.VarChar(50), codigo)
       .input('id', sql.Int, idSubPartida)
-      .query('SELECT 1 AS ok FROM pro_obc.sub_partidas WHERE codigo = @cod AND id <> @id');
+      .input('tipo', sql.VarChar(20), tipoObra)
+      .query(`SELECT 1 AS ok FROM pro_obc.sub_partidas sp
+              JOIN pro_obc.partidas p ON p.id = sp.partida_id
+              JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+              WHERE sp.codigo = @cod AND sp.id <> @id AND g.tipo_obra = @tipo`);
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe otra subpartida con el código "${codigo}"` }, { status: 409 });
     }
@@ -51,7 +77,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         .input('id', sql.Int, idSubPartida)
         .input('codigo', sql.VarChar(50), codigo)
         .input('nombre', sql.NVarChar(150), nombre)
-        .input('numSprint', sql.SmallInt, numSprint)
+        .input('numSprint', sql.SmallInt, sprintGuardado)
         .input('esCritica', sql.Bit, esCritica)
         .input('descripcion', sql.NVarChar(sql.MAX), descripcion)
         .input('activo', sql.Bit, activo)
@@ -68,7 +94,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       // Reemplazar tipos de casa.
       await new sql.Request(tx).input('id', sql.Int, idSubPartida)
         .query('DELETE FROM pro_obc.sub_partida_tipos WHERE sub_partida_id = @id');
-      for (const tc of tiposCasa) {
+      for (const tc of tiposGuardados) {
         await new sql.Request(tx)
           .input('id', sql.Int, idSubPartida)
           .input('tc', sql.VarChar(20), tc)
@@ -82,7 +108,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     await logAudit({
       idColAccion: session.idCol, accion: 'EDITAR_SUBPARTIDA', entidad: 'SubPartida',
-      idEntidad: idSubPartida, detalleNuevo: { codigo, nombre, numSprint, esCritica, descripcion, tiposCasa, activo }, ip,
+      idEntidad: idSubPartida, detalleNuevo: { codigo, nombre, tipoObra, numSprint: sprintGuardado, esCritica, descripcion, tiposCasa: tiposGuardados, activo }, ip,
     });
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
