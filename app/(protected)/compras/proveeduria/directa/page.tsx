@@ -6,8 +6,8 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, almacenesFisicos } from "@/lib/compras/helpers";
-import type { OrdenLinea } from "@/lib/compras/types";
+import { money, almacenesFisicos, etiquetaArticulo } from "@/lib/compras/helpers";
+import type { Articulo, OrdenLinea } from "@/lib/compras/types";
 
 // Orden DIRECTA: compra armada por Proveeduría sin partir de una solicitud de
 // Ingeniería (material que no vino en ningún pedido). Todas las líneas son
@@ -27,11 +27,12 @@ export default function OrdenDirectaPage() {
 
   // Catálogos en vivo desde Business Central (con respaldo al catálogo seed).
   const [bcProv, setBcProv] = useState<typeof proveedores | null>(null);
-  const [itemsBc, setItemsBc] = useState<{ code: string; descripcion: string; unidad: string; precioUltimo?: number }[]>([]);
+  // El catálogo trae TODOS los tipos de BC (inventario, servicio, no inventariable).
+  const [itemsBc, setItemsBc] = useState<{ code: string; descripcion: string; unidad: string; precioUltimo?: number; tipo?: Articulo["tipo"] }[]>([]);
   const [bcAlm, setBcAlm] = useState<typeof almacenes | null>(null);
   useEffect(() => {
     fetch("/api/compras/bc/vendors").then((r) => (r.ok ? r.json() : { proveedores: [] })).then((d) => { if (Array.isArray(d.proveedores) && d.proveedores.length) setBcProv(d.proveedores); }).catch(() => {});
-    fetch("/api/compras/bc/items").then((r) => (r.ok ? r.json() : { items: [] })).then((d) => { if (Array.isArray(d.items)) setItemsBc(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", precioUltimo: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined }))); }).catch(() => {});
+    fetch("/api/compras/bc/items").then((r) => (r.ok ? r.json() : { items: [] })).then((d) => { if (Array.isArray(d.items)) setItemsBc(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", precioUltimo: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined, tipo: i.tipo }))); }).catch(() => {});
     fetch("/api/compras/bc/almacenes").then((r) => (r.ok ? r.json() : { almacenes: [] })).then((d) => {
       if (Array.isArray(d.almacenes) && d.almacenes.length) { setBcAlm(d.almacenes); if (!d.almacenes.some((a: any) => a.codigo === "ALM-GRAL")) setAlmacen(d.almacenes[0].codigo); }
     }).catch(() => {});
@@ -126,7 +127,7 @@ export default function OrdenDirectaPage() {
                   if (it?.precioUltimo) setQaPrecio(String(it.precioUltimo)); // respaldo inmediato
                   if (k) fetch(`/api/bc/lastprice?item=${encodeURIComponent(k)}&vendor=${encodeURIComponent(provSel?.code ?? "")}`)
                     .then((r) => r.json()).then((d) => { if (typeof d.precio === "number" && d.precio > 0) setQaPrecio(String(d.precio)); }).catch(() => {});
-                }} getKey={(i) => i.code} getLabel={(i) => `${i.code} — ${i.descripcion}`} getSearch={(i) => `${i.code} ${i.descripcion}`} minChars={2} placeholder="Buscar artículo del catálogo…" />
+                }} getKey={(i) => i.code} getLabel={(i) => etiquetaArticulo(i)} getSearch={(i) => `${i.code} ${i.descripcion}`} asegurarGrupos={(i) => i.tipo ?? "inventario"} minChars={2} placeholder="Buscar artículo del catálogo…" />
             </div>
             <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</label><Input type="number" min={0} value={qaQty} onChange={(e) => setQaQty(e.target.value)} placeholder="0" style={{ width: 90 }} /></div>
             <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Precio</label><Input type="number" min={0} value={qaPrecio} onChange={(e) => setQaPrecio(e.target.value)} placeholder="0" style={{ width: 110 }} />{(() => { const it = itemsBc.find((x) => x.code === qaCode); return it?.precioUltimo ? <div className="ds-body-sm ds-muted" style={{ marginTop: 2 }}>últ. compra {money(it.precioUltimo, currency)}</div> : null; })()}</div>

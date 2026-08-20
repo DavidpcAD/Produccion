@@ -5,9 +5,12 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/compras/data-table";
 import { Skeleton } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
-import { money, num } from "@/lib/compras/helpers";
+import { money, num, etiquetaTipoArticulo } from "@/lib/compras/helpers";
+import type { Articulo } from "@/lib/compras/types";
 
-type Row = { code: string; descripcion: string; unidad: string; almacenDefault: string; precioReferencia: number; recibido: number };
+// tipo = BC Item.Type. El catálogo trae los tres tipos (inventario, servicio y no
+// inventariable); servicio y no inventariable no tienen stock, por eso se etiquetan.
+type Row = { code: string; descripcion: string; unidad: string; almacenDefault: string; precioReferencia: number; recibido: number; tipo: Articulo["tipo"] };
 type Existencia = { itemNo: string; variantCode: string; locationCode: string; descripcion: string; cantidad: number; unidad: string };
 type StockInfo = { total: number; detalle: Existencia[] };
 type StockEstado = "loading" | "ok" | "error";
@@ -21,11 +24,11 @@ export function InventariosView({ tablaKey = "inventarios" }: { tablaKey?: strin
   const { articulos, ordenes } = useStore();
 
   // Catálogo de BC (todos los productos). Fallback al catálogo local si BC no responde.
-  const [items, setItems] = useState<{ code: string; descripcion: string; unidad: string; lastDirectCost?: number }[] | null>(null);
+  const [items, setItems] = useState<{ code: string; descripcion: string; unidad: string; lastDirectCost?: number; tipo?: Articulo["tipo"] }[] | null>(null);
   useEffect(() => {
     fetch("/api/compras/bc/items")
       .then((r) => (r.ok ? r.json() : { items: [] }))
-      .then((d) => { if (Array.isArray(d.items)) setItems(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", lastDirectCost: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined }))); })
+      .then((d) => { if (Array.isArray(d.items)) setItems(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", lastDirectCost: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined, tipo: i.tipo }))); })
       .catch(() => { /* sin BC: se usa el catálogo local */ });
   }, []);
 
@@ -41,7 +44,7 @@ export function InventariosView({ tablaKey = "inventarios" }: { tablaKey?: strin
   const rows = useMemo<Row[]>(() => {
     const base = (items && items.length)
       ? items
-      : articulos.map((a) => ({ code: a.code, descripcion: a.descripcion, unidad: a.unidad, lastDirectCost: undefined as number | undefined }));
+      : articulos.map((a) => ({ code: a.code, descripcion: a.descripcion, unidad: a.unidad, lastDirectCost: undefined as number | undefined, tipo: a.tipo }));
     return base.map((b) => {
       const a = artByCode.get(b.code);
       return {
@@ -51,6 +54,7 @@ export function InventariosView({ tablaKey = "inventarios" }: { tablaKey?: strin
         almacenDefault: a?.almacenDefault ?? "—",
         precioReferencia: a?.precioReferencia ?? b.lastDirectCost ?? 0,
         recibido: recibidoMap.get(b.code) ?? 0,
+        tipo: b.tipo ?? "inventario",
       };
     });
   }, [items, articulos, artByCode, recibidoMap]);
@@ -105,6 +109,7 @@ export function InventariosView({ tablaKey = "inventarios" }: { tablaKey?: strin
     { id: "code", header: "Código", accessorFn: (a) => a.code, meta: { label: "Código" }, cell: (c) => <span className="ds-strong">{c.getValue()}</span> },
     { id: "desc", header: "Descripción", accessorFn: (a) => a.descripcion, meta: { label: "Descripción" }, cell: (c) => c.getValue() },
     { id: "unidad", header: "Unidad", accessorFn: (a) => a.unidad, meta: { label: "Unidad" }, cell: (c) => c.getValue() },
+    { id: "tipo", header: "Tipo", accessorFn: (a) => etiquetaTipoArticulo(a.tipo) || "Inventario", meta: { label: "Tipo" }, cell: (c) => c.getValue() },
     {
       id: "stock", header: "Stock (BC)", accessorFn: (a) => stockByItem[a.code]?.total ?? 0,
       meta: { label: "Stock (BC)", num: true }, enableColumnFilter: false,

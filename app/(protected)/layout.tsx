@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSession } from '@/hooks/useSession';
-import { getInitials, getRouteModule } from '@/lib/permissions';
+import { getInitials, rutaPermitida } from '@/lib/permissions';
 
 const NAVPIN_KEY = 'adelante_oc_navpin';
 
@@ -25,10 +25,14 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     [session],
   );
 
-  // Guard de página: si el rol no habilita el módulo de la ruta actual, al Dashboard.
+  // Guard de página: si el rol no habilita NINGUNO de los módulos que abren la ruta,
+  // al Dashboard. Se usa `rutaPermitida` (la misma que gatea el proxy y arma el menú)
+  // y no `getRouteModule`, que mapea TODO /compras a 'ingenieria': con eso el rol
+  // Bodega veía "Mis solicitudes" en el menú pero al entrar lo rebotaba al Dashboard,
+  // o sea no podía pedir material. Ver modulosDeRuta en lib/permissions.ts.
   useEffect(() => {
     if (!session || !allowedModules) return;
-    if (!allowedModules.includes(getRouteModule(pathname))) router.replace('/');
+    if (!rutaPermitida(pathname, allowedModules)) router.replace('/');
   }, [session, allowedModules, pathname, router]);
 
   const nivelAdmin = session?.nivelAdmin ?? 0;

@@ -44,7 +44,9 @@ export interface Articulo {
   unidad: string;      // UND, KG, M, ...
   almacenDefault: string;
   precioReferencia: number;
-  tipo: "inventario" | "servicio"; // BC Item.Type
+  // BC Item.Type. El catálogo de los buscadores trae los tres tipos: se compra
+  // igual, solo cambia que servicio / no inventariable no llevan almacén en BC.
+  tipo: "inventario" | "servicio" | "no-inventario";
 }
 
 export interface Obra {

@@ -22,8 +22,8 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega } from "@/lib/compras/helpers";
-import { coincideBusqueda } from "@/lib/utilidades/buscar";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega, etiquetaTipoArticulo } from "@/lib/compras/helpers";
+import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
 // Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
@@ -57,7 +57,9 @@ export type NuevaSolicitudEdicion = { id: string; numero: string; seed: NuevaSol
 /** Contexto de la Matriz: obra fija + clasificación a la que se liga el pedido. */
 export type NuevaSolicitudPreset = { obraCodigo?: string; idClasificacion?: number };
 type FTipo = "todas" | "mias" | "general" | "bodega";
-type Item = { id: string; title: string; sub?: string };
+// tag = etiqueta chica a la derecha (ej. "Servicio"): el buscador ofrece TODO el
+// catálogo de BC (inventario, servicio y no inventariable) y el tag dice qué es.
+type Item = { id: string; title: string; sub?: string; tag?: string };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const SOLO = "solo"; // grupo único para repuesto/bodega (sin obra)
@@ -113,11 +115,29 @@ const PRIORIDADES: { v: Pedido["prioridad"]; label: string }[] = [
 const F_TIPOS: { v: FTipo; label: string }[] = [
   { v: "todas", label: "Todas" }, { v: "mias", label: "Mías" }, { v: "general", label: "General" }, { v: "bodega", label: "Bodega" },
 ];
-const filtrar = (items: Item[], q: string, max = 40) => {
-  const s = q.trim();
-  // Busca por palabras: "tubo 3\"" encuentra «TUBO PVC … 3"». Ver lib/utilidades/buscar.
-  return (s ? items.filter((i) => coincideBusqueda(`${i.title} ${i.sub ?? ""}`, s)) : items).slice(0, max);
-};
+// Busca por palabras y ORDENA por relevancia: "tubo 3\"" encuentra «TUBO PVC … 3"»,
+// y "servicio" trae primero los artículos que EMPIEZAN con la palabra (los de tipo
+// servicio) y no los materiales que solo la llevan en medio del nombre. Sin el
+// orden por relevancia, el tope de resultados dejaba fuera los servicios.
+const ordenarMatches = (items: Item[], q: string) => buscarOrdenado(items, q, (i) => [i.title, i.sub ?? ""]);
+const filtrar = (items: Item[], q: string, max = 40) => ordenarMatches(items, q).slice(0, max);
+const MAX_MAT = 60; // resultados visibles del buscador de materiales
+// Ningún TIPO se queda fuera de la ventana visible: si entre los primeros MAX no
+// entró ningún servicio (o ningún no inventariable) pero sí hay coincidencias de
+// ese tipo, se agregan las mejores al final. Pasaba con términos muy cortos ("s"),
+// donde los ~2.700 materiales que coinciden tapaban a los servicios.
+const CUPO_TIPO = 5;
+function conTodosLosTipos(ordenados: Item[], max: number): Item[] {
+  const visibles = ordenados.slice(0, max);
+  if (visibles.length === ordenados.length) return visibles;
+  const tagsVisibles = new Set(visibles.map((i) => i.tag ?? ""));
+  const extra: Item[] = [];
+  for (const tag of new Set(ordenados.map((i) => i.tag ?? ""))) {
+    if (tagsVisibles.has(tag)) continue;
+    extra.push(...ordenados.filter((i) => (i.tag ?? "") === tag).slice(0, CUPO_TIPO));
+  }
+  return extra.length ? [...visibles, ...extra] : visibles;
+}
 
 // ─── Popover flotante: se muestra encima (portal + fixed), no empuja ni recorta ─
 function Popover({ anchorRef, open, onClose, children, minWidth }: {
@@ -357,7 +377,11 @@ function MaterialSearch({ items, onAdd, compact }: {
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
-  const matches = useMemo(() => filtrar(items, q), [q, items]);
+  // El catálogo de BC son ~5.000 artículos de TODOS los tipos (inventario, servicio,
+  // no inventariable): se ordenan por relevancia y se muestran los primeros 60, con
+  // el conteo de cuántos quedaron fuera para que se siga filtrando.
+  const ordenados = useMemo(() => ordenarMatches(items, q), [q, items]);
+  const matches = useMemo(() => conTodosLosTipos(ordenados, MAX_MAT), [ordenados]);
   function reset() { setOpen(false); setQ(""); }
   const toggle = () => { if (open) { reset(); } else { setOpen(true); inputRef.current?.focus(); } };
   function clickItem(id: string) {
@@ -389,11 +413,20 @@ function MaterialSearch({ items, onAdd, compact }: {
                 className="nsl-opt row row--between" style={{ gap: 8, alignItems: "center", width: "100%", textAlign: "left", padding: "11px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent" }}>
                 <span className="col" style={{ gap: 2, minWidth: 0 }}>
                   <span className="ds-body-sm ds-strong">{i.title}</span>
-                  {i.sub && <span className="ds-muted ds-label">{i.sub}</span>}
+                  <span className="row gap-2" style={{ alignItems: "center" }}>
+                    {i.sub && <span className="ds-muted ds-label">{i.sub}</span>}
+                    {/* Servicio / no inventariable: se piden igual, solo se avisa qué son. */}
+                    {i.tag && <span className="nsl-tipotag">{i.tag}</span>}
+                  </span>
                 </span>
                 <Icon name="plus" size="sm" color="var(--ds-color-green-200)" />
               </button>
             ))}
+            {ordenados.length > matches.length && (
+              <div className="ds-muted ds-label" style={{ padding: "8px 14px", textAlign: "center" }}>
+                Mostrando {matches.length} de {ordenados.length} · seguí escribiendo para filtrar
+              </div>
+            )}
           </div>
         </div>
       </Popover>
@@ -656,8 +689,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     (async () => {
       try {
         const ri = await fetch("/api/compras/bc/items");
+        // TODO el catálogo, tal cual viene de BC: inventario, servicio y no
+        // inventariable. El tipo solo se guarda para etiquetarlo en el buscador.
         const items: Articulo[] = ri.ok ? (((await ri.json()).items ?? []).map((i: any) => ({
-          id: i.id, code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", almacenDefault: "", precioReferencia: 0, tipo: "inventario" as const,
+          id: i.id, code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", almacenDefault: "", precioReferencia: 0,
+          tipo: (i.tipo === "servicio" || i.tipo === "no-inventario" ? i.tipo : "inventario") as Articulo["tipo"],
         }))) : [];
         const [ro, ra] = await Promise.all([fetch("/api/compras/bc/obras"), fetch("/api/compras/bc/almacenes")]);
         const obrasBc: Obra[] = ro.ok ? ((await ro.json()).obras ?? []) : [];
@@ -816,7 +852,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const almacenNombre = almacenItems.find((a) => a.id === almacenSel)?.title ?? almacenSel;
   // La unidad NO va en la lista de búsqueda (solo el código); la unidad se muestra
   // en la línea ya agregada, junto a la cantidad.
-  const articuloItems: Item[] = useMemo(() => catArticulos.map((a) => ({ id: a.id, title: a.descripcion, sub: a.code })), [catArticulos]);
+  const articuloItems: Item[] = useMemo(() => catArticulos.map((a) => ({ id: a.id, title: a.descripcion, sub: a.code, tag: etiquetaTipoArticulo(a.tipo) || undefined })), [catArticulos]);
   const destinoNombre = destinoItems.find((d) => d.id === destino)?.title ?? "";
   const obraNombreDe = (code: string) => catObras.find((o) => o.codigo === code)?.nombre ?? code;
 

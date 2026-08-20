@@ -1,4 +1,4 @@
-import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
+import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
 
 // Almacén de inventario por defecto (el General). El pedido puede elegir OTRO
 // almacén real (Agregados, Herramienta, Maquinaria…): eso viaja en `almacen` de la
@@ -40,6 +40,19 @@ export function obraDeLinea(l: Pick<PedidoLinea, "obraCodigo" | "almacen">, p?: 
 export function destinoDeLinea(l: Pick<PedidoLinea, "obraCodigo" | "almacen">, p?: Pick<Pedido, "tipoSolicitud" | "obraCodigo">): string {
   if (p && p.tipoSolicitud !== "material") return l.almacen || p.obraCodigo || "";
   return obraDeLinea(l, p);
+}
+
+// Etiqueta del TIPO de artículo de BC para los buscadores. Los buscadores ofrecen el
+// catálogo COMPLETO (inventario, servicio y no inventariable): el inventario es el
+// caso normal y no lleva etiqueta; los otros dos sí, porque en BC no llevan almacén.
+export function etiquetaTipoArticulo(tipo?: Articulo["tipo"]): string {
+  return tipo === "servicio" ? "Servicio" : tipo === "no-inventario" ? "No inventariable" : "";
+}
+
+/** Etiqueta de un artículo en los buscadores: "S20-0006 — SERVICIO DE TRANSPORTE · Servicio". */
+export function etiquetaArticulo(a: { code: string; descripcion: string; tipo?: Articulo["tipo"] }): string {
+  const t = etiquetaTipoArticulo(a.tipo);
+  return `${a.code} — ${a.descripcion}${t ? ` · ${t}` : ""}`;
 }
 
 export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: string } {

@@ -136,9 +136,23 @@ async function listAll(group: string, entity: string): Promise<any[]> {
   return out;
 }
 
-export type BcItem = { id: string; code: string; descripcion: string; unidad: string; lastDirectCost?: number; categoria?: string; reorderPoint?: number; safetyStock?: number; reorderQty?: number };
+// tipo = BC Item.Type. El catálogo trae de TODO (inventario, servicio y no
+// inventariable) y los buscadores muestran los tres; el tipo se usa para etiquetar
+// y para no ponerle almacén a lo que en BC no lo lleva (ver bcCrearPedido).
+export type BcItemTipo = "inventario" | "servicio" | "no-inventario";
+export type BcItem = { id: string; code: string; descripcion: string; unidad: string; tipo: BcItemTipo; lastDirectCost?: number; categoria?: string; reorderPoint?: number; safetyStock?: number; reorderQty?: number };
 export type BcObra = { id: string; codigo: string; nombre: string };
 export type BcAlmacen = { codigo: string; nombre: string };
+
+// BC manda el tipo como "Inventory" | "Service" | "Non_x002D_Inventory"
+// (Non-Inventory viene escapado en OData). Cualquier otra cosa se trata como
+// inventario, que es el caso normal del catálogo.
+function tipoDeBc(v: unknown): BcItemTipo {
+  const t = String(v ?? "").toLowerCase().replace(/_x002d_/g, "-");
+  if (t.startsWith("serv")) return "servicio";
+  if (t.startsWith("non-inventory") || t.startsWith("noninventory")) return "no-inventario";
+  return "inventario";
+}
 
 let lastGoodItems: BcItem[] | null = null;
 export async function bcItems(): Promise<BcItem[]> {
@@ -155,6 +169,8 @@ export async function bcItems(): Promise<BcItem[]> {
           code,
           descripcion: i.Description ?? i.description ?? i.displayName ?? code,
           unidad: i.BaseUnitOfMeasure ?? i.baseUnitOfMeasure ?? i.baseUnitOfMeasureCode ?? "UND",
+          // La API custom no expone el Type; lo completa bcItemExtra (API estándar).
+          tipo: "inventario" as BcItemTipo,
           lastDirectCost: costCustom,
           categoria: catCustom,
           reorderPoint: Number(i.reorderPoint ?? i.ReorderPoint ?? 0) || undefined,
@@ -162,10 +178,13 @@ export async function bcItems(): Promise<BcItem[]> {
           reorderQty: Number(i.reorderQuantity ?? i.ReorderQuantity ?? 0) || undefined,
         };
       });
-    // Enriquecer con ÚLTIMO COSTO DIRECTO (precio de la última compra) y CATEGORÍA
-    // del ítem (= partida en Planificación) desde la API estándar v2.0.
+    // Enriquecer con COSTO UNITARIO, CATEGORÍA (= partida en Planificación) y TIPO
+    // del ítem desde la API estándar v2.0. El "último costo directo" que muestra la
+    // ficha de BC no lo expone ninguna de las dos APIs (haría falta agregarlo a la
+    // page 50125 de la extensión); mientras tanto se usa el costo unitario, que es
+    // el fallback que este código ya preveía.
     const extra = await bcItemExtra();
-    if (extra.size) items = items.map((i) => { const e = extra.get(i.code); return { ...i, lastDirectCost: e?.cost ?? i.lastDirectCost, categoria: e?.categoria ?? i.categoria }; });
+    if (extra.size) items = items.map((i) => { const e = extra.get(i.code); return { ...i, lastDirectCost: e?.cost ?? i.lastDirectCost, categoria: e?.categoria ?? i.categoria, tipo: e?.tipo ?? i.tipo }; });
     if (items.length) lastGoodItems = items; // guardamos el último catálogo bueno
     return items;
   } catch (e) {
@@ -174,13 +193,19 @@ export async function bcItems(): Promise<BcItem[]> {
   }
 }
 
-// Mapa itemNo -> { último costo directo, categoría } desde la API estándar v2.0.
-// Cacheado 5 min. Si falla, la UI cae al historial local / sin categoría.
-async function bcItemExtra(): Promise<Map<string, { cost?: number; categoria?: string }>> {
-  const map = new Map<string, { cost?: number; categoria?: string }>();
+// Mapa itemNo -> { último costo directo, categoría, tipo } desde la API estándar
+// v2.0 (la custom no devuelve el Type). Cacheado 5 min. Si falla, la UI cae al
+// historial local / sin categoría y todo se trata como inventario.
+async function bcItemExtra(): Promise<Map<string, { cost?: number; categoria?: string; tipo?: BcItemTipo }>> {
+  const map = new Map<string, { cost?: number; categoria?: string; tipo?: BcItemTipo }>();
   try {
     const cid = await getStdCompanyId();
-    let url: string | null = `${stdRoot()}/companies(${cid})/items?$select=number,lastDirectCost,unitCost,itemCategoryCode&$top=5000`;
+    // OJO: la entidad `item` de la API v2.0 de este entorno NO tiene
+    // `lastDirectCost` (BC responde 400 "Could not find a property named
+    // 'lastDirectCost'"), y con el $select inválido esta consulta fallaba SIEMPRE:
+    // el mapa salía vacío y ni el costo ni la categoría ni el tipo llegaban. Se pide
+    // `unitCost` (el costo unitario del ítem), que ya era el fallback previsto.
+    let url: string | null = `${stdRoot()}/companies(${cid})/items?$select=number,unitCost,itemCategoryCode,type&$top=5000`;
     let guard = 0;
     while (url && guard++ < 20) {
       const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
@@ -189,15 +214,36 @@ async function bcItemExtra(): Promise<Map<string, { cost?: number; categoria?: s
       for (const it of (data.value ?? [])) {
         const no = it.number ?? it.no ?? "";
         if (!no) continue;
-        const cost = (typeof it.lastDirectCost === "number" && it.lastDirectCost > 0) ? it.lastDirectCost
-          : (typeof it.unitCost === "number" && it.unitCost > 0) ? it.unitCost : undefined;
+        const cost = (typeof it.unitCost === "number" && it.unitCost > 0) ? it.unitCost : undefined;
         const categoria = (it.itemCategoryCode ?? "").toString().trim() || undefined;
-        map.set(no, { cost, categoria });
+        map.set(no, { cost, categoria, tipo: tipoDeBc(it.type) });
       }
       url = data["@odata.nextLink"] ?? null;
     }
   } catch { /* sin datos extra */ }
   return map;
+}
+
+// Tipo (Item.Type) de varios artículos, por la API estándar v2.0. Se usa al armar
+// el pedido de compra: los buscadores ofrecen TODO el catálogo (inventario,
+// servicio y no inventariable) y BC no acepta almacén en las líneas de servicio /
+// no inventariable, así que esas van SIN locationCode.
+// Si la consulta falla, el ítem se trata como inventario (comportamiento previo).
+export async function bcItemTipos(codes: string[]): Promise<Map<string, BcItemTipo>> {
+  const out = new Map<string, BcItemTipo>();
+  const unicos = [...new Set((codes ?? []).map((c) => (c ?? "").trim()).filter(Boolean))];
+  if (!unicos.length) return out;
+  try {
+    const cid = await getStdCompanyId();
+    for (let i = 0; i < unicos.length; i += 15) {
+      const filtro = unicos.slice(i, i + 15).map((c) => `number eq '${odataStr(c)}'`).join(" or ");
+      const res = await bcFetch(`${stdRoot()}/companies(${cid})/items?$select=number,type&$filter=${encodeURIComponent(filtro)}`, { cache: "no-store" });
+      if (!res.ok) continue;
+      const data = (await res.json()) as { value?: { number?: string; type?: string }[] };
+      for (const it of (data.value ?? [])) { const no = it.number ?? ""; if (no) out.set(no, tipoDeBc(it.type)); }
+    }
+  } catch { /* sin tipo: se trata como inventario */ }
+  return out;
 }
 
 // Último costo directo de UN item (precio de su última compra), API estándar v2.0.
@@ -206,13 +252,14 @@ export async function bcItemLastCost(itemNo: string): Promise<number | null> {
   if (!itemNo) return null;
   try {
     const cid = await getStdCompanyId();
-    const url = `${stdRoot()}/companies(${cid})/items?$filter=${encodeURIComponent(`number eq '${itemNo}'`)}&$select=number,lastDirectCost,unitCost&$top=1`;
+    // Sin `lastDirectCost`: no existe en la entidad `item` de la API v2.0 de este
+    // entorno y el $select inválido hacía que esto devolviera siempre null.
+    const url = `${stdRoot()}/companies(${cid})/items?$filter=${encodeURIComponent(`number eq '${itemNo}'`)}&$select=number,unitCost&$top=1`;
     const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
     if (!res.ok) return null;
     const it = ((await res.json())?.value ?? [])[0];
     if (!it) return null;
-    return (typeof it.lastDirectCost === "number" && it.lastDirectCost > 0) ? it.lastDirectCost
-      : (typeof it.unitCost === "number" && it.unitCost > 0) ? it.unitCost : null;
+    return (typeof it.unitCost === "number" && it.unitCost > 0) ? it.unitCost : null;
   } catch { return null; }
 }
 
@@ -669,7 +716,13 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   // La línea estándar de BC requiere el GUID (locationId), no el código.
   const locFallback = input.locationCode || process.env.BC_RECEPCION_LOCATION || "";
   const esConsumo = (l: NuevaLineaBc) => !!(l.jobNo && l.jobTaskNo); // consumo requiere ambos
-  const almacenDe = (l: NuevaLineaBc) => (esConsumo(l) ? (l.locationCode || l.jobNo!) : (l.locationCode || locFallback));
+  // SERVICIO / NO INVENTARIABLE: en BC esas líneas no llevan almacén (el campo no es
+  // editable y el Release falla). El catálogo de los buscadores trae los tres tipos,
+  // así que acá se consulta el tipo y se les manda la línea SIN almacén; el proyecto
+  // + la tarea sí se les pone (el consumo contra la obra se registra igual).
+  const tiposItem = await bcItemTipos(lineas.map((l) => l.itemNo));
+  const sinAlmacen = (l: NuevaLineaBc) => (tiposItem.get(l.itemNo) ?? "inventario") !== "inventario";
+  const almacenDe = (l: NuevaLineaBc) => (sinAlmacen(l) ? "" : esConsumo(l) ? (l.locationCode || l.jobNo!) : (l.locationCode || locFallback));
   // Se resuelven ANTES de crear nada en BC: si a una línea de consumo le falta el
   // almacén de su obra, abortamos sin dejar un pedido a medias en BC (y NUNCA se cae a
   // ALM-GRAL: mandaría a la bodega central material que no pasa por ahí).
@@ -677,7 +730,7 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   for (const l of lineas) {
     const code = almacenDe(l);
     if (code && !locIds.has(code)) locIds.set(code, await getStdLocationId(cid, code));
-    if (esConsumo(l) && !locIds.get(code)) {
+    if (esConsumo(l) && !sinAlmacen(l) && !locIds.get(code)) {
       throw new Error(`Consumo inmediato: la obra ${l.jobNo} no tiene almacén propio en Business Central (se buscó el código "${code}"). Creá el almacén de la obra en BC, o pedí el material a inventario.`);
     }
   }
@@ -814,6 +867,7 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
   const bcLines: any[] = (await resLines.json()).value ?? [];
   const usados = new Set<string>();
   const asignaciones: AsignacionLineaBc[] = [];
+  const tiposResync = await bcItemTipos(items.map((l) => l.itemNo));
   let patched = 0; const sinMatch: string[] = [];
   for (const l of items) {
     const bc = bcLines.find((b) => !usados.has(b.id) && String(b.lineObjectNumber) === String(l.itemNo) && /item/i.test(String(b.lineType)));
@@ -825,7 +879,9 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
     // (código = proyecto), y jobLineType en blanco ("None"). Esto es lo que arregla el
     // relanzamiento de un pedido que quedó Abierto en BC por falta de almacén.
     const conJob = !!(l.jobNo && l.jobTaskNo);
-    const locCode = conJob ? (l.locationCode || l.jobNo!) : (l.locationCode || "");
+    // Servicio / no inventariable: sin almacén (BC no lo acepta). Ver bcCrearPedido.
+    const soloServicio = (tiposResync.get(l.itemNo) ?? "inventario") !== "inventario";
+    const locCode = soloServicio ? "" : conJob ? (l.locationCode || l.jobNo!) : (l.locationCode || "");
     if (lineNo && (conJob || locCode)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "None") : undefined, locationCode: locCode || undefined });
     const patch: Record<string, unknown> = {};
     if (l.precio && l.precio > 0 && Number(bc.directUnitCost) !== l.precio) patch.directUnitCost = l.precio;

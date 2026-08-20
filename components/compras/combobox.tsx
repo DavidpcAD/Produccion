@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { coincideBusqueda } from "@/lib/utilidades/buscar";
+import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 // Selector con buscador (un solo valor). El menú se renderiza en un PORTAL con
 // posición fija, así NUNCA lo recorta un contenedor con overflow (paneles, cards,
@@ -17,6 +17,7 @@ export function Combobox<T>({
   getSearch,
   renderItem,
   groupBy,
+  asegurarGrupos,
   placeholder = "Buscar…",
   max = 50,
   minChars = 0,
@@ -31,6 +32,10 @@ export function Combobox<T>({
   renderItem?: (t: T) => ReactNode;
   // Si se pasa, agrupa las opciones bajo encabezados de sección.
   groupBy?: (t: T) => string;
+  // Si se pasa, garantiza que ningún grupo (ej. el TIPO de artículo: inventario,
+  // servicio, no inventariable) se quede fuera por el tope `max`: de los grupos que
+  // no entraron se agregan sus mejores coincidencias al final.
+  asegurarGrupos?: (t: T) => string;
   placeholder?: string;
   max?: number;
   // Mínimo de caracteres para mostrar opciones. Con 0 (default) al abrir muestra
@@ -46,11 +51,25 @@ export function Combobox<T>({
   const q = query.trim();
   const below = q.length < minChars;
   const matched = useMemo(
-    // Busca por palabras: "tubo 3\"" encuentra «TUBO PVC … 3"». Ver lib/utilidades/buscar.
-    () => (below ? [] : q ? items.filter((i) => coincideBusqueda(getSearch ? getSearch(i) : getLabel(i), q)) : items),
+    // Busca por palabras y ordena por relevancia: "tubo 3\"" encuentra «TUBO PVC … 3"»,
+    // y con un catálogo de miles de artículos lo más parecido a lo escrito queda
+    // ARRIBA, así el tope (`max`) no deja fuera lo que se estaba buscando (pasaba con
+    // los artículos de SERVICIO). Ver lib/utilidades/buscar.
+    () => (below ? [] : buscarOrdenado(items, q, (i) => [getSearch ? getSearch(i) : getLabel(i)])),
     [items, q, below] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const filtered = matched.slice(0, max);
+  const filtered = useMemo(() => {
+    const visibles = matched.slice(0, max);
+    if (!asegurarGrupos || visibles.length === matched.length) return visibles;
+    const vistos = new Set(visibles.map(asegurarGrupos));
+    const extra: T[] = [];
+    for (const g of new Set(matched.map(asegurarGrupos))) {
+      if (vistos.has(g)) continue;
+      extra.push(...matched.filter((i) => asegurarGrupos(i) === g).slice(0, 5));
+    }
+    return extra.length ? [...visibles, ...extra] : visibles;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matched, max]);
 
   function reposition() {
     const el = wrapRef.current;
@@ -108,7 +127,7 @@ export function Combobox<T>({
           </div>
         ));
       })()}
-      {matched.length > max && <div className="combo__more">Mostrando {max} de {matched.length} · escribí para filtrar</div>}
+      {matched.length > filtered.length && <div className="combo__more">Mostrando {filtered.length} de {matched.length} · escribí para filtrar</div>}
     </div>
     </div>,
     document.body

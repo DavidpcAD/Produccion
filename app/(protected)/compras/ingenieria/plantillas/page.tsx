@@ -7,6 +7,8 @@ import { Combobox } from "@/components/compras/combobox";
 import { IconEdit } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
+import { etiquetaArticulo } from "@/lib/compras/helpers";
+import type { Articulo } from "@/lib/compras/types";
 
 type Etapa = { id: number; codigo: string; nombre: string };
 type Partida = { id: number; codigo: string; nombre: string; etapaId: number | null };
@@ -16,7 +18,9 @@ type Wbs = { etapas: Etapa[]; partidas: Partida[]; subpartidas: SubPartida[]; cl
 type Linea = { code: string; descripcion?: string; cantidad: number; unidad?: string; obraCodigo?: string; variantCode?: string; variantNombre?: string };
 type TipoPlantilla = "general" | "bodega";
 type Plantilla = { id: number; nombre: string; creadoPor: string; idClasificacion: number | null; lineas: Linea[]; tipo?: TipoPlantilla };
-type ItemBc = { code: string; descripcion: string; unidad: string };
+// tipo = BC Item.Type: el catálogo trae inventario, servicio y no inventariable, y
+// el buscador los ofrece todos (el tipo se muestra como etiqueta).
+type ItemBc = { code: string; descripcion: string; unidad: string; tipo?: Articulo["tipo"] };
 
 export default function PlantillasPage() {
   const toast = useToast();
@@ -57,7 +61,7 @@ export default function PlantillasPage() {
       })
       .then((d) => {
         const arr = Array.isArray(d.items) ? d.items : [];
-        setItems(arr.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND" })));
+        setItems(arr.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", tipo: i.tipo })));
         // BC respondió pero sin materiales → lo tratamos como fallo recuperable.
         if (arr.length === 0) setItemsError(true);
       })
@@ -385,7 +389,7 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
         <div className="row wrap gap-2" style={{ alignItems: "flex-end", margin: "8px 0 10px" }}>
           <div style={{ flex: "1 1 260px", minWidth: 200 }}>
             <label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Artículo</label>
-            <Combobox items={items} value={qaCode} onChange={(k) => setQaCode(k)} getKey={(i) => i.code} getLabel={(i) => `${i.code} — ${i.descripcion}`} getSearch={(i) => `${i.code} ${i.descripcion}`} placeholder={itemsCargando ? "Cargando materiales…" : "Buscar artículo…"} />
+            <Combobox items={items} value={qaCode} onChange={(k) => setQaCode(k)} getKey={(i) => i.code} getLabel={(i) => etiquetaArticulo(i)} getSearch={(i) => `${i.code} ${i.descripcion}`} asegurarGrupos={(i) => i.tipo ?? "inventario"} placeholder={itemsCargando ? "Cargando materiales…" : "Buscar artículo…"} />
             {itemsCargando ? (
               <div className="ds-body-sm ds-muted" style={{ marginTop: 4 }}>Cargando materiales de Business Central…</div>
             ) : itemsError ? (

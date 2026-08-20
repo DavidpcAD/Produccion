@@ -6,8 +6,8 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, ordenEsDirecta, ordenPedidos, almacenesFisicos } from "@/lib/compras/helpers";
-import type { OrdenLinea } from "@/lib/compras/types";
+import { money, ordenEsDirecta, ordenPedidos, almacenesFisicos, etiquetaArticulo } from "@/lib/compras/helpers";
+import type { Articulo, OrdenLinea } from "@/lib/compras/types";
 
 interface Row { key: string; articuloId: string; descripcion: string; unidad: string; obra: string; cantidad: string; precio: string; iva: string; descuento: string; proyecto?: string; taskNo?: string; pedidoLineaId?: string; pedidoNumero?: string; }
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -25,11 +25,12 @@ export default function EditarOrdenPage() {
     || null;
 
   const [bcProv, setBcProv] = useState<typeof proveedores | null>(null);
-  const [itemsBc, setItemsBc] = useState<{ code: string; descripcion: string; unidad: string; precioUltimo?: number }[]>([]);
+  // El catálogo trae TODOS los tipos de BC (inventario, servicio, no inventariable).
+  const [itemsBc, setItemsBc] = useState<{ code: string; descripcion: string; unidad: string; precioUltimo?: number; tipo?: Articulo["tipo"] }[]>([]);
   const [bcAlm, setBcAlm] = useState<typeof almacenes | null>(null);
   useEffect(() => {
     fetch("/api/compras/bc/vendors").then((r) => (r.ok ? r.json() : { proveedores: [] })).then((d) => { if (Array.isArray(d.proveedores) && d.proveedores.length) setBcProv(d.proveedores); }).catch(() => {});
-    fetch("/api/compras/bc/items").then((r) => (r.ok ? r.json() : { items: [] })).then((d) => { if (Array.isArray(d.items)) setItemsBc(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", precioUltimo: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined }))); }).catch(() => {});
+    fetch("/api/compras/bc/items").then((r) => (r.ok ? r.json() : { items: [] })).then((d) => { if (Array.isArray(d.items)) setItemsBc(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", precioUltimo: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined, tipo: i.tipo }))); }).catch(() => {});
     fetch("/api/compras/bc/almacenes").then((r) => (r.ok ? r.json() : { almacenes: [] })).then((d) => { if (Array.isArray(d.almacenes) && d.almacenes.length) setBcAlm(d.almacenes); }).catch(() => {});
   }, []);
   const catProv = bcProv ?? proveedores;
@@ -145,7 +146,7 @@ export default function EditarOrdenPage() {
             <div className="row wrap gap-2" style={{ alignItems: "flex-end", padding: "12px 16px", borderBottom: "1.5px solid var(--ds-color-gray-100)", background: "color-mix(in srgb, var(--ds-color-green-100) 6%, var(--ds-tint-base))" }}>
               <div style={{ flex: "1 1 280px", minWidth: 220 }}>
                 <label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Agregar artículo</label>
-                <Combobox items={itemsBc} value={qaCode} onChange={(k) => { setQaCode(k); const it = itemsBc.find((x) => x.code === k); if (it?.precioUltimo) setQaPrecio(String(it.precioUltimo)); }} getKey={(i) => i.code} getLabel={(i) => `${i.code} — ${i.descripcion}`} getSearch={(i) => `${i.code} ${i.descripcion}`} minChars={2} placeholder="Buscar artículo del catálogo…" />
+                <Combobox items={itemsBc} value={qaCode} onChange={(k) => { setQaCode(k); const it = itemsBc.find((x) => x.code === k); if (it?.precioUltimo) setQaPrecio(String(it.precioUltimo)); }} getKey={(i) => i.code} getLabel={(i) => etiquetaArticulo(i)} getSearch={(i) => `${i.code} ${i.descripcion}`} asegurarGrupos={(i) => i.tipo ?? "inventario"} minChars={2} placeholder="Buscar artículo del catálogo…" />
               </div>
               <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</label><Input type="number" min={0} value={qaQty} onChange={(e) => setQaQty(e.target.value)} placeholder="0" style={{ width: 90 }} /></div>
               <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Precio</label><Input type="number" min={0} value={qaPrecio} onChange={(e) => setQaPrecio(e.target.value)} placeholder="0" style={{ width: 110 }} />{(() => { const it = itemsBc.find((x) => x.code === qaCode); return it?.precioUltimo ? <div className="ds-body-sm ds-muted" style={{ marginTop: 2 }}>últ. compra {money(it.precioUltimo, currency)}</div> : null; })()}</div>
