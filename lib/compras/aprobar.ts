@@ -9,8 +9,29 @@ import { ALMACEN_GENERAL } from "./helpers";
 type SetOrdenEstado = (
   id: string,
   estado: Orden["estado"],
-  extra?: { bcNumber?: string; bcDeepLink?: string },
+  extra?: { bcNumber?: string; bcDeepLink?: string; motivo?: string; tipoMovimiento?: string },
 ) => Promise<void>;
+
+/** Tipo de movimiento con el que se registra un lanzamiento fallido en el historial. */
+const MOV_FALLO = "lanzamiento_fallido";
+
+/**
+ * Deja el MOTIVO en el historial de la orden y devuelve el error para el toast.
+ * Antes el porqué solo vivía en el toast: se perdía al cerrarlo y en el servidor no
+ * quedaba nada (los logs del App Service ni se estaban guardando hasta el 21/08/2026).
+ * No cambia el estado de la orden: se manda el que ya tiene.
+ */
+async function fallo(
+  orden: Orden,
+  setOrdenEstado: SetOrdenEstado,
+  message: string,
+  extra?: { bcNumber?: string; bcDeepLink?: string },
+): Promise<{ ok: false; message: string; tone: "error" }> {
+  // Si no se puede registrar, igual hay que devolverle el error al usuario.
+  try { await setOrdenEstado(orden.id, orden.estado, { ...extra, motivo: message, tipoMovimiento: MOV_FALLO }); }
+  catch (e) { console.warn("No se pudo registrar el fallo en el historial:", e); }
+  return { ok: false, tone: "error", message };
+}
 
 export async function aprobarYLanzar(
   orden: Orden,
@@ -67,7 +88,7 @@ export async function aprobarYLanzar(
   // Precio obligatorio: ninguna línea puede ir a BC en 0 (BC la deja sin costo).
   const sinPrecio = lineasBc.filter((l) => !(l.precio > 0));
   if (sinPrecio.length) {
-    return { ok: false, tone: "error", message: `La orden tiene ${sinPrecio.length} línea(s) sin precio; no se envía a BC. Poné el precio en proveeduría antes de lanzar.` };
+    return fallo(orden, setOrdenEstado, `La orden tiene ${sinPrecio.length} línea(s) sin precio; no se envía a BC. Poné el precio en proveeduría antes de lanzar.`);
   }
 
   // Si la orden YA se creó en BC en un intento previo (tiene bcNumber pero el
@@ -86,7 +107,7 @@ export async function aprobarYLanzar(
       });
       d = await res.json().catch(() => ({}));
     } catch (e: any) {
-      return { ok: false, tone: "error", message: `No se pudo contactar BC: ${String(e?.message ?? e)}. La orden queda pendiente.` };
+      return fallo(orden, setOrdenEstado, `No se pudo contactar BC: ${String(e?.message ?? e)}. La orden queda pendiente.`);
     }
     if (!(res.ok && d.ok)) {
       // El pedido ya no existe en BC (lo registraron, lo eliminaron o lo archivaron):
@@ -94,10 +115,10 @@ export async function aprobarYLanzar(
       // relanzar para siempre un pedido fantasma. Un pedido de compra archivado no se
       // puede restaurar en BC, así que crear de nuevo es la única salida.
       if (d.bcInexistente) {
-        await setOrdenEstado(orden.id, orden.estado, { bcNumber: "" });
-        return { ok: false, tone: "error", message: `${d.error} Ya desligamos ${orden.bcNumber} de esta orden: dale "Aprobar y lanzar" otra vez y se crea de nuevo en BC.` };
+        // Se desliga el bcNumber Y se deja el motivo, en una sola escritura.
+        return fallo(orden, setOrdenEstado, `${d.error} Ya desligamos ${orden.bcNumber} de esta orden: dale "Aprobar y lanzar" otra vez y se crea de nuevo en BC.`, { bcNumber: "" });
       }
-      return { ok: false, tone: "error", message: `No se lanzó ${orden.bcNumber} en BC: ${d.error || `HTTP ${res.status}`}. La orden queda pendiente.` };
+      return fallo(orden, setOrdenEstado, `No se lanzó ${orden.bcNumber} en BC: ${d.error || `HTTP ${res.status}`}. La orden queda pendiente.`);
     }
     await setOrdenEstado(orden.id, "lanzado", { bcNumber: orden.bcNumber });
     // Ya estaba lanzada en BC (la liberaron a mano): la app se pone al día en vez de
@@ -120,7 +141,7 @@ export async function aprobarYLanzar(
     });
     d = await res.json().catch(() => ({}));
   } catch (e: any) {
-    return { ok: false, tone: "error", message: `No se pudo contactar BC: ${String(e?.message ?? e)}. La orden queda pendiente.` };
+    return fallo(orden, setOrdenEstado, `No se pudo contactar BC: ${String(e?.message ?? e)}. La orden queda pendiente.`);
   }
 
   // Si el pedido se CREÓ en BC (aunque el release falle), guardamos su número:
@@ -137,12 +158,11 @@ export async function aprobarYLanzar(
       await setOrdenEstado(orden.id, "lanzado", { bcNumber: d.number, bcDeepLink: d.deepLink || undefined });
       return { ok: true, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${d.number} aprobada y lanzada en BC${avisoLineas}${avisoCargo}${avisoJob}` };
     }
-    // Creado pero no lanzado: persistimos el bcNumber sin cambiar el estado real.
-    await setOrdenEstado(orden.id, orden.estado, { bcNumber: d.number, bcDeepLink: d.deepLink || undefined });
-    return { ok: false, tone: "error", message: `${d.number} se creó en BC pero no se lanzó: ${d.releaseError || "sin detalle"}. Reintentá "Aprobar y lanzar" (no se creará otro).` };
+    // Creado pero no lanzado: se persiste el bcNumber y el motivo, sin cambiar el estado.
+    return fallo(orden, setOrdenEstado, `${d.number} se creó en BC pero no se lanzó: ${d.releaseError || "sin detalle"}. Reintentá "Aprobar y lanzar" (no se creará otro).`, { bcNumber: d.number, bcDeepLink: d.deepLink || undefined });
   }
 
   // Ni siquiera se creó el pedido en BC.
   const motivo = d.lineError || d.error || `HTTP ${res.status}`;
-  return { ok: false, tone: "error", message: `No se creó en BC: ${motivo}. La orden queda pendiente.` };
+  return fallo(orden, setOrdenEstado, `No se creó en BC: ${motivo}. La orden queda pendiente.`);
 }

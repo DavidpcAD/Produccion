@@ -33,6 +33,8 @@ const LABEL: Record<string, string> = {
   recepcion_parcial: "Recepción parcial",
   recepcion_total: "Recepción total",
   eliminado: "Eliminado",
+  // Intento de lanzar a BC que falló: el motivo va en `detalle`.
+  lanzamiento_fallido: "No se pudo lanzar a BC",
 };
 
 // Etiqueta contextual: el mismo tipo de movimiento se lee distinto según
@@ -62,6 +64,7 @@ function colorPunto(m: Movimiento): string {
       case "recepcion_total":
       case "completado": return "var(--ds-color-green-200)"; // recibido total / completado · verde fuerte
       case "rechazado": return "var(--ds-color-red-200)";    // rechazada · rojo
+      case "lanzamiento_fallido": return "var(--ds-color-red-100)"; // no se pudo lanzar · rojo
       case "eliminado": return "var(--ds-color-red-100)";
     }
   }

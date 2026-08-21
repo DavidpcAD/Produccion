@@ -421,7 +421,11 @@ export async function createOrden(input: NewOrdenDB): Promise<number> {
   }
 }
 
-export async function setOrdenEstado(id: number, estado: string, usuario: string, rol: Role, motivo?: string, bcNumber?: string) {
+// `tipoMovimiento` explícito: normalmente el tipo se DERIVA del estado, pero para
+// registrar un FALLO (ej. BC rechazó el lanzamiento) el estado no cambia y hace falta
+// decir qué pasó — si no, el historial mostraría "Enviado a aprobación" con el error
+// pegado, que se lee al revés.
+export async function setOrdenEstado(id: number, estado: string, usuario: string, rol: Role, motivo?: string, bcNumber?: string, tipoMovimiento?: string) {
   const pool = await getPool();
   const prev = await pool.request().input("id", sql.Int, id).query("SELECT idEstado, ordenNo FROM dbo.OrdenCompra WHERE idOrdenCompra=@id");
   const idEstado = await idDeEstado(estado);
@@ -435,7 +439,8 @@ export async function setOrdenEstado(id: number, estado: string, usuario: string
   // próximo "Aprobar y lanzar" cree uno nuevo en vez de relanzar un fantasma.
   else if (bcNumber === "") setBc = ", bcNo=NULL, syncedToBc=0";
   await req.query(`UPDATE dbo.OrdenCompra SET idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u${setBc} WHERE idOrdenCompra=@id`);
-  const tipo = estado === "pendiente_aprobacion" ? "enviado_aprobacion" : estado === "lanzado" ? "aprobado_lanzado" : estado === "abierto" ? "reabierto" : estado;
+  const tipo = tipoMovimiento
+    ?? (estado === "pendiente_aprobacion" ? "enviado_aprobacion" : estado === "lanzado" ? "aprobado_lanzado" : estado === "abierto" ? "reabierto" : estado);
   const tx = new sql.Transaction(pool); await tx.begin();
   await logMov(tx, { entidad: "orden", idEntidad: id, documentoNo: prev.recordset[0]?.ordenNo ?? "", tipoMovimiento: tipo, estadoAnterior: codigoDeId(prev.recordset[0]?.idEstado), estadoNuevo: estado, detalle: motivo ? `Motivo: ${motivo}` : undefined, usuario, rol });
   await tx.commit();

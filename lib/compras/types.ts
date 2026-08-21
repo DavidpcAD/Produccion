@@ -53,6 +53,9 @@ export interface Obra {
   id: string;
   codigo: string;      // OBRA-001
   nombre: string;
+  /** BC: Job.Blocked = "All". Una obra bloqueada NO admite material (BC rechaza la
+   *  línea), así que no se ofrece al crear el pedido. Ojo: es distinto de Job.Status. */
+  bloqueada?: boolean;
 }
 
 export interface Maquina {

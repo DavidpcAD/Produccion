@@ -75,7 +75,9 @@ interface StoreShape {
 
   createOrden: (input: NewOrdenInput) => Promise<Orden>;
   updateOrden: (id: string, input: NewOrdenInput) => Promise<void>;
-  setOrdenEstado: (id: string, estado: Orden["estado"], extra?: { bcNumber?: string; bcDeepLink?: string }) => Promise<void>;
+  // `motivo` + `tipoMovimiento`: para dejar en el HISTORIAL por qué falló algo (ej. BC
+  // rechazó el lanzamiento) sin cambiar el estado de la orden.
+  setOrdenEstado: (id: string, estado: Orden["estado"], extra?: { bcNumber?: string; bcDeepLink?: string; motivo?: string; tipoMovimiento?: string }) => Promise<void>;
 
   registrarRecepcion: (input: RegistrarRecepcionInput) => Promise<Recepcion>;
   // MODO 2: registrar la factura de una recepción que quedó EN REVISIÓN (Kattya).
@@ -416,14 +418,16 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
 
     const setOrdenEstado: StoreShape["setOrdenEstado"] = async (id, estado, extra) => {
       if (USE_API) {
-        await api.patchOrdenEstado(id, { estado, usuario: persona, rol: rolActual, bcNumber: extra?.bcNumber });
+        await api.patchOrdenEstado(id, { estado, usuario: persona, rol: rolActual, bcNumber: extra?.bcNumber, motivo: extra?.motivo, tipoMovimiento: extra?.tipoMovimiento });
         await refreshFromApi();
         return;
       }
       setData((d) => {
         const prevo = d.ordenes.find((o) => o.id === id);
-        const tipo = estado === "pendiente_aprobacion" ? "enviado_aprobacion" : estado === "lanzado" ? "aprobado_lanzado" : estado === "abierto" ? "reabierto" : estado === "completado" ? "completado" : estado;
-        const mov = mkMov({ entidad: "orden", idEntidad: id, documentoNo: prevo?.numero ?? "", tipoMovimiento: tipo, estadoAnterior: prevo?.estado, estadoNuevo: estado, detalle: extra?.bcNumber ? `BC ${extra.bcNumber}` : undefined });
+        const tipo = extra?.tipoMovimiento
+          ?? (estado === "pendiente_aprobacion" ? "enviado_aprobacion" : estado === "lanzado" ? "aprobado_lanzado" : estado === "abierto" ? "reabierto" : estado === "completado" ? "completado" : estado);
+        const detalle = extra?.motivo ? `Motivo: ${extra.motivo}` : extra?.bcNumber ? `BC ${extra.bcNumber}` : undefined;
+        const mov = mkMov({ entidad: "orden", idEntidad: id, documentoNo: prevo?.numero ?? "", tipoMovimiento: tipo, estadoAnterior: prevo?.estado, estadoNuevo: estado, detalle });
         return { ...d, ordenes: d.ordenes.map((o) => (o.id === id ? { ...o, estado, bcNumber: extra?.bcNumber ?? o.bcNumber, bcDeepLink: extra?.bcDeepLink ?? o.bcDeepLink } : o)), movimientos: [mov, ...d.movimientos] };
       });
     };

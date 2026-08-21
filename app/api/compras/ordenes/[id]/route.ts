@@ -16,8 +16,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { estado, usuario, rol, motivo, bcNumber } = await req.json();
-    await setOrdenEstado(Number((await params).id), estado, usuario, rol, motivo, bcNumber);
+    const { estado, usuario, rol, motivo, bcNumber, tipoMovimiento } = await req.json();
+    await setOrdenEstado(Number((await params).id), estado, usuario, rol, motivo, bcNumber, tipoMovimiento);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });

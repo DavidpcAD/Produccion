@@ -848,7 +848,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const sinObra = esRepuesto || esStock;
   // Consumo directo de material: se consume contra proyecto + tarea de la obra.
   const esConsumo = esMaterial && destinoMat === "consumo";
-  const obraItems: Item[] = useMemo(() => catObras.map((o) => ({ id: o.codigo, title: o.nombre, sub: o.codigo })), [catObras]);
+  // Las obras BLOQUEADAS en BC no se ofrecen: BC no les deja cargar material, así que
+  // el pedido nacería condenado a no poder lanzarse (caso VN-K.26 / CP-005132). Si la
+  // obra ya venía elegida (copiar/editar/Matriz) igual se muestra, marcada.
+  const obraItems: Item[] = useMemo(
+    () => catObras.filter((o) => !o.bloqueada).map((o) => ({ id: o.codigo, title: o.nombre, sub: o.codigo })),
+    [catObras],
+  );
+  const obrasBloqueadas = useMemo(() => new Set(catObras.filter((o) => o.bloqueada).map((o) => o.codigo)), [catObras]);
   const destinoItems: Item[] = useMemo(() => {
     if (esRepuesto) return maquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.no }));
     return obraItems;
@@ -907,7 +914,15 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // Consumo inmediato: sin tarea BC no puede consumir contra el proyecto, así que la
   // actividad es obligatoria en cada obra que tenga líneas.
   const tareasOk = !esConsumo || grupos.every((g) => !lineas.some((l) => l.grupoKey === g.key) || !!g.taskNo);
-  const canContinue = validLines.length > 0 && destinoOk && almacenOk && comentarioOk && tareasOk && validLines.every((l) => !necesitaVariante(l));
+  // Obra bloqueada en BC: puede llegar por copiar/editar un pedido viejo, por plantilla
+  // o desde la Matriz. No se puede pedir contra ella (BC rechaza la línea), así que se
+  // avisa y no se deja seguir — mejor acá que con el pedido ya creado en BC.
+  const obrasChocadas = useMemo(
+    () => [...new Set(grupos.map((g) => g.obraCodigo).filter((c): c is string => !!c && obrasBloqueadas.has(c)))],
+    [grupos, obrasBloqueadas],
+  );
+  const canContinue = validLines.length > 0 && destinoOk && almacenOk && comentarioOk && tareasOk
+    && obrasChocadas.length === 0 && validLines.every((l) => !necesitaVariante(l));
 
   function reset() {
     setTipo("material"); setDestinoMat("almacen"); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
@@ -1301,6 +1316,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                       <span className="ds-form-field__label">Obras y materiales</span>
                       <span className="ds-muted ds-label">{validLines.length} línea(s)</span>
                     </div>
+                    {obrasChocadas.length > 0 && (
+                      <div className="ds-body-sm" style={{ padding: "8px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-red-100) 12%, var(--ds-color-white))", color: "var(--ds-color-red-200)" }}>
+                        La obra {obrasChocadas.join(", ")} está bloqueada en Business Central: no se le puede cargar material.
+                        Cambiá la obra de esa tarjeta, o pedí que la desbloqueen en BC.
+                      </div>
+                    )}
                     <div className="col gap-3">
                       {grupos.map((g) => {
                         const filas = lineas.filter((l) => l.grupoKey === g.key);

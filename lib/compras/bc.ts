@@ -141,7 +141,12 @@ async function listAll(group: string, entity: string): Promise<any[]> {
 // y para no ponerle almacén a lo que en BC no lo lleva (ver bcCrearPedido).
 export type BcItemTipo = "inventario" | "servicio" | "no-inventario";
 export type BcItem = { id: string; code: string; descripcion: string; unidad: string; tipo: BcItemTipo; lastDirectCost?: number; categoria?: string; reorderPoint?: number; safetyStock?: number; reorderQty?: number };
-export type BcObra = { id: string; codigo: string; nombre: string };
+// bloqueada = la OBRA está bloqueada en BC (Job.Blocked = "All"). Ojo: NO es lo mismo
+// que Job.Status ("Open"): una obra puede estar Open y bloqueada a la vez, y es lo que
+// pasó con VN-K.26 (caso CP-005132, 21/08/2026) — BC rechaza poner ese proyecto en una
+// línea de compra con "Project VN-K.26 must not be blocked with type All", así que el
+// pedido se crea y nunca se puede lanzar. En producción hay 82 de 221 obras así.
+export type BcObra = { id: string; codigo: string; nombre: string; bloqueada?: boolean };
 export type BcAlmacen = { codigo: string; nombre: string };
 
 // BC manda el tipo como "Inventory" | "Service" | "Non_x002D_Inventory"
@@ -283,11 +288,44 @@ export async function bcItemUltimaCompra(itemNo: string): Promise<number | null>
 
 export async function bcObras(): Promise<BcObra[]> {
   const rows = await listAll("project", "jobs");
-  return rows.map((j) => ({
-    id: j.id ?? j.no ?? "",
-    codigo: j.no ?? j.No ?? "",
-    nombre: j.description ?? j.Description ?? j.no ?? "",
-  }));
+  // El API custom de obras NO expone el bloqueo, así que se lee de la página publicada
+  // FichaProyecto. Si no se puede leer, NADIE queda marcado como bloqueada (degradar
+  // así evita el peor caso: dejar al usuario sin obras para elegir).
+  const bloqueadas = await bcObrasBloqueadas();
+  return rows.map((j) => {
+    const codigo = j.no ?? j.No ?? "";
+    return {
+      id: j.id ?? j.no ?? "",
+      codigo,
+      nombre: j.description ?? j.Description ?? j.no ?? "",
+      bloqueada: bloqueadas?.has(codigo) || undefined,
+    };
+  });
+}
+
+/** Códigos de obra con Job.Blocked distinto de vacío. `null` = no se pudo leer. */
+let bloqueadasCache: { set: Set<string>; exp: number } | null = null;
+export async function bcObrasBloqueadas(): Promise<Set<string> | null> {
+  if (bloqueadasCache && bloqueadasCache.exp > Date.now()) return bloqueadasCache.set;
+  try {
+    const cid = await getStdCompanyId();
+    const out = new Set<string>();
+    let url: string | null = `${odataRoot()}/FichaProyecto?company=${encodeURIComponent(cid)}&$select=No,Blocked&$top=1000`;
+    let guard = 0;
+    while (url && guard++ < 10) {
+      const res = await bcFetch(url, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { value?: { No?: string; Blocked?: string }[]; "@odata.nextLink"?: string };
+      for (const j of (data.value ?? [])) {
+        const no = String(j.No ?? "").trim();
+        const b = String(j.Blocked ?? "").trim();
+        if (no && b && b !== "_x0020_") out.add(no);
+      }
+      url = data["@odata.nextLink"] ?? null;
+    }
+    bloqueadasCache = { set: out, exp: Date.now() + 5 * 60_000 }; // 5 min, como el catálogo
+    return out;
+  } catch { return null; }
 }
 
 // Lista paginada de una API custom con path+query ya armados (incluye $filter).
@@ -780,6 +818,18 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   const catalogoCargos = cargosEfectivos.some((c) => c.precio > 0) ? await bcItemCharges() : [];
   if (cargosEfectivos.some((c) => c.precio > 0 && !resolverItemChargeNo(c, catalogoCargos))) {
     throw new Error("El cargo no tiene tipo (Item Charge) y no se pudo deducir por la descripción. Elegí el tipo de cargo en Proveeduría y reintentá.");
+  }
+  // GUARD (antes de tocar BC): OBRA BLOQUEADA. Si el proyecto está bloqueado, BC no deja
+  // ponerlo en la línea ("Project X must not be blocked with type All") y el pedido queda
+  // creado y sin poder lanzarse nunca — es lo que pasó con CP-005132 (obra VN-K.26).
+  // Mejor no crear nada y decir el motivo.
+  const obrasPedido = [...new Set(lineas.map((l) => (l.jobNo ?? "").trim()).filter(Boolean))];
+  if (obrasPedido.length) {
+    const bloqueadas = await bcObrasBloqueadas();
+    const chocan = bloqueadas ? obrasPedido.filter((o) => bloqueadas.has(o)) : [];
+    if (chocan.length) {
+      throw new Error(`La obra ${chocan.join(", ")} está BLOQUEADA en Business Central, así que no se le puede cargar material. Desbloqueala en BC o pedí el material contra otra obra. (No se creó nada en BC.)`);
+    }
   }
   const cid = await getStdCompanyId(); // MISMA compañía que items/vendors (API estándar)
   const jsonHeaders = { "Content-Type": "application/json" };
