@@ -669,6 +669,103 @@ export async function bcSetLineJobs(orderNo: string, asignaciones: AsignacionLin
   return { updated: Number(inner?.updated ?? 0) || 0, errors: String(inner?.errors ?? "") };
 }
 
+// ─── Proyecto/tarea de la línea: verificar y, si hace falta, escribirlo directo ──
+// Caso real del 21/08/2026 (CP-005132 en producción): el codeunit
+// AdelantePO_SetLineJob contestó sin error, pero la línea quedó en BC con Job No. y
+// Job Task No. VACÍOS. Como la app no lanza un pedido de consumo directo sin su obra
+// (si no, el material entra a inventario en silencio — caso CP-003873), la orden se
+// quedó pendiente. El mismo llamado SÍ aplica en Sandbox: la extensión "AdelanteAPI"
+// está en 1.2.4.5 en Sandbox y en 1.2.4.4 en Production.
+// Conclusión: no se le puede creer al "ok" del codeunit. Se LEE la línea en BC y, si
+// el proyecto/tarea no quedó, se escribe por la página publicada
+// Purchase_Order_Line_Excel (OData V4), que existe en los dos entornos y no depende
+// de la extensión. Verificado contra Sandbox: borrar y poner Job No./Job Task No. por
+// PATCH funciona (200) y queda.
+type LineaJobBc = { lineNo: number; jobNo: string; jobTaskNo: string; locationCode: string };
+
+function paginaLineasUrl(cid: string, orderNo: string): string {
+  const filtro = encodeURIComponent(`Document_No eq '${odataStr(orderNo)}'`);
+  return `${odataRoot()}/Purchase_Order_Line_Excel?company=${encodeURIComponent(cid)}&$filter=${filtro}&$select=Document_No,Line_No,Job_No,Job_Task_No,Location_Code`;
+}
+
+/** Proyecto/tarea/almacén REALES de las líneas del pedido en BC. `null` = no se pudo leer. */
+async function bcLineasJob(orderNo: string): Promise<LineaJobBc[] | null> {
+  try {
+    const cid = await getStdCompanyId();
+    const res = await bcFetch(paginaLineasUrl(cid, orderNo), { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { value?: { Line_No?: number; Job_No?: string; Job_Task_No?: string; Location_Code?: string }[] };
+    return (data.value ?? []).map((l) => ({
+      lineNo: Number(l.Line_No ?? 0),
+      jobNo: String(l.Job_No ?? "").trim(),
+      jobTaskNo: String(l.Job_Task_No ?? "").trim(),
+      locationCode: String(l.Location_Code ?? "").trim(),
+    }));
+  } catch { return null; }
+}
+
+/** Asignaciones que BC NO tiene puestas. `null` = no se pudo verificar (no concluir). */
+async function bcAsignacionesFaltantes(orderNo: string, asignaciones: AsignacionLineaBc[]): Promise<AsignacionLineaBc[] | null> {
+  const enBc = await bcLineasJob(orderNo);
+  if (!enBc) return null;
+  return asignaciones.filter((a) => {
+    const l = enBc.find((x) => x.lineNo === a.lineNo);
+    if (!l) return true;
+    if (a.jobNo && (l.jobNo !== a.jobNo || l.jobTaskNo !== (a.jobTaskNo ?? ""))) return true;
+    if (a.locationCode && l.locationCode !== a.locationCode) return true;
+    return false;
+  });
+}
+
+/** Escribe proyecto+tarea (y almacén) línea por línea con la página publicada. */
+async function bcSetLineJobPagina(orderNo: string, asignaciones: AsignacionLineaBc[]): Promise<{ updated: number; errors: string }> {
+  let updated = 0; let errors = "";
+  const cid = await getStdCompanyId();
+  for (const a of asignaciones) {
+    const key = `Purchase_Order_Line_Excel(Document_Type='Order',Document_No='${odataStr(orderNo)}',Line_No=${a.lineNo})`;
+    const body: Record<string, unknown> = {};
+    if (a.jobNo) { body.Job_No = a.jobNo; body.Job_Task_No = a.jobTaskNo ?? ""; }
+    if (a.locationCode) body.Location_Code = a.locationCode;
+    if (!Object.keys(body).length) continue;
+    try {
+      const res = await bcFetch(`${odataRoot()}/${key}?company=${encodeURIComponent(cid)}`, {
+        method: "PATCH", cache: "no-store",
+        headers: { "Content-Type": "application/json", "If-Match": "*" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) updated++;
+      else if (!errors) errors = `línea ${a.lineNo}: BC ${res.status} ${mensajeBcLegible((await res.text()).slice(0, 400))}`;
+    } catch (e: any) { if (!errors) errors = `línea ${a.lineNo}: ${String(e?.message ?? e)}`; }
+  }
+  return { updated, errors };
+}
+
+/** Aplica proyecto/tarea/almacén y CONFIRMA contra BC. Devuelve el motivo si al final
+ *  no quedó (quien llama NO debe lanzar el pedido), o undefined si quedó bien. */
+async function bcAplicarAsignaciones(orderNo: string, asignaciones: AsignacionLineaBc[]): Promise<string | undefined> {
+  if (!asignaciones.length) return undefined;
+  // 1) El codeunit sigue siendo el camino principal (es el que el dev de BC mantiene).
+  let quejaCodeunit = "";
+  try {
+    const r = await bcSetLineJobs(orderNo, asignaciones);
+    if (r.errors) quejaCodeunit = r.errors;
+  } catch (e: any) { quejaCodeunit = String(e?.message ?? e); }
+  // 2) Verificar en BC. Si no se puede leer, se respeta la respuesta del codeunit.
+  const faltan = await bcAsignacionesFaltantes(orderNo, asignaciones);
+  if (faltan === null) return quejaCodeunit || undefined;
+  if (!faltan.length) return undefined; // quedó puesto (aunque el codeunit se haya quejado)
+  // 3) Plan B: escribirlo directo en la línea y volver a verificar.
+  const plan = await bcSetLineJobPagina(orderNo, faltan);
+  const siguenFaltando = await bcAsignacionesFaltantes(orderNo, asignaciones);
+  if (siguenFaltando && !siguenFaltando.length) {
+    console.warn(`BC ${orderNo}: el codeunit no aplicó proyecto/tarea (${quejaCodeunit || "sin error, pero la línea quedó vacía"}); se completó escribiendo la línea directo (${plan.updated} línea(s)). Revisar la versión de la extensión AdelanteAPI en este entorno.`);
+    return undefined;
+  }
+  const detalle = [quejaCodeunit || "el codeunit no aplicó nada", plan.errors].filter(Boolean).join(" · ");
+  const lineas = (siguenFaltando ?? faltan).map((a) => a.lineNo).join(", ");
+  return `${detalle} (líneas sin proyecto/tarea: ${lineas})`;
+}
+
 export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: string; locationCode?: string; lineas: NuevaLineaBc[]; cargos?: CargoBc[]; flete?: { monto: number; descripcion?: string } }): Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados: number; jobError?: string }> {
   if (!input?.vendorNo) throw new Error("Falta el proveedor (vendorNo).");
   const lineas = (input.lineas ?? []).filter((l) => l.itemNo && l.cantidad > 0);
@@ -807,15 +904,9 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   // el material termina sumado a inventario en silencio — que es justo lo que pasó con
   // CP-003873. Por eso se exige que BC confirme TODAS las asignaciones; si no, quien
   // llama NO debe lanzar el pedido (queda Abierto en BC con el motivo real).
-  let jobError: string | undefined;
-  if (asignaciones.length) {
-    try {
-      const r = await bcSetLineJobs(po.number, asignaciones);
-      if (r.errors) jobError = r.errors;
-      else if (r.updated < asignaciones.length) jobError = `BC aplicó ${r.updated} de ${asignaciones.length} asignaciones de proyecto/almacén.`;
-    }
-    catch (e: any) { jobError = String(e?.message ?? e); }
-  }
+  // No basta con que el codeunit diga que sí: se confirma leyendo la línea en BC y,
+  // si falta, se escribe directo (ver bcAplicarAsignaciones).
+  const jobError = await bcAplicarAsignaciones(po.number, asignaciones);
   return { number: po.number ?? "", id: po.id ?? "", omitidas, creadas, lineError, cargoError, cargosCreados, jobError };
 }
 
@@ -966,15 +1057,8 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
   }
   // Consumo inmediato / Stock: aplicar proyecto+tarea / almacén por línea (idempotente).
   // Si NO se aplicaron todas, es un error DURO (ver nota en bcCrearPedido).
-  let jobError: string | undefined;
-  if (asignaciones.length) {
-    try {
-      const r = await bcSetLineJobs(orderNo, asignaciones);
-      if (r.errors) jobError = r.errors;
-      else if (r.updated < asignaciones.length) jobError = `BC aplicó ${r.updated} de ${asignaciones.length} asignaciones de proyecto/almacén.`;
-    }
-    catch (e: any) { jobError = String(e?.message ?? e); }
-  }
+  // Mismo criterio que en el alta: confirmar contra BC, no creerle al codeunit.
+  const jobError = await bcAplicarAsignaciones(orderNo, asignaciones);
   return { patched, sinMatch, jobError };
 }
 
