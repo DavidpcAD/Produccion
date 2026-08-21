@@ -325,12 +325,34 @@ function VarianteBtn({ variantes, value, onPick }: {
   );
 }
 
-// ─── Cantidad (input simple; al enfocar selecciona todo para reemplazar) ─────────
+// ─── Cantidad: entera o con DECIMALES (2, 1.5, 0,25) ────────────────────────────
+// Antes el campo borraba todo lo que no fuera dígito, así que no se podía ni teclear
+// el separador: media unidad era imposible. La base ya guarda decimal(18,4), el que
+// no dejaba era el input.
+// Se maneja como TEXTO mientras se escribe (si fuera número, al teclear "1." el punto
+// desaparece y no se puede seguir) y sale como número. Coma o punto valen igual —acá
+// se escribe con coma— y se aceptan hasta 4 decimales, lo que guarda la base.
+const MAX_DEC = 4;
+function limpiarCantidad(s: string): string {
+  let t = s.replace(/[^\d.,]/g, "").replace(/,/g, ".");
+  const i = t.indexOf(".");
+  if (i >= 0) t = t.slice(0, i + 1) + t.slice(i + 1).replace(/\./g, ""); // un solo separador
+  const [ent, dec] = t.split(".");
+  return dec === undefined ? ent : `${ent}.${dec.slice(0, MAX_DEC)}`;
+}
+const textoDeCantidad = (n: number) =>
+  Number.isFinite(n) ? String(Math.round(n * 10 ** MAX_DEC) / 10 ** MAX_DEC) : "";
+
 function Cantidad({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  // `null` = mostrar el valor de afuera (plantilla, o "pedir = plantilla − stock").
+  // En cuanto se teclea, manda el texto tecleado; al salir del campo vuelve a mandar
+  // el valor real, ya normalizado. Así no hace falta sincronizar con un efecto.
+  const [txt, setTxt] = useState<string | null>(null);
   return (
-    <input inputMode="numeric" value={value} aria-label="Cantidad" onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) => onChange(Math.max(0, Number(e.target.value.replace(/\D/g, "")) || 0))}
-      style={{ width: 72, textAlign: "center", height: 40, borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", color: "var(--ds-color-yellow)", fontVariantNumeric: "tabular-nums", fontWeight: 700 }} />
+    <input inputMode="decimal" value={txt ?? textoDeCantidad(value)} aria-label="Cantidad" onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => { const t = limpiarCantidad(e.target.value); setTxt(t); onChange(Math.max(0, Number(t) || 0)); }}
+      onBlur={() => setTxt(null)}
+      style={{ width: 86, textAlign: "center", height: 40, borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", color: "var(--ds-color-yellow)", fontVariantNumeric: "tabular-nums", fontWeight: 700 }} />
   );
 }
 
