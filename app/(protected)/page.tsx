@@ -169,7 +169,7 @@ const SUBTITULO: Record<Modulo, string> = {
   presupuesto: 'Resumen de presupuesto: partidas, obras y proyectos.',
   concreto: 'Resumen de concreto: coladas, batches y laboratorio.',
   desembolsos: 'Resumen de desembolsos: casas y montos pendientes.',
-  bodega: 'Resumen de bodega: pedidos al stock.',
+  bodega: 'Resumen de pedidos: material que pedís al stock.',
   recepcion: 'Resumen de bodega: material por recibir.',
   dashboard: 'Resumen de producción.',
 };
@@ -228,7 +228,7 @@ export default async function DashboardPage() {
     // Bodega: no tiene tablero propio, solo la puerta a sus pedidos.
     if (has('bodega') && !has('ingenieria')) {
       quickActions.push(
-        { href: '/compras/ingenieria', label: 'Hacer un pedido a bodega', icon: 'entrega' },
+        { href: '/compras/ingenieria', label: 'Hacer un pedido de material', icon: 'entrega' },
       );
     }
     // Recepción (Fábrica de Maderas): la puerta a lo que está por recibir.

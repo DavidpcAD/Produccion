@@ -167,8 +167,15 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   if (n === 'administracion' || n === 'administración') {
     if (t === 'digitacion' || t === 'digitación') return ['concreto'];
     if (t === 'contabilidad' || t === 'contabilidad general') return ['desembolsos'];
+    // Administración de LOCALES (ej. milenav): pide material igual que un ingeniero,
+    // así que lleva el mismo módulo que Bodega (solo "Mis solicitudes", ver
+    // modulosDeRuta). No recibe material ni entra a proveeduría/aprobación.
+    if (t.startsWith('local')) return ['bodega'];
     return undefined; // "Administracion" sin tipo reconocido → no scopea (fallback)
   }
+  // El mismo rol si en RH quedó con todo en el NOMBRE ("Administracion Locales")
+  // en vez de nombre + tipo.
+  if (n.startsWith('administracion') && n.includes('local')) return ['bodega'];
   // Bodega (ej. jersonm): hace lo mismo que un ingeniero —pedir material—, pero solo
   // en esa parte de Órdenes de Compra (ver modulosDeRuta). NO recibe: la recepción
   // del material vive del lado de proveeduría.
