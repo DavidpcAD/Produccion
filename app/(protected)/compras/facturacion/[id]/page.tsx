@@ -7,7 +7,8 @@ import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/co
 import { IconWarning } from "@/components/compras/icons";
 import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
-import { money, distribuirCargo, num, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, todayISO } from "@/lib/compras/helpers";
+import { useSession } from "@/hooks/useSession";
+import { money, distribuirCargo, num, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo, todayISO } from "@/lib/compras/helpers";
 import type { MotivoNC } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
@@ -29,7 +30,15 @@ export default function RegistrarFacturaPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes, proveedores, registrarRecepcion, marcarNotasCredito } = useStore();
+  const { ordenes: ordenesAll, pedidos, proveedores, registrarRecepcion, marcarNotasCredito } = useStore();
+  const me = useSession();
+  // Fábrica de Maderas recibe SOLO su material: una orden que no salió de una de sus
+  // solicitudes no existe para ella, tampoco escribiendo la URL a mano.
+  const soloMias = soloRecibeLoSuyo(me);
+  const ordenes = useMemo(
+    () => (soloMias ? ordenesDeMisPedidos(ordenesAll, pedidos, me) : ordenesAll),
+    [soloMias, ordenesAll, pedidos, me],
+  );
 
   const orden = ordenes.find((o) => o.id === id);
 

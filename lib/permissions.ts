@@ -155,6 +155,19 @@ const norm = (s?: string) => (s ?? '').trim().toLowerCase();
  * Ingenieria ×3) y se distinguen por el tipo — igual que en la pantalla de roles.
  * '*' = todo · undefined = no es rol de Producción (no cuenta).
  */
+/** Roles "satélite" que piden su material y reciben SOLO lo suyo (hoy: Fábrica de
+ *  Maderas). La bodega central, en cambio, recibe todo lo que llega. */
+function esFabricaMaderas(n: string): boolean {
+  return n.startsWith('fabrica') && n.includes('madera');
+}
+
+/** ¿Este usuario, en la recepción, ve solo el material de sus propias solicitudes?
+ *  Se decide por el NOMBRE del rol y no por el módulo, porque Bodega y Fábrica de
+ *  Maderas llevan los mismos módulos y se diferencian justo en esto. */
+export function recibeSoloLoSuyo(roleNames?: string[]): boolean {
+  return (roleNames ?? []).some((r) => esFabricaMaderas(norm(r)));
+}
+
 function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefined {
   const n = norm(nombre), t = norm(tipo);
   // Super Admin (por nombre o por tipo de "Administracion")
@@ -165,7 +178,10 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   // ('avance'). Si Avance está apagado, computeAllowedModules lo saca.
   if (n === 'ingenieria' || n === 'ingeniería' || n === 'ingeniero' || n.startsWith('ingeniero ')) return ['ingenieria', 'avance'];
   if (n === 'administracion' || n === 'administración') {
-    if (t === 'digitacion' || t === 'digitación') return ['concreto'];
+    // Digitación (jessieCor): decisión de David 21/08/2026 — este rol pasa a ser SOLO
+    // de Órdenes de Compra (pedir material, igual que Bodega/Locales) y deja de abrir
+    // Concreto. Ojo: con esto el módulo de Concreto queda solo para Super Admin.
+    if (t === 'digitacion' || t === 'digitación') return ['bodega'];
     if (t === 'contabilidad' || t === 'contabilidad general') return ['desembolsos'];
     // Administración de LOCALES (ej. milenav): pide material igual que un ingeniero,
     // así que lleva el mismo módulo que Bodega (solo "Mis solicitudes", ver
@@ -176,13 +192,12 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   // El mismo rol si en RH quedó con todo en el NOMBRE ("Administracion Locales")
   // en vez de nombre + tipo.
   if (n.startsWith('administracion') && n.includes('local')) return ['bodega'];
-  // Bodega (ej. jersonm): hace lo mismo que un ingeniero —pedir material—, pero solo
-  // en esa parte de Órdenes de Compra (ver modulosDeRuta). NO recibe: la recepción
-  // del material vive del lado de proveeduría.
-  if (n === 'bodega') return ['bodega'];
-  // Fábrica de Maderas: caso especial —ellos mismos piden el material Y lo reciben—,
-  // así que llevan los dos módulos.
-  if (n.startsWith('fabrica') && n.includes('madera')) return ['bodega', 'recepcion'];
+  // Bodega (hoy solo jerson): pide material como un ingeniero Y recibe el material.
+  // Nada más: no entra a proveeduría, aprobación ni a las herramientas del ingeniero.
+  if (n === 'bodega') return ['bodega', 'recepcion'];
+  // Fábrica de Maderas: igual que Bodega —pide y recibe—, pero es un satélite: solo
+  // ve el material de SUS propias solicitudes (ver recibeSoloLoSuyo).
+  if (esFabricaMaderas(n)) return ['bodega', 'recepcion'];
   // Legacy / nombres explícitos
   if (n.startsWith('digitacion') || n.startsWith('digitación') || n === 'digitador') return ['concreto'];
   if (n === 'contabilidad') return ['desembolsos'];

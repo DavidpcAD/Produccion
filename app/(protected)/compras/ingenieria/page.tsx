@@ -12,7 +12,7 @@ import { HoverCard } from "@/components/compras/hover-card";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { devolucionInfo, esConsumoInmediato, formatDate, formatDiaMes, pedidoBadge, pedidoNumeroCorto, pedidoProgreso, tipoSolicitudBadge, type DevolucionInfo } from "@/lib/compras/helpers";
+import { devolucionInfo, esConsumoInmediato, formatDate, formatDiaMes, pedidoBadge, pedidoNumeroCorto, pedidoProgreso, tipoSolicitudBadge, type DevolucionInfo, pedidoEsDelUsuario, veTodoEnCompras } from "@/lib/compras/helpers";
 import type { Pedido } from "@/lib/compras/types";
 
 type Filtro = "todas" | "material" | "repuesto" | "completado";
@@ -26,12 +26,14 @@ export default function IngenieriaPage() {
 
   // Cada usuario ve SOLO sus solicitudes (id estable = username; calza por nombre
   // para históricos). Mientras la sesión carga (me === null) no muestra nada.
+  // EXCEPCIÓN: el Super Admin ve las de TODOS (pedido de David, 21/08/2026) — antes
+  // también quedaba encerrado en las suyas y no podía revisar el trabajo de nadie.
+  const veTodo = veTodoEnCompras(me);
   const pedidos = useMemo(() => {
     if (!me) return [];
-    return pedidosAll.filter((p) =>
-      (!!me.username && p.creadoPorId === me.username) || (!!me.nombre && p.solicitante === me.nombre),
-    );
-  }, [pedidosAll, me]);
+    if (veTodo) return pedidosAll;
+    return pedidosAll.filter((p) => pedidoEsDelUsuario(p, me));
+  }, [pedidosAll, me, veTodo]);
   const listaRef = useRef<HTMLDivElement>(null);
 
   function seleccionar(f: Filtro) { setFiltro(f); setTimeout(() => listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); }
@@ -80,8 +82,10 @@ export default function IngenieriaPage() {
       <main className="page page--wide">
         <div className="page__head" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div className="page__title" style={{ flex: 1, minWidth: 0 }}>
-            <h1 className="ds-heading">Mis solicitudes de material</h1>
-            <p className="ds-muted">Pedí material para una obra o repuestos para una máquina. Proveeduría se encarga del proveedor.</p>
+            <h1 className="ds-heading">{veTodo ? "Solicitudes de material" : "Mis solicitudes de material"}</h1>
+            <p className="ds-muted">{veTodo
+              ? "Todas las solicitudes de todos los usuarios. Pedí material para una obra o repuestos para una máquina."
+              : "Pedí material para una obra o repuestos para una máquina. Proveeduría se encarga del proveedor."}</p>
           </div>
           <div style={{ flexShrink: 0 }}><Button onClick={() => setNuevoOpen(true)}>+ Nueva solicitud</Button></div>
         </div>

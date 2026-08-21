@@ -1,15 +1,26 @@
 "use client";
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, QtyRing, Tile } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
-import { money, formatDate, ordenEsParcial, ordenRecibidoPct } from "@/lib/compras/helpers";
+import { useSession } from "@/hooks/useSession";
+import { money, formatDate, ordenEsParcial, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo } from "@/lib/compras/helpers";
 
 export default function FacturacionPage() {
-  const { ordenes, proveedores } = useStore();
+  const { ordenes: ordenesAll, pedidos, proveedores } = useStore();
+  const me = useSession();
   const router = useRouter();
   const prov = (id: string) => proveedores.find((p) => p.id === id);
+
+  // Fábrica de Maderas recibe SOLO su material: se ven únicamente las órdenes que
+  // salieron de sus propias solicitudes. Ingeniería y Super Admin ven todas.
+  const soloMias = soloRecibeLoSuyo(me);
+  const ordenes = useMemo(
+    () => (soloMias ? ordenesDeMisPedidos(ordenesAll, pedidos, me) : ordenesAll),
+    [soloMias, ordenesAll, pedidos, me],
+  );
 
   // órdenes lanzadas pendientes de recibir (total o parcial)
   const porRecibir = ordenes.filter((o) => o.estado === "lanzado");
@@ -21,7 +32,7 @@ export default function FacturacionPage() {
         <div className="page__head">
           <div className="page__title">
             <h1 className="ds-heading">Órdenes por recibir</h1>
-            <p className="ds-muted">Registrá la factura cuando el material llega a bodega. Soporta entregas parciales.</p>
+            <p className="ds-muted">Registrá la factura cuando el material llega a bodega. Soporta entregas parciales.{soloMias ? " Acá salen solo las órdenes de tus solicitudes." : ""}</p>
           </div>
         </div>
 
@@ -33,7 +44,11 @@ export default function FacturacionPage() {
         </div>
 
         <div className="col gap-4 mt-6">
-          {porRecibir.length === 0 && <Card><div className="empty" style={{ lineHeight: 1.6 }}>No hay órdenes pendientes de recibir.<br /><span className="ds-muted ds-body-sm">Para ver todas las órdenes y sus facturas, abrí la pestaña <strong>“Todas las órdenes”</strong> arriba.</span></div></Card>}
+          {/* Sin órdenes: el pie que manda a "Todas las órdenes" NO se muestra a quien solo
+              ve lo suyo — esa pestaña es de contabilidad y no la tiene habilitada. */}
+          {porRecibir.length === 0 && <Card><div className="empty" style={{ lineHeight: 1.6 }}>No hay órdenes pendientes de recibir.<br />{soloMias
+            ? <span className="ds-muted ds-body-sm">Acá aparecen las órdenes que proveeduría arma con <strong>tus solicitudes</strong>, cuando quedan lanzadas.</span>
+            : <span className="ds-muted ds-body-sm">Para ver todas las órdenes y sus facturas, abrí la pestaña <strong>“Todas las órdenes”</strong> arriba.</span>}</div></Card>}
           {porRecibir.map((o) => {
             const total = o.lineas.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
             return (

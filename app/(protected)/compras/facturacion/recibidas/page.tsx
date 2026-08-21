@@ -4,12 +4,26 @@ import { useMemo } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Card, Tile } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
-import { formatDate } from "@/lib/compras/helpers";
+import { useSession } from "@/hooks/useSession";
+import { formatDate, ordenesDeMisPedidos, soloRecibeLoSuyo } from "@/lib/compras/helpers";
 
 // Bodega (recibe): historial de lo que se recibió, con quién lo recibió.
 // Pensada para celular/tablet: tarjetas grandes, sin tablas anchas.
 export default function RecibidasPage() {
-  const { recepciones, ordenes, proveedores } = useStore();
+  const { recepciones: recepcionesAll, ordenes: ordenesAll, pedidos, proveedores } = useStore();
+  const me = useSession();
+  // Mismo criterio que "Órdenes por recibir": Fábrica de Maderas solo ve el material
+  // de las órdenes que salieron de sus propias solicitudes.
+  const soloMias = soloRecibeLoSuyo(me);
+  const ordenes = useMemo(
+    () => (soloMias ? ordenesDeMisPedidos(ordenesAll, pedidos, me) : ordenesAll),
+    [soloMias, ordenesAll, pedidos, me],
+  );
+  const recepciones = useMemo(() => {
+    if (!soloMias) return recepcionesAll;
+    const ids = new Set(ordenes.map((o) => o.id));
+    return recepcionesAll.filter((r) => ids.has(r.ordenId));
+  }, [soloMias, recepcionesAll, ordenes]);
   const ordenDe = (ordenId: string) => ordenes.find((o) => o.id === ordenId);
   const provNombre = (ordenId: string) => {
     const o = ordenDe(ordenId);

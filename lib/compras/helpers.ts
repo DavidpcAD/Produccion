@@ -1,4 +1,5 @@
 import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
+import { recibeSoloLoSuyo } from "../permissions";
 
 // Almacén de inventario por defecto (el General). El pedido puede elegir OTRO
 // almacén real (Agregados, Herramienta, Maquinaria…): eso viaja en `almacen` de la
@@ -53,6 +54,54 @@ export function etiquetaTipoArticulo(tipo?: Articulo["tipo"]): string {
 export function etiquetaArticulo(a: { code: string; descripcion: string; tipo?: Articulo["tipo"] }): string {
   const t = etiquetaTipoArticulo(a.tipo);
   return `${a.code} — ${a.descripcion}${t ? ` · ${t}` : ""}`;
+}
+
+// ─── Quién ve QUÉ dentro de Órdenes de Compra ────────────────────────────────
+// El scope de las listas es por USUARIO, no por rol: cada uno ve sus solicitudes y
+// —si solo recibe lo suyo— las órdenes que salieron de ellas. Ojo: esto es cosmética
+// de cliente; el bootstrap sigue trayendo todo (el blindaje por API está pendiente).
+type Sesion = { username?: string; nombre?: string; modules?: string[]; roleNames?: string[]; nivelAdmin?: number } | null;
+
+/** Super Admin ve TODO, no solo lo suyo. Se decide por el módulo 'admin' (que solo
+ *  sale del rol comodín); quien no tiene rol de Producción conserva el criterio
+ *  viejo por nivel, para no quitarle de golpe lo que ya veía. */
+export function veTodoEnCompras(me: Sesion): boolean {
+  if (!me) return false;
+  return me.modules?.length ? me.modules.includes('admin') : (me.nivelAdmin ?? 0) >= 4;
+}
+
+/** ¿Ve SOLO su material en la recepción? Fábrica de Maderas es un satélite: pide su
+ *  material y recibe únicamente las órdenes que salieron de sus propias solicitudes.
+ *  Bodega (la bodega central), Ingeniería y Super Admin reciben TODO — si no, el
+ *  material de los ingenieros no lo podría recibir nadie. */
+export function soloRecibeLoSuyo(me: Sesion): boolean {
+  const m = me?.modules ?? [];
+  if (m.includes('ingenieria') || m.includes('admin')) return false;
+  return recibeSoloLoSuyo(me?.roleNames);
+}
+
+/** ¿Este pedido lo creó el usuario de la sesión? `creadoPorId` es el id estable
+ *  (username); `solicitante` calza por nombre para los pedidos históricos. */
+export function pedidoEsDelUsuario(p: Pick<Pedido, "creadoPorId" | "solicitante">, me: Sesion): boolean {
+  if (!me) return false;
+  return (!!me.username && p.creadoPorId === me.username) || (!!me.nombre && p.solicitante === me.nombre);
+}
+
+/** Órdenes que salieron de los pedidos de este usuario. El enlace pedido↔orden vive
+ *  a nivel de LÍNEA (`pedidoLineaId`): `pedidoNumero` solo existe en el catálogo de
+ *  prueba — en SQL viene vacío (ver repo.ts), así que no se puede depender de él. */
+export function ordenesDeMisPedidos(ordenes: Orden[], pedidos: Pedido[], me: Sesion): Orden[] {
+  const lineasMias = new Set<string>();
+  const numerosMios = new Set<string>();
+  for (const p of pedidos) {
+    if (!pedidoEsDelUsuario(p, me)) continue;
+    numerosMios.add(p.numero);
+    for (const l of p.lineas) lineasMias.add(l.id);
+  }
+  if (!lineasMias.size && !numerosMios.size) return [];
+  return ordenes.filter((o) => o.lineas.some((l) =>
+    (l.pedidoLineaId && lineasMias.has(l.pedidoLineaId)) || (l.pedidoNumero && numerosMios.has(l.pedidoNumero)),
+  ));
 }
 
 export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: string } {
