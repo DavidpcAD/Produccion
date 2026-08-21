@@ -94,6 +94,11 @@ const navItems: NavItemDef[] = [
     ],
   },
   { href: '/compras/aprobacion', label: 'Aprobación OC', icon: 'rol',    minLevel: 4 },
+  // Recepción del material de las órdenes ya creadas ("Órdenes por recibir" /
+  // "Recibidas"). Lo usa Fábrica de Maderas, que pide su material y lo recibe; el
+  // resto de las pestañas de esa pantalla (notas de crédito, cargos, archivo) son
+  // de contabilidad y siguen siendo solo de ingeniería. Ver modulosDeRuta.
+  { href: '/compras/facturacion', label: 'Recibir material', icon: 'traslado', minLevel: 4 },
   {
     href: '/desembolsos/dashboard', label: 'Desembolsos', icon: 'boleta', minLevel: 2,
     section: '/desembolsos',

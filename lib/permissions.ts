@@ -49,6 +49,8 @@ const MODULE_LEVEL: Record<string, number> = {
   // Bodega solo crea y ve SUS pedidos: no aprueba ni registra en BC, así que su
   // rol no debe elevar el nivel del usuario (con 4 entraría a todo lo demás).
   bodega: 1,
+  // Recepción de material y facturas. Mismo criterio que bodega: no eleva el nivel.
+  recepcion: 1,
   admin: 4,
 };
 
@@ -118,7 +120,12 @@ export function getRouteLevel(pathname: string): number {
 // ─────────────────────────────────────────────────────────────────────────
 export type Modulo =
   | 'dashboard' | 'presupuesto' | 'ingenieria' | 'avance' | 'concreto' | 'desembolsos'
-  | 'bodega' | 'admin';
+  // Dos cosas distintas dentro de Órdenes de Compra:
+  //   · 'bodega'    (rol "Bodega", ej. jersonm) PIDE material para el stock de bodega:
+  //     lo mismo que un ingeniero, solo en "Mis solicitudes".
+  //   · 'recepcion' RECIBE el material y sus facturas ("Órdenes por recibir" /
+  //     "Recibidas"). Lo lleva Fábrica de Maderas, que pide Y recibe lo suyo.
+  | 'bodega' | 'recepcion' | 'admin';
 
 /** ── Interruptor de "Avance de obra" ──────────────────────────────────────
  *  El módulo está incompleto, así que NO sale a producción todavía: en `false`
@@ -129,7 +136,7 @@ export type Modulo =
 export const AVANCE_OBRA_ACTIVO = false;
 
 const MODULOS_BASE: Modulo[] =
-  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'admin'];
+  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin'];
 
 /** Módulos publicados (los apagados no salen para nadie). */
 export const MODULOS_TODOS: Modulo[] =
@@ -162,9 +169,13 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
     if (t === 'contabilidad' || t === 'contabilidad general') return ['desembolsos'];
     return undefined; // "Administracion" sin tipo reconocido → no scopea (fallback)
   }
-  // Bodega: crea pedidos al stock de bodega. Entra SOLO a esa parte de Órdenes
-  // de Compra (ver modulosDeRuta), no a proveeduría, facturación ni aprobación.
-  if (n === 'bodega' || n === 'bodeguero') return ['bodega'];
+  // Bodega (ej. jersonm): hace lo mismo que un ingeniero —pedir material—, pero solo
+  // en esa parte de Órdenes de Compra (ver modulosDeRuta). NO recibe: la recepción
+  // del material vive del lado de proveeduría.
+  if (n === 'bodega') return ['bodega'];
+  // Fábrica de Maderas: caso especial —ellos mismos piden el material Y lo reciben—,
+  // así que llevan los dos módulos.
+  if (n.startsWith('fabrica') && n.includes('madera')) return ['bodega', 'recepcion'];
   // Legacy / nombres explícitos
   if (n.startsWith('digitacion') || n.startsWith('digitación') || n === 'digitador') return ['concreto'];
   if (n === 'contabilidad') return ['desembolsos'];
@@ -240,9 +251,15 @@ export function getRouteModule(pathname: string): Modulo {
 // Subsecciones de Órdenes de Compra que son SOLO de Ingeniería (Bodega no entra):
 // las otras etapas del flujo y las herramientas del ingeniero.
 const COMPRAS_SOLO_INGENIERIA =
-  /^\/(?:api\/)?compras\/(?:proveeduria|facturacion)/;
+  /^\/(?:api\/)?compras\/proveeduria/;
 const COMPRAS_INGENIERIA_INTERNO =
   /^\/compras\/ingenieria\/(?:matriz|clasificaciones|plantillas|inventarios|seguimiento|devoluciones)/;
+// Dentro de /compras/facturacion conviven DOS oficios: la RECEPCIÓN del material
+// (bodeguero: por recibir, recibidas, el detalle y el registro de la recepción) y
+// lo de CONTABILIDAD (Kattya: notas de crédito, cargos sobre factura, todas,
+// archivo). El bodeguero entra solo a lo primero.
+const COMPRAS_SOLO_CONTABILIDAD =
+  /^\/compras\/facturacion\/(?:notas-credito|cargo|todas|archivo)/;
 
 /**
  * Módulos que ABREN una ruta. Casi todas tienen uno solo (`getRouteModule`); las
@@ -256,6 +273,16 @@ const COMPRAS_INGENIERIA_INTERNO =
 export function modulosDeRuta(pathname: string): Modulo[] {
   if (pathname.startsWith('/compras') || pathname.startsWith('/api/compras')) {
     if (pathname.startsWith('/compras/aprobacion')) return ['admin'];
+    // Las APIs del módulo las comparten los tres roles de Órdenes de Compra: no
+    // están partidas por etapa (el scope real lo hace la pantalla). La excepción
+    // son las notas de crédito, que son de contabilidad.
+    if (pathname.startsWith('/api/compras')) {
+      if (pathname.startsWith('/api/compras/notas-credito')) return ['ingenieria'];
+      return ['ingenieria', 'bodega', 'recepcion'];
+    }
+    if (COMPRAS_SOLO_CONTABILIDAD.test(pathname)) return ['ingenieria'];
+    // Recepción de material: el bodeguero (y también ingeniería).
+    if (pathname.startsWith('/compras/facturacion')) return ['ingenieria', 'recepcion'];
     if (COMPRAS_SOLO_INGENIERIA.test(pathname) || COMPRAS_INGENIERIA_INTERNO.test(pathname)) return ['ingenieria'];
     return ['ingenieria', 'bodega'];
   }

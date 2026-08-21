@@ -170,6 +170,7 @@ const SUBTITULO: Record<Modulo, string> = {
   concreto: 'Resumen de concreto: coladas, batches y laboratorio.',
   desembolsos: 'Resumen de desembolsos: casas y montos pendientes.',
   bodega: 'Resumen de bodega: pedidos al stock.',
+  recepcion: 'Resumen de bodega: material por recibir.',
   dashboard: 'Resumen de producción.',
 };
 
@@ -189,7 +190,8 @@ export default async function DashboardPage() {
     has('presupuesto') ? 'presupuesto' :
     has('concreto') ? 'concreto' :
     has('desembolsos') ? 'desembolsos' :
-    has('bodega') ? 'bodega' : 'admin';
+    has('bodega') ? 'bodega' :
+    has('recepcion') ? 'recepcion' : 'admin';
 
   // Tarjetas por módulo. Super Admin ve el resumen global de producción; cada rol
   // funcional ve solo lo suyo.
@@ -227,6 +229,12 @@ export default async function DashboardPage() {
     if (has('bodega') && !has('ingenieria')) {
       quickActions.push(
         { href: '/compras/ingenieria', label: 'Hacer un pedido a bodega', icon: 'entrega' },
+      );
+    }
+    // Recepción (Fábrica de Maderas): la puerta a lo que está por recibir.
+    if (has('recepcion') && !has('ingenieria')) {
+      quickActions.push(
+        { href: '/compras/facturacion', label: 'Recibir material (órdenes por recibir)', icon: 'entrega' },
       );
     }
     if (has('presupuesto')) {
