@@ -200,6 +200,29 @@ export default function PlantillasPage() {
   );
 }
 
+// ─── Borrador automático de la plantilla que se está armando ─────────────────────
+// Pedido de Roger Solano (24/08/2026): "si uno lleva varias líneas y la página se
+// recarga o me devuelvo, se pierde todo". Se guarda lo tecleado en el navegador y se
+// recupera al volver a abrir. Es POR PLANTILLA (o "nueva"), y solo local: no toca la
+// base — la plantilla se crea/actualiza recién al darle Guardar.
+type BorradorPlantilla = { etapaId: string; partidaId: string; idClas: string; tipo: TipoPlantilla; nombre: string; lineas: Linea[]; ts: number };
+const claveBorrador = (id?: number | string) => `adelante_oc_plantilla_borrador:${id ?? "nueva"}`;
+
+function leerBorrador(clave: string): BorradorPlantilla | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(clave);
+    if (!raw) return null;
+    const b = JSON.parse(raw) as BorradorPlantilla;
+    // Sin nombre ni líneas no hay nada que recuperar (y así no molesta con un formulario vacío).
+    if (!b || (!String(b.nombre ?? "").trim() && !(b.lineas ?? []).length)) return null;
+    return b;
+  } catch { return null; }
+}
+function borrarBorrador(clave: string) {
+  try { window.localStorage.removeItem(clave); } catch { /* modo privado */ }
+}
+
 function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsError, onReintentarItems, onClose, onSaved }: {
   plantilla: Plantilla | null; wbs: Wbs; items: ItemBc[]; usuario: string;
   itemsCargando: boolean; itemsError: boolean; onReintentarItems: () => void;
@@ -210,13 +233,18 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
   const clasInicial = wbs.clasificaciones.find((c) => c.id === plantilla?.idClasificacion);
   const subInicial = clasInicial?.subPartidaId ? wbs.subpartidas.find((s) => s.id === clasInicial.subPartidaId) : undefined;
   const partInicial = wbs.partidas.find((p) => p.id === (clasInicial?.partidaId ?? subInicial?.partidaId));
-  const [etapaId, setEtapaId] = useState(String(wbs.etapas.find((e) => e.id === partInicial?.etapaId)?.id ?? wbs.etapas[0]?.id ?? ""));
+  // El editor se monta solo al abrir el modal (nunca en SSR), así que se puede leer el
+  // borrador directo en el inicializador: sin efecto y sin parpadeo.
+  const clave = claveBorrador(plantilla?.id);
+  const [borrador] = useState(() => leerBorrador(clave));
+  const [recuperado, setRecuperado] = useState(!!borrador);
+  const [etapaId, setEtapaId] = useState(borrador?.etapaId ?? String(wbs.etapas.find((e) => e.id === partInicial?.etapaId)?.id ?? wbs.etapas[0]?.id ?? ""));
   const partidasEt = wbs.partidas.filter((p) => String(p.etapaId) === etapaId);
-  const [partidaId, setPartidaId] = useState(String(partInicial?.id ?? partidasEt[0]?.id ?? ""));
-  const [idClas, setIdClas] = useState(plantilla?.idClasificacion ? String(plantilla.idClasificacion) : "");
-  const [tipo, setTipo] = useState<TipoPlantilla>(plantilla?.tipo ?? (plantilla && !plantilla.idClasificacion ? "bodega" : "general"));
-  const [nombre, setNombre] = useState(plantilla?.nombre ?? "");
-  const [lineas, setLineas] = useState<Linea[]>(plantilla?.lineas ?? []);
+  const [partidaId, setPartidaId] = useState(borrador?.partidaId ?? String(partInicial?.id ?? partidasEt[0]?.id ?? ""));
+  const [idClas, setIdClas] = useState(borrador?.idClas ?? (plantilla?.idClasificacion ? String(plantilla.idClasificacion) : ""));
+  const [tipo, setTipo] = useState<TipoPlantilla>(borrador?.tipo ?? plantilla?.tipo ?? (plantilla && !plantilla.idClasificacion ? "bodega" : "general"));
+  const [nombre, setNombre] = useState(borrador?.nombre ?? plantilla?.nombre ?? "");
+  const [lineas, setLineas] = useState<Linea[]>(borrador?.lineas ?? plantilla?.lineas ?? []);
   const [qaCode, setQaCode] = useState(""); const [qaQty, setQaQty] = useState("");
   // Variantes del artículo elegido (BC). Para plantillas de bodega, el material
   // que tiene variantes debe pedir cuál — así la solicitud sale con la variante.
@@ -233,6 +261,19 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
     return () => { vivo = false; };
   }, [qaCode]);
   const variantePendiente = qaVariantes.length > 0 && !qaVariante;
+  // Guardado automático del borrador. Se escribe con un respiro (600 ms) para no tocar
+  // el localStorage en cada tecla. Un formulario vacío borra el borrador en vez de
+  // guardar basura.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (!nombre.trim() && !lineas.length) { borrarBorrador(clave); return; }
+        const b: BorradorPlantilla = { etapaId, partidaId, idClas, tipo, nombre, lineas, ts: Date.now() };
+        window.localStorage.setItem(clave, JSON.stringify(b));
+      } catch { /* modo privado / sin espacio: no vale tumbar el editor por esto */ }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [clave, etapaId, partidaId, idClas, tipo, nombre, lineas]);
   const [guardando, setGuardando] = useState(false);
   // Stock actual en Business Central por material (código → total | null s/d | "…" cargando).
   const [stockBc, setStockBc] = useState<Record<string, number | null | "loading">>({});
@@ -323,6 +364,7 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
         : await fetch("/api/compras/plantillas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");
+      borrarBorrador(clave); // ya está en la base: el borrador local sobra
       toast(`Plantilla ${plantilla ? "actualizada" : "creada"}`, "success"); onSaved();
     } catch (e: any) { toast(String(e?.message ?? e), "error"); setGuardando(false); }
   }
@@ -338,6 +380,19 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
         <Button variant="outline" onClick={onClose}>Cancelar</Button>
         <Button onClick={guardar} disabled={guardando || !nombre.trim() || (tipo === "general" && !idClas)}>{guardando ? "Guardando…" : "Guardar plantilla"}</Button>
       </>}>
+      {recuperado && (
+        <div className="row row--between wrap gap-2" style={{ alignItems: "center", padding: "10px 14px", marginBottom: 12, borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" }}>
+          <span className="ds-body-sm">Recuperamos lo que estabas armando{borrador?.lineas?.length ? ` (${borrador.lineas.length} línea(s))` : ""}. Se guarda solo mientras editás.</span>
+          <Button variant="ghost" onClick={() => {
+            borrarBorrador(clave);
+            setRecuperado(false);
+            setNombre(plantilla?.nombre ?? "");
+            setLineas(plantilla?.lineas ?? []);
+            setTipo(plantilla?.tipo ?? (plantilla && !plantilla.idClasificacion ? "bodega" : "general"));
+            setIdClas(plantilla?.idClasificacion ? String(plantilla.idClasificacion) : "");
+          }}>Descartar y empezar de cero</Button>
+        </div>
+      )}
       {/* Tipo de plantilla: general (amarrada a clasificación) vs bodega (solo materiales) */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {([["general", "General", "Etapa · partida · clasificación"], ["bodega", "Bodega", "Solo lista de materiales"]] as const).map(([t, titulo, hint]) => {

@@ -122,6 +122,8 @@ const F_TIPOS: { v: FTipo; label: string }[] = [
 const ordenarMatches = (items: Item[], q: string) => buscarOrdenado(items, q, (i) => [i.title, i.sub ?? ""]);
 const filtrar = (items: Item[], q: string, max = 40) => ordenarMatches(items, q).slice(0, max);
 const MAX_MAT = 60; // resultados visibles del buscador de materiales
+// A partir de cuántas variantes se muestra el buscador dentro del selector.
+const MIN_BUSCAR_VAR = 6;
 // Ningún TIPO se queda fuera de la ventana visible: si entre los primeros MAX no
 // entró ningún servicio (o ningún no inventariable) pero sí hay coincidencias de
 // ese tipo, se agregan las mejores al final. Pasaba con términos muy cortos ("s"),
@@ -298,9 +300,15 @@ function VarianteBtn({ variantes, value, onPick }: {
   variantes: Variante[]; value?: string; onPick: (code: string, nombre?: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
+  const buscaRef = useRef<HTMLInputElement>(null);
   const sel = variantes.find((v) => v.code === value);
   const label = sel ? (sel.descripcion || sel.code) : "Agregar variante";
+  // Con muchas variantes, buscar por texto (pedido de Ana Gómez): no hay que recorrer
+  // toda la lista a mano. Con pocas no vale la pena el campo.
+  const conBuscador = variantes.length > MIN_BUSCAR_VAR;
+  const lista = useMemo(() => buscarOrdenado(variantes, q, (v) => [v.descripcion || "", v.code]), [variantes, q]);
   return (
     <div ref={wrapRef} style={{ display: "inline-flex", width: "100%", minWidth: 0 }}>
       <button type="button" className="nsl-varbtn" data-warn={value ? undefined : "1"} title={label} onClick={() => setOpen((o) => !o)}>
@@ -308,12 +316,17 @@ function VarianteBtn({ variantes, value, onPick }: {
         <svg className="nsl-varbtn__chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
           style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s ease" }}><path d="M6 9l6 6 6-6" /></svg>
       </button>
-      <Popover anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} minWidth={260}>
+      <Popover anchorRef={wrapRef} open={open} onClose={() => { setOpen(false); setQ(""); }} minWidth={260}>
         <div style={{ width: "100%", padding: 8 }}>
+          {conBuscador && (
+            <input ref={buscaRef} value={q} autoFocus placeholder="Buscar variante…" onChange={(e) => setQ(e.target.value)}
+              style={{ width: "100%", margin: "2px 0 8px", height: 38, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 14px", fontSize: 14, outline: "none" }} />
+          )}
           <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 260 }}>
             {variantes.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin variantes.</div>}
-            {variantes.map((v) => (
-              <button key={v.code} type="button" onClick={() => { onPick(v.code, v.descripcion); setOpen(false); }}
+            {variantes.length > 0 && lista.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Ninguna variante coincide con “{q}”.</div>}
+            {lista.map((v) => (
+              <button key={v.code} type="button" onClick={() => { onPick(v.code, v.descripcion); setOpen(false); setQ(""); }}
                 className={`nsl-opt${v.code === value ? " is-active" : ""}`} style={{ display: "flex", alignItems: "center", width: "100%", textAlign: "left", padding: "10px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent", fontSize: 13, fontWeight: 500, lineHeight: 1.35 }}>
                 {v.descripcion || v.code}
               </button>
