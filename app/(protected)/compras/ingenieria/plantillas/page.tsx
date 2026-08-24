@@ -7,7 +7,7 @@ import { Combobox } from "@/components/compras/combobox";
 import { IconEdit } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
-import { etiquetaArticulo } from "@/lib/compras/helpers";
+import { etiquetaArticulo, saltarCantidad } from "@/lib/compras/helpers";
 import type { Articulo } from "@/lib/compras/types";
 
 type Etapa = { id: number; codigo: string; nombre: string };
@@ -487,7 +487,9 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
                         ? <span className="ds-muted" title="Sin conexión a Business Central">s/d</span>
                         : <span className={st > 0 ? "ds-strong" : "ds-muted"}>{st.toLocaleString("es-CR")}</span>}
                   </td>
-                  <td className="ds-num"><Input type="number" min={0} value={l.cantidad} onChange={(e) => setLinea(i, { cantidad: Number(e.target.value) })} style={{ width: 90, textAlign: "right", padding: "6px 10px" }} /></td>
+                  <td className="ds-num"><Input type="number" min={0} value={l.cantidad} data-cant="1" onKeyDown={saltarCantidad}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onChange={(e) => setLinea(i, { cantidad: Number(e.target.value) })} style={{ width: 90, textAlign: "right", padding: "6px 10px" }} /></td>
                   <td className="ds-num"><button className="icon-btn icon-btn--quitar" title="Quitar" onClick={() => delLinea(i)}>×</button></td>
                 </tr>
                 );

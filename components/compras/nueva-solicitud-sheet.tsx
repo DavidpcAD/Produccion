@@ -22,7 +22,7 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega, etiquetaTipoArticulo } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega, etiquetaTipoArticulo, saltarCantidad } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
@@ -386,7 +386,9 @@ function Cantidad({ value, onChange }: { value: number; onChange: (n: number) =>
   // el valor real, ya normalizado. Así no hace falta sincronizar con un efecto.
   const [txt, setTxt] = useState<string | null>(null);
   return (
-    <input inputMode="decimal" value={txt ?? textoDeCantidad(value)} aria-label="Cantidad" onFocus={(e) => e.currentTarget.select()}
+    <input inputMode="decimal" value={txt ?? textoDeCantidad(value)} aria-label="Cantidad" data-cant="1"
+      onFocus={(e) => e.currentTarget.select()}
+      onKeyDown={saltarCantidad}
       onChange={(e) => { const t = limpiarCantidad(e.target.value); setTxt(t); onChange(Math.max(0, Number(t) || 0)); }}
       onBlur={() => setTxt(null)}
       style={{ width: 86, textAlign: "center", height: 40, borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", color: "var(--ds-color-yellow)", fontVariantNumeric: "tabular-nums", fontWeight: 700 }} />

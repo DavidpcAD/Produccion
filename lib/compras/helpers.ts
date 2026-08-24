@@ -104,6 +104,29 @@ export function ordenesDeMisPedidos(ordenes: Orden[], pedidos: Pedido[], me: Ses
   ));
 }
 
+/**
+ * Enter/↓ salta a la SIGUIENTE cantidad, Shift+Enter/↑ a la anterior — pedido de los
+ * usuarios: "cuando estoy usando una plantilla que pueda bajar a la siguiente línea
+ * con un enter, es más rápido cuando pongo cantidades" (24/08/2026).
+ * Los campos se ubican por `data-cant` en el orden en que están en la pantalla, así
+ * funciona igual con las líneas repartidas en varias tarjetas de obra.
+ * Al llegar al final, Enter cierra el teclado en vez de dar la vuelta (evita pisar
+ * la primera cantidad sin querer).
+ */
+export function saltarCantidad(e: React.KeyboardEvent<HTMLInputElement>) {
+  const baja = e.key === "Enter" || e.key === "ArrowDown";
+  const sube = e.key === "ArrowUp" || (e.key === "Enter" && e.shiftKey);
+  if (!baja && !sube) return;
+  e.preventDefault();
+  const campos = Array.from(document.querySelectorAll<HTMLInputElement>("input[data-cant]"));
+  const i = campos.indexOf(e.currentTarget);
+  if (i === -1) return;
+  const destino = campos[i + (sube ? -1 : 1)];
+  if (!destino) { e.currentTarget.blur(); return; }
+  destino.focus();
+  destino.select();
+}
+
 export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: string } {
   return t === "repuesto" ? { label: "Repuesto", tone: "yellow" }
     : t === "stock" ? { label: "Stock", tone: "gray" }
