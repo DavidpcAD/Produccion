@@ -804,6 +804,28 @@ async function bcAplicarAsignaciones(orderNo: string, asignaciones: AsignacionLi
   return `${detalle} (líneas sin proyecto/tarea: ${lineas})`;
 }
 
+/** De una lista de artículos, cuáles TIENEN variantes en BC. `null` = no se pudo saber.
+ *  Se usa como guard al crear el pedido: si el artículo tiene variantes hay que mandar
+ *  cuál, si no BC rechaza el lanzamiento ("Variant Code must have a value in Purchase
+ *  Line"). Comprobado en producción: de 76 líneas de artículos con variantes, las 72
+ *  que llevan variante están lanzadas y las 4 que no, quedaron trabadas. */
+export async function bcItemsConVariantes(codes: string[]): Promise<Set<string> | null> {
+  const unicos = [...new Set((codes ?? []).map((c) => (c ?? "").trim()).filter(Boolean))];
+  if (!unicos.length) return new Set();
+  try {
+    const cid = await getStdCompanyId();
+    const out = new Set<string>();
+    for (let i = 0; i < unicos.length; i += 15) {
+      const filtro = unicos.slice(i, i + 15).map((c) => `itemNumber eq '${odataStr(c)}'`).join(" or ");
+      const res = await bcFetch(`${stdRoot()}/companies(${cid})/itemVariants?$select=itemNumber&$filter=${encodeURIComponent(filtro)}&$top=500`, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { value?: { itemNumber?: string }[] };
+      for (const v of (data.value ?? [])) { const n = String(v.itemNumber ?? "").trim(); if (n) out.add(n); }
+    }
+    return out;
+  } catch { return null; }
+}
+
 export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: string; locationCode?: string; lineas: NuevaLineaBc[]; cargos?: CargoBc[]; flete?: { monto: number; descripcion?: string } }): Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados: number; jobError?: string }> {
   if (!input?.vendorNo) throw new Error("Falta el proveedor (vendorNo).");
   const lineas = (input.lineas ?? []).filter((l) => l.itemNo && l.cantidad > 0);
@@ -829,6 +851,16 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
     const chocan = bloqueadas ? obrasPedido.filter((o) => bloqueadas.has(o)) : [];
     if (chocan.length) {
       throw new Error(`La obra ${chocan.join(", ")} está BLOQUEADA en Business Central, así que no se le puede cargar material. Desbloqueala en BC o pedí el material contra otra obra. (No se creó nada en BC.)`);
+    }
+  }
+  // GUARD (antes de tocar BC): VARIANTE FALTANTE. Si el artículo tiene variantes, BC
+  // exige cuál en la línea; sin ella el pedido se crea y no se puede lanzar nunca.
+  const sinVariante = lineas.filter((l) => !(l.variantCode ?? "").trim()).map((l) => l.itemNo);
+  if (sinVariante.length) {
+    const conVariantes = await bcItemsConVariantes(sinVariante);
+    const faltan = conVariantes ? [...new Set(sinVariante.filter((i) => conVariantes.has(i)))] : [];
+    if (faltan.length) {
+      throw new Error(`El artículo ${faltan.join(", ")} tiene variantes en Business Central y la orden no dice cuál. Elegí la variante en la orden (proveeduría) y reintentá. (No se creó nada en BC.)`);
     }
   }
   const cid = await getStdCompanyId(); // MISMA compañía que items/vendors (API estándar)

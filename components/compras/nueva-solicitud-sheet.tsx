@@ -61,6 +61,30 @@ type FTipo = "todas" | "mias" | "general" | "bodega";
 // catálogo de BC (inventario, servicio y no inventariable) y el tag dice qué es.
 type Item = { id: string; title: string; sub?: string; tag?: string };
 
+// ─── Borrador automático del pedido que se está armando ──────────────────────────
+// Mismo pedido de Roger Solano que en plantillas: si la página se recarga o el usuario
+// se devuelve, no se pierde lo tecleado. Solo aplica al pedido NUEVO en blanco — si el
+// drawer viene con semilla (copiar/editar) o desde la Matriz, manda esa carga.
+// Ojo: es distinto de "Guardar borrador", que sí crea el pedido en la base.
+const CLAVE_BORRADOR_PEDIDO = "adelante_oc_pedido_borrador";
+type BorradorPedido = {
+  tipo: TipoSolicitud; destinoMat: DestinoMat; almacenSel: string; destino: string;
+  prioridad: Pedido["prioridad"]; notas: string; grupos: Grupo[]; lineas: Row[]; ts: number;
+};
+function leerBorradorPedido(): BorradorPedido | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CLAVE_BORRADOR_PEDIDO);
+    if (!raw) return null;
+    const b = JSON.parse(raw) as BorradorPedido;
+    // Sin líneas no hay nada que recuperar (y así no molesta con un pedido vacío).
+    return b && Array.isArray(b.lineas) && b.lineas.length ? b : null;
+  } catch { return null; }
+}
+function borrarBorradorPedido() {
+  try { window.localStorage.removeItem(CLAVE_BORRADOR_PEDIDO); } catch { /* modo privado */ }
+}
+
 const uid = () => Math.random().toString(36).slice(2, 9);
 const SOLO = "solo"; // grupo único para repuesto/bodega (sin obra)
 
@@ -941,8 +965,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     setTipo("material"); setDestinoMat("almacen"); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
     setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]); setConfirmPedir(false);
+    setBorradorRecuperado(false);
     plantAuto.current = false;
   }
+  /** El pedido ya quedó guardado en la base: el borrador local sobra. */
+  function limpiarBorradorLocal() { borrarBorradorPedido(); setBorradorRecuperado(false); }
   function close() { setConfirmExit(false); setConfirmPedir(false); setOpen(false); setTimeout(reset, 260); }
   function requestDismiss() { if (hasData && !saving) setConfirmExit(true); else close(); }
 
@@ -1059,6 +1086,39 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     if (open && semilla && !seedApplied.current) { aplicarSeed(semilla); seedApplied.current = true; }
     if (!open) seedApplied.current = false;
   }, [open, seed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Recuperar el borrador al abrir un pedido NUEVO en blanco (no con semilla ni Matriz).
+  // Una sola vez por apertura; el aviso se muestra hasta que se descarte o se envíe.
+  const [borradorRecuperado, setBorradorRecuperado] = useState(false);
+  const borradorAplicado = useRef(false);
+  useEffect(() => {
+    if (!open) { borradorAplicado.current = false; return; }
+    if (borradorAplicado.current || semilla || idClasificacion != null || obraPreset) return;
+    borradorAplicado.current = true;
+    const b = leerBorradorPedido();
+    if (b) aplicarBorrador(b);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function aplicarBorrador(b: BorradorPedido) {
+    setTipo(b.tipo); setDestinoMat(b.destinoMat); setAlmacenSel(b.almacenSel);
+    setDestino(b.destino); setPrioridad(b.prioridad); setNotas(b.notas);
+    setGrupos(b.grupos ?? []); setLineas(b.lineas ?? []);
+    setBorradorRecuperado(true);
+  }
+
+  // Guardar mientras se arma (con 600 ms de respiro, como en plantillas). No se guarda
+  // lo que se está EDITANDO ni lo que vino con semilla: eso ya vive en la base.
+  useEffect(() => {
+    if (!open || editandoId || semilla) return;
+    const t = setTimeout(() => {
+      try {
+        if (!lineas.length) { borrarBorradorPedido(); return; }
+        const b: BorradorPedido = { tipo, destinoMat, almacenSel, destino, prioridad, notas, grupos, lineas, ts: Date.now() };
+        window.localStorage.setItem(CLAVE_BORRADOR_PEDIDO, JSON.stringify(b));
+      } catch { /* modo privado / sin espacio */ }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [open, editandoId, semilla, tipo, destinoMat, almacenSel, destino, prioridad, notas, grupos, lineas]);
   function cargarPlantilla(id: string) {
     const pl = plantillas.find((p) => String(p.id) === id);
     if (!pl) return;
@@ -1189,6 +1249,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     try {
       const p = await addPedido(buildInput());
       await setPedidoEstado(p.id, "aprobado");
+      limpiarBorradorLocal();
       toast(`Pedido ${p.numero} enviado a proveeduría`, "success");
       onGuardado?.({ numero: p.numero, enviado: true });
       close();
@@ -1199,6 +1260,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     setSaving(true);
     try {
       const p = await addPedido(buildInput());
+      limpiarBorradorLocal(); // ya es un borrador REAL en la base
       toast(`Borrador ${p.numero} guardado`, "info");
       onGuardado?.({ numero: p.numero, enviado: false });
       close();
@@ -1285,6 +1347,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
           {/* Body */}
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 22px" }}>
               <div className="col gap-5">
+                {borradorRecuperado && (
+                  <div className="row row--between wrap gap-2" style={{ alignItems: "center", padding: "10px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" }}>
+                    <span className="ds-body-sm">Recuperamos el pedido que estabas armando ({lineas.length} línea(s)).</span>
+                    <Button variant="ghost" onClick={() => { limpiarBorradorLocal(); reset(); }}>Descartar y empezar de cero</Button>
+                  </div>
+                )}
                 <Field label="Tipo de solicitud">
                   <Segmented variant="pill" value={tipo} options={TIPOS.map((t) => ({ v: t.v, label: t.label }))} onChange={cambiarTipo} />
                 </Field>

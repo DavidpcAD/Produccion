@@ -283,7 +283,12 @@ export async function listOrdenes(): Promise<Orden[]> {
              -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
              -- la tarea del pedido. Sin tarea, BC no puede consumir contra el proyecto y
              -- el material entra a inventario. Se hereda de la línea de pedido origen.
-             COALESCE(d.taskNo, pd.taskNo) AS taskNoEfectivo
+             COALESCE(d.taskNo, pd.taskNo) AS taskNoEfectivo,
+             -- La VARIANTE se pierde igual que la tarea: el pedido la trae (la eligió
+             -- ingeniería) y la orden de proveeduría la deja en NULL. Sin variante, BC
+             -- rechaza el lanzamiento: "Variant Code must have a value in Purchase Line"
+             -- (casos CP-005149 y CP-004973, 24/08/2026). Se hereda de la línea origen.
+             COALESCE(d.variantCode, pd.variantCode) AS variantCodeEfectivo
       FROM dbo.OrdenCompraDet d
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       ORDER BY d.idOrdenCompraDet`);
@@ -300,7 +305,12 @@ export async function getOrden(id: number): Promise<Orden | null> {
              -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
              -- la tarea del pedido. Sin tarea, BC no puede consumir contra el proyecto y
              -- el material entra a inventario. Se hereda de la línea de pedido origen.
-             COALESCE(d.taskNo, pd.taskNo) AS taskNoEfectivo
+             COALESCE(d.taskNo, pd.taskNo) AS taskNoEfectivo,
+             -- La VARIANTE se pierde igual que la tarea: el pedido la trae (la eligió
+             -- ingeniería) y la orden de proveeduría la deja en NULL. Sin variante, BC
+             -- rechaza el lanzamiento: "Variant Code must have a value in Purchase Line"
+             -- (casos CP-005149 y CP-004973, 24/08/2026). Se hereda de la línea origen.
+             COALESCE(d.variantCode, pd.variantCode) AS variantCodeEfectivo
       FROM dbo.OrdenCompraDet d
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       WHERE d.idOrdenCompra = @id
@@ -321,7 +331,9 @@ function mapOrden(o: any, lineas: any[]): Orden {
     bcNumber: o.bcNo || undefined,           // Nº del Pedido en BC (para relanzar/recibir/facturar)
     lineas: lineas.map((l): OrdenLinea => ({
       id: String(l.idOrdenCompraDet), tipo: (l.tipoLinea === "cargo" ? "cargo" : "articulo"),
-      articuloId: l.itemNo ?? undefined, variantCode: l.variantCode ?? undefined, pedidoLineaId: l.idPedidoCompraDet ? String(l.idPedidoCompraDet) : undefined,
+      // La variante se hereda del pedido si la orden no la trae (ver el COALESCE del
+      // query): sin ella BC rechaza el lanzamiento.
+      articuloId: l.itemNo ?? undefined, variantCode: (l.variantCodeEfectivo ?? l.variantCode) ?? undefined, pedidoLineaId: l.idPedidoCompraDet ? String(l.idPedidoCompraDet) : undefined,
       pedidoNumero: undefined, descripcion: l.descripcion ?? "", cantidad: Number(l.quantity ?? 0),
       unidad: l.unitOfMeasureCode ?? "", almacen: l.locationCode ?? "", precioUnitario: Number(l.directUnitCost ?? 0),
       ivaPct: Number(l.vatPct ?? 0), descuentoPct: Number(l.lineDiscountPct ?? 0) || undefined,
