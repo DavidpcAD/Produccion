@@ -22,14 +22,21 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega, etiquetaTipoArticulo, saltarCantidad } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, saltarCantidad } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
 // Una obra dentro del pedido = una TARJETA con sus materiales. El pedido puede tener
 // varias obras (varias tarjetas). Para repuesto/bodega se usa un único grupo (SOLO).
 type Grupo = { key: string; obraCodigo?: string; obraNombre?: string; taskNo?: string; taskNombre?: string };
-type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string; notas?: string; requerido?: number; autoPedir?: boolean };
+type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string; notas?: string; requerido?: number; autoPedir?: boolean;
+  /** SUBCONTRATO: alcance en texto libre. Viaja como DESCRIPCIÓN de la línea (a la
+   *  orden y a BC); si va vacío queda la descripción del servicio del catálogo. */
+  detalle?: string;
+  /** SUBCONTRATO: monto global de la línea. No hay precio en la tabla del pedido:
+   *  el monto vive en la ORDEN (precio unitario, cantidad 1), que el subcontrato
+   *  crea de una vez. */
+  monto?: number };
 type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string;
   // Tarea de la obra (consumo directo). Viaja al copiar/editar un pedido para no
   // perder la actividad; en las plantillas guardadas no existe.
@@ -70,6 +77,8 @@ const CLAVE_BORRADOR_PEDIDO = "adelante_oc_pedido_borrador";
 type BorradorPedido = {
   tipo: TipoSolicitud; destinoMat: DestinoMat; almacenSel: string; destino: string;
   prioridad: Pedido["prioridad"]; notas: string; grupos: Grupo[]; lineas: Row[]; ts: number;
+  /** Subcontrato: proveedor y moneda elegidos (sin esto se perderían al recargar). */
+  proveedorId?: string; currency?: string;
 };
 function leerBorradorPedido(): BorradorPedido | null {
   if (typeof window === "undefined") return null;
@@ -116,6 +125,7 @@ const TIPOS: { v: TipoSolicitud; label: string; destino: string }[] = [
   { v: "material", label: "Material (obra)", destino: "Obra" },
   { v: "repuesto", label: "Repuesto", destino: "Máquina" },
   { v: "stock", label: "Stock", destino: "Almacén" },
+  { v: "subcontrato", label: "Subcontrato", destino: "Obra" },
 ];
 // TAG del pedido (chiquito, al lado del tipo): ALM = entra a inventario del almacén
 // REAL elegido · CD = consumo directo, no entra a inventario. Stock siempre es a un
@@ -395,6 +405,28 @@ function Cantidad({ value, onChange }: { value: number; onChange: (n: number) =>
   );
 }
 
+// ─── MONTO de una línea de SUBCONTRATO ──────────────────────────────────────────
+// El servicio se contrata por un monto global, no por cantidad × precio. Se teclea
+// libre y al salir del campo se muestra con separador de miles, para que un monto de
+// siete cifras se pueda leer de un vistazo.
+function Monto({ value, onChange, currency }: { value?: number; onChange: (n: number) => void; currency: string }) {
+  // Con el campo ENFOCADO se ven los dígitos pelados (editables); al salir se ve con
+  // separador de miles. Ojo: no se puede mostrar "1.500.000" mientras se teclea, porque
+  // el punto es también el separador decimal y el valor se leería como 1,5.
+  const [txt, setTxt] = useState<string | null>(null);
+  const fmt = value && value > 0 ? num.format(value) : "";
+  return (
+    <div className="row gap-1" style={{ alignItems: "center", flexShrink: 0 }}>
+      <span className="ds-muted ds-label" style={{ fontWeight: 700 }}>{currency === "USD" ? "$" : "₡"}</span>
+      <input inputMode="decimal" value={txt ?? fmt} aria-label="Monto del subcontrato" placeholder="0"
+        onFocus={(e) => { setTxt(value && value > 0 ? textoDeCantidad(value) : ""); e.currentTarget.select(); }}
+        onChange={(e) => { const t = limpiarCantidad(e.target.value); setTxt(t); onChange(Math.max(0, Number(t) || 0)); }}
+        onBlur={() => setTxt(null)}
+        style={{ width: 130, textAlign: "right", height: 40, borderRadius: 8, border: `1.5px solid ${value && value > 0 ? "var(--ds-color-gray-200)" : "var(--ds-color-yellow)"}`, background: "var(--ds-color-white)", color: "var(--ds-color-ink)", fontVariantNumeric: "tabular-nums", fontWeight: 700, padding: "0 10px" }} />
+    </div>
+  );
+}
+
 // ─── Columnas de STOCK de la línea: existencias en el almacén elegido y cuánto
 //     pide la plantilla. Van pegadas a la cantidad (grupo anclado a la derecha), así
 //     quedan alineadas como columnas en todas las filas. ────────────────────────────
@@ -625,7 +657,9 @@ function PrioridadBtn({ value, onChange }: { value: Pedido["prioridad"]; onChang
 }
 
 // ─── Comentario como BOTÓN de mensaje que abre el campo (popover). Activo si hay nota ─
-function ComentarioBtn({ value, onChange, required }: { value: string; onChange: (v: string) => void; required?: boolean }) {
+// `para` = quién va a leer el comentario. En un pedido normal lo lee proveeduría; en
+// un subcontrato no pasa por ahí, lo lee quien aprueba.
+function ComentarioBtn({ value, onChange, required, para }: { value: string; onChange: (v: string) => void; required?: boolean; para?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const has = !!value.trim();
@@ -640,7 +674,7 @@ function ComentarioBtn({ value, onChange, required }: { value: string; onChange:
       </button>
       <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={400}>
         <div style={{ padding: 14, width: "100%" }}>
-          <span className="ds-form-field__label" style={{ display: "block", marginBottom: 8 }}>Comentario para proveeduría{required ? " (obligatorio)" : ""}</span>
+          <span className="ds-form-field__label" style={{ display: "block", marginBottom: 8 }}>Comentario para {para ?? "proveeduría"}{required ? " (obligatorio)" : ""}</span>
           <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={5} placeholder="Escribí una nota…"
             style={{ display: "block", width: "100%", minWidth: 372, height: 128, resize: "vertical", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-color-white)", color: "var(--ds-color-ink)" }} />
         </div>
@@ -738,7 +772,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   /** Aviso al crear/enviar/guardar (la Matriz marca la celda con esto). */
   onGuardado?: (info: { numero: string; enviado: boolean }) => void;
 }) {
-  const { articulos, obras, maquinas, almacenes, usuario, addPedido, editPedido, setPedidoEstado } = useStore();
+  const { articulos, obras, maquinas, almacenes, proveedores, usuario, addPedido, editPedido, setPedidoEstado, createOrden, setOrdenEstado } = useStore();
   const toast = useToast();
 
   // Catálogo REAL de Business Central (respaldo al store si BC no responde).
@@ -779,6 +813,20 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   }, [bcArt, articulos, extraArt]);
   const catObras = bcObras ?? obras;
   const catAlm = bcAlm ?? almacenes;
+  // Proveedores (subcontratistas) desde BC. Solo hace falta en Subcontrato, así que
+  // se pide la primera vez que se elige ese tipo (y no en cada apertura del drawer).
+  const [bcProv, setBcProv] = useState<typeof proveedores | null>(null);
+  const pidiendoProv = useRef(false);
+  async function cargarProveedores() {
+    if (pidiendoProv.current || bcProv) return;
+    pidiendoProv.current = true;
+    try {
+      const r = await fetch("/api/compras/bc/vendors");
+      const d = r.ok ? await r.json() : { proveedores: [] };
+      if (Array.isArray(d.proveedores) && d.proveedores.length) setBcProv(d.proveedores);
+    } catch { /* respaldo del store */ }
+  }
+  const catProv = bcProv ?? proveedores;
 
   const [tipo, setTipo] = useState<TipoSolicitud>("material");
   // Tag del pedido: ALM (a inventario de un almacén real) o CD (consumo directo).
@@ -787,6 +835,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // Se usa con el tag ALM (material/repuesto) y en el pedido de Stock.
   const [almacenSel, setAlmacenSel] = useState<string>(ALM_GENERAL);
   const [destino, setDestino] = useState(""); // repuesto → máquina
+  // SUBCONTRATO: proveedor (subcontratista) y moneda de la orden.
+  const [proveedorId, setProveedorId] = useState("");
+  const [currency, setCurrency] = useState("");
   const [prioridad, setPrioridad] = useState<Pedido["prioridad"]>("normal");
   const [lineas, setLineas] = useState<Row[]>([]);
   // Tarjetas de obra (material). Arranca con una vacía para elegir obra + materiales.
@@ -841,7 +892,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const [stockReady, setStockReady] = useState(false);
   // Con almacén (tag ALM o pedido de Stock) se muestran las columnas de existencias
   // del almacén ELEGIDO; en consumo directo no hay inventario que mirar.
-  const usaAlmacen = tipo === "stock" || destinoMat === "almacen";
+  const usaAlmacen = tipo === "stock" || (tipo !== "subcontrato" && destinoMat === "almacen");
   const verStock = usaAlmacen && !!almacenSel;
   useEffect(() => {
     if (!verStock) { setStockReady(false); setStockPorCode({}); return; }
@@ -883,6 +934,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const esMaterial = tipo === "material";
   const esRepuesto = tipo === "repuesto";
   const esStock = tipo === "stock";
+  // SUBCONTRATO: servicio contratado contra la obra. El ingeniero arma la solicitud
+  // Y la orden de compra (proveedor + montos), que nace pendiente de aprobación.
+  const esSub = tipo === "subcontrato";
   // Repuesto y Stock no llevan obra: una sola lista de materiales (grupo SOLO).
   const sinObra = esRepuesto || esStock;
   // Consumo directo de material: se consume contra proyecto + tarea de la obra.
@@ -921,6 +975,19 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // La unidad NO va en la lista de búsqueda (solo el código); la unidad se muestra
   // en la línea ya agregada, junto a la cantidad.
   const articuloItems: Item[] = useMemo(() => catArticulos.map((a) => ({ id: a.id, title: a.descripcion, sub: a.code, tag: etiquetaTipoArticulo(a.tipo) || undefined })), [catArticulos]);
+  // SUBCONTRATO: solo artículos de tipo SERVICIO (los SUB_* de BC: eléctrico, tapias,
+  // ventanería, cerámica…). Son los que en BC van sin almacén y se consumen contra el
+  // proyecto + la tarea. Si BC no devolvió el tipo de los artículos (el enriquecido de
+  // la API estándar falló), se ofrece el catálogo completo para no dejar el buscador
+  // vacío. El TAG del tipo no se muestra: acá todos son servicios.
+  const servicioItems: Item[] = useMemo(() => {
+    const servicios = catArticulos.filter((a) => a.tipo === "servicio");
+    const base = servicios.length ? servicios : catArticulos;
+    return base.map((a) => ({ id: a.id, title: a.descripcion, sub: a.code }));
+  }, [catArticulos]);
+  const itemsBuscador = esSub ? servicioItems : articuloItems;
+  const provItems: Item[] = useMemo(() => catProv.map((p) => ({ id: p.id, title: p.nombre, sub: p.code })), [catProv]);
+  const provSel = catProv.find((p) => p.id === proveedorId);
   const destinoNombre = destinoItems.find((d) => d.id === destino)?.title ?? "";
   const obraNombreDe = (code: string) => catObras.find((o) => o.codigo === code)?.nombre ?? code;
 
@@ -945,14 +1012,18 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const necesitaVariante = (l: Row) => { const vs = variantesDe(l); return vs.length > 0 && !l.variantCode; };
   // Material: cada línea debe tener obra (su tarjeta debe tener obra elegida).
   // Repuesto: máquina. Stock: almacén.
-  const destinoOk = esMaterial ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo))
+  const destinoOk = (esMaterial || esSub) ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo))
     : esRepuesto ? !!destino : !!almacenSel;
+  // Subcontrato: proveedor obligatorio (es quien va a facturar) y todas las líneas
+  // con monto. Sin monto la orden no se puede lanzar a BC (línea sin precio).
+  const proveedorOk = !esSub || !!proveedorId;
+  const montosOk = !esSub || validLines.every((l) => (l.monto ?? 0) > 0);
   // Con tag ALM (o en Stock) hace falta el almacén real elegido.
   const almacenOk = !usaAlmacen || !!almacenSel;
   const comentarioOk = notas.trim().length > 0; // comentario para proveeduría OBLIGATORIO al solicitar
   // Consumo inmediato: sin tarea BC no puede consumir contra el proyecto, así que la
   // actividad es obligatoria en cada obra que tenga líneas.
-  const tareasOk = !esConsumo || grupos.every((g) => !lineas.some((l) => l.grupoKey === g.key) || !!g.taskNo);
+  const tareasOk = (!esConsumo && !esSub) || grupos.every((g) => !lineas.some((l) => l.grupoKey === g.key) || !!g.taskNo);
   // Obra bloqueada en BC: puede llegar por copiar/editar un pedido viejo, por plantilla
   // o desde la Matriz. No se puede pedir contra ella (BC rechaza la línea), así que se
   // avisa y no se deja seguir — mejor acá que con el pedido ya creado en BC.
@@ -961,10 +1032,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     [grupos, obrasBloqueadas],
   );
   const canContinue = validLines.length > 0 && destinoOk && almacenOk && comentarioOk && tareasOk
+    && proveedorOk && montosOk
     && obrasChocadas.length === 0 && validLines.every((l) => !necesitaVariante(l));
+  // Total del subcontrato (para la confirmación y el pie del panel).
+  const totalSub = useMemo(() => validLines.reduce((t, l) => t + (l.monto ?? 0), 0), [validLines]);
 
   function reset() {
     setTipo("material"); setDestinoMat("almacen"); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
+    setProveedorId(""); setCurrency("");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
     setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]); setConfirmPedir(false);
     setBorradorRecuperado(false);
@@ -989,12 +1064,17 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // Cambia el tipo de solicitud y limpia lo dependiente (obra/almacén/materiales).
   function cambiarTipo(v: TipoSolicitud) {
     setTipo(v); setDestino(""); setPlantillaSel("");
+    setProveedorId(""); setCurrency("");
+    // Subcontrato: una sola obra (una tarjeta) y hace falta el catálogo de proveedores.
+    if (v === "subcontrato") cargarProveedores();
     // Cambiar de tipo arranca de nuevo: destino ALM (a inventario). Stock ADEMÁS es
     // siempre a un almacén y sus plantillas son las de Bodega → el filtro del
     // selector arranca ahí.
     setDestinoMat("almacen");
     setFTipoPl(v === "stock" ? "bodega" : "todas");
-    setLineas([]); setGrupos([]); setOpenMat([]); setCardMenuKey(null);
+    setLineas([]); setOpenMat([]); setCardMenuKey(null);
+    // El subcontrato arranca con su tarjeta de obra ya puesta (siempre es una sola).
+    setGrupos(v === "subcontrato" ? [{ key: uid() }] : []);
   }
 
   // Convierte una lista de líneas (código/obra/variante/cantidad) en el modelo del
@@ -1105,7 +1185,15 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     setTipo(b.tipo); setDestinoMat(b.destinoMat); setAlmacenSel(b.almacenSel);
     setDestino(b.destino); setPrioridad(b.prioridad); setNotas(b.notas);
     setGrupos(b.grupos ?? []); setLineas(b.lineas ?? []);
+    if (b.tipo === "subcontrato") { cargarProveedores(); setProveedorId(b.proveedorId ?? ""); setCurrency(b.currency ?? ""); }
     setBorradorRecuperado(true);
+  }
+
+  /** Subcontrato: al elegir el subcontratista se hereda su moneda (como en la orden). */
+  function elegirProveedor(id: string) {
+    setProveedorId(id);
+    const p = catProv.find((x) => x.id === id);
+    if (p) setCurrency(p.currencyCode ?? "");
   }
 
   // Guardar mientras se arma (con 600 ms de respiro, como en plantillas). No se guarda
@@ -1115,12 +1203,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     const t = setTimeout(() => {
       try {
         if (!lineas.length) { borrarBorradorPedido(); return; }
-        const b: BorradorPedido = { tipo, destinoMat, almacenSel, destino, prioridad, notas, grupos, lineas, ts: Date.now() };
+        const b: BorradorPedido = { tipo, destinoMat, almacenSel, destino, prioridad, notas, grupos, lineas, ts: Date.now(), proveedorId, currency };
         window.localStorage.setItem(CLAVE_BORRADOR_PEDIDO, JSON.stringify(b));
       } catch { /* modo privado / sin espacio */ }
     }, 600);
     return () => clearTimeout(t);
-  }, [open, editandoId, semilla, tipo, destinoMat, almacenSel, destino, prioridad, notas, grupos, lineas]);
+  }, [open, editandoId, semilla, tipo, destinoMat, almacenSel, destino, prioridad, notas, grupos, lineas, proveedorId, currency]);
   function cargarPlantilla(id: string) {
     const pl = plantillas.find((p) => String(p.id) === id);
     if (!pl) return;
@@ -1136,9 +1224,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // DENTRO de la misma obra; sí se puede pedir en otra obra (otra tarjeta).
   function addRow(grupoKey: string, articuloId: string, variantCode?: string, variantNombre?: string, cantidad = 1) {
     const g = grupos.find((x) => x.key === grupoKey);
-    const obraCodigo = esMaterial ? g?.obraCodigo : undefined;
-    const obraNombre = esMaterial ? g?.obraNombre : undefined;
-    const ex = lineas.find((l) => dupKey(l.grupoKey, l.articuloId, l.variantCode) === dupKey(grupoKey, articuloId, variantCode));
+    const obraCodigo = (esMaterial || esSub) ? g?.obraCodigo : undefined;
+    const obraNombre = (esMaterial || esSub) ? g?.obraNombre : undefined;
+    // Subcontrato: el MISMO servicio puede ir varias veces (dos alcances distintos del
+    // mismo rubro, cada uno con su monto), así que acá no hay duplicado que colapsar.
+    const ex = esSub ? undefined : lineas.find((l) => dupKey(l.grupoKey, l.articuloId, l.variantCode) === dupKey(grupoKey, articuloId, variantCode));
     if (ex) {
       const a = catArticulos.find((x) => x.id === articuloId);
       const scope = esMaterial && obraCodigo ? " en esta obra" : "";
@@ -1207,7 +1297,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const delLinea = (key: string) => setLineas((ls) => ls.filter((l) => l.key !== key));
 
   function headerObra(): { codigo?: string; nombre?: string } {
-    if (!esMaterial) return {};
+    if (!esMaterial && !esSub) return {};
     const codes = Array.from(new Set(validLines.map((l) => l.obraCodigo).filter(Boolean))) as string[];
     if (codes.length === 1) return { codigo: codes[0], nombre: obraNombreDe(codes[0]) };
     if (codes.length === 0) return {};
@@ -1220,8 +1310,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       tipoSolicitud: tipo,
       // Stock: el encabezado guarda el ALMACÉN en el campo de obra (misma convención
       // que la pantalla vieja de pedidos a bodega). Material: la obra, o "(varias)".
-      obraCodigo: esMaterial ? h.codigo : esStock ? almacenSel : undefined,
-      obraNombre: esMaterial ? h.nombre : esStock ? almacenNombre : undefined,
+      obraCodigo: (esMaterial || esSub) ? h.codigo : esStock ? almacenSel : undefined,
+      obraNombre: (esMaterial || esSub) ? h.nombre : esStock ? almacenNombre : undefined,
       maquinaNo: esRepuesto ? destino : undefined,
       maquinaNombre: esRepuesto ? destinoNombre : undefined,
       // Amarre a la celda de la Matriz (se conserva al editar).
@@ -1230,6 +1320,21 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       prioridad, notas: notas.trim() || undefined,
       lineas: validLines.map((l) => {
         const a = catArticulos.find((x) => x.id === l.articuloId)!;
+        // SUBCONTRATO: la línea es el SERVICIO contratado. Cantidad 1 (el servicio se
+        // factura completo, no por avances) y la descripción es el alcance que escribió
+        // el ingeniero. Lleva obra + tarea como el consumo directo: en BC el artículo de
+        // servicio no admite almacén y se consume contra el proyecto. El MONTO no va acá
+        // —la tabla del pedido no tiene precio— sino en la orden que se crea enseguida.
+        if (esSub) {
+          const gs = grupos.find((x) => x.key === l.grupoKey);
+          return {
+            articuloId: a.id, descripcion: l.detalle?.trim() || a.descripcion,
+            cantidad: 1, unidad: a.unidad, almacen: l.obraCodigo || "",
+            obraCodigo: l.obraCodigo || undefined,
+            notas: l.notas?.trim() || undefined,
+            taskNo: gs?.taskNo || undefined, taskDescr: gs?.taskNombre || undefined,
+          };
+        }
         // Consumo inmediato: la tarea (actividad) se elige por obra y se copia a cada línea.
         const g = esConsumo ? grupos.find((x) => x.key === l.grupoKey) : undefined;
         // Almacén de la línea: en consumo directo de MATERIAL es el almacén de la obra
@@ -1245,17 +1350,72 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     };
   }
 
+  /**
+   * SUBCONTRATO: arma la ORDEN DE COMPRA del pedido recién creado y la deja pendiente
+   * de aprobación. Un subcontrato no pasa por Proveeduría —el ingeniero ya eligió al
+   * subcontratista y negoció los montos—, así que la solicitud y su orden nacen juntas
+   * y lo único que falta es que Aprobación la apruebe (ahí se crea en BC) y que bodega
+   * reciba la factura al terminar el servicio.
+   * Cada línea va con cantidad 1 y el MONTO como precio unitario: el servicio se
+   * factura completo, así que la recepción es del 100% y no hay fracciones.
+   */
+  async function crearOrdenSubcontrato(p: Pedido) {
+    // Emparejar cada fila del panel con su línea ya guardada (para el enlace
+    // pedido↔orden, que es lo que mueve el stepper y la recepción). Se busca por
+    // artículo + descripción y se van consumiendo, así dos líneas del mismo servicio
+    // no se pisan.
+    const pend = [...p.lineas];
+    const tomar = (itemNo: string, descr: string) => {
+      let i = pend.findIndex((x) => x.articuloId === itemNo && x.descripcion === descr);
+      if (i < 0) i = pend.findIndex((x) => x.articuloId === itemNo);
+      return i >= 0 ? pend.splice(i, 1)[0] : undefined;
+    };
+    const lineas = validLines.map((l) => {
+      const a = catArticulos.find((x) => x.id === l.articuloId)!;
+      const g = grupos.find((x) => x.key === l.grupoKey);
+      const descripcion = l.detalle?.trim() || a.descripcion;
+      const pl = tomar(a.id, descripcion);
+      return {
+        tipo: "articulo" as const, articuloId: a.id,
+        pedidoLineaId: pl?.id, pedidoNumero: p.numero,
+        descripcion, cantidad: 1, unidad: a.unidad,
+        // El servicio no entra a ningún almacén: se consume contra el proyecto + la
+        // tarea (BC ni acepta almacén en una línea de artículo de tipo servicio).
+        almacen: "", precioUnitario: l.monto ?? 0, ivaPct: 13,
+        proyecto: l.obraCodigo || undefined, taskNo: g?.taskNo || undefined,
+      };
+    });
+    const orden = await createOrden({
+      proveedorId, proveedorNo: provSel?.code, proveedorNombre: provSel?.nombre,
+      currencyCode: currency, lineas,
+    });
+    await setOrdenEstado(orden.id, "pendiente_aprobacion");
+    return orden;
+  }
+
   async function pedir() {
     if (!canContinue || saving) return;
     setSaving(true);
     try {
       const p = await addPedido(buildInput());
-      await setPedidoEstado(p.id, "aprobado");
-      limpiarBorradorLocal();
-      toast(`Pedido ${p.numero} enviado a proveeduría`, "success");
+      if (esSub) {
+        const orden = await crearOrdenSubcontrato(p);
+        limpiarBorradorLocal();
+        toast(`Subcontrato ${p.numero} enviado a aprobación (orden ${orden.numero})`, "success");
+      } else {
+        await setPedidoEstado(p.id, "aprobado");
+        limpiarBorradorLocal();
+        toast(`Pedido ${p.numero} enviado a proveeduría`, "success");
+      }
       onGuardado?.({ numero: p.numero, enviado: true });
       close();
-    } catch { toast("No se pudo enviar el pedido. Intentá de nuevo.", "error"); setSaving(false); }
+    } catch (e) {
+      // El pedido puede haber quedado creado y la ORDEN no: hay que decirlo, si no
+      // el subcontrato queda invisible (sin orden nadie lo aprueba).
+      const motivo = e instanceof Error ? e.message : String(e);
+      toast(esSub ? `No se pudo enviar el subcontrato: ${motivo}` : "No se pudo enviar el pedido. Intentá de nuevo.", "error");
+      setSaving(false);
+    }
   }
   async function guardarBorrador() {
     if (validLines.length === 0) { close(); return; }
@@ -1362,7 +1522,25 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                 {/* Material / Repuesto: TAG chico ALM|CD. Con ALM se elige el almacén
                     REAL (Almacén General, Agregados, Herramienta, Maquinaria…), en la
                     misma fila. Stock no lleva tag: siempre es a un almacén. */}
-                {!esStock && (
+                {/* SUBCONTRATO: subcontratista + moneda. Es lo que en un pedido normal
+                    pondría Proveeduría; acá lo pone el ingeniero porque ya lo negoció. */}
+                {esSub && (
+                  <div className="col gap-2">
+                    <span className="ds-form-field__label">Subcontratista</span>
+                    <div className="row gap-3 wrap">
+                      <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+                        <Dropdown placeholder="Buscar proveedor…" items={provItems} value={proveedorId} onPick={elegirProveedor} />
+                      </div>
+                      <Segmented size="sm" value={currency || "CRC"} options={[{ v: "CRC", label: "CRC" }, { v: "USD", label: "USD" }]}
+                        onChange={(v: string) => setCurrency(v === "CRC" ? "" : v)} />
+                    </div>
+                    <span className="ds-muted ds-label">
+                      El servicio se contrata completo: se aprueba, se crea la orden en Business Central y se recibe la factura al terminar.
+                    </span>
+                  </div>
+                )}
+
+                {!esStock && !esSub && (
                   /* Sin <Field>: el DS le fija 370px de ancho y el almacén quedaba
                      angosto. Rótulo propio + fila (el tag y el almacén en la misma
                      línea, centrados por .row) a lo ancho del panel. */
@@ -1390,14 +1568,16 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                     </div>
                     <div style={{ flex: "1 1 220px", minWidth: 0 }}>{plantillaBtn}</div>
                   </div>
-                ) : plantillaBtn}
+                ) : esSub ? null : plantillaBtn}
 
-                {esMaterial ? (
+                {(esMaterial || esSub) ? (
                   /* MATERIAL: una TARJETA por obra; adentro, sus materiales. */
                   <div className="col gap-2">
                     <div className="row row--between" style={{ alignItems: "center" }}>
-                      <span className="ds-form-field__label">Obras y materiales</span>
-                      <span className="ds-muted ds-label">{validLines.length} línea(s)</span>
+                      <span className="ds-form-field__label">{esSub ? "Obra y alcance" : "Obras y materiales"}</span>
+                      <span className="ds-muted ds-label">
+                        {validLines.length} línea(s){esSub && totalSub > 0 ? ` · ${money(totalSub, currency)}` : ""}
+                      </span>
                     </div>
                     {obrasChocadas.length > 0 && (
                       <div className="ds-body-sm" style={{ padding: "8px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-red-100) 12%, var(--ds-color-white))", color: "var(--ds-color-red-200)" }}>
@@ -1421,21 +1601,21 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                                 /* Buscador INLINE en la misma línea, a la DERECHA de la obra (no encima).
                                    Al elegir un material se agrega y el buscador se encoge de nuevo al +. */
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <MaterialSearch compact items={articuloItems}
+                                  <MaterialSearch compact items={itemsBuscador}
                                     onAdd={(id, vc, vn) => { addRow(g.key, id, vc, vn); setOpenMat((ks) => ks.filter((k) => k !== g.key)); }} />
                                 </div>
                               ) : (
                                 <div style={{ flex: 1 }} />
                               )}
                               <button type="button" onClick={() => setOpenMat((ks) => (ks.includes(g.key) ? [] : [g.key]))}
-                                aria-label="Agregar material" title="Agregar material a esta obra"
+                                aria-label={esSub ? "Agregar servicio" : "Agregar material"} title={esSub ? "Agregar un servicio al subcontrato" : "Agregar material a esta obra"}
                                 style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 12, border: 0, background: "var(--ds-color-green-100)", color: "var(--ds-color-black)", cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "var(--ds-shadow-01)" }}>
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
                               </button>
-                              <button type="button" onClick={() => setCardMenuKey((k) => (k === g.key ? null : g.key))} aria-label="Opciones de la obra"
+                              {!esSub && <button type="button" onClick={() => setCardMenuKey((k) => (k === g.key ? null : g.key))} aria-label="Opciones de la obra"
                                 style={{ flexShrink: 0, background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>
-                              </button>
+                              </button>}
                               {cardMenuKey === g.key && (
                                 <>
                                   <div onClick={() => setCardMenuKey(null)} style={{ position: "fixed", inset: 0, zIndex: 3 }} />
@@ -1452,7 +1632,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                             {/* Consumo inmediato: actividad (tarea) de la obra. Sin
                                 tarea BC no puede consumir contra el proyecto, así que
                                 acá es obligatoria (y no se pide si va a inventario). */}
-                            {esConsumo && g.obraCodigo && (
+                            {(esConsumo || esSub) && g.obraCodigo && (
                               <div className="row gap-2" style={{ alignItems: "center", padding: "0 12px 10px" }}>
                                 <span className="ds-muted ds-label" style={{ flexShrink: 0 }}>Actividad</span>
                                 <TareaPicker obra={g.obraCodigo} value={g.taskNo} valueNombre={g.taskNombre}
@@ -1462,7 +1642,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                             {/* Materiales de esta obra */}
                             {filas.length === 0 ? (
                               <div className="ds-muted ds-body-sm" style={{ padding: "0 14px 14px" }}>
-                                {g.obraCodigo ? "Agregá materiales con el +." : "Elegí una obra y agregá sus materiales con el +."}
+                                {esSub
+                                  ? (g.obraCodigo ? "Agregá los servicios del subcontrato con el +." : "Elegí la obra y agregá los servicios con el +.")
+                                  : (g.obraCodigo ? "Agregá materiales con el +." : "Elegí una obra y agregá sus materiales con el +.")}
                               </div>
                             ) : (
                               <div className="col gap-0" style={{ borderTop: "1.5px solid var(--ds-color-gray-100)" }}>
@@ -1473,6 +1655,28 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                                   const variantes = variantesDe(l);
                                   const faltaVar = necesitaVariante(l);
                                   const flash = l.key === flashKey;
+                                  // SUBCONTRATO: servicio + ALCANCE en texto libre + MONTO global. No hay
+                                  // cantidad, ni variante, ni existencias: el servicio se contrata completo.
+                                  if (esSub) return (
+                                    <div key={l.key} className="col gap-2" style={{ padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0, background: flash ? "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" : "transparent", transition: "background .2s ease" }}>
+                                      <div className="row gap-3" style={{ alignItems: "center" }}>
+                                        <div className="col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+                                          <span className="ds-body-sm ds-strong">{a?.descripcion ?? "—"}</span>
+                                          <span className="ds-muted ds-label">{a?.code}</span>
+                                        </div>
+                                        <Monto value={l.monto} onChange={(n) => setLinea(l.key, { monto: n })} currency={currency} />
+                                        <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar servicio"
+                                          style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8, flexShrink: 0 }}>
+                                          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+                                        </button>
+                                      </div>
+                                      {/* El alcance es lo que va a leer el proveedor en la orden de BC. Si se
+                                          deja vacío queda la descripción del servicio del catálogo. */}
+                                      <input value={l.detalle ?? ""} onChange={(e) => setLinea(l.key, { detalle: e.target.value })}
+                                        placeholder="Alcance (lo que va a decir la orden)…" aria-label="Alcance del servicio"
+                                        style={{ width: "100%", height: 38, borderRadius: 10, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 12px", fontSize: 14, outline: "none" }} />
+                                    </div>
+                                  );
                                   return (
                                     <div key={l.key} className="row gap-3 wrap" style={{ alignItems: "center", padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0, background: flash ? "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" : faltaVar ? "color-mix(in srgb, var(--ds-color-yellow) 12%, var(--ds-color-white))" : "transparent", transition: "background .2s ease" }}>
                                       <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
@@ -1505,11 +1709,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                         );
                       })}
                     </div>
-                    <button type="button" onClick={addGrupo} className="row gap-2"
+                    {esMaterial && <button type="button" onClick={addGrupo} className="row gap-2"
                       style={{ alignItems: "center", justifyContent: "center", width: "100%", padding: 12, borderRadius: 14, border: "1.5px dashed var(--ds-color-gray-300)", background: "var(--ds-tint-base)", cursor: "pointer", color: "var(--ds-color-ink)", fontWeight: 600 }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
                       Agregar obra
-                    </button>
+                    </button>}
                   </div>
                 ) : (
                   /* REPUESTO: una máquina + sus repuestos. STOCK: solo la lista de
@@ -1583,11 +1787,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
             {hayMateriales && (
               <div className="row gap-2" style={{ alignItems: "center" }}>
                 <PrioridadBtn value={prioridad} onChange={setPrioridad} />
-                <ComentarioBtn value={notas} onChange={setNotas} required />
-                <button type="button" className="nsl-toolbtn" data-tip="Guardar como plantilla" onClick={() => { setNombrePlant(""); setGuardarPlantOpen(true); }} disabled={validLines.length === 0}
+                <ComentarioBtn value={notas} onChange={setNotas} required para={esSub ? "aprobación" : undefined} />
+                {!esSub && <button type="button" className="nsl-toolbtn" data-tip="Guardar como plantilla" onClick={() => { setNombrePlant(""); setGuardarPlantOpen(true); }} disabled={validLines.length === 0}
                   aria-label="Guardar como plantilla">
                   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 17l-5.2 2.6 1-5.75-4.2-4.1 5.8-.85L12 3.6z" /></svg>
-                </button>
+                </button>}
               </div>
             )}
             {/* Editando: guarda los cambios del pedido. Nuevo: confirma y envía. */}
@@ -1626,7 +1830,16 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
           {confirmPedir && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(15,18,20,.42)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 6 }}>
               <div role="dialog" aria-modal="true" aria-label="¿Enviar el pedido?" style={{ background: "var(--ds-tint-base)", borderRadius: 18, padding: 22, width: "100%", maxWidth: 380, boxShadow: "0 24px 60px rgba(15,18,20,.28)" }}>
-                <h3 className="ds-subtitle-lg" style={{ marginTop: 0, marginBottom: 8 }}>¿Enviar el pedido?</h3>
+                <h3 className="ds-subtitle-lg" style={{ marginTop: 0, marginBottom: 8 }}>{esSub ? "¿Enviar el subcontrato?" : "¿Enviar el pedido?"}</h3>
+                {esSub ? (
+                  <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
+                    Se envía a aprobación: <strong>{validLines.length} servicio(s)</strong> por <strong>{money(totalSub, currency)}</strong>{" "}
+                    a <strong>{provSel?.nombre ?? "el subcontratista"}</strong>, contra{" "}
+                    <strong>{grupos[0]?.obraCodigo ?? "la obra"}</strong>
+                    {grupos[0]?.taskNo ? <> · tarea <strong>{grupos[0].taskNo}</strong></> : null}.
+                    {" "}Al aprobarse se crea la orden de compra en Business Central.
+                  </p>
+                ) : (
                 <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
                   Se envía a proveeduría: <strong>{validLines.length} material(es)</strong>
                   {esMaterial
@@ -1636,6 +1849,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                       : <> para <strong>{destinoNombre || tipoMeta.destino}</strong>{usaAlmacen ? <> · a <strong>{almacenNombre}</strong></> : <> · <strong>consumo directo</strong></>}</>}
                   {prioridad !== "normal" && <> · prioridad <strong>{PRIORIDADES.find((p) => p.v === prioridad)!.label}</strong></>}.
                 </p>
+                )}
                 <div className="col gap-2" style={{ marginTop: 18 }}>
                   <Button block onClick={pedir} disabled={saving}>{saving ? "Enviando…" : "Confirmar y enviar"}</Button>
                   <Button block variant="ghost" onClick={() => setConfirmPedir(false)} disabled={saving}>Cancelar</Button>
@@ -1652,11 +1866,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                 <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
                   {editandoId
                     ? <>Tenés cambios sin guardar en este pedido. Podés <strong>guardarlos</strong> o descartarlos.</>
-                    : <>Tenés cambios sin enviar. Podés guardarlo como <strong>borrador</strong> para seguir después, o descartarlo.</>}
+                    : esSub
+                      ? <>Tenés un subcontrato sin enviar. Si lo descartás se pierden los montos; si volvés a abrir el panel, lo recuperamos.</>
+                      : <>Tenés cambios sin enviar. Podés guardarlo como <strong>borrador</strong> para seguir después, o descartarlo.</>}
                 </p>
                 <div className="col gap-2" style={{ marginTop: 18 }}>
                   {validLines.length > 0 && (editandoId
                     ? <Button block onClick={guardarEdicion} disabled={saving || !canContinue}>Guardar cambios</Button>
+                    : esSub ? null
                     : <Button block onClick={guardarBorrador} disabled={saving}>Guardar en borrador</Button>)}
                   <Button block variant="outline" onClick={close}>Descartar</Button>
                   <Button block variant="ghost" onClick={() => setConfirmExit(false)}>Seguir editando</Button>

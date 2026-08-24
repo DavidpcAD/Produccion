@@ -362,18 +362,23 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
         await refreshFromApi();
         return o;
       }
-      let created!: Orden;
+      // La orden se arma ACÁ, no dentro del updater de setData: React corre el updater
+      // cuando le toca renderizar, así que si el objeto nacía adentro, quien llamaba
+      // recibía `undefined`. Lo destapó el subcontrato, que necesita el id de la orden
+      // para mandarla a aprobación en el mismo paso. `data` está fresco (el useMemo que
+      // arma estas funciones depende de él).
+      const numero = nextNumero("CP", data.ordenes.map((o) => o.numero));
+      const lineasNuevas: OrdenLinea[] = input.lineas.map((l) => ({ ...l, id: uid(), cantidadRecibida: 0, cantidadFacturada: 0 }));
+      const created: Orden = {
+        id: uid(), numero, proveedorId: input.proveedorId, fecha: todayISO(),
+        fechaRecepEsperada: input.fechaRecepEsperada, currencyCode: input.currencyCode,
+        estado: "abierto", versionesArchivadas: 0, lineas: lineasNuevas,
+        proveedorNo: input.proveedorNo, proveedorNombre: input.proveedorNombre,
+        almacenRecepcion: input.almacenRecepcion,
+        bcNumber: input.bcNumber, bcDeepLink: input.bcDeepLink,
+      };
       setData((d) => {
-        const numero = nextNumero("CP", d.ordenes.map((o) => o.numero));
-        const lineas: OrdenLinea[] = input.lineas.map((l) => ({ ...l, id: uid(), cantidadRecibida: 0, cantidadFacturada: 0 }));
-        created = {
-          id: uid(), numero, proveedorId: input.proveedorId, fecha: todayISO(),
-          fechaRecepEsperada: input.fechaRecepEsperada, currencyCode: input.currencyCode,
-          estado: "abierto", versionesArchivadas: 0, lineas,
-          proveedorNo: input.proveedorNo, proveedorNombre: input.proveedorNombre,
-          almacenRecepcion: input.almacenRecepcion,
-          bcNumber: input.bcNumber, bcDeepLink: input.bcDeepLink,
-        };
+        const lineas = lineasNuevas;
         const pedidos = d.pedidos.map((p) => {
           let touched = false;
           const ls = p.lineas.map((pl) => {

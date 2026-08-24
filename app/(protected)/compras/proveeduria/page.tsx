@@ -9,14 +9,15 @@ import { DataTable } from "@/components/compras/data-table";
 import { VistaToggle } from "@/components/compras/vista-toggle";
 import { IconEye, IconReceipt, IconList } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, destinoCodigo, num, pedidoLineaPendiente, solicitudResumen, tipoSolicitudBadge, destinoDeLinea } from "@/lib/compras/helpers";
+import type { TipoSolicitud } from "@/lib/compras/types";
+import { destinoLabel, destinoCodigo, esSubcontrato, num, pedidoLineaPendiente, solicitudResumen, tipoSolicitudBadge, destinoDeLinea } from "@/lib/compras/helpers";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
 interface Row {
   pedidoId: string;
   pedidoNumero: string;
   destino: string;
-  tipo: "material" | "repuesto" | "stock";
+  tipo: TipoSolicitud;
   pedidoLineaId: string;
   articuloId: string;
   descripcion: string;
@@ -37,8 +38,10 @@ export default function ProveeduriaMaterialesPage() {
   // Proveeduría solo ve líneas de solicitudes ya ENVIADAS por Ingeniería
   // (aprobado / en orden) con saldo por ordenar. Se excluyen borrador y devueltas
   // (siguen en manos del solicitante) y las cerradas (sin saldo).
+  // Los SUBCONTRATOS no pasan por acá: el ingeniero ya eligió al subcontratista y
+  // puso los montos, y su orden nace pendiente de aprobación (ver esSubcontrato).
   const pedidosConSaldo = useMemo(
-    () => pedidos.filter((p) => (p.estado === "aprobado" || p.estado === "en_orden") && p.lineas.some((l) => pedidoLineaPendiente(l) > 0)),
+    () => pedidos.filter((p) => !esSubcontrato(p) && (p.estado === "aprobado" || p.estado === "en_orden") && p.lineas.some((l) => pedidoLineaPendiente(l) > 0)),
     [pedidos]
   );
 

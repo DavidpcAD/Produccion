@@ -15,7 +15,7 @@ import { useSession } from "@/hooks/useSession";
 import { devolucionInfo, esConsumoInmediato, formatDate, formatDiaMes, pedidoBadge, pedidoNumeroCorto, pedidoProgreso, tipoSolicitudBadge, type DevolucionInfo, pedidoEsDelUsuario, veTodoEnCompras } from "@/lib/compras/helpers";
 import type { Pedido } from "@/lib/compras/types";
 
-type Filtro = "todas" | "material" | "repuesto" | "completado";
+type Filtro = "todas" | "material" | "repuesto" | "subcontrato" | "completado";
 
 export default function IngenieriaPage() {
   const { pedidos: pedidosAll, ordenes, movimientos } = useStore();
@@ -48,12 +48,14 @@ export default function IngenieriaPage() {
   const esCompletada = (p: Pedido) => pedidoProgreso(p, ordenesFinal).completado;
   const material = fuente.filter((p) => p.tipoSolicitud === "material").length;
   const repuesto = fuente.filter((p) => p.tipoSolicitud === "repuesto").length;
+  const subcontratos = fuente.filter((p) => p.tipoSolicitud === "subcontrato").length;
   const completadas = fuente.filter(esCompletada).length;
 
   // KPIs (tiles) filtran la tabla; los filtros por columna se apilan encima.
   const base = useMemo(() => fuente.filter((p) =>
     filtro === "material" ? p.tipoSolicitud === "material"
       : filtro === "repuesto" ? p.tipoSolicitud === "repuesto"
+      : filtro === "subcontrato" ? p.tipoSolicitud === "subcontrato"
       : filtro === "completado" ? esCompletada(p) : true
   ), [fuente, filtro, ordenesFinal]); // eslint-disable-line react-hooks/exhaustive-deps
   const dataFinal = base;
@@ -84,8 +86,8 @@ export default function IngenieriaPage() {
           <div className="page__title" style={{ flex: 1, minWidth: 0 }}>
             <h1 className="ds-heading">{veTodo ? "Solicitudes de material" : "Mis solicitudes de material"}</h1>
             <p className="ds-muted">{veTodo
-              ? "Todas las solicitudes de todos los usuarios. Pedí material para una obra o repuestos para una máquina."
-              : "Pedí material para una obra o repuestos para una máquina. Proveeduría se encarga del proveedor."}</p>
+              ? "Todas las solicitudes de todos los usuarios. Material para una obra, repuestos para una máquina o un subcontrato."
+              : "Pedí material para una obra o repuestos para una máquina — o contratá un subcontrato. Proveeduría se encarga del proveedor (el subcontrato va directo a aprobación)."}</p>
           </div>
           <div style={{ flexShrink: 0 }}><Button onClick={() => setNuevoOpen(true)}>+ Nueva solicitud</Button></div>
         </div>
@@ -94,6 +96,7 @@ export default function IngenieriaPage() {
           <Tile value={fuente.length} label="Total" onClick={() => seleccionar("todas")} active={filtro === "todas"} />
           <Tile value={material} label="De material (obra)" accent="var(--ds-color-green-100)" onClick={() => seleccionar("material")} active={filtro === "material"} />
           <Tile value={repuesto} label="De repuesto (máquina)" accent="var(--ds-color-yellow)" onClick={() => seleccionar("repuesto")} active={filtro === "repuesto"} />
+          <Tile value={subcontratos} label="Subcontratos" accent="var(--ds-color-gray-500)" onClick={() => seleccionar("subcontrato")} active={filtro === "subcontrato"} />
           <Tile value={completadas} label="Completadas" accent="var(--ds-color-green-200)" onClick={() => seleccionar("completado")} active={filtro === "completado"} />
         </div>
 

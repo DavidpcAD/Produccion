@@ -20,7 +20,10 @@
 export type Role = "ingenieria" | "proveeduria" | "aprobacion" | "facturacion" | "contabilidad";
 
 export type LineType = "articulo" | "cargo"; // 'cargo' = flete / cargo de producto
-export type TipoSolicitud = "material" | "repuesto" | "stock"; // stock = compra para bodega/inventario
+// stock = compra para bodega/inventario · subcontrato = servicio contratado contra
+// la obra (en BC no hay módulo de subcontratos: es un pedido de compra a un
+// proveedor, con proyecto + tarea, que el ingeniero arma completo).
+export type TipoSolicitud = "material" | "repuesto" | "stock" | "subcontrato";
 // Destino del material/repuesto pedido (el "tag" ALM/CD del pedido):
 //   'almacen' → entra a inventario de un almacén REAL elegido (ALM-GRAL, F-AGREGADO, …)
 //   'consumo' → consumo directo: no entra a inventario (material: contra obra + tarea)

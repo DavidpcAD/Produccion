@@ -272,6 +272,9 @@
 .oc-scope .ds-badge--yellow { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
 .oc-scope .ds-badge--red { background: color-mix(in srgb, var(--ds-color-red-100) 22%, var(--ds-tint-base)); color: var(--ds-color-red-200); }
 .oc-scope .ds-badge--blueish { background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); }
+/* Subcontrato: chip OSCURO. Es la única solicitud que no pasa por proveeduría, así
+   que no debe confundirse con el gris claro de Stock. */
+.oc-scope .ds-badge--ink { background: var(--ds-color-gray-500); color: var(--ds-color-white); }
 
 /* =====================  QUANTITY SELECTOR (ring)  ===================== */
 .oc-scope .ds-qty-selector {

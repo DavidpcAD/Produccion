@@ -130,7 +130,31 @@ export function saltarCantidad(e: React.KeyboardEvent<HTMLInputElement>) {
 export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: string } {
   return t === "repuesto" ? { label: "Repuesto", tone: "yellow" }
     : t === "stock" ? { label: "Stock", tone: "gray" }
+    : t === "subcontrato" ? { label: "Subcontrato", tone: "ink" }
     : { label: "Material", tone: "green" };
+}
+
+// ─── Subcontratos ───────────────────────────────────────────────────────────────
+// Un subcontrato NO pasa por Proveeduría: el ingeniero arma la solicitud Y su orden
+// de compra (proveedor, líneas con monto global, proyecto + tarea) de una sola vez, y
+// esa orden nace "pendiente de aprobación". Al aprobarla se crea el pedido de compra
+// en BC como cualquier otra, y bodega recibe la factura al terminar el servicio.
+// Cada línea va a BC como CANTIDAD 1 × el monto: el servicio se factura completo, no
+// por avances, así que no hay que recibir fracciones.
+export function esSubcontrato(p: Pick<Pedido, "tipoSolicitud">): boolean {
+  return p.tipoSolicitud === "subcontrato";
+}
+
+/** Monto de una línea de subcontrato: vive en la ORDEN (precioUnitario), no en la
+ *  línea de pedido — la tabla del pedido no tiene precio, y el subcontrato siempre
+ *  nace con su orden. Devuelve 0 si todavía no hay orden ligada. */
+export function montoDeLineaSubcontrato(ordenes: Orden[], pedidoLineaId: string): number {
+  for (const o of ordenes) {
+    for (const l of o.lineas) {
+      if (l.pedidoLineaId === pedidoLineaId) return (l.precioUnitario || 0) * (l.cantidad || 1);
+    }
+  }
+  return 0;
 }
 
 // Consumo inmediato: el pedido de obra cuyo material se consume de una vez contra

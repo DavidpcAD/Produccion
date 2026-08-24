@@ -901,6 +901,9 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   // + la tarea sí se les pone (el consumo contra la obra se registra igual).
   const tiposItem = await bcItemTipos(lineas.map((l) => l.itemNo));
   const sinAlmacen = (l: NuevaLineaBc) => (tiposItem.get(l.itemNo) ?? "inventario") !== "inventario";
+  // ¿La descripción la manda la APP o la ficha del artículo de BC? Solo los que no
+  // son de inventario (servicio / no inventariable) llevan la de la app.
+  const descripcionPropia = (l: NuevaLineaBc) => !!(l.descripcion ?? "").trim() && sinAlmacen(l);
   const almacenDe = (l: NuevaLineaBc) => (sinAlmacen(l) ? "" : esConsumo(l) ? (l.locationCode || l.jobNo!) : (l.locationCode || locFallback));
   // Se resuelven ANTES de crear nada en BC: si a una línea de consumo le falta el
   // almacén de su obra, abortamos sin dejar un pedido a medias en BC (y NUNCA se cae a
@@ -920,6 +923,13 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
     const locId = locCode ? locIds.get(locCode) ?? null : null;
     const lineBody: Record<string, unknown> = { lineType: "Item", lineObjectNumber: l.itemNo, quantity: l.cantidad };
     if (l.precio && l.precio > 0) lineBody.directUnitCost = l.precio;
+    // DESCRIPCIÓN de la línea. En un artículo de INVENTARIO manda la ficha de BC (su
+    // descripción es la buena y no se pisa). En SERVICIO / NO INVENTARIABLE la
+    // descripción ES el trabajo contratado —el alcance que escribió el ingeniero en un
+    // subcontrato—, así que esa sí viaja: sin esto la orden llegaba a BC diciendo
+    // "SUBCONTRATO ELECTRICO" a secas, sin decir de qué obra ni de qué alcance.
+    // (BC corta el campo en 100 caracteres.)
+    if (descripcionPropia(l)) lineBody.description = l.descripcion!.slice(0, 100);
     if (locId) lineBody.locationId = locId;
     // Variante: si el item la exige, BC pide itemVariantId (GUID), no el código.
     if (l.variantCode) {
@@ -1101,7 +1111,7 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
   const poId = ((await resPo.json()).value ?? [])[0]?.id;
   if (!poId) throw new Error(`No se encontró el pedido ${orderNo} en BC.`);
   // 2) Líneas existentes en BC.
-  const resLines = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${poId})/purchaseOrderLines?$select=id,sequence,lineType,lineObjectNumber,quantity,directUnitCost,itemVariantId`, { cache: "no-store" });
+  const resLines = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${poId})/purchaseOrderLines?$select=id,sequence,lineType,lineObjectNumber,quantity,directUnitCost,itemVariantId,description`, { cache: "no-store" });
   if (!resLines.ok) throw new Error(`BC ${resLines.status} al leer las líneas de ${orderNo}.`);
   const bcLines: any[] = (await resLines.json()).value ?? [];
   const usados = new Set<string>();
@@ -1124,6 +1134,11 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
     if (lineNo && (conJob || locCode)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "None") : undefined, locationCode: locCode || undefined });
     const patch: Record<string, unknown> = {};
     if (l.precio && l.precio > 0 && Number(bc.directUnitCost) !== l.precio) patch.directUnitCost = l.precio;
+    // Igual que el precio: al validar el artículo, BC pisa la descripción con la de la
+    // ficha. En servicio / no inventariable la descripción de la app es la que vale
+    // (el alcance del subcontrato), así que se reafirma acá.
+    const descr = (l.descripcion ?? "").trim().slice(0, 100);
+    if (descr && soloServicio && String(bc.description ?? "") !== descr) patch.description = descr;
     if (l.variantCode) {
       const vId = await getStdVariantId(l.itemNo, l.variantCode);
       if (vId && bc.itemVariantId !== vId) patch.itemVariantId = vId;

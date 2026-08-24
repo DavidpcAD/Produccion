@@ -7,7 +7,7 @@ import { Badge, Button, Card, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, esConsumoInmediato, formatDate, num, obraDeLinea, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { destinoLabel, esConsumoInmediato, esSubcontrato, formatDate, money, montoDeLineaSubcontrato, num, obraDeLinea, ordenesDePedido, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
 export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +28,12 @@ export default function PedidoDetallePage() {
   const b = pedidoBadge(pedido.estado);
   const t = tipoSolicitudBadge(pedido.tipoSolicitud);
   const ordenado = pedido.lineas.some((l) => l.cantidadOrdenada > 0);
+  // SUBCONTRATO: el proveedor y los montos viven en la orden que se creó junto con la
+  // solicitud (la tabla del pedido no tiene precio).
+  const esSub = esSubcontrato(pedido);
+  const ordenSub = esSub ? ordenesDePedido(ordenes, pedido)[0] : undefined;
+  const monedaSub = ordenSub?.currencyCode ?? "";
+  const totalSub = esSub ? pedido.lineas.reduce((t, l) => t + montoDeLineaSubcontrato(ordenes, l.id), 0) : 0;
 
   // Semilla del pedido: la usa "Copiar" (crea uno nuevo con las mismas líneas) y
   // "Editar" (el MISMO drawer, guardando sobre este pedido). La pantalla completa
@@ -64,7 +70,8 @@ export default function PedidoDetallePage() {
             <div className="row gap-3">
               <h1 className="ds-heading">{pedido.numero}</h1>
               <Badge tone={t.tone}>{t.label}</Badge>
-              {pedido.tipoSolicitud !== "stock" && (
+              {esSub && ordenSub && <Badge tone="ink">{ordenSub.proveedorNombre ?? ordenSub.proveedorNo ?? "Subcontratista"}</Badge>}
+              {pedido.tipoSolicitud !== "stock" && !esSub && (
                 <Badge tone={esConsumoInmediato(pedido) ? "green" : "gray"}>
                   {esConsumoInmediato(pedido)
                     ? "CD · consumo directo"
@@ -76,10 +83,25 @@ export default function PedidoDetallePage() {
             <p className="ds-muted">{destinoLabel(pedido)} · {pedido.solicitante} · {formatDate(pedido.fecha)}</p>
           </div>
           <div className="row gap-3">
-            <Button variant="outline" title="Crear una solicitud nueva con las mismas líneas" onClick={() => setCopiarOpen(true)}>
-              ⧉ Copiar
-            </Button>
-            {(pedido.estado === "borrador" || pedido.estado === "devuelto") && (
+            {!esSub && (
+              <Button variant="outline" title="Crear una solicitud nueva con las mismas líneas" onClick={() => setCopiarOpen(true)}>
+                ⧉ Copiar
+              </Button>
+            )}
+            {/* Subcontrato en borrador = su orden no se llegó a crear (falló el envío).
+                No se puede "mandar a proveeduría" ni editar sin los montos: se elimina y
+                se vuelve a crear (el panel recupera lo que se había tecleado). */}
+            {esSub && (pedido.estado === "borrador" || pedido.estado === "devuelto") && (
+              <>
+                <span className="ds-muted ds-label" style={{ alignSelf: "center", maxWidth: 320 }}>
+                  Este subcontrato quedó sin orden de compra. Eliminalo y volvé a crearlo desde “Nuevo pedido”.
+                </span>
+                <Button variant="outline" onClick={async () => { await deletePedido(pedido.id); toast("Subcontrato eliminado"); router.push("/compras/ingenieria"); }}>
+                  Eliminar
+                </Button>
+              </>
+            )}
+            {!esSub && (pedido.estado === "borrador" || pedido.estado === "devuelto") && (
               <>
                 <Button variant="outline" onClick={async () => { await deletePedido(pedido.id); toast("Pedido eliminado"); router.push("/compras/ingenieria"); }}>
                   Eliminar
@@ -107,6 +129,43 @@ export default function PedidoDetallePage() {
           <Card flat className="mt-2"><span className="ds-muted ds-label">Notas:</span> {pedido.notas}</Card>
         )}
 
+        {/* SUBCONTRATO: no hay cantidades ni almacén que mostrar — hay ALCANCE y MONTO.
+            El servicio se recibe completo, así que la última columna es sí/no. */}
+        {esSub ? (
+        <Card className="mt-4" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="ds-table-wrap" style={{ boxShadow: "none" }}>
+            <table className="ds-table ds-table--center-num">
+              <thead>
+                <tr>
+                  <th>Servicio</th><th>Obra</th><th>Actividad</th>
+                  <th className="ds-num">Monto</th><th className="ds-num">Recibido</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pedido.lineas.map((l) => {
+                  const recibido = recibidoDeLineaPedido(ordenes, l.id) > 0;
+                  return (
+                    <tr key={l.id}>
+                      <td>{l.descripcion}</td>
+                      <td className="ds-muted">{obraDeLinea(l, pedido) || pedido.obraCodigo || "—"}</td>
+                      <td className="ds-muted">{l.taskNo ? `${l.taskNo}${l.taskDescr ? ` — ${l.taskDescr}` : ""}` : "—"}</td>
+                      <td className="ds-num ds-strong">{money(montoDeLineaSubcontrato(ordenes, l.id), monedaSub)}</td>
+                      <td className="ds-num">{recibido ? <Badge tone="green">Sí</Badge> : <span className="ds-pending-text">Pendiente</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3} className="ds-strong">Total del subcontrato</td>
+                  <td className="ds-num ds-strong">{money(totalSub, monedaSub)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </Card>
+        ) : (
         <Card className="mt-4" style={{ padding: 0, overflow: "hidden" }}>
           <div className="ds-table-wrap" style={{ boxShadow: "none" }}>
             <table className="ds-table ds-table--center-num">
@@ -140,9 +199,19 @@ export default function PedidoDetallePage() {
             </table>
           </div>
         </Card>
+        )}
 
-        {pedido.estado === "aprobado" && !ordenado && (
+        {!esSub && pedido.estado === "aprobado" && !ordenado && (
           <p className="ds-muted ds-label mt-4">Este pedido está aprobado. Proveeduría puede convertirlo en una orden de compra.</p>
+        )}
+        {esSub && ordenSub && (
+          <p className="ds-muted ds-label mt-4">
+            {ordenSub.estado === "pendiente_aprobacion"
+              ? <>Orden <strong>{ordenSub.numero}</strong> pendiente de aprobación. Al aprobarse se crea el pedido de compra en Business Central.</>
+              : ordenSub.estado === "rechazado"
+                ? <>Orden <strong>{ordenSub.numero}</strong> rechazada{ordenSub.motivoRechazo ? `: ${ordenSub.motivoRechazo}` : ""}.</>
+                : <>Orden <strong>{ordenSub.numero}</strong>{ordenSub.bcNumber ? <> · en Business Central como <strong>{ordenSub.bcNumber}</strong></> : null}. Falta recibir la factura del servicio.</>}
+          </p>
         )}
 
         <h3 className="ds-subtitle mt-6" style={{ marginBottom: 12 }}>Historial</h3>
