@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bcResyncPedidoLines, bcReleasePedido, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo } from "@/lib/compras/bc";
+import { bcResyncPedidoLines, bcReleasePedido, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo, bcCompletarProyectoTarea, mensajeConsumoIncompleto, bcLineasProyectoSinTarea, mensajeProyectoSinTarea } from "@/lib/compras/bc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
   let orderNo = "";
   try {
     const body = await req.json();
-    const { lineas, cargos, metodo } = body;
+    const { lineas, cargos, metodo, consumoDirecto } = body;
     orderNo = body.orderNo ?? "";
     if (!orderNo) return NextResponse.json({ error: "Falta orderNo" }, { status: 400 });
     let jobError: string | undefined;
@@ -91,6 +91,36 @@ export async function POST(req: Request) {
         error: `No se aplicó el proyecto/tarea/almacén en BC (${jobError}). El pedido ${orderNo} quedó ABIERTO en BC sin lanzar.`,
         jobError,
       }, { status: 502 });
+    }
+    // CONSUMO DIRECTO: completarle a BC el proyecto+tarea que la app conoce por la
+    // solicitud. Proveeduría crea el pedido sin la tarea y BC no lanza así; sin esto,
+    // la salida a mano es borrarle el proyecto a la línea, y entonces el material
+    // entra a inventario en vez de ir contra la partida de la obra. Solo se escribe
+    // proyecto/tarea: el ALMACÉN es de Proveeduría y no se toca.
+    // Si al final alguna línea de consumo directo se queda sin obra+tarea en BC, NO se
+    // lanza: ese es exactamente el caso en que el material entra a inventario en
+    // silencio en vez de cargarse a la partida de la obra (CP-005182 / CP-005132).
+    if (Array.isArray(consumoDirecto) && consumoDirecto.length) {
+      let cd: Awaited<ReturnType<typeof bcCompletarProyectoTarea>>;
+      try {
+        cd = await bcCompletarProyectoTarea(orderNo, consumoDirecto);
+      } catch (e) {
+        cd = { aplicadas: 0, pendientes: [], error: String((e as Error)?.message ?? e) };
+      }
+      if (cd.pendientes.length || cd.error) {
+        const detalle = cd.pendientes.length ? mensajeConsumoIncompleto(cd.pendientes) : `no se pudo dejar el consumo directo puesto en BC: ${cd.error}. El pedido ${orderNo} NO se lanzó.`;
+        return NextResponse.json({ ok: false, error: detalle, consumoPendiente: cd.pendientes, cdError: cd.error }, { status: 502 });
+      }
+    }
+    // PRE-VUELO: línea con OBRA y SIN TAREA. BC rechaza el Release con "Project Task
+    // No. must have a value in Purchase Line…", un error crudo que no dice qué línea es
+    // ni qué hacer, y el aprobador lo reintenta en vano (caso CP-005170, 25/08/2026: 8
+    // intentos). Se lee el pedido antes de lanzar para decir la línea, el artículo y la
+    // obra. NO se le quita el proyecto para poder lanzar: si la compra va contra la
+    // obra, va con su tarea — sin tarea el costo se iría a inventario y no a la partida.
+    const sinTarea = await bcLineasProyectoSinTarea(orderNo);
+    if (sinTarea?.length) {
+      return NextResponse.json({ ok: false, error: mensajeProyectoSinTarea(sinTarea), jobSinTarea: sinTarea }, { status: 502 });
     }
     try {
       const status = await bcReleasePedido(orderNo);

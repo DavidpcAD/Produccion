@@ -4,7 +4,7 @@
 // rechaza las líneas, la orden queda como estaba (pendiente) y se devuelve el
 // motivo real, para que el estado en SQL/UI nunca mienta respecto a BC.
 import type { Orden } from "./types";
-import { ALMACEN_GENERAL } from "./helpers";
+import { ALMACEN_GENERAL, numeroOrden } from "./helpers";
 
 type SetOrdenEstado = (
   id: string,
@@ -57,6 +57,8 @@ export async function aprobarYLanzar(
       // recepción → se descarta y cae al General.
       const almacenReal = l.almacen && l.almacen !== l.proyecto ? l.almacen : "";
       return {
+        // El N.º de línea viaja para poder emparejar con BC sin adivinar por artículo.
+        lineNo: l.lineNo,
         itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0,
         descripcion: l.descripcion, variantCode: l.variantCode,
         // Unidad con la que se pidió (EST, PQT…). Hasta ahora se quedaba en SQL y BC
@@ -78,10 +80,16 @@ export async function aprobarYLanzar(
   // Método de asignación del cargo (Amount|Weight|Volume|Equally). Uno por orden.
   const metodoCargo = orden.lineas.find((l) => l.tipo === "cargo")?.chargeMethod || "Amount";
 
+  // Líneas que van contra la obra (proyecto + tarea): lo que hay que asegurarse de
+  // que BC tenga puesto antes de lanzar.
+  const consumoDirecto = lineasBc
+    .filter((l) => l.jobNo && l.jobTaskNo)
+    .map((l) => ({ lineNo: l.lineNo, itemNo: l.itemNo, jobNo: l.jobNo!, jobTaskNo: l.jobTaskNo! }));
+
   // Sin proveedor de BC o sin líneas: no hay nada que enviar a BC; se lanza local.
   if (!orden.proveedorNo || !lineasBc.length) {
     await setOrdenEstado(orden.id, "lanzado");
-    return { ok: true, tone: "success", message: `${orden.numero} aprobada y lanzada (sin envío a BC)` };
+    return { ok: true, tone: "success", message: `${numeroOrden(orden)} aprobada y lanzada (sin envío a BC)` };
   }
 
   // Nota: el TIPO del cargo (Item Charge) lo resuelve el servidor — por el chargeNo del
@@ -112,9 +120,14 @@ export async function aprobarYLanzar(
       // lectura del estado real de BC cuando falla (ya lanzado / ya registrado /
       // eliminado / en aprobación), que es lo que evita que la orden se quede
       // colgada en "pendiente" para siempre.
+      //
+      // `consumoDirecto` sí viaja: son las líneas que van contra obra + tarea. El
+      // servidor le completa a BC la TAREA que Proveeduría no copia (sin tocar el
+      // almacén). Sin esto BC rechaza el Release y la salida a mano —borrarle el
+      // proyecto a la línea— manda el material a inventario en vez de a la obra.
       res = await fetch("/api/compras/bc/relanzar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderNo: orden.bcNumber }),
+        body: JSON.stringify({ orderNo: orden.bcNumber, consumoDirecto }),
       });
       d = await res.json().catch(() => ({}));
     } catch (e: any) {

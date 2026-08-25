@@ -153,6 +153,9 @@ export type OrdenEstado =
 
 export interface OrdenLinea {
   id: string;
+  /** N.º de línea del documento (10000, 20000…). Es el mismo que lleva la línea en
+   *  Business Central, así que sirve para emparejarlas sin adivinar por artículo. */
+  lineNo?: number;
   tipo: LineType;
   articuloId?: string;
   variantCode?: string;     // variante del item (obligatoria en BC para items con variantes)

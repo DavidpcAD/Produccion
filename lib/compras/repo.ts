@@ -1,4 +1,5 @@
 import { getPool, sql } from "./db";
+import { etiquetaInterna } from "./helpers";
 import type { Orden, OrdenLinea, Pedido, PedidoLinea, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
 
 /* ============================================================================
@@ -330,7 +331,8 @@ function mapOrden(o: any, lineas: any[]): Orden {
     versionesArchivadas: Number(o.versionesArchivadas ?? 0),
     bcNumber: o.bcNo || undefined,           // Nº del Pedido en BC (para relanzar/recibir/facturar)
     lineas: lineas.map((l): OrdenLinea => ({
-      id: String(l.idOrdenCompraDet), tipo: (l.tipoLinea === "cargo" ? "cargo" : "articulo"),
+      id: String(l.idOrdenCompraDet), lineNo: Number(l.lineNum ?? 0) || undefined,
+      tipo: (l.tipoLinea === "cargo" ? "cargo" : "articulo"),
       // La variante se hereda del pedido si la orden no la trae (ver el COALESCE del
       // query): sin ella BC rechaza el lanzamiento.
       articuloId: l.itemNo ?? undefined, variantCode: (l.variantCodeEfectivo ?? l.variantCode) ?? undefined, pedidoLineaId: l.idPedidoCompraDet ? String(l.idPedidoCompraDet) : undefined,
@@ -944,7 +946,7 @@ export async function listNotasCredito(): Promise<NotaCreditoLinea[]> {
   const pool = await getPool();
   const r = await pool.request().query(`
     SELECT nc.idNotaCreditoDet, nc.idOrdenCompra, nc.idOrdenCompraDet, nc.articuloNo, nc.descripcion,
-           nc.motivo, nc.cantidad, nc.precioUnitario, nc.nota, nc.estado, nc.fechaCreacion, o.ordenNo
+           nc.motivo, nc.cantidad, nc.precioUnitario, nc.nota, nc.estado, nc.fechaCreacion, o.ordenNo, o.bcNo
     FROM dbo.NotaCreditoDet nc
     LEFT JOIN dbo.OrdenCompra o ON o.idOrdenCompra = nc.idOrdenCompra
     WHERE ISNULL(nc.esEliminada,0)=0
@@ -952,7 +954,10 @@ export async function listNotasCredito(): Promise<NotaCreditoLinea[]> {
   return r.recordset.map((x: any) => ({
     id: String(x.idNotaCreditoDet),
     ordenId: String(x.idOrdenCompra),
-    ordenNumero: x.ordenNo ?? "",
+    // El N.º de BC si la orden ya está allá; si no, "Interno 62". Nunca el `ordenNo`
+    // crudo: se lee igual que un pedido de BC y en BC no existe (Contabilidad lo busca
+    // allá y no aparece).
+    ordenNumero: x.bcNo || etiquetaInterna(x.ordenNo ?? ""),
     ordenLineaId: x.idOrdenCompraDet != null ? String(x.idOrdenCompraDet) : undefined,
     articuloNo: x.articuloNo ?? undefined,
     descripcion: x.descripcion ?? "",

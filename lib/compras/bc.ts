@@ -870,11 +870,11 @@ export async function bcSetLineJobs(orderNo: string, asignaciones: AsignacionLin
 // Purchase_Order_Line_Excel (OData V4), que existe en los dos entornos y no depende
 // de la extensión. Verificado contra Sandbox: borrar y poner Job No./Job Task No. por
 // PATCH funciona (200) y queda.
-type LineaJobBc = { lineNo: number; jobNo: string; jobTaskNo: string; locationCode: string };
+type LineaJobBc = { lineNo: number; itemNo: string; jobNo: string; jobTaskNo: string; locationCode: string };
 
 function paginaLineasUrl(cid: string, orderNo: string): string {
   const filtro = encodeURIComponent(`Document_No eq '${odataStr(orderNo)}'`);
-  return `${odataRoot()}/Purchase_Order_Line_Excel?company=${encodeURIComponent(cid)}&$filter=${filtro}&$select=Document_No,Line_No,Job_No,Job_Task_No,Location_Code`;
+  return `${odataRoot()}/Purchase_Order_Line_Excel?company=${encodeURIComponent(cid)}&$filter=${filtro}&$select=Document_No,Line_No,No,Job_No,Job_Task_No,Location_Code`;
 }
 
 /** Proyecto/tarea/almacén REALES de las líneas del pedido en BC. `null` = no se pudo leer. */
@@ -883,14 +883,40 @@ async function bcLineasJob(orderNo: string): Promise<LineaJobBc[] | null> {
     const cid = await getStdCompanyId();
     const res = await bcFetch(paginaLineasUrl(cid, orderNo), { cache: "no-store" });
     if (!res.ok) return null;
-    const data = (await res.json()) as { value?: { Line_No?: number; Job_No?: string; Job_Task_No?: string; Location_Code?: string }[] };
+    const data = (await res.json()) as { value?: { Line_No?: number; No?: string; Job_No?: string; Job_Task_No?: string; Location_Code?: string }[] };
     return (data.value ?? []).map((l) => ({
       lineNo: Number(l.Line_No ?? 0),
+      itemNo: String(l.No ?? "").trim(),
       jobNo: String(l.Job_No ?? "").trim(),
       jobTaskNo: String(l.Job_Task_No ?? "").trim(),
       locationCode: String(l.Location_Code ?? "").trim(),
     }));
   } catch { return null; }
+}
+
+/** Líneas que en BC llevan OBRA pero NO tarea. `null` = no se pudo leer (no concluir).
+ *
+ *  BC no lanza un pedido así ("Project Task No. must have a value in Purchase Line…")
+ *  y el error crudo no dice qué hacer. Se lee ANTES del Release para poder avisar con
+ *  la línea, el artículo y la obra.
+ *
+ *  Regla (25/08/2026, caso CP-005170 / orden CP-000057): si la línea lleva obra, lleva
+ *  su TAREA. No se le quita el proyecto para salir del paso: el costo se iría a
+ *  inventario en vez de a la partida de la obra. Quién mete el proyecto sin tarea:
+ *  Proveeduría, que al enviar la orden a aprobación crea el pedido en BC y copia el
+ *  campo `obra` de la línea a Job No. aunque la solicitud no tenga tarea (una solicitud
+ *  de material "a inventario" NO debería llevar proyecto). */
+export async function bcLineasProyectoSinTarea(orderNo: string): Promise<{ lineNo: number; itemNo: string; jobNo: string }[] | null> {
+  const enBc = await bcLineasJob(orderNo);
+  if (!enBc) return null;
+  return enBc.filter((l) => l.jobNo && !l.jobTaskNo).map(({ lineNo, itemNo, jobNo }) => ({ lineNo, itemNo, jobNo }));
+}
+
+/** Texto para el usuario de las líneas con obra y sin tarea (para el toast y el
+ *  historial de la orden). Sin el Nº de pedido: quien llama ya lo dice. */
+export function mensajeProyectoSinTarea(lineas: { lineNo: number; itemNo: string; jobNo: string }[]): string {
+  const detalle = lineas.map((l) => `línea ${l.lineNo}${l.itemNo ? ` (${l.itemNo})` : ""} · obra ${l.jobNo}`).join(" · ");
+  return `hay ${lineas.length} línea(s) con obra y sin tarea (${detalle}). BC no lanza una línea con proyecto sin tarea: ponele la tarea (actividad) de la obra a esa línea y reintentá. Si el material no va contra la obra, quitale el proyecto al pedido.`;
 }
 
 /** Asignaciones que BC NO tiene puestas. `null` = no se pudo verificar (no concluir). */
@@ -953,6 +979,93 @@ async function bcAplicarAsignaciones(orderNo: string, asignaciones: AsignacionLi
   const detalle = [quejaCodeunit || "el codeunit no aplicó nada", plan.errors].filter(Boolean).join(" · ");
   const lineas = (siguenFaltando ?? faltan).map((a) => a.lineNo).join(", ");
   return `${detalle} (líneas sin proyecto/tarea: ${lineas})`;
+}
+
+// ─── Consumo directo: completar el proyecto/tarea que la app SÍ conoce ──────────
+//
+// POR QUÉ (caso 25/08/2026): Proveeduría crea el pedido en BC copiando la obra al
+// `Job No.` (o al almacén) pero NUNCA la tarea, porque no la tiene. BC entonces
+// rechaza el Release con "Project Task No. must have a value…" y la salida fácil es
+// borrarle el proyecto a la línea en BC — con eso el pedido lanza, pero el material
+// entra a INVENTARIO en la ubicación de la obra en vez de consumirse contra la
+// partida (pasó con CP-005182, CP-005183 y CP-005132).
+//
+// La app sí sabe la tarea: viene de la solicitud de Ingeniería. Así que antes de
+// lanzar se la escribe a BC. Reglas, todas para no romper nada de lo que ya hay allá:
+//   · Solo `Job No.` + `Job Task No.` (+ Job Line Type "None", igual que al crear el
+//     pedido: con "Budget" BC infla el presupuesto de la obra con cada compra). El
+//     ALMACÉN no se toca — es de Proveeduría y pisarlo fue el problema que arregló
+//     el cambio de "aprobar es lanzar, no reescribir" (ver aprobar.ts).
+//   · Se emparejan las líneas por N.º de línea, y solo si el ARTÍCULO coincide. Sin
+//     eso, un pedido con el mismo artículo repetido (una línea a inventario y otra
+//     contra la obra) podía terminar cargándole la obra a la línea equivocada.
+//   · Si la línea en BC ya tiene tarea, no se le toca: alguien la puso a mano.
+//   · Si en BC la línea tiene OTRA obra que la de la app, tampoco: repuntar el costo
+//     a otra obra en silencio es peor que no lanzar. Sale como pendiente y quien
+//     aprueba se entera.
+// `pendientes` son las líneas de consumo directo que, después de intentarlo, siguen
+// SIN obra+tarea en BC: quien llama NO debe lanzar el pedido si hay alguna.
+export type LineaConsumoBc = { lineNo?: number; itemNo: string; jobNo: string; jobTaskNo: string };
+export type PendienteConsumoBc = { lineNo: number; itemNo: string; motivo: string };
+
+export async function bcCompletarProyectoTarea(
+  orderNo: string,
+  cd: LineaConsumoBc[],
+): Promise<{ aplicadas: number; pendientes: PendienteConsumoBc[]; error?: string }> {
+  const items = (cd ?? []).filter((l) => l.itemNo && l.jobNo && l.jobTaskNo);
+  if (!orderNo || !items.length) return { aplicadas: 0, pendientes: [] };
+  const enBc = await bcLineasJob(orderNo);
+  // No se pudo LEER el pedido: no se puede afirmar que las líneas estén bien, y
+  // lanzar a ciegas es justo lo que manda el material a inventario sin su obra.
+  if (!enBc) return { aplicadas: 0, pendientes: [], error: `no se pudieron leer las líneas de ${orderNo} en BC para verificar el consumo directo` };
+
+  const clave = (n: string) => (n ?? "").trim().toUpperCase();
+  const lineas = [...enBc].sort((a, b) => a.lineNo - b.lineNo);
+  const usadas = new Set<number>();
+  const pares: { linea: LineaJobBc; quiere: LineaConsumoBc }[] = [];
+
+  // 1) Por N.º de línea (lo firme), exigiendo que el artículo sea el mismo.
+  const pendientesDeEmparejar: LineaConsumoBc[] = [];
+  for (const q of items) {
+    const l = q.lineNo ? lineas.find((x) => x.lineNo === q.lineNo && clave(x.itemNo) === clave(q.itemNo)) : undefined;
+    if (l && !usadas.has(l.lineNo)) { usadas.add(l.lineNo); pares.push({ linea: l, quiere: q }); }
+    else pendientesDeEmparejar.push(q);
+  }
+  // 2) Las que quedaron (datos viejos sin N.º de línea): por artículo, en orden.
+  for (const q of pendientesDeEmparejar) {
+    const l = lineas.find((x) => !usadas.has(x.lineNo) && clave(x.itemNo) === clave(q.itemNo));
+    if (l) { usadas.add(l.lineNo); pares.push({ linea: l, quiere: q }); }
+  }
+
+  const asignaciones: AsignacionLineaBc[] = [];
+  const pendientes: PendienteConsumoBc[] = [];
+  for (const { linea, quiere } of pares) {
+    if (linea.jobTaskNo) continue;                       // ya tiene tarea en BC: se respeta
+    if (linea.jobNo && clave(linea.jobNo) !== clave(quiere.jobNo)) {
+      pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `en BC está contra la obra ${linea.jobNo} y la solicitud dice ${quiere.jobNo}: no se toca desde acá` });
+      continue;
+    }
+    asignaciones.push({ lineNo: linea.lineNo, jobNo: quiere.jobNo, jobTaskNo: quiere.jobTaskNo, jobLineType: "None" });
+  }
+  // Líneas de consumo directo de la app que ni siquiera están en el pedido de BC.
+  for (const q of items) {
+    if (pares.some((p) => p.quiere === q)) continue;
+    pendientes.push({ lineNo: q.lineNo ?? 0, itemNo: q.itemNo, motivo: `la línea del artículo ${q.itemNo} no aparece en el pedido de BC` });
+  }
+  if (!asignaciones.length) return { aplicadas: 0, pendientes };
+
+  const error = await bcAplicarAsignaciones(orderNo, asignaciones);
+  if (error) {
+    for (const a of asignaciones) pendientes.push({ lineNo: a.lineNo, itemNo: lineas.find((l) => l.lineNo === a.lineNo)?.itemNo ?? "", motivo: "BC no aceptó el proyecto/tarea" });
+    return { aplicadas: 0, pendientes, error };
+  }
+  return { aplicadas: asignaciones.length, pendientes };
+}
+
+/** Texto para el usuario de las líneas de consumo directo que quedaron sin obra+tarea. */
+export function mensajeConsumoIncompleto(pendientes: PendienteConsumoBc[]): string {
+  const detalle = pendientes.map((p) => `línea ${p.lineNo || "?"}${p.itemNo ? ` (${p.itemNo})` : ""}: ${p.motivo}`).join(" · ");
+  return `${pendientes.length} línea(s) de consumo directo se quedaron sin obra y tarea en BC (${detalle}). No se lanzó el pedido: así el material entraría a inventario en vez de cargarse a la obra. Arreglalo en BC (o quitale el consumo directo a la solicitud) y reintentá.`;
 }
 
 /** De una lista de artículos, cuáles TIENEN variantes en BC. `null` = no se pudo saber.
@@ -1203,6 +1316,10 @@ export function mensajeBcLegible(raw: string): string {
     return "El pedido está pendiente de aprobación en BC. Aprobalo ahí y reintentá el lanzamiento.";
   if (l.includes("location code must have a value"))
     return `A una línea le falta el almacén en BC: ${msg}`;
+  // Línea con obra y sin tarea. Respaldo del pre-vuelo de /api/compras/bc/relanzar
+  // (que sí sabe qué línea y qué obra): esto es para cuando no se pudo leer el pedido.
+  if (l.includes("project task no. must have a value") || l.includes("job task no. must have a value"))
+    return `Una línea del pedido lleva obra pero no tarea, y BC no lanza así. Ponele la tarea (actividad) de la obra a esa línea; si el material no va contra la obra, quitale el proyecto. Detalle de BC: ${msg}`;
   return msg || "BC no dio detalle del error.";
 }
 
@@ -1451,6 +1568,16 @@ export async function bcCrearYLanzarPedido(input: { vendorNo: string; currencyCo
       number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError,
       released: false,
       releaseError: `No se aplicó el proyecto/tarea/almacén en BC (${jobError}). El pedido ${number} quedó ABIERTO en BC sin lanzar, para no registrar material sin su obra.`,
+    };
+  }
+  // Misma red que en /api/compras/bc/relanzar: si alguna línea quedó con obra y sin
+  // tarea, BC rechaza el Release con un error crudo. Se avisa con la línea y la obra.
+  const sinTarea = await bcLineasProyectoSinTarea(number);
+  if (sinTarea?.length) {
+    return {
+      number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError,
+      released: false,
+      releaseError: `El pedido ${number} quedó ABIERTO en BC: ${mensajeProyectoSinTarea(sinTarea)}`,
     };
   }
   try {
