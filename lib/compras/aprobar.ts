@@ -59,6 +59,9 @@ export async function aprobarYLanzar(
       return {
         itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0,
         descripcion: l.descripcion, variantCode: l.variantCode,
+        // Unidad con la que se pidió (EST, PQT…). Hasta ahora se quedaba en SQL y BC
+        // ponía la suya; sin esto, pedir 2 PQT termina comprando 2 UND.
+        unidad: l.unidad,
         jobNo: consumo ? l.proyecto : undefined,
         jobTaskNo: consumo ? l.taskNo : undefined,
         // Consumo inmediato: el almacén de la OBRA (en BC tiene el mismo código que el

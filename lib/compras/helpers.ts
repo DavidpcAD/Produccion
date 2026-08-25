@@ -43,6 +43,81 @@ export function destinoDeLinea(l: Pick<PedidoLinea, "obraCodigo" | "almacen">, p
   return obraDeLinea(l, p);
 }
 
+// ─── UNIDADES DE MEDIDA ─────────────────────────────────────────────────────────
+// Un material se CONSUME en una unidad y se COMPRA en otra. El adhesivo M06-0009 se
+// consume en gramos (unidad base) y se le compra al proveedor por ESTAÑÓN: 255.000
+// gramos por estañón. La solicitud tiene que decir "1 EST", no "1 GR": el 21/08/2026
+// salió una orden pidiendo 1 gramo con el precio del gramo, 255.000 veces abajo.
+//
+// El factor de cada unidad (`qtyPerUnitOfMeasure`) es cuántas unidades BASE trae, y
+// la base es la de factor 1. Todo se convierte pasando por la base.
+
+/** Unidad de un artículo tal como viene de BC (itemUnitsOfMeasure). */
+export type UnidadItem = { code: string; factor: number };
+
+// HRS está cargada en 3.508 de los 5.500 artículos de BC (una pintura "medida en
+// horas"), casi siempre con factor 1 pero en el adhesivo con 4636,36 — el mismo que
+// CUB. Es una carga masiva mal hecha: no se ofrece. Excepción: si es la unidad BASE
+// del artículo (hay uno así), esconderla lo dejaría sin ninguna unidad.
+const UNIDADES_BASURA = new Set(["HRS"]);
+
+/** Unidades que se le OFRECEN a la persona para un artículo. Descarta las que no se
+ *  pueden convertir (sin factor) y la basura de BC, y garantiza que la unidad base
+ *  esté siempre (14 artículos no tienen ninguna fila cargada en BC). */
+export function unidadesOfrecidas(unidades: UnidadItem[], base: string): UnidadItem[] {
+  const b = (base ?? "").trim();
+  const out = (unidades ?? [])
+    .filter((u) => u.code && u.factor > 0)
+    .filter((u) => !UNIDADES_BASURA.has(u.code.toUpperCase()) || u.code.toUpperCase() === b.toUpperCase());
+  if (b && !out.some((u) => u.code.toUpperCase() === b.toUpperCase())) out.unshift({ code: b, factor: 1 });
+  return [...out].sort((a, c) => a.factor - c.factor || a.code.localeCompare(c.code));
+}
+
+/** Con qué unidad arranca una línea nueva: la de COMPRA del artículo si BC la tiene
+ *  y es ofrecible; si no, la base. (En BC casi nadie mantiene la unidad de compra
+ *  —1 artículo de 5.500—, así que en la práctica arranca en la base y la persona
+ *  elige; por eso el selector muestra la equivalencia.) */
+export function unidadPorDefecto(unidades: UnidadItem[], base: string, compra?: string): string {
+  const ofrecidas = unidadesOfrecidas(unidades, base);
+  const c = (compra ?? "").trim();
+  if (c && ofrecidas.some((u) => u.code.toUpperCase() === c.toUpperCase())) return c;
+  const b = (base ?? "").trim();
+  if (b && ofrecidas.some((u) => u.code.toUpperCase() === b.toUpperCase())) return b;
+  return ofrecidas[0]?.code ?? b;
+}
+
+/** Decimales que aguanta la base: dbo.PedidoCompraDet.quantitySolicitado y
+ *  dbo.OrdenCompraDet.quantity son decimal(18,4). Redondear a más no sirve de nada,
+ *  SQL lo trunca igual. */
+export const DEC_CANTIDAD = 4;
+export const redondearCantidad = (n: number) => Math.round(n * 10 ** DEC_CANTIDAD) / 10 ** DEC_CANTIDAD;
+
+/** La MISMA cantidad expresada en otra unidad: 255.000 GR son 1 EST.
+ *  Devuelve null si falta un factor — nunca se adivina — y ya viene redondeada a lo
+ *  que la base puede guardar. */
+export function cantidadEntreUnidades(cantidad: number, factorDesde: number, factorHasta: number): number | null {
+  const q = Number(cantidad), fd = Number(factorDesde), fh = Number(factorHasta);
+  if (!Number.isFinite(q) || q < 0) return null;
+  if (!(fd > 0) || !(fh > 0)) return null;
+  return redondearCantidad((q * fd) / fh);
+}
+
+/** El precio va al revés que la cantidad: ¢1,74 el gramo son ¢443.700 el estañón. */
+export function precioEntreUnidades(precio: number, factorDesde: number, factorHasta: number): number | null {
+  const p = Number(precio), fd = Number(factorDesde), fh = Number(factorHasta);
+  if (!Number.isFinite(p) || p < 0) return null;
+  if (!(fd > 0) || !(fh > 0)) return null;
+  return (p / fd) * fh;
+}
+
+/** "1 EST = 255 000 GR" — nadie sabe cuánto trae un estañón hasta que se lo dicen. */
+export function equivalenciaUnidad(u: UnidadItem | undefined, base: string): string {
+  if (!u || !(u.factor > 0) || u.factor === 1) return "";
+  const b = (base ?? "").trim();
+  if (!b || u.code.toUpperCase() === b.toUpperCase()) return "";
+  return `1 ${u.code} = ${num.format(u.factor)} ${b}`;
+}
+
 // Etiqueta del TIPO de artículo de BC para los buscadores. Los buscadores ofrecen el
 // catálogo COMPLETO (inventario, servicio y no inventariable): el inventario es el
 // caso normal y no lleva etiqueta; los otros dos sí, porque en BC no llevan almacén.

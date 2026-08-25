@@ -44,7 +44,11 @@ export interface Articulo {
   id: string;
   code: string;        // M16-0075
   descripcion: string;
-  unidad: string;      // UND, KG, M, ...
+  unidad: string;      // unidad BASE (UND, KG, GR…): con la que el material se CONSUME
+  /** Unidad de COMPRA de BC (Purch. Unit of Measure): con la que se le pide al
+   *  proveedor. Casi ningún artículo la tiene distinta de la base, así que sirve como
+   *  default, no para saber si el artículo es multi-unidad (eso lo dice itemUnitsOfMeasure). */
+  unidadCompra?: string;
   almacenDefault: string;
   precioReferencia: number;
   // BC Item.Type. El catálogo de los buscadores trae los tres tipos: se compra

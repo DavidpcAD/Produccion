@@ -22,7 +22,7 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, saltarCantidad } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, cantidadEntreUnidades, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, saltarCantidad, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
@@ -30,6 +30,9 @@ type Variante = { code: string; descripcion: string };
 // varias obras (varias tarjetas). Para repuesto/bodega se usa un único grupo (SOLO).
 type Grupo = { key: string; obraCodigo?: string; obraNombre?: string; taskNo?: string; taskNombre?: string };
 type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: string; variantNombre?: string; cantidad: number; obraCodigo?: string; obraNombre?: string; notas?: string; requerido?: number; autoPedir?: boolean;
+  /** Unidad con la que se le va a pedir al proveedor (EST, PQT…). `undefined` = todavía
+   *  no se resolvió; al cargar las unidades del artículo se pone la que corresponde. */
+  unidad?: string;
   /** SUBCONTRATO: alcance en texto libre. Viaja como DESCRIPCIÓN de la línea (a la
    *  orden y a BC); si va vacío queda la descripción del servicio del catálogo. */
   detalle?: string;
@@ -110,7 +113,9 @@ function mergeDedup(rows: Row[]): { rows: Row[]; merged: number } {
   const byKey = new Map<string, Row>();
   let merged = 0;
   for (const r of rows) {
-    const k = dupKey(r.grupoKey, r.articuloId, r.variantCode);
+    // La UNIDAD entra en la clave: 1 EST y 100 GR del mismo material no se pueden
+    // sumar (darían 101 de algo). Si difieren, quedan como dos líneas.
+    const k = `${dupKey(r.grupoKey, r.articuloId, r.variantCode)}|${(r.unidad ?? "").toUpperCase()}`;
     const prev = byKey.get(k);
     if (prev) { prev.cantidad += r.cantidad; merged++; }
     else byKey.set(k, { ...r });
@@ -330,6 +335,55 @@ function Dropdown({ placeholder, items, value, onPick, mode = "select", small, w
 
 // ─── Botón de variante (NO se ve como dropdown): abre la lista al hacer click, y
 //     se puede volver a abrir para CAMBIAR la variante si se eligió mal. ────────────
+// ─── UNIDAD de la línea ─────────────────────────────────────────────────────────
+// Con una sola unidad ofrecible (el 99% de los materiales) se ve exactamente igual que
+// antes: el código, en gris, al lado de la cantidad. Cuando el artículo tiene varias
+// —el adhesivo que se consume en gramos y se compra por estañón— se vuelve un selector
+// que ADEMÁS convierte la cantidad, porque cambiar solo la etiqueta es justo el error
+// que se quiere evitar (1 estañón ≠ 1 gramo).
+function UnidadBtn({ unidades, value, base, onPick }: {
+  unidades: UnidadItem[]; value: string; base: string; onPick: (code: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const sel = unidades.find((u) => u.code.toUpperCase() === (value ?? "").toUpperCase());
+  const equiv = equivalenciaUnidad(sel, base);
+  if (unidades.length <= 1) {
+    return <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{value || base}</span>;
+  }
+  return (
+    <div ref={wrapRef} style={{ display: "inline-flex", flexShrink: 0 }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} title={equiv || `Unidad: ${value}`}
+        aria-label={`Unidad de la línea: ${value}`}
+        style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 40, minWidth: 62, padding: "0 8px", borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "var(--ds-color-ink)" }}>
+        <span>{value || base}</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s ease" }}><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      <Popover anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} minWidth={230}>
+        <div style={{ width: "100%", padding: 8 }}>
+          <span className="ds-muted ds-label" style={{ display: "block", padding: "4px 10px 8px" }}>
+            Unidad con la que se le pide al proveedor
+          </span>
+          <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 260 }}>
+            {unidades.map((u) => {
+              const eq = equivalenciaUnidad(u, base);
+              return (
+                <button key={u.code} type="button" onClick={() => { onPick(u.code); setOpen(false); }}
+                  className={`nsl-opt${u.code.toUpperCase() === (value ?? "").toUpperCase() ? " is-active" : ""}`}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, width: "100%", textAlign: "left", padding: "9px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent", fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>
+                  <span>{u.code}</span>
+                  {eq && <span className="ds-muted ds-label">{eq}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
 function VarianteBtn({ variantes, value, onPick }: {
   variantes: Variante[]; value?: string; onPick: (code: string, nombre?: string) => void;
 }) {
@@ -395,6 +449,12 @@ function Cantidad({ value, onChange }: { value: number; onChange: (n: number) =>
   // En cuanto se teclea, manda el texto tecleado; al salir del campo vuelve a mandar
   // el valor real, ya normalizado. Así no hace falta sincronizar con un efecto.
   const [txt, setTxt] = useState<string | null>(null);
+  // Si el valor cambia DESDE AFUERA sin pasar por el teclado —cambiar la unidad
+  // convierte la cantidad (510.000 GR → 2 EST)— lo tecleado deja de valer: si no, el
+  // campo seguiría mostrando 510.000 al lado de EST, que es justo el error de 255.000×
+  // que esto viene a evitar.
+  const [visto, setVisto] = useState(value);
+  if (value !== visto) { setVisto(value); if (txt !== null) setTxt(null); }
   return (
     <input inputMode="decimal" value={txt ?? textoDeCantidad(value)} aria-label="Cantidad" data-cant="1"
       onFocus={(e) => e.currentTarget.select()}
@@ -787,7 +847,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         // TODO el catálogo, tal cual viene de BC: inventario, servicio y no
         // inventariable. El tipo solo se guarda para etiquetarlo en el buscador.
         const items: Articulo[] = ri.ok ? (((await ri.json()).items ?? []).map((i: any) => ({
-          id: i.id, code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", almacenDefault: "", precioReferencia: 0,
+          id: i.id, code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", unidadCompra: i.unidadCompra || undefined, almacenDefault: "", precioReferencia: 0,
           tipo: (i.tipo === "servicio" || i.tipo === "no-inventario" ? i.tipo : "inventario") as Articulo["tipo"],
         }))) : [];
         const [ro, ra] = await Promise.all([fetch("/api/compras/bc/obras"), fetch("/api/compras/bc/almacenes")]);
@@ -855,6 +915,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const [confirmExit, setConfirmExit] = useState(false);
   const [confirmPedir, setConfirmPedir] = useState(false); // confirmación antes de enviar
   const varCache = useRef<Record<string, Variante[]>>({});
+  const uomCache = useRef<Record<string, UnidadItem[]>>({});
   const seedApplied = useRef(false); // copiar/editar: aplicar la semilla una sola vez por apertura
   const plantAuto = useRef(false);   // Matriz: cargar la plantilla de la clasificación una sola vez
   // Editando un pedido existente (mismo drawer, botón "Guardar cambios").
@@ -864,6 +925,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const idClasificacion = preset?.idClasificacion ?? semilla?.idClasificacion ?? null;
   const obraPreset = preset?.obraCodigo ?? undefined;
   const [varMap, setVarMap] = useState<Record<string, Variante[]>>({});
+  const [uomMap, setUomMap] = useState<Record<string, UnidadItem[]>>({});
   const [fTipoPl, setFTipoPl] = useState<FTipo>("todas");
   const [plantillaSel, setPlantillaSel] = useState("");                          // plantilla elegida (para mostrarla en el campo)
 
@@ -881,9 +943,48 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       varCache.current[code] = vs; setVarMap((m) => ({ ...m, [code]: vs })); return vs;
     } catch { return []; }
   }
+  // Variantes Y unidades del artículo de cada línea, en la misma pasada.
   useEffect(() => {
-    for (const l of lineas) { const a = catArticulos.find((x) => x.id === l.articuloId); if (a?.code) getVariantes(a.code); }
+    for (const l of lineas) {
+      const a = catArticulos.find((x) => x.id === l.articuloId);
+      if (!a?.code) continue;
+      getVariantes(a.code);
+      getUnidades(a.code);
+    }
   }, [lineas, catArticulos]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── UNIDADES del artículo (mismo patrón que las variantes) ────────────────────
+  // Un material se consume en una unidad y se compra en otra: la solicitud tiene que
+  // ir en la unidad con la que se le pide al proveedor. Las unidades y su factor
+  // salen de BC por artículo, se cachean y se piden al agregar la línea.
+  async function getUnidades(code: string): Promise<UnidadItem[]> {
+    if (!code) return [];
+    if (uomCache.current[code]) return uomCache.current[code];
+    try {
+      const r = await fetch(`/api/compras/bc/unidades?item=${encodeURIComponent(code)}`);
+      const us = (r.ok ? (await r.json()).unidades ?? [] : []) as UnidadItem[];
+      uomCache.current[code] = us; setUomMap((m) => ({ ...m, [code]: us })); return us;
+    } catch { return []; }
+  }
+  // Unidades OFRECIBLES de una línea (sin HRS, con la base garantizada) y la elegida.
+  const unidadesDe = (l: Row): UnidadItem[] => {
+    const a = catArticulos.find((x) => x.id === l.articuloId);
+    if (!a) return [];
+    return unidadesOfrecidas(uomMap[a.code] ?? [], a.unidad);
+  };
+  const unidadDe = (l: Row): string => {
+    if (l.unidad) return l.unidad;                       // la que eligió la persona
+    const a = catArticulos.find((x) => x.id === l.articuloId);
+    if (!a) return "";
+    const us = uomMap[a.code];
+    // Mientras BC no conteste, la base: es lo que se venía mandando siempre.
+    return us ? unidadPorDefecto(us, a.unidad, a.unidadCompra) : a.unidad;
+  };
+  const factorDe = (l: Row, code?: string): number => {
+    const c = (code ?? unidadDe(l)).toUpperCase();
+    return unidadesDe(l).find((u) => u.code.toUpperCase() === c)?.factor ?? 1;
+  };
+
 
   // ── Stock del Almacén General, para sugerir cuánto pedir ──────────────────────
   // Aplica al material de obra que va a inventario (no al de consumo inmediato):
@@ -924,11 +1025,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         if (!l.autoPedir || l.requerido == null) return l;
         changed = true;
         const code = catArticulos.find((x) => x.id === l.articuloId)?.code ?? l.articuloId;
-        return { ...l, cantidad: Math.max(0, l.requerido - (stockPorCode[code] ?? 0)), autoPedir: false };
+        const stock = cantidadEntreUnidades(stockPorCode[code] ?? 0, 1, factorDe(l)) ?? (stockPorCode[code] ?? 0);
+        return { ...l, cantidad: Math.max(0, l.requerido - stock), autoPedir: false };
       });
       return changed ? next : ls;
     });
-  }, [verStock, stockReady, stockPorCode, lineas, catArticulos]);
+  }, [verStock, stockReady, stockPorCode, lineas, catArticulos, uomMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tipoMeta = TIPOS.find((t) => t.v === tipo)!;
   const esMaterial = tipo === "material";
@@ -1107,7 +1209,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
             taskNo: pl2.taskNo || undefined, taskNombre: pl2.taskDescr || undefined });
         }
       }
-      rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: pl2.variantCode, variantNombre: pl2.variantNombre, cantidad: pl2.cantidad || 1, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
+      // La UNIDAD viaja con la línea (plantilla nueva o pedido copiado): sin esto la
+      // cantidad quedaría pensada en una unidad y expresada en la base. Las plantillas
+      // viejas la traen vacía y la resuelve el efecto que fija la unidad por defecto.
+      rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: pl2.variantCode, variantNombre: pl2.variantNombre, cantidad: pl2.cantidad || 1, unidad: (pl2.unidad ?? "").trim() || undefined, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
     }
     return { grupos: nuevosGrupos, rows, extras };
   }
@@ -1296,6 +1401,30 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   };
   const delLinea = (key: string) => setLineas((ls) => ls.filter((l) => l.key !== key));
 
+  /** Cambiar la unidad CONVIERTE la cantidad. Cambiar solo la etiqueta es exactamente
+   *  el error que se quiere evitar: 1 estañón no es 1 gramo. Si la conversión no cabe
+   *  en los 4 decimales que guarda la base (1 GR en estañones daría 0,0000 y la línea
+   *  se perdería), no se cambia nada y se avisa. */
+  function cambiarUnidad(l: Row, code: string) {
+    const actual = unidadDe(l);
+    if (!code || code.toUpperCase() === actual.toUpperCase()) return;
+    const nueva = cantidadEntreUnidades(l.cantidad, factorDe(l, actual), factorDe(l, code));
+    if (nueva === null) { setLinea(l.key, { unidad: code }); return; }
+    if (l.cantidad > 0 && nueva === 0) {
+      toast(`${num.format(l.cantidad)} ${actual} no llega a 1 ${code}. Subí la cantidad o dejalo en ${actual}.`, "info");
+      return;
+    }
+    setLinea(l.key, { unidad: code, cantidad: nueva, autoPedir: false });
+  }
+
+  /** Existencias de BC en la unidad de la LÍNEA: BC las devuelve en unidad base, así
+   *  que sin convertir la columna compararía gramos contra estañones. */
+  const stockEnUnidad = (l: Row): number => {
+    const a = catArticulos.find((x) => x.id === l.articuloId);
+    const base = stockPorCode[a?.code ?? ""] ?? 0;
+    return cantidadEntreUnidades(base, 1, factorDe(l)) ?? base;
+  };
+
   function headerObra(): { codigo?: string; nombre?: string } {
     if (!esMaterial && !esSub) return {};
     const codes = Array.from(new Set(validLines.map((l) => l.obraCodigo).filter(Boolean))) as string[];
@@ -1345,7 +1474,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         const almacenLinea = esConsumo ? (l.obraCodigo || "") : usaAlmacen ? almacenSel : ALMACEN_MAQUINARIA;
         // Si se eligió variante, se guarda la descripción de la variante (más específica);
         // si no, la descripción base del material.
-        return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: a.unidad, almacen: almacenLinea, obraCodigo: esMaterial ? (l.obraCodigo || undefined) : undefined, variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined, taskNo: g?.taskNo || undefined, taskDescr: g?.taskNombre || undefined };
+        // unidad: la que ELIGIÓ la persona (EST, PQT…), no la base del catálogo. Es lo
+        // que termina en dbo.PedidoCompraDet.unitOfMeasureCode y lo que decide con qué
+        // unidad se le pide al proveedor.
+        return { articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad, unidad: unidadDe(l) || a.unidad, almacen: almacenLinea, obraCodigo: esMaterial ? (l.obraCodigo || undefined) : undefined, variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined, taskNo: g?.taskNo || undefined, taskDescr: g?.taskNombre || undefined };
       }),
     };
   }
@@ -1463,7 +1595,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       const k = `${code}|${variantCode ?? ""}`;
       const prev = mapPlant.get(k);
       if (prev) prev.cantidad += l.cantidad;
-      else mapPlant.set(k, { code, descripcion: l.variantNombre || a?.descripcion || "", cantidad: l.cantidad, unidad: a?.unidad || "UND", obraCodigo: "", variantCode, variantNombre: l.variantNombre || undefined });
+      // La plantilla guarda la unidad ELEGIDA: si guardara la base, al volver a usarla
+      // la cantidad quedaría pensada en una unidad y expresada en otra.
+      else mapPlant.set(k, { code, descripcion: l.variantNombre || a?.descripcion || "", cantidad: l.cantidad, unidad: unidadDe(l) || a?.unidad || "UND", obraCodigo: "", variantCode, variantNombre: l.variantNombre || undefined });
     }
     const lineasPlant = [...mapPlant.values()];
     try {
@@ -1692,9 +1826,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                                       {/* Comentario de la línea: al centro y VISIBLE cuando hay texto. */}
                                       <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                       <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
-                                        {verStock && <StockCols stock={stockPorCode[a?.code ?? ""] ?? 0} ready={stockReady} requerido={l.requerido} />}
+                                        {verStock && <StockCols stock={stockEnUnidad(l)} ready={stockReady} requerido={l.requerido} />}
                                         <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n, autoPedir: false })} />
-                                        <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
+                                        <UnidadBtn unidades={unidadesDe(l)} value={unidadDe(l)} base={a?.unidad ?? ""} onPick={(code) => cambiarUnidad(l, code)} />
                                         <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
                                           style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
                                           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -1755,11 +1889,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                                 {/* Comentario de la línea: al centro y VISIBLE cuando hay texto. */}
                                 <LineaComentarioBtn value={l.notas ?? ""} onChange={(v) => setLinea(l.key, { notas: v })} />
                                 <div className="row gap-2" style={{ alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
-                                  {verStock && <StockCols stock={stockPorCode[a?.code ?? ""] ?? 0} ready={stockReady} requerido={l.requerido} />}
+                                  {verStock && <StockCols stock={stockEnUnidad(l)} ready={stockReady} requerido={l.requerido} />}
                                   {/* autoPedir:false → si el usuario ya escribió, el prellenado
                                       (requerido − stock) no le pisa el número al llegar el stock. */}
                                   <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n, autoPedir: false })} />
-                                  <span className="ds-muted ds-label" style={{ minWidth: 26 }}>{a?.unidad}</span>
+                                  <UnidadBtn unidades={unidadesDe(l)} value={unidadDe(l)} base={a?.unidad ?? ""} onPick={(code) => cambiarUnidad(l, code)} />
                                   <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar material"
                                     style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8 }}>
                                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>

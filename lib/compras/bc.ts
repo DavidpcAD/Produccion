@@ -140,7 +140,7 @@ async function listAll(group: string, entity: string): Promise<any[]> {
 // inventariable) y los buscadores muestran los tres; el tipo se usa para etiquetar
 // y para no ponerle almacén a lo que en BC no lo lleva (ver bcCrearPedido).
 export type BcItemTipo = "inventario" | "servicio" | "no-inventario";
-export type BcItem = { id: string; code: string; descripcion: string; unidad: string; tipo: BcItemTipo; lastDirectCost?: number; categoria?: string; reorderPoint?: number; safetyStock?: number; reorderQty?: number };
+export type BcItem = { id: string; code: string; descripcion: string; unidad: string; unidadCompra?: string; tipo: BcItemTipo; lastDirectCost?: number; categoria?: string; reorderPoint?: number; safetyStock?: number; reorderQty?: number };
 // bloqueada = la OBRA está bloqueada en BC (Job.Blocked = "All"). Ojo: NO es lo mismo
 // que Job.Status ("Open"): una obra puede estar Open y bloqueada a la vez, y es lo que
 // pasó con VN-K.26 (caso CP-005132, 21/08/2026) — BC rechaza poner ese proyecto en una
@@ -174,6 +174,12 @@ export async function bcItems(): Promise<BcItem[]> {
           code,
           descripcion: i.Description ?? i.description ?? i.displayName ?? code,
           unidad: i.BaseUnitOfMeasure ?? i.baseUnitOfMeasure ?? i.baseUnitOfMeasureCode ?? "UND",
+          // Unidad de COMPRA (Purch. Unit of Measure). Viene en la MISMA respuesta y
+          // hasta ahora se descartaba: es el default con el que se le pide al proveedor.
+          // Ojo: en BC casi nadie la mantiene (1 artículo de 5.500 la tiene distinta de
+          // la base), así que NO sirve para saber si un artículo es multi-unidad — eso
+          // lo dice itemUnitsOfMeasure. Solo sirve como default cuando existe.
+          unidadCompra: (i.PurchUnitOfMeasure ?? i.purchUnitOfMeasure ?? "").toString().trim() || undefined,
           // La API custom no expone el Type; lo completa bcItemExtra (API estándar).
           tipo: "inventario" as BcItemTipo,
           lastDirectCost: costCustom,
@@ -236,18 +242,30 @@ async function bcItemExtra(): Promise<Map<string, { cost?: number; categoria?: s
 // Si la consulta falla, el ítem se trata como inventario (comportamiento previo).
 export async function bcItemTipos(codes: string[]): Promise<Map<string, BcItemTipo>> {
   const out = new Map<string, BcItemTipo>();
+  for (const [no, f] of await bcItemFichas(codes)) out.set(no, f.tipo);
+  return out;
+}
+
+/** Tipo + unidad BASE de varios artículos, en una sola pasada (API estándar v2.0).
+ *  La base hace falta para decidir si la unidad de una línea es "la que eligió la
+ *  persona" o "la que venía por defecto" — ver `unidadParaBc` en bcCrearPedido. */
+export async function bcItemFichas(codes: string[]): Promise<Map<string, { tipo: BcItemTipo; base: string }>> {
+  const out = new Map<string, { tipo: BcItemTipo; base: string }>();
   const unicos = [...new Set((codes ?? []).map((c) => (c ?? "").trim()).filter(Boolean))];
   if (!unicos.length) return out;
   try {
     const cid = await getStdCompanyId();
     for (let i = 0; i < unicos.length; i += 15) {
       const filtro = unicos.slice(i, i + 15).map((c) => `number eq '${odataStr(c)}'`).join(" or ");
-      const res = await bcFetch(`${stdRoot()}/companies(${cid})/items?$select=number,type&$filter=${encodeURIComponent(filtro)}`, { cache: "no-store" });
+      const res = await bcFetch(`${stdRoot()}/companies(${cid})/items?$select=number,type,baseUnitOfMeasureCode&$filter=${encodeURIComponent(filtro)}`, { cache: "no-store" });
       if (!res.ok) continue;
-      const data = (await res.json()) as { value?: { number?: string; type?: string }[] };
-      for (const it of (data.value ?? [])) { const no = it.number ?? ""; if (no) out.set(no, tipoDeBc(it.type)); }
+      const data = (await res.json()) as { value?: { number?: string; type?: string; baseUnitOfMeasureCode?: string }[] };
+      for (const it of (data.value ?? [])) {
+        const no = it.number ?? "";
+        if (no) out.set(no, { tipo: tipoDeBc(it.type), base: (it.baseUnitOfMeasureCode ?? "").trim() });
+      }
     }
-  } catch { /* sin tipo: se trata como inventario */ }
+  } catch { /* sin tipo: se trata como inventario, y sin base no se manda unidad */ }
   return out;
 }
 
@@ -349,6 +367,69 @@ async function listCustom(group: string, path: string, opts: RequestInit = { cac
 // Escapa una comilla simple para un literal OData ('' = comilla dentro del string).
 function odataStr(v: string): string {
   return v.replace(/'/g, "''");
+}
+
+// ─── UNIDADES DE MEDIDA DE UN ARTÍCULO ──────────────────────────────────────────
+// Un material se CONSUME en una unidad y se COMPRA en otra: el adhesivo M06-0009 se
+// consume en gramos (unidad base) pero se le compra al proveedor por estañón, y un
+// estañón trae 255.000 gramos. Si la solicitud viaja en la unidad base, la orden le
+// pide al proveedor "1 GR" con el precio del gramo: el documento sale 255.000 veces
+// abajo (pasó el 21/08/2026).
+//
+// La lista REAL de unidades de un artículo vive en la API custom, entidad
+// `itemUnitsOfMeasure` (campos camelCase: itemNo, code, qtyPerUnitOfMeasure). La
+// unidad BASE es la que tiene factor 1. Ojo: la API NO soporta el operador `in`
+// (501), así que se filtra con `or`.
+//
+// La `Purch. Unit of Measure` de la ficha NO sirve para detectar artículos
+// multi-unidad: solo 1 de 5.500 la tiene distinta de la base. Sirve únicamente como
+// default cuando el artículo sí tiene varias unidades.
+export type BcUnidadItem = { code: string; factor: number };
+
+type FilaUom = { itemNo?: string; ItemNo?: string; code?: string; Code?: string; qtyPerUnitOfMeasure?: number | string; QtyPerUnitOfMeasure?: number | string };
+function mapUnidades(filas: FilaUom[]): Map<string, BcUnidadItem[]> {
+  const out = new Map<string, BcUnidadItem[]>();
+  for (const f of filas) {
+    const item = (f.itemNo ?? f.ItemNo ?? "").toString().trim();
+    const code = (f.code ?? f.Code ?? "").toString().trim();
+    const factor = Number(f.qtyPerUnitOfMeasure ?? f.QtyPerUnitOfMeasure ?? 0);
+    // Sin factor no se puede convertir, y convertir a ciegas es peor que no ofrecer
+    // la unidad. (Hoy no hay ninguna fila así en el catálogo, pero es barato.)
+    if (!item || !code || !(factor > 0)) continue;
+    const lista = out.get(item) ?? [];
+    if (!lista.some((u) => u.code === code)) lista.push({ code, factor });
+    out.set(item, lista);
+  }
+  for (const lista of out.values()) lista.sort((a, b) => a.factor - b.factor || a.code.localeCompare(b.code));
+  return out;
+}
+
+/** Unidades de UN artículo, con su factor respecto de la base. Lista vacía si el
+ *  artículo no tiene ninguna cargada en BC (hay 14 así) o si BC falla. */
+export async function bcUnidadesDeItem(itemNo: string): Promise<BcUnidadItem[]> {
+  const code = (itemNo ?? "").trim();
+  if (!code) return [];
+  const filas = await listCustom("inventory", `itemUnitsOfMeasure?$filter=${encodeURIComponent(`itemNo eq '${odataStr(code)}'`)}`);
+  return mapUnidades(filas).get(code) ?? [];
+}
+
+/** Unidades de VARIOS artículos (para validar antes de mandar la línea a BC). Se
+ *  pide en tandas con `or`, igual que bcItemTipos. Si BC falla devuelve lo que haya:
+ *  quien llama debe tratar "sin datos" como "no validar", no como "inválido". */
+export async function bcUnidadesDeItems(codes: string[]): Promise<Map<string, BcUnidadItem[]>> {
+  const unicos = [...new Set((codes ?? []).map((c) => (c ?? "").trim()).filter(Boolean))];
+  const out = new Map<string, BcUnidadItem[]>();
+  if (!unicos.length) return out;
+  try {
+    for (let i = 0; i < unicos.length; i += 15) {
+      const filtro = unicos.slice(i, i + 15).map((c) => `itemNo eq '${odataStr(c)}'`).join(" or ");
+      const filas = await listCustom("inventory", `itemUnitsOfMeasure?$filter=${encodeURIComponent(filtro)}`);
+      for (const [item, lista] of mapUnidades(filas)) out.set(item, lista);
+    }
+  } catch (e) {
+    console.warn("BC unidades por item falló; se manda la línea sin unidad:", e);
+  }
+  return out;
 }
 
 export type BcExistencia = { itemNo: string; variantCode: string; locationCode: string; descripcion: string; cantidad: number; unidad: string };
@@ -657,7 +738,10 @@ async function getStdVariantId(itemNo: string, code: string): Promise<string | n
 }
 
 // ---- Escritura: crear Pedido de compra (Purchase Order) por la API ESTÁNDAR ----
-export type NuevaLineaBc = { itemNo: string; cantidad: number; precio?: number; descripcion?: string; variantCode?: string; jobNo?: string; jobTaskNo?: string; jobLineType?: string; locationCode?: string };
+export type NuevaLineaBc = { itemNo: string; cantidad: number; precio?: number; descripcion?: string; variantCode?: string; jobNo?: string; jobTaskNo?: string; jobLineType?: string; locationCode?: string;
+  /** Unidad con la que se le pide al proveedor (EST, PQT…). Ver `unidadParaBc`: solo
+   *  viaja a BC cuando NO es la unidad base del artículo. */
+  unidad?: string };
 
 // La API estándar de purchaseOrderLine NO acepta `locationCode`; requiere
 // `locationId` (el systemId GUID del almacén). Lo resolvemos por código contra
@@ -899,8 +983,28 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   // editable y el Release falla). El catálogo de los buscadores trae los tres tipos,
   // así que acá se consulta el tipo y se les manda la línea SIN almacén; el proyecto
   // + la tarea sí se les pone (el consumo contra la obra se registra igual).
-  const tiposItem = await bcItemTipos(lineas.map((l) => l.itemNo));
+  const fichasItem = await bcItemFichas(lineas.map((l) => l.itemNo));
+  const tiposItem = new Map([...fichasItem].map(([no, f]) => [no, f.tipo] as const));
   const sinAlmacen = (l: NuevaLineaBc) => (tiposItem.get(l.itemNo) ?? "inventario") !== "inventario";
+  // UNIDAD de la línea. Si no se la mandamos, BC NO usa la unidad base: usa la
+  // `Purch. Unit of Measure` del artículo. Comprobado en el Sandbox con M06-0009 (base
+  // GR, compra EST): la misma línea, con y sin unidad en el POST, queda en EST. O sea
+  // que una solicitud de "255.000 GR" terminaba pidiéndole al proveedor 255.000
+  // ESTAÑONES. Por eso la unidad que eligió la persona viaja SIEMPRE.
+  // Único filtro: que el código exista para ese artículo en BC. Hay líneas históricas
+  // con unidades que salieron del catálogo de respaldo (SACO, ROLLO) y BC rechazaría
+  // la línea entera; esas se mandan sin unidad, como hasta ahora.
+  const unidadesItem = await bcUnidadesDeItems(
+    lineas.filter((l) => (l.unidad ?? "").trim()).map((l) => l.itemNo),
+  );
+  const unidadParaBc = (l: NuevaLineaBc): string => {
+    const code = (l.unidad ?? "").trim();
+    if (!code) return "";
+    const lista = unidadesItem.get(l.itemNo);
+    if (!lista || !lista.length) return "";                       // sin datos: no se inventa
+    const match = lista.find((u) => u.code.toUpperCase() === code.toUpperCase());
+    return match ? match.code : "";
+  };
   // ¿La descripción la manda la APP o la ficha del artículo de BC? Solo los que no
   // son de inventario (servicio / no inventariable) llevan la de la app.
   const descripcionPropia = (l: NuevaLineaBc) => !!(l.descripcion ?? "").trim() && sinAlmacen(l);
@@ -922,6 +1026,11 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
     const locCode = almacenDe(l);
     const locId = locCode ? locIds.get(locCode) ?? null : null;
     const lineBody: Record<string, unknown> = { lineType: "Item", lineObjectNumber: l.itemNo, quantity: l.cantidad };
+    // La unidad va ANTES del precio a propósito: BC aplica las propiedades en el orden
+    // del JSON y al validar la unidad recalcula el Direct Unit Cost de la línea. Si
+    // fuera después, pisaría el precio negociado.
+    const uom = unidadParaBc(l);
+    if (uom) lineBody.unitOfMeasureCode = uom;
     if (l.precio && l.precio > 0) lineBody.directUnitCost = l.precio;
     // DESCRIPCIÓN de la línea. En un artículo de INVENTARIO manda la ficha de BC (su
     // descripción es la buena y no se pisa). En SERVICIO / NO INVENTARIABLE la
@@ -1111,12 +1220,23 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
   const poId = ((await resPo.json()).value ?? [])[0]?.id;
   if (!poId) throw new Error(`No se encontró el pedido ${orderNo} en BC.`);
   // 2) Líneas existentes en BC.
-  const resLines = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${poId})/purchaseOrderLines?$select=id,sequence,lineType,lineObjectNumber,quantity,directUnitCost,itemVariantId,description`, { cache: "no-store" });
+  const resLines = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${poId})/purchaseOrderLines?$select=id,sequence,lineType,lineObjectNumber,quantity,directUnitCost,itemVariantId,description,unitOfMeasureCode`, { cache: "no-store" });
   if (!resLines.ok) throw new Error(`BC ${resLines.status} al leer las líneas de ${orderNo}.`);
   const bcLines: any[] = (await resLines.json()).value ?? [];
   const usados = new Set<string>();
   const asignaciones: AsignacionLineaBc[] = [];
-  const tiposResync = await bcItemTipos(items.map((l) => l.itemNo));
+  const fichasResync = await bcItemFichas(items.map((l) => l.itemNo));
+  const tiposResync = new Map([...fichasResync].map(([no, f]) => [no, f.tipo] as const));
+  // Misma regla que al crear: la unidad elegida se reafirma siempre que exista para ese
+  // artículo en BC (si no, el reintento de lanzamiento la revertiría a la de BC).
+  const unidadesResync = await bcUnidadesDeItems(items.filter((l) => (l.unidad ?? "").trim()).map((l) => l.itemNo));
+  const unidadResync = (l: NuevaLineaBc): string => {
+    const code = (l.unidad ?? "").trim();
+    if (!code) return "";
+    const lista = unidadesResync.get(l.itemNo);
+    const match = lista?.find((u) => u.code.toUpperCase() === code.toUpperCase());
+    return match ? match.code : "";
+  };
   let patched = 0; const sinMatch: string[] = [];
   for (const l of items) {
     const bc = bcLines.find((b) => !usados.has(b.id) && String(b.lineObjectNumber) === String(l.itemNo) && /item/i.test(String(b.lineType)));
@@ -1133,6 +1253,9 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
     const locCode = soloServicio ? "" : conJob ? (l.locationCode || l.jobNo!) : (l.locationCode || "");
     if (lineNo && (conJob || locCode)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "None") : undefined, locationCode: locCode || undefined });
     const patch: Record<string, unknown> = {};
+    // La unidad PRIMERO (BC recalcula el costo al validarla) y solo si cambió.
+    const uomR = unidadResync(l);
+    if (uomR && String(bc.unitOfMeasureCode ?? "").toUpperCase() !== uomR.toUpperCase()) patch.unitOfMeasureCode = uomR;
     if (l.precio && l.precio > 0 && Number(bc.directUnitCost) !== l.precio) patch.directUnitCost = l.precio;
     // Igual que el precio: al validar el artículo, BC pisa la descripción con la de la
     // ficha. En servicio / no inventariable la descripción de la app es la que vale
