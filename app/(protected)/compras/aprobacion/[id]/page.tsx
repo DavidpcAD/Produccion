@@ -7,6 +7,7 @@ import { Button, Modal, Textarea, useToast } from "@/components/compras/ui";
 import { OrdenDetalle } from "@/components/compras/orden-detalle";
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
+import { numeroOrden } from "@/lib/compras/helpers";
 
 export default function AprobacionOrdenDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -39,7 +40,7 @@ export default function AprobacionOrdenDetallePage() {
   async function confirmarRechazo() {
     if (!motivo.trim()) { toast("Escribí el motivo del rechazo.", "error"); return; }
     await devolverOrden(orden!.id, motivo.trim());
-    toast(`${orden!.numero} devuelta a proveeduría`, "info");
+    toast(`${numeroOrden(orden!)} devuelta a proveeduría`, "info");
     setRechazarOpen(false);
     router.push("/compras/aprobacion");
   }
@@ -55,7 +56,7 @@ export default function AprobacionOrdenDetallePage() {
     <AppShell role="aprobacion">
       <OrdenDetalle orden={orden} volverHref="/compras/aprobacion/todas" volverLabel="Volver a órdenes" acciones={acciones} />
       {rechazarOpen && (
-        <Modal title={`Rechazar ${orden.numero}`} onClose={() => setRechazarOpen(false)}
+        <Modal title={`Rechazar ${numeroOrden(orden)}`} onClose={() => setRechazarOpen(false)}
           footer={<><Button variant="outline" onClick={() => setRechazarOpen(false)}>Cancelar</Button><Button variant="red" onClick={confirmarRechazo}>Rechazar y devolver</Button></>}>
           <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>Indicá por qué se devuelve la orden. Le llega una notificación a Proveeduría y el motivo queda en el historial.</p>
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo del rechazo…" rows={4} style={{ width: "100%" }} />

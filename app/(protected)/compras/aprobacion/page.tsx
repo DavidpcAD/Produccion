@@ -6,7 +6,7 @@ import { Badge, Button, Card, Modal, Textarea, Tile, useToast } from "@/componen
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
 import { AprobarControl } from "@/components/compras/aprobar-control";
-import { money, formatDate, num, ordenLineaImporte, ordenMaquinas, ordenTotalConIva } from "@/lib/compras/helpers";
+import { money, formatDate, num, numeroOrden, ordenLineaImporte, ordenMaquinas, ordenTotalConIva } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 export default function AprobacionPage() {
@@ -43,7 +43,7 @@ export default function AprobacionPage() {
     let ok = 0; const fallos: string[] = [];
     for (const o of seleccionadas) {
       const r = await aprobarYLanzar(o, setOrdenEstado);
-      if (r.ok) ok++; else fallos.push(o.numero);
+      if (r.ok) ok++; else fallos.push(numeroOrden(o));
     }
     setLote(false); setSel(new Set());
     toast(`Aprobadas y lanzadas: ${ok}${fallos.length ? ` · con problema: ${fallos.join(", ")} (revisá cada una)` : ""}`, fallos.length ? "info" : "success");
@@ -132,7 +132,7 @@ export default function AprobacionPage() {
                         style={{ display: "inline-flex", alignItems: "center" }}>
                         <input type="checkbox" className="ds-cbx" checked={sel.has(o.id)} onChange={() => toggleSel(o.id)} onClick={(e) => e.stopPropagation()} title="Seleccionar para aprobar en lote" />
                       </span>
-                      <span className="ds-subtitle">{o.numero}</span>
+                      <span className="ds-subtitle">{numeroOrden(o)}</span>
                       <Badge tone="yellow">Pendiente de aprobación</Badge>
                     </div>
                     <span className="ds-muted ds-label">{o.proveedorNo ?? prov(o.proveedorId)?.code} · {o.proveedorNombre ?? prov(o.proveedorId)?.nombre} · {formatDate(o.fecha)}</span>
@@ -173,9 +173,9 @@ export default function AprobacionPage() {
                   <AprobarControl
                     busy={aprobandoId === o.id}
                     approveLabel="Aprobar y lanzar"
-                    title={`${o.numero} · ${money(total, o.currencyCode)}`}
+                    title={`${numeroOrden(o)} · ${money(total, o.currencyCode)}`}
                     onApprove={() => aprobar(o)}
-                    onReject={() => { setMotivo(""); setRechObj({ id: o.id, numero: o.numero }); }}
+                    onReject={() => { setMotivo(""); setRechObj({ id: o.id, numero: numeroOrden(o) }); }}
                   />
                 </div>
               </Card>

@@ -7,7 +7,7 @@ import { Badge, ProgressBar } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { IconChevronDown } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
-import { money, formatDate, ordenBadge, ordenRecibidoPct, ordenSubtotal, ordenPedidos, ordenEsDirecta, ordenLineaImporte, num } from "@/lib/compras/helpers";
+import { money, formatDate, ordenBadge, ordenRecibidoPct, ordenSubtotal, ordenPedidos, ordenEsDirecta, ordenLineaImporte, num, numeroOrden } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Lista de órdenes reutilizable (Proveeduría / Aprobación / Bodega), sobre DataTable
@@ -33,7 +33,12 @@ export function OrdenesLista({
   const toggleGrupo = (k: string) => setAbiertos((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
   const columns = useMemo<ColumnDef<Orden, any>[]>(() => [
-    { id: "num", header: "N.º", accessorFn: (o) => o.numero, meta: { label: "N.º" }, cell: (c) => <span className="ds-strong">{c.getValue()}</span> },
+    // Se MUESTRA el N.º de BC, pero se busca y ordena por los dos: el interno sigue
+    // apareciendo en el historial y en los avisos viejos, y hay que poder pegarlo acá.
+    {
+      id: "num", header: "N.º", accessorFn: (o) => `${numeroOrden(o)} ${o.numero}`,
+      meta: { label: "N.º" }, cell: (c) => <span className="ds-strong">{numeroOrden(c.row.original)}</span>,
+    },
     { id: "prov", header: "Proveedor", accessorFn: (o) => o.proveedorNombre ?? prov(o.proveedorId)?.nombre ?? "—", meta: { label: "Proveedor" }, cell: (c) => c.getValue() },
     {
       id: "solic", header: "Solicitudes", accessorFn: (o) => (ordenEsDirecta(o) ? "Directa" : ordenPedidos(o).join(" ")), meta: { label: "Solicitudes" },
@@ -143,7 +148,7 @@ export function OrdenesLista({
                           const peds = ordenPedidos(o); const dir = ordenEsDirecta(o); const b = ordenBadge(o.estado);
                           return (
                             <tr key={o.id} className="is-clickable" onClick={() => router.push(hrefDetalle(o.id))} style={{ cursor: "pointer" }}>
-                              <td className="ds-strong">{o.numero}</td>
+                              <td className="ds-strong">{numeroOrden(o)}</td>
                               <td><div className="row gap-2 wrap">{dir && <Badge tone="yellow">Directa</Badge>}{peds.slice(0, 2).map((n) => <Badge key={n} tone="gray">{n}</Badge>)}{peds.length > 2 && <span className="ds-muted ds-body-sm">+{peds.length - 2}</span>}</div></td>
                               <td className="ds-body-sm">{formatDate(o.fecha)}</td>
                               <td className="ds-num ds-strong">{money(ordenSubtotal(o), o.currencyCode)}</td>

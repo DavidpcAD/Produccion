@@ -688,3 +688,32 @@ export function nextNumero(prefix: string, existentes: string[]): string {
 export function almacenesFisicos<T extends { codigo: string }>(list: T[]): T[] {
   return list.filter((a) => a.codigo.toUpperCase().startsWith("ALM-"));
 }
+
+// N.º con el que se conoce una orden. Desde que Proveeduría crea el Pedido de compra
+// en BC al enviar la orden a aprobación, TODA orden que llega acá ya existe allá: lo
+// que hay que mostrar es su N.º de BC, que es por el que se la busca, se la aprueba y
+// se la recibe.
+export function numeroOrden(o: { numero: string; bcNumber?: string }): string {
+  return o.bcNumber || etiquetaInterna(o.numero);
+}
+
+// Rótulo de una orden que todavía NO existe en Business Central.
+//
+// El `numero` interno de la app es una serie aparte, pero con el MISMO prefijo y el
+// mismo formato de 6 dígitos que la serie C PED de BC: "CP-000065" se lee igual que
+// "CP-005154" y en BC no existe. Alguien lo busca allá y no aparece. Por eso acá se
+// rompe el disfraz: "Interno 65" no se confunde con un pedido de BC.
+//
+// Un formato que no sea CP-<dígitos> se devuelve tal cual: es un dato migrado o de
+// otra serie, y adivinar sería peor que mostrarlo.
+export function etiquetaInterna(numero: string): string {
+  const n = (numero ?? "").trim();
+  if (!n) return "—";
+  const m = /^CP-0*(\d+)$/i.exec(n);
+  return m ? `Interno ${m[1]}` : n;
+}
+
+// ¿La orden ya existe en Business Central?
+export function tieneBc(o: { bcNumber?: string }): boolean {
+  return !!(o.bcNumber ?? "").trim();
+}

@@ -7,7 +7,7 @@ import { IconChevronDown } from "@/components/compras/icons";
 import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { money, num, formatDate, ordenBadge, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
+import { money, num, formatDate, numeroOrden, tieneBc, ordenBadge, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Vista de detalle de una orden, reutilizada por Proveeduría, Aprobación y Bodega.
@@ -79,11 +79,11 @@ export function OrdenDetalle({
       <div className="page__head">
         <div className="page__title">
           <div className="row gap-3">
-            <h1 className="ds-heading">{orden.numero}</h1>
+            <h1 className="ds-heading">{numeroOrden(orden)}</h1>
             <Badge tone={b.tone}>{b.label}</Badge>
             {esDirecta && <Badge tone="yellow">Directa</Badge>}
           </div>
-          <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · emitida {formatDate(orden.fecha)} · recibido {ordenRecibidoPct(orden)}%{orden.bcNumber ? ` · BC ${orden.bcNumber}` : ""}</p>
+          <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · emitida {formatDate(orden.fecha)} · recibido {ordenRecibidoPct(orden)}%{tieneBc(orden) ? ` · interno ${orden.numero}` : ""}</p>
           {maquinas.length > 0 && <p className="ds-body-sm ds-muted">Máquina: <span className="ds-strong">{maquinas.join(", ")}</span></p>}
           {orden.almacenRecepcion && <p className="ds-body-sm ds-muted">Recepción en almacén <span className="ds-strong">{orden.almacenRecepcion}</span></p>}
           <div className="row gap-2 wrap mt-2">
