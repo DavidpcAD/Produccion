@@ -52,9 +52,19 @@ jobs:
       - name: Empaquetar standalone
         # `next build` con output:standalone deja server.js + node_modules mínimos en
         # .next/standalone, pero NO copia .next/static ni public: se arman a mano.
+        #
+        # `-L` (resolver symlinks) NO es cosmético: standalone crea 4 symlinks en
+        # .next/node_modules (mssql, import-in-the-middle x2, require-in-the-middle) y en
+        # el wwwroot del App Service esas rutas ya existen como CARPETAS REALES (las dejó
+        # un deploy manual viejo). El rsync de Kudu corre sin --delete/--force, así que no
+        # puede reemplazar una carpeta no vacía por un symlink: falla con
+        # "could not make way for new symlink" (exit 23) y mata el thread que le tocó ese
+        # split → el deploy sube SOLO PARTE del build, Kudu igual reporta "Deployment
+        # successful" y el sitio se queda con el build anterior. Copiando el contenido en
+        # vez del symlink (son 264 KB) el rsync sincroniza carpeta contra carpeta y pasa.
         run: |
           mkdir -p deploy-package
-          cp -r .next/standalone/. deploy-package/
+          cp -rL .next/standalone/. deploy-package/
           mkdir -p deploy-package/.next
           cp -r .next/static deploy-package/.next/static
           if [ -d public ]; then cp -r public deploy-package/public; fi
