@@ -290,17 +290,49 @@ export async function bcItemLastCost(itemNo: string): Promise<number | null> {
 // (page 50235 lastPurchasePrices sobre Item Ledger Entry, solo recepciones de
 // compra). Trae el movimiento más reciente (postingDate desc, entryNo desc) y
 // devuelve su unitCost. Es lo más fiel al "último precio pagado" por ese ítem.
-export async function bcItemUltimaCompra(itemNo: string): Promise<number | null> {
+/** Última compra REAL de un artículo (API custom `lastPurchasePrices`).
+ *
+ *  OJO con la unidad, que es la trampa de todo esto: la fila dice
+ *  `unitOfMeasureCode: "EST"` pero `quantity` viene en unidad BASE y `unitCost` es
+ *  `costAmountActual / quantity`, o sea el precio POR UNIDAD BASE. Comprobado con
+ *  M06-0009: uom EST, quantity 255.000, costAmountActual ¢442.434,15, unitCost
+ *  ¢1,7350 — que es el gramo, no el estañón (255.000 gramos = 1 estañón). Quien lea
+ *  `unitCost` creyendo que es el precio de la unidad del documento se equivoca por
+ *  255.000x: es exactamente el error del 21/08/2026.
+ *
+ *  Por eso esto devuelve el precio SIEMPRE por unidad base y quien lo use lo convierte
+ *  con el factor de la unidad de su línea (ver `precioEnUnidad` en helpers).
+ *  Si viene `vendorNo`, se prefiere la última compra a ESE proveedor; si nunca le
+ *  compró, cae a la última de cualquiera. */
+export type BcUltimaCompra = { precioBase: number; unidadDocumento: string; fecha: string; documentoNo: string; vendorNo: string; delProveedor: boolean };
+export async function bcUltimaCompra(itemNo: string, vendorNo = ""): Promise<BcUltimaCompra | null> {
   if (!itemNo) return null;
   try {
     const cid = await getCompanyId();
-    const filtro = `$filter=${encodeURIComponent(`itemNo eq '${itemNo}'`)}`;
-    const url = `${customRoot("purchasing")}/companies(${cid})/lastPurchasePrices?${filtro}&$orderby=postingDate desc,entryNo desc&$top=1`;
+    const filtro = `$filter=${encodeURIComponent(`itemNo eq '${odataStr(itemNo)}'`)}`;
+    const url = `${customRoot("purchasing")}/companies(${cid})/lastPurchasePrices?${filtro}&$orderby=postingDate desc,entryNo desc&$top=20`;
     const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
     if (!res.ok) return null;
-    const row = ((await res.json())?.value ?? [])[0];
-    const uc = row?.unitCost;
-    return (typeof uc === "number" && uc > 0) ? uc : null;
+    const filas = ((await res.json())?.value ?? []) as Record<string, unknown>[];
+    const prov = vendorNo.trim().toUpperCase();
+    const deEse = prov ? filas.filter((f) => String(f.vendorNo ?? "").toUpperCase() === prov) : [];
+    const fila = deEse[0] ?? filas[0];
+    if (!fila) return null;
+    // El precio por unidad base se recalcula del importe y la cantidad (que ya viene en
+    // base), en vez de confiar en `unitCost`: son lo mismo, pero así queda a la vista
+    // de qué se está dividiendo.
+    const cantidad = Number(fila.quantity ?? 0);
+    const importe = Number(fila.costAmountActual ?? 0);
+    const precioBase = cantidad > 0 && importe > 0 ? importe / cantidad : Number(fila.unitCost ?? 0);
+    if (!(precioBase > 0)) return null;
+    return {
+      precioBase,
+      unidadDocumento: String(fila.unitOfMeasureCode ?? "").trim(),
+      fecha: String(fila.postingDate ?? ""),
+      documentoNo: String(fila.documentNo ?? ""),
+      vendorNo: String(fila.vendorNo ?? ""),
+      delProveedor: deEse.length > 0,
+    };
   } catch { return null; }
 }
 
@@ -616,6 +648,19 @@ export async function bcVendors(): Promise<BcVendor[]> {
 // de compra registradas en BC (API estándar v2.0). Revisa las facturas más
 // recientes del proveedor y devuelve el precio de la línea de ese item.
 // Devuelve null si no hay historial o si BC no responde (la UI cae al historial local).
+/** OBSOLETA — no la use nadie para proponer precio.
+ *
+ *  (1) El `$select` pide `directUnitCost`, que NO existe en `purchaseInvoiceLine`: BC
+ *  responde 400 y la función devolvía null SIEMPRE. Esta "fuente", que el código
+ *  presentaba como la más precisa, nunca funcionó.
+ *  (2) Corregido el $select sí devuelve el precio de compra real (unitCost × quantity =
+ *  netAmount), pero en la MONEDA y la UNIDAD DEL DOCUMENTO: para M06-0009 son 969,91
+ *  DÓLARES por ESTAÑÓN. Mezclarlo con las otras dos fuentes, que están en colones y por
+ *  unidad base, exige convertir moneda y unidad — y equivocarse ahí son 456x y 255.000x.
+ *  Comprobado: 969,91 USD × 456,16 (tipo de cambio del 29/05/2026) = ¢442.434,15, que es
+ *  exactamente el costAmountActual de esa misma compra en `lastPurchasePrices`.
+ *  Por eso el precio sale de `bcUltimaCompra`, que está en colones y por unidad base.
+ *  Se deja el código como registro de lo que NO hay que volver a intentar. */
 export async function bcUltimoPrecioFacturado(itemNo: string, vendorNo: string): Promise<number | null> {
   if (!itemNo || !vendorNo) return null;
   try {

@@ -64,11 +64,15 @@ const UNIDADES_BASURA = new Set(["HRS"]);
 /** Unidades que se le OFRECEN a la persona para un artículo. Descarta las que no se
  *  pueden convertir (sin factor) y la basura de BC, y garantiza que la unidad base
  *  esté siempre (14 artículos no tienen ninguna fila cargada en BC). */
-export function unidadesOfrecidas(unidades: UnidadItem[], base: string): UnidadItem[] {
+export function unidadesOfrecidas(unidades: UnidadItem[], base: string, tipo?: Articulo["tipo"]): UnidadItem[] {
   const b = (base ?? "").trim();
+  // En un SERVICIO, HRS no es basura: es con lo que se contrata (S20-0001 tiene
+  // DIA/HRS/UND). El filtro es para los materiales, donde una pintura "medida en
+  // horas" es una carga masiva mal hecha.
+  const esServicio = tipo === "servicio" || tipo === "no-inventario";
   const out = (unidades ?? [])
     .filter((u) => u.code && u.factor > 0)
-    .filter((u) => !UNIDADES_BASURA.has(u.code.toUpperCase()) || u.code.toUpperCase() === b.toUpperCase());
+    .filter((u) => esServicio || !UNIDADES_BASURA.has(u.code.toUpperCase()) || u.code.toUpperCase() === b.toUpperCase());
   if (b && !out.some((u) => u.code.toUpperCase() === b.toUpperCase())) out.unshift({ code: b, factor: 1 });
   return [...out].sort((a, c) => a.factor - c.factor || a.code.localeCompare(c.code));
 }
@@ -77,8 +81,8 @@ export function unidadesOfrecidas(unidades: UnidadItem[], base: string): UnidadI
  *  y es ofrecible; si no, la base. (En BC casi nadie mantiene la unidad de compra
  *  —1 artículo de 5.500—, así que en la práctica arranca en la base y la persona
  *  elige; por eso el selector muestra la equivalencia.) */
-export function unidadPorDefecto(unidades: UnidadItem[], base: string, compra?: string): string {
-  const ofrecidas = unidadesOfrecidas(unidades, base);
+export function unidadPorDefecto(unidades: UnidadItem[], base: string, compra?: string, tipo?: Articulo["tipo"]): string {
+  const ofrecidas = unidadesOfrecidas(unidades, base, tipo);
   const c = (compra ?? "").trim();
   if (c && ofrecidas.some((u) => u.code.toUpperCase() === c.toUpperCase())) return c;
   const b = (base ?? "").trim();
@@ -97,9 +101,23 @@ export const redondearCantidad = (n: number) => Math.round(n * 10 ** DEC_CANTIDA
  *  que la base puede guardar. */
 export function cantidadEntreUnidades(cantidad: number, factorDesde: number, factorHasta: number): number | null {
   const q = Number(cantidad), fd = Number(factorDesde), fh = Number(factorHasta);
-  if (!Number.isFinite(q) || q < 0) return null;
+  if (!Number.isFinite(q)) return null;
   if (!(fd > 0) || !(fh > 0)) return null;
   return redondearCantidad((q * fd) / fh);
+}
+
+/** ¿La conversión SIGUE significando lo mismo con los 4 decimales que guarda la base?
+ *  100 GR pasados a estañones dan 0,0004 EST, que al volver son 102 GR: la orden le
+ *  pediría al proveedor un 2% más de lo que se pidió, con cara de correcta. Redondear
+ *  no es gratis cuando el factor es 255.000, así que se comprueba la ida y vuelta. */
+export function conversionFiel(cantidad: number, factorDesde: number, factorHasta: number, toleranciaPct = 0.5): boolean {
+  const ida = cantidadEntreUnidades(cantidad, factorDesde, factorHasta);
+  if (ida == null) return false;
+  if (cantidad > 0 && ida === 0) return false;                 // se perdería la línea
+  const vuelta = cantidadEntreUnidades(ida, factorHasta, factorDesde);
+  if (vuelta == null) return false;
+  if (cantidad === 0) return true;
+  return Math.abs(vuelta - cantidad) / Math.abs(cantidad) * 100 <= toleranciaPct;
 }
 
 /** El precio va al revés que la cantidad: ¢1,74 el gramo son ¢443.700 el estañón. */
@@ -108,6 +126,23 @@ export function precioEntreUnidades(precio: number, factorDesde: number, factorH
   if (!Number.isFinite(p) || p < 0) return null;
   if (!(fd > 0) || !(fh > 0)) return null;
   return (p / fd) * fh;
+}
+
+/** Pasa un precio de la unidad `desde` a la unidad `hasta` con las unidades del
+ *  artículo. Devuelve **null** si no se puede saber el factor: más vale no proponer
+ *  precio que proponer uno equivocado — el error del 21/08 fue exactamente un precio
+ *  correcto en la unidad equivocada (¢1,74, que era por gramo, en una línea de
+ *  estañones). Si las dos unidades son la misma, devuelve el precio tal cual, así el
+ *  99% del catálogo (una sola unidad) no cambia en nada. */
+export function precioEnUnidad(precio: number, desde: string, hasta: string, unidades: UnidadItem[]): number | null {
+  const d = (desde ?? "").trim(), h = (hasta ?? "").trim();
+  if (!Number.isFinite(precio) || precio <= 0) return null;
+  if (!d || !h) return null;
+  if (d.toUpperCase() === h.toUpperCase()) return precio;
+  const fd = unidades.find((u) => u.code.toUpperCase() === d.toUpperCase())?.factor;
+  const fh = unidades.find((u) => u.code.toUpperCase() === h.toUpperCase())?.factor;
+  if (!(fd && fd > 0) || !(fh && fh > 0)) return null;
+  return precioEntreUnidades(precio, fd, fh);
 }
 
 /** "1 EST = 255 000 GR" — nadie sabe cuánto trae un estañón hasta que se lo dicen. */
@@ -396,12 +431,21 @@ export function ordenLineaCompleta(l: OrdenLinea): boolean {
 }
 
 // Último precio usado para un artículo con un proveedor (para detectar aumentos)
-export function ultimoPrecioProveedor(ordenes: Orden[], articuloId: string, proveedorId: string): number | null {
+// Devuelve el precio CON SU UNIDAD Y SU MONEDA: un precio suelto no se puede comparar
+// ni copiar a otra línea. ¢0,77 el gramo no es ¢0,77 el estañón (255.000x), y $969,91
+// no es ¢969,91 (~500x). Los dos errores son de órdenes de magnitud.
+export function ultimoPrecioProveedor(ordenes: Orden[], articuloId: string, proveedorId: string): { precio: number; unidad: string; moneda: string } | null {
   const cand = ordenes
     .filter((o) => o.proveedorId === proveedorId)
-    .flatMap((o) => o.lineas.filter((l) => l.articuloId === articuloId).map((l) => ({ fecha: o.fecha, precio: l.precioUnitario })))
+    .flatMap((o) => o.lineas.filter((l) => l.articuloId === articuloId).map((l) => ({ fecha: o.fecha, precio: l.precioUnitario, unidad: l.unidad ?? "", moneda: o.currencyCode ?? "" })))
     .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
-  return cand.length ? cand[0].precio : null;
+  return cand.length ? { precio: cand[0].precio, unidad: cand[0].unidad, moneda: cand[0].moneda } : null;
+}
+
+/** ¿Son la misma moneda? En la app "" y "CRC" son las dos el colón. */
+export function mismaMoneda(a?: string, b?: string): boolean {
+  const n = (m?: string) => ((m ?? "").trim().toUpperCase() || "CRC");
+  return n(a) === n(b);
 }
 
 export function ordenLineaImporte(l: OrdenLinea): number {

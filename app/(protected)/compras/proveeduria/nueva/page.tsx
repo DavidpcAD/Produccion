@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, ALMACEN_GENERAL, obraDeLinea, destinoDeLinea } from "@/lib/compras/helpers";
+import { money, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, precioEnUnidad, mismaMoneda, ALMACEN_GENERAL, obraDeLinea, destinoDeLinea, type UnidadItem } from "@/lib/compras/helpers";
 import type { OrdenLinea } from "@/lib/compras/types";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
@@ -119,7 +119,13 @@ export default function ArmarOrdenPage() {
   // Último precio de compra por BC: con proveedor trae el precio FACTURADO a ese
   // proveedor; SIN proveedor cae al último costo directo del item. Así el precio
   // del material aparece aunque todavía no se haya elegido proveedor.
-  const [bcPrices, setBcPrices] = useState<Record<string, number | null>>({});
+  // El precio de BC viene CON la unidad a la que corresponde: el mismo artículo puede
+  // valer ¢0,77 el gramo y ¢197.543 el estañón, y la línea puede ir en cualquiera de
+  // las dos. Sin la unidad, el número no se puede usar.
+  const [bcPrices, setBcPrices] = useState<Record<string, { precio: number; unidad: string } | null>>({});
+  // Unidades (con su factor) de los artículos de la orden, para convertir el precio a
+  // la unidad de CADA línea. Un artículo de una sola unidad no necesita nada.
+  const [uomPorItem, setUomPorItem] = useState<Record<string, UnidadItem[]>>({});
   const itemIdsKey = [...new Set(rows.map((r) => r.articuloId).filter(Boolean))].sort().join(",");
   useEffect(() => {
     const code = provSel?.code ?? "";
@@ -128,13 +134,30 @@ export default function ArmarOrdenPage() {
     let cancel = false;
     Promise.all(items.map(async (it) => {
       try {
-        const r = await fetch(`/api/bc/lastprice?item=${encodeURIComponent(it)}&vendor=${encodeURIComponent(code)}`);
+        // OJO: la ruta es /api/compras/bc/lastprice. Estuvo apuntando a /api/bc/lastprice
+        // —que no existe— así que el precio sugerido de BC nunca llegaba y el 404 se
+        // tragaba en el catch: proveeduría veía solo el costo del catálogo.
+        const r = await fetch(`/api/compras/bc/lastprice?item=${encodeURIComponent(it)}&vendor=${encodeURIComponent(code)}`);
         const d = await r.json();
-        return [it, typeof d.precio === "number" ? d.precio : null] as const;
+        const val = typeof d.precio === "number" && d.precio > 0 && d.unidad ? { precio: d.precio, unidad: String(d.unidad) } : null;
+        return [it, val] as const;
       } catch { return [it, null] as const; }
     })).then((pairs) => { if (!cancel) setBcPrices(Object.fromEntries(pairs)); });
     return () => { cancel = true; };
   }, [proveedorId, itemIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const items = itemIdsKey ? itemIdsKey.split(",") : [];
+    // Sin líneas no hay nada que pedir; las unidades ya cacheadas se dejan estar (van
+    // por artículo, no estorban).
+    if (!items.length) return;
+    let cancel = false;
+    fetch(`/api/compras/bc/unidades?items=${encodeURIComponent(items.join(","))}`)
+      .then((r) => (r.ok ? r.json() : { porItem: {} }))
+      .then((d) => { if (!cancel) setUomPorItem((d?.porItem ?? {}) as Record<string, UnidadItem[]>); })
+      .catch(() => { /* sin unidades: no se convierte ningún precio */ });
+    return () => { cancel = true; };
+  }, [itemIdsKey]);
 
   const setRow = (id: string, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.pedidoLineaId === id ? { ...r, ...patch } : r)));
@@ -156,7 +179,8 @@ export default function ArmarOrdenPage() {
   function agregarDeSolicitud(p: (typeof pedidos)[number], l: (typeof pedidos)[number]["lineas"][number], pend: number) {
     // Precio inicial = último precio de compra real (BC); si no hay historial, 0
     // para que proveeduría escriba lo acordado con el proveedor.
-    const hist = itemsBc.find((x) => x.code === l.articuloId)?.precioUltimo ?? bcPrices[l.articuloId] ?? 0;
+    // El precio se propone YA en la unidad de la línea (ver precioSugerido).
+    const hist = precioSugerido(l.articuloId, l.unidad) ?? 0;
     setRows((rs) => [...rs, {
       pedidoNumero: p.numero, pedidoLineaId: l.id, articuloId: l.articuloId, variantCode: l.variantCode ?? "",
       descripcion: l.descripcion, unidad: l.unidad,
@@ -180,13 +204,34 @@ export default function ArmarOrdenPage() {
     if (metodoAsig === "Amount") return subtotal > 0 ? cargosTotal * calcImporte(r) / subtotal : 0;
     return 0; // Weight / Volume → se calcula en BC
   };
-  const lastPrice = (r: Row) => {
-    const bc = bcPrices[r.articuloId];
-    if (typeof bc === "number") return bc;
-    const it = itemsBc.find((x) => x.code === r.articuloId);
-    if (it?.precioUltimo) return it.precioUltimo;
-    return proveedorId ? ultimoPrecioProveedor(ordenes, r.articuloId, proveedorId) : null;
+  /** Último precio conocido, YA CONVERTIDO a la unidad de la línea. Cada fuente trae
+   *  su propia unidad: BC factura por la unidad del documento, el costo del catálogo es
+   *  SIEMPRE por unidad base, y el historial de la app es por la unidad de esa orden.
+   *  Si no se puede convertir (no se sabe el factor), devuelve null: mejor "sin
+   *  historial" que un precio en la unidad equivocada. */
+  const precioSugerido = (articuloId: string, unidad: string): number | null => {
+    const unidades = uomPorItem[articuloId] ?? [];
+    const it = itemsBc.find((x) => x.code === articuloId);
+    // Los precios que trae BC (última compra y costo de la ficha) están en COLONES.
+    // Si la orden va en otra moneda no se propone nada: convertir moneda es otro
+    // problema, y poner ¢442.434 en una orden en dólares es peor que no poner nada.
+    // (La orden CP-000032 de este mismo artículo está en USD: $969,91 el estañón.)
+    const enColones = mismaMoneda(currency, "CRC");
+    // Las líneas viejas pueden no traer unidad (antes no se elegía): valen como si
+    // fueran la base del artículo, que es lo que eran. Sin esto se quedarían sin
+    // precio sugerido.
+    const destino = (unidad || it?.unidad || "").trim();
+    const bc = bcPrices[articuloId];
+    if (enColones && bc) return precioEnUnidad(bc.precio, bc.unidad, destino, unidades);
+    // El costo del catálogo (items.unitCost de BC) es por unidad BASE del artículo.
+    if (enColones && it?.precioUltimo && it.unidad) return precioEnUnidad(it.precioUltimo, it.unidad, destino, unidades);
+    // El historial de la app sí está en la moneda de SU orden: sirve si es la misma.
+    // Si esa orden vieja no guardó unidad, se asume la misma de la línea.
+    const hist = proveedorId ? ultimoPrecioProveedor(ordenes, articuloId, proveedorId) : null;
+    if (hist && !mismaMoneda(hist.moneda, currency)) return null;
+    return hist ? precioEnUnidad(hist.precio, hist.unidad || destino, destino, unidades) : null;
   };
+  const lastPrice = (r: Row): number | null => precioSugerido(r.articuloId, r.unidad);
   // Prellenar el precio con el ÚLTIMO precio mostrado (que incluye el historial de
   // órdenes de la app al mismo proveedor), para las líneas que sigan en 0. Antes
   // solo se prellenaba desde BC/catálogo; si el ítem nunca se compró en BC (solo se
@@ -198,7 +243,7 @@ export default function ArmarOrdenPage() {
       return typeof lp === "number" && lp > 0 ? { ...r, precio: String(lp) } : r;
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bcPrices, itemsBc, proveedorId, ordenes]);
+  }, [bcPrices, itemsBc, proveedorId, ordenes, uomPorItem]);
   // El IVA se aplica a los materiales Y al flete/cargo (13%), igual que en BC. Antes
   // el cargo quedaba sin IVA y el total no cuadraba con BC (faltaba el 13% del flete).
   const ivaCargos = cargosTotal * 0.13;
@@ -355,7 +400,7 @@ export default function ArmarOrdenPage() {
               <thead>
                 <tr>
                   <th>Pedido</th><th>Artículo</th><th>Obra</th>
-                  <th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Desc%</th><th className="ds-num">IVA%</th>
+                  <th className="ds-num">Cantidad</th><th className="ds-num">Precio unitario</th><th className="ds-num">Desc%</th><th className="ds-num">IVA%</th>
                   <th className="ds-num">Importe</th><th></th>
                 </tr>
               </thead>
@@ -365,12 +410,31 @@ export default function ArmarOrdenPage() {
                     <td className="ds-body-sm ds-strong">{r.pedidoNumero}</td>
                     <td><div className="ds-truncate" title={`${r.articuloId} — ${r.descripcion}`} style={{ maxWidth: 260 }}><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div></td>
                     <td className="ds-muted ds-body-sm">{r.almacen}</td>
-                    <td className="ds-num"><input className="ds-cell-input" type="number" min={0} value={r.cantidad} style={{ width: 70 }} onChange={(e) => setRow(r.pedidoLineaId, { cantidad: e.target.value })} /></td>
+                    <td className="ds-num">
+                      <span className="row gap-1" style={{ alignItems: "center", justifyContent: "flex-end" }}>
+                        <input className="ds-cell-input" type="number" min={0} value={r.cantidad} style={{ width: 70 }} onChange={(e) => setRow(r.pedidoLineaId, { cantidad: e.target.value })} />
+                        {/* La unidad de la línea: la eligió ingeniería y es la que se le
+                            pide al proveedor. Sin verla, "2" y "0,77" no dicen nada. */}
+                        {r.unidad && <span className="ds-muted ds-label" style={{ minWidth: 24 }}>{r.unidad}</span>}
+                      </span>
+                    </td>
                     <td className="ds-num">
                       <input className="ds-cell-input" type="number" min={0} value={r.precio} style={{ width: 92 }} onChange={(e) => setRow(r.pedidoLineaId, { precio: e.target.value })} />
                       {(() => {
                         const lp = lastPrice(r);
-                        if (lp == null) return <div className="ds-body-sm ds-muted">sin historial</div>;
+                        if (lp == null) {
+                          // null también es "hay precio pero no se puede usar acá": en otra
+                          // moneda, o en una unidad que no se puede convertir. Se dice cuál
+                          // es, sin meterlo en el campo — antes que proponer un número que
+                          // está bien en otra unidad o en otra moneda.
+                          const bc = bcPrices[r.articuloId];
+                          if (bc && !mismaMoneda(currency, "CRC")) return (
+                            <div className="ds-body-sm ds-muted" title="El precio que guarda BC está en colones y esta orden va en otra moneda">
+                              últ. {money(bc.precio, "CRC")}/{bc.unidad} · esta orden va en {currency}
+                            </div>
+                          );
+                          return <div className="ds-body-sm ds-muted">sin historial</div>;
+                        }
                         const up = Number(r.precio) > lp, down = Number(r.precio) < lp;
                         const igual = !up && !down;
                         return (
@@ -378,7 +442,7 @@ export default function ArmarOrdenPage() {
                             title={igual ? "Precio igual al último" : "Usar este último precio"}
                             onClick={() => setRow(r.pedidoLineaId, { precio: String(lp) })}
                             style={{ color: up ? "var(--ds-color-red-200)" : down ? "var(--ds-color-green-200)" : "var(--ds-color-gray-400)", cursor: igual ? "default" : "pointer" }}>
-                            últ. {money(lp, currency)} {up ? "↑" : down ? "↓" : "="}
+                            últ. {money(lp, currency)}{r.unidad ? `/${r.unidad}` : ""} {up ? "↑" : down ? "↓" : "="}
                           </button>
                         );
                       })()}

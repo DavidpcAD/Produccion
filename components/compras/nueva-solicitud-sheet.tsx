@@ -22,7 +22,7 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, cantidadEntreUnidades, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, saltarCantidad, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, redondearCantidad, saltarCantidad, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
@@ -970,7 +970,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const unidadesDe = (l: Row): UnidadItem[] => {
     const a = catArticulos.find((x) => x.id === l.articuloId);
     if (!a) return [];
-    return unidadesOfrecidas(uomMap[a.code] ?? [], a.unidad);
+    return unidadesOfrecidas(uomMap[a.code] ?? [], a.unidad, a.tipo);
+  };
+  /** ¿Ya contestó BC con las unidades de este artículo? Mientras no conteste, el factor
+   *  es 1 por defecto y cualquier conversión daría un número plausible y equivocado —
+   *  que es exactamente el patrón del error que esto viene a evitar. */
+  const unidadesListas = (l: Row): boolean => {
+    const a = catArticulos.find((x) => x.id === l.articuloId);
+    return !!a && uomMap[a.code] !== undefined;
   };
   const unidadDe = (l: Row): string => {
     if (l.unidad) return l.unidad;                       // la que eligió la persona
@@ -978,7 +985,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     if (!a) return "";
     const us = uomMap[a.code];
     // Mientras BC no conteste, la base: es lo que se venía mandando siempre.
-    return us ? unidadPorDefecto(us, a.unidad, a.unidadCompra) : a.unidad;
+    return us ? unidadPorDefecto(us, a.unidad, a.unidadCompra, a.tipo) : a.unidad;
   };
   const factorDe = (l: Row, code?: string): number => {
     const c = (code ?? unidadDe(l)).toUpperCase();
@@ -1023,9 +1030,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       let changed = false;
       const next = ls.map((l) => {
         if (!l.autoPedir || l.requerido == null) return l;
+        // Sin las unidades del artículo el factor sería 1 y "plantilla − stock" restaría
+        // gramos a estañones: la línea quedaría en 0 y NUNCA se recalcularía (autoPedir
+        // se apaga). Se espera; el efecto vuelve a correr cuando llegan.
+        if (!unidadesListas(l)) return l;
         changed = true;
-        const code = catArticulos.find((x) => x.id === l.articuloId)?.code ?? l.articuloId;
-        const stock = cantidadEntreUnidades(stockPorCode[code] ?? 0, 1, factorDe(l)) ?? (stockPorCode[code] ?? 0);
+        const stock = stockEnUnidad(l);
         return { ...l, cantidad: Math.max(0, l.requerido - stock), autoPedir: false };
       });
       return changed ? next : ls;
@@ -1408,10 +1418,13 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   function cambiarUnidad(l: Row, code: string) {
     const actual = unidadDe(l);
     if (!code || code.toUpperCase() === actual.toUpperCase()) return;
-    const nueva = cantidadEntreUnidades(l.cantidad, factorDe(l, actual), factorDe(l, code));
+    const fd = factorDe(l, actual), fh = factorDe(l, code);
+    const nueva = cantidadEntreUnidades(l.cantidad, fd, fh);
     if (nueva === null) { setLinea(l.key, { unidad: code }); return; }
-    if (l.cantidad > 0 && nueva === 0) {
-      toast(`${num.format(l.cantidad)} ${actual} no llega a 1 ${code}. Subí la cantidad o dejalo en ${actual}.`, "info");
+    // No basta con que no dé 0: 100 GR en estañones dan 0,0004 EST, que al volver son
+    // 102 GR. Un 2% de más con cara de correcto es justo lo que hay que evitar.
+    if (l.cantidad > 0 && !conversionFiel(l.cantidad, fd, fh)) {
+      toast(`${num.format(l.cantidad)} ${actual} no se puede expresar en ${code} sin desviarse. Ajustá la cantidad o dejalo en ${actual}.`, "info");
       return;
     }
     setLinea(l.key, { unidad: code, cantidad: nueva, autoPedir: false });
@@ -1422,7 +1435,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const stockEnUnidad = (l: Row): number => {
     const a = catArticulos.find((x) => x.id === l.articuloId);
     const base = stockPorCode[a?.code ?? ""] ?? 0;
-    return cantidadEntreUnidades(base, 1, factorDe(l)) ?? base;
+    const f = factorDe(l);
+    // El stock puede venir NEGATIVO de BC; se convierte igual (dividir por el factor
+    // no tiene problema con el signo).
+    return f > 0 ? redondearCantidad(base / f) : base;
   };
 
   function headerObra(): { codigo?: string; nombre?: string } {

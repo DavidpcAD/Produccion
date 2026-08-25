@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, almacenesFisicos, etiquetaArticulo } from "@/lib/compras/helpers";
+import { money, almacenesFisicos, etiquetaArticulo, mismaMoneda } from "@/lib/compras/helpers";
 import type { Articulo, OrdenLinea } from "@/lib/compras/types";
 
 // Orden DIRECTA: compra armada por Proveeduría sin partir de una solicitud de
@@ -125,12 +125,23 @@ export default function OrdenDirectaPage() {
                   setQaCode(k);
                   const it = itemsBc.find((x) => x.code === k);
                   if (it?.precioUltimo) setQaPrecio(String(it.precioUltimo)); // respaldo inmediato
-                  if (k) fetch(`/api/bc/lastprice?item=${encodeURIComponent(k)}&vendor=${encodeURIComponent(provSel?.code ?? "")}`)
-                    .then((r) => r.json()).then((d) => { if (typeof d.precio === "number" && d.precio > 0) setQaPrecio(String(d.precio)); }).catch(() => {});
+                  // La ruta es /api/compras/bc/lastprice (antes apuntaba a /api/bc/lastprice,
+                  // que no existe: el 404 se tragaba y el precio de BC nunca llegaba).
+                  // El precio viene por UNIDAD BASE del artículo, que es la misma con la que
+                  // se agrega la línea acá, así que se usa tal cual; si algún día esta
+                  // pantalla deja elegir unidad, hay que convertirlo (precioEnUnidad).
+                  if (k) fetch(`/api/compras/bc/lastprice?item=${encodeURIComponent(k)}&vendor=${encodeURIComponent(provSel?.code ?? "")}`)
+                    .then((r) => r.json())
+                    .then((d) => {
+                      const mismaUnidad = !d.unidad || !it?.unidad || String(d.unidad).toUpperCase() === it.unidad.toUpperCase();
+                      // El precio de BC viene en COLONES: en una orden en dólares no se
+                      // propone (poner ¢442.434 como si fueran dólares es peor que nada).
+                      if (typeof d.precio === "number" && d.precio > 0 && mismaUnidad && mismaMoneda(currency, "CRC")) setQaPrecio(String(d.precio));
+                    }).catch(() => {});
                 }} getKey={(i) => i.code} getLabel={(i) => etiquetaArticulo(i)} getSearch={(i) => `${i.code} ${i.descripcion}`} asegurarGrupos={(i) => i.tipo ?? "inventario"} minChars={2} placeholder="Buscar artículo del catálogo…" />
             </div>
             <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</label><Input type="number" min={0} value={qaQty} onChange={(e) => setQaQty(e.target.value)} placeholder="0" style={{ width: 90 }} /></div>
-            <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Precio</label><Input type="number" min={0} value={qaPrecio} onChange={(e) => setQaPrecio(e.target.value)} placeholder="0" style={{ width: 110 }} />{(() => { const it = itemsBc.find((x) => x.code === qaCode); return it?.precioUltimo ? <div className="ds-body-sm ds-muted" style={{ marginTop: 2 }}>últ. compra {money(it.precioUltimo, currency)}</div> : null; })()}</div>
+            <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Precio</label><Input type="number" min={0} value={qaPrecio} onChange={(e) => setQaPrecio(e.target.value)} placeholder="0" style={{ width: 110 }} />{(() => { const it = itemsBc.find((x) => x.code === qaCode); return it?.precioUltimo ? <div className="ds-body-sm ds-muted" style={{ marginTop: 2 }}>últ. compra {money(it.precioUltimo, currency)}{it.unidad ? `/${it.unidad}` : ""}</div> : null; })()}</div>
             <Button variant="outline" onClick={agregarLinea} disabled={!qaCode || !(Number(qaQty) > 0)}>+ Agregar línea</Button>
           </div>
           <div className="ds-table-wrap" style={{ boxShadow: "none" }}>
