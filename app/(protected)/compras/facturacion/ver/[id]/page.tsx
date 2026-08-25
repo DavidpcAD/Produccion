@@ -9,11 +9,11 @@ import { useStore } from "@/lib/compras/store";
 export default function BodegaOrdenDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { ordenes } = useStore();
+  const { ordenes, cargando } = useStore();
 
   const orden = ordenes.find((o) => o.id === id);
   if (!orden) {
-    return <AppShell role="contabilidad"><main className="page"><div className="empty">Orden no encontrada.</div></main></AppShell>;
+    return <AppShell role="contabilidad"><main className="page"><div className="empty">{cargando ? "Cargando orden…" : "Orden no encontrada."}</div></main></AppShell>;
   }
 
   const acciones = orden.estado === "lanzado" ? (

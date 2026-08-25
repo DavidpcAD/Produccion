@@ -334,7 +334,13 @@ export const CRC = new Intl.NumberFormat("es-CR", {
 export const num = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 2 });
 
 export function money(amount: number, currencyCode?: string): string {
-  const cur = currencyCode && currencyCode.trim() ? currencyCode : "CRC";
+  const cur = (currencyCode ?? "").trim() || "CRC";
+  // Intl exige un código ISO de TRES LETRAS: con cualquier otra cosa lanza RangeError y
+  // se cae el render de toda la pantalla. Y en BC hay monedas cargadas como "EURO" y
+  // "COLONES" — el total que devuelve /api/compras/bc/orden-totales sale de ahí sin
+  // validar, y esa llamada solo existe en el DETALLE de la orden. Con un código así se
+  // formatea el número y se pone el código al lado, que es honesto y no revienta.
+  if (!/^[A-Za-z]{3}$/.test(cur)) return `${num.format(amount || 0)} ${cur}`;
   return new Intl.NumberFormat("es-CR", { style: "currency", currency: cur, minimumFractionDigits: 2 }).format(amount || 0);
 }
 
@@ -644,6 +650,11 @@ export function ordenBadge(estado: Orden["estado"]): { label: string; tone: stri
     case "lanzado": return { label: "Lanzado", tone: "green" };
     case "completado": return { label: "Completado", tone: "green" };
   }
+  // Sin este default, un estado fuera del union devuelve undefined y el `.tone` de quien
+  // llama tira TypeError: pantalla en blanco por un dato inesperado. La tabla de estados
+  // de SQL tiene códigos que no están en OrdenEstado ('devuelto', 'cerrado'…), así que
+  // es alcanzable. Mejor mostrar el código crudo que reventar.
+  return { label: String(estado ?? "—"), tone: "gray" };
 }
 
 // Distribución proporcional de un cargo (flete) por importe de las líneas de artículo

@@ -16,7 +16,7 @@ export default function EditarOrdenPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes, proveedores, almacenes, recepciones, pedidos, updateOrden } = useStore();
+  const { ordenes, proveedores, almacenes, recepciones, pedidos, updateOrden, cargando } = useStore();
   const orden = ordenes.find((o) => o.id === id);
   // id del pedido (solicitud) de origen de una línea, para enlazar a su detalle.
   const pedidoIdDe = (pedidoLineaId?: string, pedidoNumero?: string) =>
@@ -69,7 +69,7 @@ export default function EditarOrdenPage() {
   const total = subtotal + fleteNum + ivaTotal;
   const [guardando, setGuardando] = useState(false);
 
-  if (!orden) return <AppShell role="proveeduria"><main className="page"><div className="empty">Orden no encontrada.</div></main></AppShell>;
+  if (!orden) return <AppShell role="proveeduria"><main className="page"><div className="empty">{cargando ? "Cargando orden…" : "Orden no encontrada."}</div></main></AppShell>;
   // No se puede editar una orden que ya tiene recepciones: reescribir las líneas
   // rompería la trazabilidad de lo recibido/facturado (y su enlace a las recepciones).
   const tieneRecepciones = recepciones.some((r) => r.ordenId === orden.id)

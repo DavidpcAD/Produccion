@@ -10,11 +10,11 @@ export default function ProvOrdenDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes, pedidos, setOrdenEstado } = useStore();
+  const { ordenes, pedidos, setOrdenEstado, cargando } = useStore();
 
   const orden = ordenes.find((o) => o.id === id);
   if (!orden) {
-    return <AppShell role="proveeduria"><main className="page"><div className="empty">Orden no encontrada.</div></main></AppShell>;
+    return <AppShell role="proveeduria"><main className="page"><div className="empty">{cargando ? "Cargando orden…" : "Orden no encontrada."}</div></main></AppShell>;
   }
   // Link de cada línea a su solicitud de origen (para ver quién la pidió).
   const solicitudHref = (l: NonNullable<typeof orden>["lineas"][number]) => {

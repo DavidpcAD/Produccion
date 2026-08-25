@@ -33,7 +33,7 @@ export default function RegistrarFacturaPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes: ordenesAll, pedidos, proveedores, registrarRecepcion, marcarNotasCredito } = useStore();
+  const { ordenes: ordenesAll, pedidos, proveedores, registrarRecepcion, marcarNotasCredito, cargando } = useStore();
   const me = useSession();
   // Fábrica de Maderas recibe SOLO su material: una orden que no salió de una de sus
   // solicitudes no existe para ella, tampoco escribiendo la URL a mano.
@@ -135,7 +135,7 @@ export default function RegistrarFacturaPage() {
   const fechasCoinciden = fechaFactura === fechaRegistro;
 
   if (!orden) {
-    return <AppShell role="facturacion"><main className="page"><div className="empty">Orden no encontrada.</div></main></AppShell>;
+    return <AppShell role="facturacion"><main className="page"><div className="empty">{cargando ? "Cargando orden…" : "Orden no encontrada."}</div></main></AppShell>;
   }
   const prov = proveedores.find((p) => p.id === orden.proveedorId);
 

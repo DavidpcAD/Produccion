@@ -12,11 +12,11 @@ import { money, formatDate, num } from "@/lib/compras/helpers";
 export default function RecepcionDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { recepciones, ordenes, proveedores } = useStore();
+  const { recepciones, ordenes, proveedores, cargando } = useStore();
 
   const rec = recepciones.find((r) => r.id === id);
   if (!rec) {
-    return <AppShell role="contabilidad"><main className="page"><div className="empty">Recepción no encontrada.</div></main></AppShell>;
+    return <AppShell role="contabilidad"><main className="page"><div className="empty">{cargando ? "Cargando recepción…" : "Recepción no encontrada."}</div></main></AppShell>;
   }
   const orden = ordenes.find((o) => o.id === rec.ordenId);
   const provNombre = orden?.proveedorNombre ?? proveedores.find((p) => p.id === orden?.proveedorId)?.nombre;

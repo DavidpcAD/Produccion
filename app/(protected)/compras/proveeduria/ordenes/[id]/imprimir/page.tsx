@@ -23,14 +23,18 @@ export default function ImprimirOrdenPage() {
   const params = useParams();
   const router = useRouter();
   const id = String(params?.id ?? "");
-  const { ordenes, proveedores } = useStore();
+  const { ordenes, proveedores, cargando } = useStore();
   const orden = ordenes.find((o) => o.id === id);
 
   if (!orden) {
     return (
       <div style={{ padding: 40, fontFamily: "Roboto, system-ui, sans-serif" }}>
-        Orden no encontrada.{" "}
-        <button onClick={() => router.back()} style={{ cursor: "pointer" }}>Volver</button>
+        {cargando ? "Cargando orden…" : (
+          <>
+            Orden no encontrada.{" "}
+            <button onClick={() => router.back()} style={{ cursor: "pointer" }}>Volver</button>
+          </>
+        )}
       </div>
     );
   }

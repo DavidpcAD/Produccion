@@ -13,7 +13,7 @@ export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { pedidos, ordenes, setPedidoEstado, deletePedido } = useStore();
+  const { pedidos, ordenes, setPedidoEstado, deletePedido, cargando } = useStore();
   const [copiarOpen, setCopiarOpen] = useState(false);
   const [editarOpen, setEditarOpen] = useState(false);
 
@@ -21,7 +21,7 @@ export default function PedidoDetallePage() {
   if (!pedido) {
     return (
       <AppShell role="ingenieria">
-        <main className="page"><div className="empty">Pedido no encontrado.</div></main>
+        <main className="page"><div className="empty">{cargando ? "Cargando pedido…" : "Pedido no encontrado."}</div></main>
       </AppShell>
     );
   }

@@ -12,13 +12,13 @@ export default function ProveeduriaPedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { pedidos, ordenes, setBorrador, devolverPedido } = useStore();
+  const { pedidos, ordenes, setBorrador, devolverPedido, cargando } = useStore();
   const [devolverOpen, setDevolverOpen] = useState(false);
   const [motivo, setMotivo] = useState("");
 
   const pedido = pedidos.find((p) => p.id === id);
   if (!pedido) {
-    return <AppShell role="proveeduria"><main className="page"><div className="empty">Solicitud no encontrada.</div></main></AppShell>;
+    return <AppShell role="proveeduria"><main className="page"><div className="empty">{cargando ? "Cargando solicitud…" : "Solicitud no encontrada."}</div></main></AppShell>;
   }
   const b = pedidoBadge(pedido.estado);
   const t = tipoSolicitudBadge(pedido.tipoSolicitud);

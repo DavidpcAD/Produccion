@@ -12,19 +12,21 @@ export default function AprobacionOrdenDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes, setOrdenEstado, devolverOrden } = useStore();
+  const { ordenes, setOrdenEstado, devolverOrden, cargando } = useStore();
   const [rechazarOpen, setRechazarOpen] = useState(false);
   const [motivo, setMotivo] = useState("");
+  const [aprobando, setAprobando] = useState(false);
 
   const orden = ordenes.find((o) => o.id === id);
+  // Mientras el store trae las órdenes todavía no sabemos si existe: no digas
+  // "no encontrada" antes de tiempo. Todos los hooks van ARRIBA de este return.
   if (!orden) {
-    return <AppShell role="aprobacion"><main className="page"><div className="empty">Orden no encontrada.</div></main></AppShell>;
+    return <AppShell role="aprobacion"><main className="page"><div className="empty">{cargando ? "Cargando orden…" : "Orden no encontrada."}</div></main></AppShell>;
   }
 
   // Aprobar (Luis Roberto): crea y LANZA el pedido en BC en un paso. La orden solo
   // pasa a "lanzado" si BC de verdad la creó con líneas y la lanzó; si BC falla,
   // queda pendiente y se muestra el motivo real (ver lib/aprobar.ts).
-  const [aprobando, setAprobando] = useState(false);
   async function aprobar() {
     setAprobando(true);
     const r = await aprobarYLanzar(orden!, setOrdenEstado);
