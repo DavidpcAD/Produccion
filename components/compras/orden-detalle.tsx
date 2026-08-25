@@ -42,23 +42,19 @@ export function OrdenDetalle({
     return () => { vivo = false; };
   }, [orden.bcNumber]);
 
-  // Reintenta el lanzamiento en BC de un pedido YA creado (no duplica). Ahora
-  // RE-SINCRONIZA las líneas (precio + variante) antes del Release, para que las
-  // correcciones hechas en la app después de crearlo (p.ej. el precio de un
-  // material sin historial) sí viajen a BC.
+  // Reintenta el LANZAMIENTO en BC de un pedido ya creado (no duplica). Solo lanza:
+  // las líneas del pedido las escribe Proveeduría, que es la dueña del contenido, y
+  // reescribirlas desde acá le pisaba el almacén y la obra que acababa de poner.
   async function reintentarLanzar() {
     if (!orden.bcNumber) return;
     setRelanzando(true);
     try {
-      const lineas = orden.lineas
-        .filter((l) => l.tipo === "articulo" && l.articuloId && l.cantidad > 0)
-        .map((l) => ({ itemNo: l.articuloId!, cantidad: l.cantidad, precio: l.precioUnitario || 0, descripcion: l.descripcion, variantCode: l.variantCode }));
       const r = await fetch("/api/compras/bc/relanzar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderNo: orden.bcNumber, lineas }),
+        body: JSON.stringify({ orderNo: orden.bcNumber }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) toast(`BC ${orden.bcNumber}: ${d.status ?? "lanzado"} (líneas sincronizadas)`, "success");
+      if (r.ok) toast(`BC ${orden.bcNumber}: ${d.status ?? "lanzado"}`, "success");
       else toast(`No se pudo lanzar en BC: ${d.error ?? r.status}`, "error");
     } catch (e: any) {
       toast(`No se pudo lanzar en BC: ${String(e?.message ?? e)}`, "error");

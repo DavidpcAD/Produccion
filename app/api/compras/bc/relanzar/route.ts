@@ -43,9 +43,13 @@ async function respuestaDelFallo(orderNo: string, e: unknown) {
   return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 502 });
 }
 
-// Re-sincroniza (precio + variante) las líneas de un pedido YA creado en BC y luego
-// lo lanza. Se usa al REINTENTAR "Aprobar y lanzar": si la orden se corrigió en la
-// app después de crearse en BC, esas correcciones viajan a BC antes del release.
+// LANZA (Release) un pedido que ya existe en BC, y opcionalmente re-sincroniza sus
+// líneas antes.
+//
+// El flujo normal ya NO manda líneas: el pedido lo crea Proveeduría al enviar la
+// orden a aprobación y es ella la dueña de su contenido, así que aprobar es solo
+// lanzar. `lineas`/`cargos` siguen soportados para el camino en que ESTA app creó el
+// pedido (sin bcNo previo), donde sí le toca aplicar obra/tarea/almacén.
 export async function POST(req: Request) {
   let orderNo = "";
   try {

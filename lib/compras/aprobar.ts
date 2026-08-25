@@ -94,19 +94,27 @@ export async function aprobarYLanzar(
     return fallo(orden, setOrdenEstado, `La orden tiene ${sinPrecio.length} línea(s) sin precio; no se envía a BC. Poné el precio en proveeduría antes de lanzar.`);
   }
 
-  // Si la orden YA se creó en BC en un intento previo (tiene bcNumber pero el
-  // release falló), NO se crea otra: solo se REINTENTA el release de ese pedido.
-  // Así no se acumulan pedidos duplicados en BC en cada reintento.
+  // El pedido YA EXISTE en BC (Proveeduría lo crea ABIERTO al enviar la orden a
+  // aprobación). Acá solo se LANZA: no se crea nada y no se le tocan las líneas.
+  //
+  // Antes esta rama re-sincronizaba las líneas antes del release, porque el pedido
+  // lo creaba esta app y las correcciones posteriores no viajaban solas. Ya no:
+  // Proveeduría es la dueña del contenido del pedido y lo empuja ella (al editar y
+  // al reenviar). Volver a escribirlas desde acá era pisarle lo que acaba de poner
+  // — sobre todo el ALMACÉN: la regla de "obra sin tarea va al Almacén General"
+  // (más arriba) mandaba el material a ALM-GRAL aunque en Proveeduría se hubiera
+  // elegido otro centro de costo. Aprobar es lanzar, no reescribir.
   if (orden.bcNumber) {
     let res: Response;
     let d: any = {};
     try {
-      // Re-sincroniza las líneas (precio + variante) del pedido YA creado en BC y
-      // luego lanza. Así, si la orden se corrigió en la app después de crearse en
-      // BC, esas correcciones viajan a BC en vez de relanzar la versión vieja.
+      // Sin `lineas` ni `cargos` el endpoint va derecho al Release, pero conserva su
+      // lectura del estado real de BC cuando falla (ya lanzado / ya registrado /
+      // eliminado / en aprobación), que es lo que evita que la orden se quede
+      // colgada en "pendiente" para siempre.
       res = await fetch("/api/compras/bc/relanzar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderNo: orden.bcNumber, lineas: lineasBc, cargos, metodo: metodoCargo }),
+        body: JSON.stringify({ orderNo: orden.bcNumber }),
       });
       d = await res.json().catch(() => ({}));
     } catch (e: any) {
@@ -133,7 +141,10 @@ export async function aprobarYLanzar(
     return { ok: !d.cargoError && !d.jobError, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${orden.bcNumber} aprobada y lanzada en BC${avisoCargoRe}${avisoJobRe}` };
   }
 
-  // Primer intento: crear el pedido en BC y lanzarlo.
+  // Sin pedido en BC: o la orden es vieja (de antes de que Proveeduría lo creara al
+  // enviar), o allá está apagada la creación (BC_CREAR_AL_ENVIAR=0). Se crea y se
+  // lanza acá, como siempre — incluyendo la aplicación de obra/tarea/almacén, que en
+  // este camino sí es responsabilidad de esta app.
   let res: Response;
   let d: any = {};
   try {
