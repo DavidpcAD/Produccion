@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, almacenesFisicos, etiquetaArticulo, mismaMoneda } from "@/lib/compras/helpers";
+import { money, numeroOrden, almacenesFisicos, etiquetaArticulo, mismaMoneda } from "@/lib/compras/helpers";
 import type { Articulo, OrdenLinea } from "@/lib/compras/types";
 
 // Orden DIRECTA: compra armada por Proveeduría sin partir de una solicitud de
@@ -84,7 +84,7 @@ export default function OrdenDirectaPage() {
       if (fleteNum > 0) ls.push({ tipo: "cargo", descripcion: "FLETE / TRANSPORTE", cantidad: 1, unidad: "UND", almacen: rows[0]?.obra ?? "", precioUnitario: fleteNum, ivaPct: 13 });
       const orden = await createOrden({ proveedorId, proveedorNo: provSel?.code, proveedorNombre: provSel?.nombre, currencyCode: currency, almacenRecepcion: almacen, lineas: ls });
       if (aprobar) await setOrdenEstado(orden.id, "pendiente_aprobacion");
-      toast(`Orden directa ${orden.numero} ${aprobar ? "enviada a aprobación" : "guardada como abierta"}`, "success");
+      toast(`Orden directa ${numeroOrden(orden)} ${aprobar ? "enviada a aprobación" : "guardada como abierta"}`, "success");
       router.push(`/compras/proveeduria/ordenes/${orden.id}`);
     } catch (e: any) { toast(String(e?.message ?? e), "error"); setGuardando(false); }
   }

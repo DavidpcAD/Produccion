@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, ordenEsDirecta, ordenPedidos, almacenesFisicos, etiquetaArticulo , mismaMoneda } from "@/lib/compras/helpers";
+import { money, numeroOrden, ordenEsDirecta, ordenPedidos, almacenesFisicos, etiquetaArticulo , mismaMoneda } from "@/lib/compras/helpers";
 import type { Articulo, Orden, OrdenLinea } from "@/lib/compras/types";
 
 interface Row { key: string; articuloId: string; descripcion: string; unidad: string; obra: string; cantidad: string; precio: string; iva: string; descuento: string; proyecto?: string; taskNo?: string; pedidoLineaId?: string; pedidoNumero?: string; }
@@ -127,7 +127,7 @@ export default function EditarOrdenPage() {
       }));
       if (fleteNum > 0) ls.push({ tipo: "cargo", descripcion: "FLETE / TRANSPORTE", cantidad: 1, unidad: "UND", almacen: rows[0]?.obra ?? "", precioUnitario: fleteNum, ivaPct: 13 });
       await updateOrden(orden!.id, { proveedorId, proveedorNo: provSel?.code, proveedorNombre: provSel?.nombre, currencyCode: currency, almacenRecepcion: almacen, lineas: ls });
-      toast(`Orden ${orden!.numero} actualizada`, "success");
+      toast(`Orden ${numeroOrden(orden!)} actualizada`, "success");
       router.push(`/compras/proveeduria/ordenes/${orden!.id}`);
     } catch (e: any) { toast(String(e?.message ?? e), "error"); setGuardando(false); }
   }
@@ -138,7 +138,7 @@ export default function EditarOrdenPage() {
         <div className="back-link" onClick={() => router.push(`/compras/proveeduria/ordenes/${id}`)}>Volver a la orden</div>
         <div className="page__head">
           <div className="page__title">
-            <div className="row gap-3"><h1 className="ds-heading">Editar {orden.numero}</h1><Badge tone="gray">Abierta</Badge></div>
+            <div className="row gap-3"><h1 className="ds-heading">Editar {numeroOrden(orden)}</h1><Badge tone="gray">Abierta</Badge></div>
             <p className="ds-muted">Ajustá proveedor, almacén, líneas y precios. Solo se puede mientras la orden esté Abierta.</p>
           </div>
         </div>

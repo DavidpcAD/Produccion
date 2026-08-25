@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, QtyRing, Tile } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { money, formatDate, ordenEsParcial, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo } from "@/lib/compras/helpers";
+import { money, formatDate, numeroOrden, ordenEsParcial, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo } from "@/lib/compras/helpers";
 
 export default function FacturacionPage() {
   const { ordenes: ordenesAll, pedidos, proveedores } = useStore();
@@ -58,7 +58,7 @@ export default function FacturacionPage() {
                     <QtyRing recibida={o.lineas.reduce((s, l) => s + l.cantidadRecibida, 0)} total={o.lineas.reduce((s, l) => s + l.cantidad, 0)} />
                     <div className="col" style={{ gap: 4 }}>
                       <div className="row gap-3">
-                        <span className="ds-strong">{o.numero}</span>
+                        <span className="ds-strong">{numeroOrden(o)}</span>
                         {ordenEsParcial(o) ? <Badge tone="yellow">Parcial · {ordenRecibidoPct(o)}%</Badge> : <Badge tone="green">Lanzado</Badge>}
                       </div>
                       <span className="ds-muted ds-label">{o.proveedorNombre ?? prov(o.proveedorId)?.nombre} · emitida {formatDate(o.fecha)}</span>

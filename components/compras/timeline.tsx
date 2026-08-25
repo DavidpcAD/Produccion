@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@/lib/compras/store";
-import { formatDateTime, ROL_LABEL } from "@/lib/compras/helpers";
+import { formatDateTime, numeroOrden, ROL_LABEL } from "@/lib/compras/helpers";
 import type { Movimiento } from "@/lib/compras/types";
 
 // Códigos de estado -> nombre legible (pedidos y órdenes).
@@ -96,8 +96,10 @@ export function Timeline({
   // Movimientos propios de la entidad.
   let items = movimientos.filter((m) => m.entidad === entidad && m.idEntidad === idEntidad);
 
-  // Mapa idOrden -> número de orden, para mostrar de qué orden viene cada evento.
-  const numeroDeOrden = new Map(ordenes.map((o) => [o.id, o.numero]));
+  // Mapa idOrden -> rótulo de la orden, para mostrar de qué orden viene cada evento.
+  // Es el N.º de BC si ya está allá y "Interno NN" si no: el `numero` crudo
+  // ("CP-000062") se lee igual que un pedido de BC y en BC no existe.
+  const numeroDeOrden = new Map(ordenes.map((o) => [o.id, numeroOrden(o)]));
 
   if (traza && entidad === "pedido") {
     const pedido = pedidos.find((p) => p.id === idEntidad);

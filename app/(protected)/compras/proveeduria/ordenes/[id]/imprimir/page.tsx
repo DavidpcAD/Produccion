@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useStore } from "@/lib/compras/store";
-import { num, formatDate, ordenLineaImporte } from "@/lib/compras/helpers";
+import { num, formatDate, numeroOrden, ordenLineaImporte } from "@/lib/compras/helpers";
 
 // Datos de la empresa (Adelante) para el encabezado del documento.
 const EMPRESA = {
@@ -136,7 +136,7 @@ export default function ImprimirOrdenPage() {
             <div className="po-prov">{orden.proveedorNombre ?? prov?.nombre ?? "—"}</div>
             <Campo k="Compra a-Nº proveedor" v={orden.proveedorNo ?? prov?.code ?? "—"} />
             <div style={{ height: 14 }} />
-            <Campo k="Nº pedido" v={orden.numero} b />
+            <Campo k="Nº pedido" v={numeroOrden(orden)} b />
             <Campo k="Fecha emisión documento" v={formatDate(orden.fecha)} />
             {prov?.paymentTermsCode && <Campo k="Términos pago" v={prov.paymentTermsCode} />}
             <Campo k="Moneda" v={cur} />

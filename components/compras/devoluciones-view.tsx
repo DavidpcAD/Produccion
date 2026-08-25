@@ -7,7 +7,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, formatDate } from "@/lib/compras/helpers";
+import { destinoLabel, formatDate, numeroOrden } from "@/lib/compras/helpers";
 import type { Role } from "@/lib/compras/types";
 
 type Dev = { id: string; tipo: "Solicitud" | "Orden"; numero: string; contra: string; motivo: string; fecha: string; href: string };
@@ -36,7 +36,7 @@ export function DevolucionesView({ role }: { role: Role }) {
     if (verOrdenes) {
       for (const o of ordenes.filter((o) => o.estado === "rechazado")) {
         out.push({
-          id: o.id, tipo: "Orden", numero: o.numero, contra: o.proveedorNombre ?? o.proveedorNo ?? "—",
+          id: o.id, tipo: "Orden", numero: numeroOrden(o), contra: o.proveedorNombre ?? o.proveedorNo ?? "—",
           motivo: o.motivoRechazo ?? "—", fecha: o.fecha,
           href: role === "aprobacion" ? `/compras/aprobacion/${o.id}` : role === "proveeduria" ? `/compras/proveeduria/ordenes/${o.id}` : "",
         });

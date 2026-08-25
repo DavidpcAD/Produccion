@@ -22,7 +22,7 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, numeroOrden, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
@@ -1586,7 +1586,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       if (esSub) {
         const orden = await crearOrdenSubcontrato(p);
         limpiarBorradorLocal();
-        toast(`Subcontrato ${p.numero} enviado a aprobación (orden ${orden.numero})`, "success");
+        toast(`Subcontrato ${p.numero} enviado a aprobación (orden ${numeroOrden(orden)})`, "success");
       } else {
         await setPedidoEstado(p.id, "aprobado");
         limpiarBorradorLocal();

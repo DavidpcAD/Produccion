@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Card } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
-import { money, formatDate, num } from "@/lib/compras/helpers";
+import { money, formatDate, num, numeroOrden } from "@/lib/compras/helpers";
 
 // Detalle de UNA recepción/factura: qué se recibió exactamente en ese registro
 // (líneas, cantidad recibida, precio e importe), distinto del detalle acumulado
@@ -44,7 +44,7 @@ export default function RecepcionDetallePage() {
             </div>
             <p className="ds-muted">
               {provNombre ?? "—"}
-              {orden && <> · orden <button className="link-btn" onClick={() => router.push(`/compras/facturacion/ver/${orden.id}`)}>{orden.numero}</button></>}
+              {orden && <> · orden <button className="link-btn" onClick={() => router.push(`/compras/facturacion/ver/${orden.id}`)}>{numeroOrden(orden)}</button></>}
             </p>
             <div className="row gap-4 wrap mt-2 ds-body-sm ds-muted">
               <span>Fecha factura: <span className="ds-strong">{formatDate(rec.fechaFactura)}</span></span>

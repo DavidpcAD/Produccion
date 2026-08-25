@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, precioEnUnidad, mismaMoneda, ALMACEN_GENERAL, obraDeLinea, destinoDeLinea, type UnidadItem } from "@/lib/compras/helpers";
+import { money, numeroOrden, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, precioEnUnidad, mismaMoneda, ALMACEN_GENERAL, obraDeLinea, destinoDeLinea, type UnidadItem } from "@/lib/compras/helpers";
 import type { OrdenLinea } from "@/lib/compras/types";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
@@ -302,7 +302,7 @@ export default function ArmarOrdenPage() {
     const orden = await createOrden({ proveedorId, proveedorNo: provSel?.code, proveedorNombre: provSel?.nombre, currencyCode: currency, almacenRecepcion: almacen, lineas: ls });
     if (aprobar) await setOrdenEstado(orden.id, "pendiente_aprobacion");
     setBorrador([]);
-    toast(`Orden ${orden.numero} ${aprobar ? "enviada a aprobación" : "guardada como abierta"}`, "success");
+    toast(`Orden ${numeroOrden(orden)} ${aprobar ? "enviada a aprobación" : "guardada como abierta"}`, "success");
     router.push(`/compras/proveeduria/ordenes/${orden.id}`);
     } catch (e: any) {
       toast(String(e?.message ?? e), "error");

@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Tile, ProgressBar } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
-import { money, num } from "@/lib/compras/helpers";
+import { money, num, numeroOrden } from "@/lib/compras/helpers";
 
 // Importe de una línea de artículo (pedido) y su parte recibida.
 const impPedido = (l: { cantidad: number; precioUnitario: number; descuentoPct?: number }) =>
@@ -48,7 +48,7 @@ export default function ProveeduriaDashboardPage() {
         const rec = impRecibido(l);
         r.pedido += ped; r.recibido += rec;
         r.lineas.push({
-          orden: o.numero, estado: o.estado,
+          orden: numeroOrden(o), estado: o.estado,
           code: l.articuloId || "", desc: l.descripcion, unidad: l.unidad,
           cantidad: l.cantidad, recibida: l.cantidadRecibida ?? 0,
           pendiente: Math.max(0, l.cantidad - (l.cantidadRecibida ?? 0)), monto: ped,

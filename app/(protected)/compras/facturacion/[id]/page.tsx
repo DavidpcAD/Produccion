@@ -8,7 +8,7 @@ import { IconWarning } from "@/components/compras/icons";
 import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { money, cantidadEntreUnidades, distribuirCargo, num, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo, todayISO, type UnidadItem } from "@/lib/compras/helpers";
+import { money, cantidadEntreUnidades, distribuirCargo, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo, todayISO, type UnidadItem } from "@/lib/compras/helpers";
 import type { MotivoNC, Orden } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
@@ -252,7 +252,7 @@ export default function RegistrarFacturaPage() {
       });
       // Líneas marcadas → notas de crédito (no bloquea el registro).
       const nc = articulo.filter((l) => marcadas[l.id]).map((l) => ({ ordenLineaId: l.id, articuloNo: l.articuloId, descripcion: l.descripcion, motivo: marcadas[l.id].motivo, cantidad: Number(marcadas[l.id].cantidad) || 0, precioUnitario: Number(marcadas[l.id].precio) || 0 }));
-      if (nc.length) { try { await marcarNotasCredito(orden!.id, orden!.numero, orden!.proveedorNombre ?? prov?.nombre, nc); } catch { /* no bloquear */ } }
+      if (nc.length) { try { await marcarNotasCredito(orden!.id, numeroOrden(orden!), orden!.proveedorNombre ?? prov?.nombre, nc); } catch { /* no bloquear */ } }
       const falloBc = aviso.includes("NO se pudo") || aviso.includes("no disponible");
       toast(`Factura ${numeroFactura} registrada${completaOrden ? " — orden completada" : " (parcial)"}${aviso}`, falloBc ? "info" : "success");
       if (bcOk) {
@@ -346,7 +346,7 @@ export default function RegistrarFacturaPage() {
         total: subtotalRecibido, lineas, facturaEnRevision: true,
       });
       const nc = articulo.filter((l) => marcadas[l.id]).map((l) => ({ ordenLineaId: l.id, articuloNo: l.articuloId, descripcion: l.descripcion, motivo: marcadas[l.id].motivo, cantidad: Number(marcadas[l.id].cantidad) || 0, precioUnitario: Number(marcadas[l.id].precio) || 0 }));
-      if (nc.length) { try { await marcarNotasCredito(orden!.id, orden!.numero, orden!.proveedorNombre ?? prov?.nombre, nc); } catch { /* no bloquear */ } }
+      if (nc.length) { try { await marcarNotasCredito(orden!.id, numeroOrden(orden!), orden!.proveedorNombre ?? prov?.nombre, nc); } catch { /* no bloquear */ } }
       const falloBc = aviso.includes("NO se pudo") || aviso.includes("no disponible");
       toast(`Material recibido — factura EN REVISIÓN${aviso}`, falloBc ? "info" : "success");
       router.push(`/compras/facturacion`);
@@ -363,7 +363,7 @@ export default function RegistrarFacturaPage() {
         <div className="page__head">
           <div className="page__title">
             <div className="row gap-3">
-              <h1 className="ds-heading">Registrar factura · {orden.numero}</h1>
+              <h1 className="ds-heading">Registrar factura · {numeroOrden(orden)}</h1>
               <Badge tone={ordenBadge(orden.estado).tone}>{ordenBadge(orden.estado).label}</Badge>
             </div>
             <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · recibido {ordenRecibidoPct(orden)}%{orden.currencyCode ? ` · ${orden.currencyCode}` : ""}</p>

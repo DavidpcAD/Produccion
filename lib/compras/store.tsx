@@ -8,7 +8,7 @@ import type {
   NotaCreditoLinea, MotivoNC,
 } from "./types";
 import * as seed from "./seed";
-import { nextNumero, nowISO, ordenEstaCompleta, PERSONA_POR_ROL, todayISO } from "./helpers";
+import { nextNumero, nowISO, numeroOrden, ordenEstaCompleta, PERSONA_POR_ROL, todayISO } from "./helpers";
 import { api, USE_API as USE_API_BUILD } from "./api";
 
 export interface NewPedidoInput {
@@ -412,7 +412,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
         });
         const peds = [...new Set(lineas.filter((l) => l.pedidoNumero).map((l) => l.pedidoNumero!))];
         const mov = mkMov({ entidad: "orden", idEntidad: created.id, documentoNo: created.numero, tipoMovimiento: "creado", estadoNuevo: "abierto", detalle: peds.length ? `Desde ${peds.join(", ")}` : undefined });
-        const notif = mkNotif("orden", `Orden de compra ${created.numero} creada`, `/compras/proveeduria/ordenes/${created.id}`, "aprobacion");
+        const notif = mkNotif("orden", `Orden de compra creada · ${numeroOrden(created)}`, `/compras/proveeduria/ordenes/${created.id}`, "aprobacion");
         return { ...d, ordenes: [created, ...d.ordenes], pedidos, movimientos: [mov, ...d.movimientos], notificaciones: [notif, ...d.notificaciones] };
       });
       return created;
@@ -501,8 +501,8 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
         const movRec = mkMov({ entidad: "recepcion", idEntidad: created.id, documentoNo: input.numeroFactura || "(en revisión)", tipoMovimiento: enRevision ? "recibido" : "creado", detalle });
         const movOrd = mkMov({ entidad: "orden", idEntidad: input.ordenId, documentoNo: orden.numero, tipoMovimiento: completada ? "recepcion_total" : "recepcion_parcial", estadoNuevo: completada ? "completado" : orden.estado, detalle });
         const notif = enRevision
-          ? mkNotif("factura", `Material recibido en ${orden.numero} — factura EN REVISIÓN (registrala en Bodega)`, `/compras/facturacion/archivo`, "facturacion")
-          : mkNotif("factura", `Factura ${input.numeroFactura} registrada en ${orden.numero}${completada ? " (orden completada)" : " (parcial)"}`, `/compras/proveeduria/ordenes/${orden.id}`, "proveeduria");
+          ? mkNotif("factura", `Material recibido en ${numeroOrden(orden)} — factura EN REVISIÓN (registrala en Bodega)`, `/compras/facturacion/archivo`, "facturacion")
+          : mkNotif("factura", `Factura ${input.numeroFactura} registrada en ${numeroOrden(orden)}${completada ? " (orden completada)" : " (parcial)"}`, `/compras/proveeduria/ordenes/${orden.id}`, "proveeduria");
         return { ...d, ordenes, recepciones: [created, ...d.recepciones], movimientos: [movOrd, movRec, ...d.movimientos], notificaciones: [notif, ...d.notificaciones] };
       });
       return created;
@@ -531,7 +531,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
         });
         const recepciones = d.recepciones.map((r) => (r.id === recepcionId ? { ...r, numeroFactura, facturaEnRevision: false } : r));
         const mov = mkMov({ entidad: "recepcion", idEntidad: recepcionId, documentoNo: numeroFactura, tipoMovimiento: "creado", detalle: `Factura ${numeroFactura} registrada (venía de revisión)` });
-        const notif = mkNotif("factura", `Factura ${numeroFactura} registrada en ${orden?.numero ?? ""} (salió de revisión)`, `/compras/proveeduria/ordenes/${rec.ordenId}`, "proveeduria");
+        const notif = mkNotif("factura", `Factura ${numeroFactura} registrada en ${orden ? numeroOrden(orden) : ""} (salió de revisión)`, `/compras/proveeduria/ordenes/${rec.ordenId}`, "proveeduria");
         return { ...d, ordenes, recepciones, movimientos: [mov, ...d.movimientos], notificaciones: [notif, ...d.notificaciones] };
       });
     };
@@ -570,7 +570,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       setData((d) => {
         const prev = d.ordenes.find((o) => o.id === id);
         const mov = mkMov({ entidad: "orden", idEntidad: id, documentoNo: prev?.numero ?? "", tipoMovimiento: "rechazado", estadoAnterior: prev?.estado, estadoNuevo: "rechazado", detalle: `Motivo: ${motivo}` });
-        const notif = mkNotif("devuelto", `La orden ${prev?.numero ?? ""} fue RECHAZADA por Aprobación: ${motivo}`, `/compras/proveeduria/ordenes/${id}`, "proveeduria");
+        const notif = mkNotif("devuelto", `La orden ${prev ? numeroOrden(prev) : ""} fue RECHAZADA por Aprobación: ${motivo}`, `/compras/proveeduria/ordenes/${id}`, "proveeduria");
         return {
           ...d,
           ordenes: d.ordenes.map((o) => (o.id === id ? { ...o, estado: "rechazado" as Orden["estado"], motivoRechazo: motivo, notas: `✕ Rechazada por Aprobación: ${motivo}${o.notas ? ` · ${o.notas}` : ""}` } : o)),

@@ -5,6 +5,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Button, useToast } from "@/components/compras/ui";
 import { OrdenDetalle } from "@/components/compras/orden-detalle";
 import { useStore } from "@/lib/compras/store";
+import { numeroOrden } from "@/lib/compras/helpers";
 
 export default function ProvOrdenDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -33,7 +34,7 @@ export default function ProvOrdenDetallePage() {
       {orden.estado === "abierto" && (
         <>
           <Button variant="outline" onClick={() => router.push(`/compras/proveeduria/ordenes/${orden.id}/editar`)}>Editar</Button>
-          <Button onClick={() => act("pendiente_aprobacion", `${orden.numero} enviada a aprobación`)}>Enviar a aprobación</Button>
+          <Button onClick={() => act("pendiente_aprobacion", `${numeroOrden(orden)} enviada a aprobación`)}>Enviar a aprobación</Button>
         </>
       )}
       {orden.estado === "pendiente_aprobacion" && (
@@ -45,7 +46,7 @@ export default function ProvOrdenDetallePage() {
       {orden.estado === "rechazado" && (
         <>
           <Button variant="outline" onClick={() => router.push(`/compras/proveeduria/ordenes/${orden.id}/editar`)}>Editar</Button>
-          <Button onClick={() => act("pendiente_aprobacion", `${orden.numero} corregida y reenviada a aprobación`)}>Reenviar a aprobación</Button>
+          <Button onClick={() => act("pendiente_aprobacion", `${numeroOrden(orden)} corregida y reenviada a aprobación`)}>Reenviar a aprobación</Button>
         </>
       )}
       {orden.estado === "lanzado" && (

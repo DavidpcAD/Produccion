@@ -5,7 +5,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Card, Tile } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { formatDate, ordenesDeMisPedidos, soloRecibeLoSuyo } from "@/lib/compras/helpers";
+import { formatDate, numeroOrden, ordenesDeMisPedidos, soloRecibeLoSuyo } from "@/lib/compras/helpers";
 
 // Bodega (recibe): historial de lo que se recibió, con quién lo recibió.
 // Pensada para celular/tablet: tarjetas grandes, sin tablas anchas.
@@ -66,7 +66,7 @@ export default function RecibidasPage() {
                 <Card key={r.id} className="rec-card">
                   <div className="row row--between wrap gap-2" style={{ alignItems: "flex-start" }}>
                     <div className="col" style={{ gap: 3, minWidth: 0 }}>
-                      <span className="ds-strong" style={{ fontSize: "var(--ds-font-size-subtitle)" }}>{o?.numero ?? "—"}</span>
+                      <span className="ds-strong" style={{ fontSize: "var(--ds-font-size-subtitle)" }}>{o ? numeroOrden(o) : "—"}</span>
                       <span className="ds-body-sm ds-muted ds-truncate">{provNombre(r.ordenId)}</span>
                     </div>
                     {enRevision ? <Badge tone="yellow">En revisión</Badge> : (r.parcial ? <Badge tone="yellow">Parcial</Badge> : <Badge tone="green">Completa</Badge>)}

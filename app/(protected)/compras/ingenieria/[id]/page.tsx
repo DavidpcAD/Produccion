@@ -7,7 +7,7 @@ import { Badge, Button, Card, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
-import { ALMACEN_GENERAL, destinoLabel, esConsumoInmediato, esSubcontrato, formatDate, money, montoDeLineaSubcontrato, num, obraDeLinea, ordenesDePedido, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, destinoLabel, esConsumoInmediato, esSubcontrato, formatDate, money, montoDeLineaSubcontrato, num, numeroOrden, obraDeLinea, ordenesDePedido, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
 export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -218,10 +218,10 @@ export default function PedidoDetallePage() {
         {esSub && ordenSub && (
           <p className="ds-muted ds-label mt-4">
             {ordenSub.estado === "pendiente_aprobacion"
-              ? <>Orden <strong>{ordenSub.numero}</strong> pendiente de aprobación. Al aprobarse se crea el pedido de compra en Business Central.</>
+              ? <>Orden <strong>{numeroOrden(ordenSub)}</strong> pendiente de aprobación. Al aprobarse se crea el pedido de compra en Business Central.</>
               : ordenSub.estado === "rechazado"
-                ? <>Orden <strong>{ordenSub.numero}</strong> rechazada{ordenSub.motivoRechazo ? `: ${ordenSub.motivoRechazo}` : ""}.</>
-                : <>Orden <strong>{ordenSub.numero}</strong>{ordenSub.bcNumber ? <> · en Business Central como <strong>{ordenSub.bcNumber}</strong></> : null}. Falta recibir la factura del servicio.</>}
+                ? <>Orden <strong>{numeroOrden(ordenSub)}</strong> rechazada{ordenSub.motivoRechazo ? `: ${ordenSub.motivoRechazo}` : ""}.</>
+                : <>Orden <strong>{numeroOrden(ordenSub)}</strong>. Falta recibir la factura del servicio.</>}
           </p>
         )}
 
