@@ -546,6 +546,12 @@ export function pedidoBadge(estado: Pedido["estado"]): { label: string; tone: st
     case "cerrado": return { label: "Cerrado", tone: "gray" };
     case "devuelto": return { label: "Devuelto", tone: "red" };
   }
+  // Mismo default que ordenBadge, por la misma razón: sin él, un estado fuera del union
+  // devuelve undefined y el `.label`/`.tone` de quien llama tira TypeError — se caen la
+  // lista de Ingeniería, su detalle, la matriz y las solicitudes de Proveeduría. Hoy no hay
+  // filas así en SBX ni en PRO, pero PedidoCompra.idEstado no tiene FK ni CHECK y
+  // codigoDeId() deja pasar crudo cualquier nombre nuevo de dbo.Estado del módulo Compras.
+  return { label: String(estado ?? "—"), tone: "gray" };
 }
 
 // Estado de COMPRA de una solicitud, tal como lo ve Proveeduría (derivado del

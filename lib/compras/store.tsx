@@ -56,6 +56,9 @@ interface StoreShape {
   setUsuario: (u: string | null) => void;
   cargando: boolean;
   hydrated: boolean; // ya se leyó el rol/usuario de localStorage (evita rebotar al login al recargar)
+  // Falló la carga inicial (modo API): hay que decírselo al usuario, no fingir que no hay datos.
+  errorCarga: string | null;
+  reintentarCarga: () => Promise<void>;
 
   proveedores: Proveedor[];
   articulos: Articulo[];
@@ -136,6 +139,17 @@ const PLAN_CATEGORIAS_SEED: PlanCategoria[] = [
   "pilas", "losa sanitaria", "zacate", "TAC",
 ].map((n, i) => ({ id: `c${i + 1}`, nombre: n }));
 
+// En modo API los cuatro conjuntos que trae el bootstrap arrancan VACÍOS. Si arrancaran con
+// la semilla y el bootstrap fallara, la pantalla mostraría los datos de DEMO como si fueran
+// producción, sin que nadie pueda notarlo: pasó de verdad — la lista de Proveeduría llegaba
+// a mostrar "2 órdenes totales" con la CP-000862 de TECNIBRE S.A., que sale de seed.ts. Los
+// catálogos (proveedores/artículos/obras/almacenes) sí siguen saliendo de la semilla: no los
+// trae el bootstrap, cada pantalla los reemplaza con los de BC.
+function datosIniciales(useApi: boolean): Persisted {
+  const d = freshData();
+  return useApi ? { ...d, pedidos: [], ordenes: [], recepciones: [], movimientos: [] } : d;
+}
+
 function freshData(): Persisted {
   return {
     notificaciones: [],
@@ -154,11 +168,14 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   const USE_API = useApi ?? USE_API_BUILD;
   const [role, setRole] = useState<Role | null>(null);
   const [usuario, setUsuario] = useState<string | null>(null);
-  const [data, setData] = useState<Persisted>(() => freshData());
+  const [data, setData] = useState<Persisted>(() => datosIniciales(USE_API));
   const [borrador, setBorrador] = useState<StoreShape["borrador"]>([]);
   const [planContexto, setPlanContexto] = useState<StoreShape["planContexto"]>(null);
   const [hydrated, setHydrated] = useState(false);
   const [cargando, setCargando] = useState(USE_API);
+  // Motivo real por el que no hay datos, para poder DECIRLO en pantalla en vez de mostrar
+  // una lista vacía (o, peor, la semilla) como si fuera la verdad.
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   // Notas de crédito (aparte del bootstrap para no romper la carga si la tabla no existe).
   const [notasCredito, setNotasCredito] = useState<NotaCreditoLinea[]>([]);
 
@@ -170,8 +187,11 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     if (u) setUsuario(u);
     if (USE_API) {
       api.bootstrap()
-        .then((b) => setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos })))
-        .catch((e) => console.error("bootstrap", e))
+        .then((b) => {
+          setErrorCarga(null);
+          setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+        })
+        .catch((e) => { console.error("bootstrap", e); setErrorCarga(String(e?.message ?? e)); })
         .finally(() => { setCargando(false); setHydrated(true); });
     } else {
       try {
@@ -603,8 +623,15 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
 
     const reset: StoreShape["reset"] = () => setData(freshData());
 
+    const reintentarCarga: StoreShape["reintentarCarga"] = async () => {
+      setCargando(true);
+      try { await refreshFromApi(); setErrorCarga(null); }
+      catch (e: any) { setErrorCarga(String(e?.message ?? e)); }
+      finally { setCargando(false); }
+    };
+
     return {
-      role, setRole, usuario, setUsuario, cargando, hydrated,
+      role, setRole, usuario, setUsuario, cargando, hydrated, errorCarga, reintentarCarga,
       proveedores: seed.proveedores, articulos: seed.articulos, obras: seed.obras,
       maquinas: seed.maquinas, almacenes: seed.almacenes,
       pedidos: data.pedidos, ordenes: data.ordenes, recepciones: data.recepciones, movimientos: data.movimientos,
@@ -617,7 +644,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       planContexto, setPlanContexto,
       borrador, setBorrador,
     };
-  }, [role, usuario, data, borrador, planContexto, cargando]);
+  }, [role, usuario, data, borrador, planContexto, cargando, errorCarga]);
 
   return <StoreCtx.Provider value={api2}>{children}</StoreCtx.Provider>;
 }

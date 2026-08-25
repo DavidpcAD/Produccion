@@ -1,16 +1,25 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
 import { money, ordenEsDirecta, ordenPedidos, almacenesFisicos, etiquetaArticulo , mismaMoneda } from "@/lib/compras/helpers";
-import type { Articulo, OrdenLinea } from "@/lib/compras/types";
+import type { Articulo, Orden, OrdenLinea } from "@/lib/compras/types";
 
 interface Row { key: string; articuloId: string; descripcion: string; unidad: string; obra: string; cantidad: string; precio: string; iva: string; descuento: string; proyecto?: string; taskNo?: string; pedidoLineaId?: string; pedidoNumero?: string; }
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+// Las filas editables que salen de las líneas de artículo de una orden.
+function filasDe(orden?: Orden): Row[] {
+  return (orden?.lineas ?? []).filter((l) => l.tipo === "articulo").map((l) => ({
+    key: l.id, articuloId: l.articuloId ?? "", descripcion: l.descripcion, unidad: l.unidad, obra: l.proyecto ?? l.almacen ?? "",
+    cantidad: String(l.cantidad), precio: String(l.precioUnitario), iva: String(l.ivaPct ?? 13), descuento: String(l.descuentoPct ?? 0),
+    proyecto: l.proyecto, taskNo: l.taskNo, pedidoLineaId: l.pedidoLineaId, pedidoNumero: l.pedidoNumero,
+  }));
+}
 
 export default function EditarOrdenPage() {
   const { id } = useParams<{ id: string }>();
@@ -41,13 +50,25 @@ export default function EditarOrdenPage() {
   const [currency, setCurrency] = useState(orden?.currencyCode ?? "");
   const [flete, setFlete] = useState(cargo ? String(cargo.precioUnitario) : "");
   const [almacen, setAlmacen] = useState(orden?.almacenRecepcion ?? "ALM-GRAL");
-  const [rows, setRows] = useState<Row[]>(
-    (orden?.lineas ?? []).filter((l) => l.tipo === "articulo").map((l) => ({
-      key: l.id, articuloId: l.articuloId ?? "", descripcion: l.descripcion, unidad: l.unidad, obra: l.proyecto ?? l.almacen ?? "",
-      cantidad: String(l.cantidad), precio: String(l.precioUnitario), iva: String(l.ivaPct ?? 13), descuento: String(l.descuentoPct ?? 0),
-      proyecto: l.proyecto, taskNo: l.taskNo, pedidoLineaId: l.pedidoLineaId, pedidoNumero: l.pedidoNumero,
-    }))
-  );
+  const [rows, setRows] = useState<Row[]>(() => filasDe(orden));
+
+  // El store arranca SIN órdenes y las trae por bootstrap unos segundos después, así que en
+  // el primer render `orden` no existe y todo el formulario de arriba quedaba vacío para
+  // siempre: entrando por la URL directa (o recargando con F5) aparecía "Sin líneas. Agregá
+  // al menos una." y sin proveedor, sobre una orden que sí tiene líneas. Se siembra UNA vez,
+  // cuando llega la orden. La comparación es por ID, no por identidad del objeto: el store se
+  // refresca solo cada 20s y volver a sembrar ahí borraría lo que la persona está escribiendo.
+  const sembradaId = useRef<string | null>(orden ? orden.id : null);
+  useEffect(() => {
+    if (!orden || sembradaId.current === orden.id) return;
+    sembradaId.current = orden.id;
+    const c = orden.lineas.find((l) => l.tipo === "cargo");
+    setProveedorId(orden.proveedorId ?? "");
+    setCurrency(orden.currencyCode ?? "");
+    setFlete(c ? String(c.precioUnitario) : "");
+    setAlmacen(orden.almacenRecepcion ?? "ALM-GRAL");
+    setRows(filasDe(orden));
+  }, [orden]);
   const [qaCode, setQaCode] = useState(""); const [qaQty, setQaQty] = useState(""); const [qaPrecio, setQaPrecio] = useState("");
 
   const provSel = catProv.find((x) => x.id === proveedorId);

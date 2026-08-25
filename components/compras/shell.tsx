@@ -73,7 +73,7 @@ const ROLE_META: Record<Role, { label: string; persona: string; home: string; na
 };
 
 export function AppShell({ role, children }: { role: Role; children: React.ReactNode }) {
-  const { role: current, setRole, usuario, setUsuario, hydrated, pedidos, ordenes } = useStore();
+  const { role: current, setRole, usuario, setUsuario, hydrated, pedidos, ordenes, errorCarga, reintentarCarga, cargando } = useStore();
   const devolCount = devolucionesCount(role, pedidos, ordenes);
   const router = useRouter();
   const pathname = usePathname();
@@ -93,6 +93,24 @@ export function AppShell({ role, children }: { role: Role; children: React.React
 
   if (!hydrated || current !== role) {
     return <div className="page"><div className="empty">Cargando…</div></div>;
+  }
+
+  // La carga inicial falló (base en pausa, red, 500…). Decirlo, porque la alternativa es
+  // pintar pantallas vacías que se leen como "no hay órdenes" — o como datos de verdad.
+  if (errorCarga) {
+    return (
+      <div className="page">
+        <div className="empty">
+          <p style={{ margin: 0, fontWeight: 600 }}>No se pudieron cargar los datos de Compras.</p>
+          <p className="ds-muted ds-body-sm" style={{ marginTop: 4 }}>
+            Preferimos no mostrarte nada antes que datos equivocados. Reintentá; si sigue fallando, avisá a TI ({errorCarga}).
+          </p>
+          <button className="btn" style={{ marginTop: 12 }} onClick={() => { void reintentarCarga(); }} disabled={cargando}>
+            {cargando ? "Reintentando…" : "Reintentar"}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const meta = ROLE_META[role];

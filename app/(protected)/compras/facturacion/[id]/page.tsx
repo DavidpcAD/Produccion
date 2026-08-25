@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { IconWarning } from "@/components/compras/icons";
@@ -9,7 +9,7 @@ import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
 import { money, cantidadEntreUnidades, distribuirCargo, num, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo, todayISO, type UnidadItem } from "@/lib/compras/helpers";
-import type { MotivoNC } from "@/lib/compras/types";
+import type { MotivoNC, Orden } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
   { v: "precio_distinto", label: "Precio distinto" },
@@ -28,6 +28,15 @@ const IVA_CARGO = 0.13; // BC recalcula; esto es solo el estimado que se muestra
 
 /** Stock de un artículo en BC: cantidad total y la unidad (BASE) en que viene. */
 type StockItem = { cantidad: number; unidad: string } | null;
+
+// Cantidad pendiente por línea de artículo, que es con lo que se precarga la factura.
+function pendientesDe(orden?: Orden): Record<string, string> {
+  const init: Record<string, string> = {};
+  (orden?.lineas ?? []).filter((l) => l.tipo === "articulo").forEach((l) => {
+    init[l.id] = String(ordenLineaPendiente(l));
+  });
+  return init;
+}
 
 export default function RegistrarFacturaPage() {
   const { id } = useParams<{ id: string }>();
@@ -48,13 +57,19 @@ export default function RegistrarFacturaPage() {
   const articulo = (orden?.lineas ?? []).filter((l) => l.tipo === "articulo");
   const cargo = (orden?.lineas ?? []).find((l) => l.tipo === "cargo");
 
-  const [recibir, setRecibir] = useState<Record<string, string>>(() => {
-    const init: Record<string, string> = {};
-    (orden?.lineas ?? []).filter((l) => l.tipo === "articulo").forEach((l) => {
-      init[l.id] = String(ordenLineaPendiente(l));
-    });
-    return init;
-  });
+  const [recibir, setRecibir] = useState<Record<string, string>>(() => pendientesDe(orden));
+
+  // Igual que en Editar orden: el store arranca sin órdenes, así que en el primer render
+  // `orden` no existe y este mapa quedaba en {} para siempre — entrando por la URL directa
+  // o recargando, las cantidades a recibir salían VACÍAS en vez de precargadas con lo
+  // pendiente. Se siembra una sola vez, cuando llega la orden, y por ID: el refresco
+  // automático de cada 20s no debe pisar las cantidades que la persona ya escribió.
+  const sembradaId = useRef<string | null>(orden ? orden.id : null);
+  useEffect(() => {
+    if (!orden || sembradaId.current === orden.id) return;
+    sembradaId.current = orden.id;
+    setRecibir(pendientesDe(orden));
+  }, [orden]);
   const [numeroFactura, setNumeroFactura] = useState("");
   // Cargo de transporte de ESTA factura/viaje (opcional). Se agrega a la OC en BC
   // y se reparte entre lo recibido según el método elegido.
