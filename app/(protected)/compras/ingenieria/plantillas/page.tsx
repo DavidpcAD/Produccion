@@ -7,7 +7,7 @@ import { Combobox } from "@/components/compras/combobox";
 import { IconEdit } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
-import { etiquetaArticulo, saltarCantidad } from "@/lib/compras/helpers";
+import { etiquetaArticulo, redondearCantidad, saltarCantidad, type UnidadItem } from "@/lib/compras/helpers";
 import type { Articulo } from "@/lib/compras/types";
 
 type Etapa = { id: number; codigo: string; nombre: string };
@@ -286,7 +286,9 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
     let vivo = true;
     Promise.all(faltan.map(async (c) => {
       try {
-        const r = await fetch(`/api/bc/existencias?itemNo=${encodeURIComponent(c)}`);
+        // Ruta correcta: /api/compras/bc/existencias (apuntaba a /api/bc/existencias,
+        // que no existe, así que esta columna decía "s/d" desde siempre).
+        const r = await fetch(`/api/compras/bc/existencias?itemNo=${encodeURIComponent(c)}`);
         const d = await r.json().catch(() => ({}));
         const tot = r.ok && Array.isArray(d.existencias)
           ? d.existencias.reduce((a: number, e: any) => a + (Number(e.cantidad) || 0), 0)
@@ -297,6 +299,34 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codigosLineas]);
+
+  // El stock de BC viene en unidad BASE y la línea de la plantilla puede estar en otra
+  // (un estañón son 255.000 gramos): sin el factor, la columna "Stock BC" quedaría al
+  // lado de "Unidad" y "Cantidad" hablando de otra cosa.
+  const [uomPorItem, setUomPorItem] = useState<Record<string, UnidadItem[]>>({});
+  useEffect(() => {
+    const codes = codigosLineas ? codigosLineas.split(",") : [];
+    if (!codes.length) return;
+    let vivo = true;
+    fetch(`/api/compras/bc/unidades?items=${encodeURIComponent(codes.join(","))}`)
+      .then((r) => (r.ok ? r.json() : { porItem: {} }))
+      .then((d) => { if (vivo) setUomPorItem((d?.porItem ?? {}) as Record<string, UnidadItem[]>); })
+      .catch(() => { /* sin unidades: el stock se muestra en unidad base, etiquetado */ });
+    return () => { vivo = false; };
+  }, [codigosLineas]);
+
+  /** Stock de la línea en SU unidad, y con qué unidad quedó (para etiquetarlo). */
+  function stockDeLinea(code: string, unidad?: string): { valor: number; unidad: string } | null {
+    const st = stockBc[code];
+    if (typeof st !== "number") return null;
+    const u = (unidad ?? "").trim();
+    const lista = uomPorItem[code] ?? [];
+    const base = lista.find((x) => x.factor === 1)?.code ?? "";
+    if (!u || !lista.length) return { valor: st, unidad: base };
+    const f = lista.find((x) => x.code.toUpperCase() === u.toUpperCase())?.factor;
+    if (!f || !(f > 0)) return { valor: st, unidad: base };      // sin factor: se deja en base
+    return { valor: redondearCantidad(st / f), unidad: u };
+  }
 
   // Clasificaciones bajo la partida elegida (directas o vía sus sub-partidas).
   const clasOpciones = useMemo(() => {
@@ -485,7 +515,17 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
                       ? <span className="ds-muted">…</span>
                       : st === null
                         ? <span className="ds-muted" title="Sin conexión a Business Central">s/d</span>
-                        : <span className={st > 0 ? "ds-strong" : "ds-muted"}>{st.toLocaleString("es-CR")}</span>}
+                        : (() => {
+                            const s2 = stockDeLinea(l.code, l.unidad);
+                            if (!s2) return <span className="ds-muted">s/d</span>;
+                            const mismaU = !l.unidad || !s2.unidad || s2.unidad.toUpperCase() === l.unidad.toUpperCase();
+                            return (
+                              <span className={s2.valor > 0 ? "ds-strong" : "ds-muted"}
+                                title={mismaU ? undefined : `Business Central lleva el inventario en ${s2.unidad}; la línea va en ${l.unidad}`}>
+                                {s2.valor.toLocaleString("es-CR")}{mismaU ? "" : ` ${s2.unidad}`}
+                              </span>
+                            );
+                          })()}
                   </td>
                   <td className="ds-num"><Input type="number" min={0} value={l.cantidad} data-cant="1" onKeyDown={saltarCantidad}
                     onFocus={(e) => e.currentTarget.select()}

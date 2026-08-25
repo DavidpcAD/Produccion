@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, ordenEsDirecta, ordenPedidos, almacenesFisicos, etiquetaArticulo } from "@/lib/compras/helpers";
+import { money, ordenEsDirecta, ordenPedidos, almacenesFisicos, etiquetaArticulo , mismaMoneda } from "@/lib/compras/helpers";
 import type { Articulo, OrdenLinea } from "@/lib/compras/types";
 
 interface Row { key: string; articuloId: string; descripcion: string; unidad: string; obra: string; cantidad: string; precio: string; iva: string; descuento: string; proyecto?: string; taskNo?: string; pedidoLineaId?: string; pedidoNumero?: string; }
@@ -56,7 +56,9 @@ export default function EditarOrdenPage() {
   function agregarLinea() {
     const it = itemsBc.find((x) => x.code === qaCode);
     if (!it || !(Number(qaQty) > 0)) { toast("Elegí un artículo y una cantidad.", "error"); return; }
-    setRows((rs) => [...rs, { key: `m-${uid()}`, articuloId: it.code, descripcion: it.descripcion, unidad: it.unidad, obra: "", cantidad: String(Number(qaQty)), precio: String(Number(qaPrecio) || it.precioUltimo || 0), iva: "13", descuento: "0", pedidoNumero: "Manual" }]);
+    // El costo del catálogo está en colones: en otra moneda se deja en 0 (ver directa).
+    const respaldo = mismaMoneda(currency, "CRC") ? (it.precioUltimo || 0) : 0;
+    setRows((rs) => [...rs, { key: `m-${uid()}`, articuloId: it.code, descripcion: it.descripcion, unidad: it.unidad, obra: "", cantidad: String(Number(qaQty)), precio: String(Number(qaPrecio) || respaldo), iva: "13", descuento: "0", pedidoNumero: "Manual" }]);
     setQaCode(""); setQaQty(""); setQaPrecio("");
   }
 
@@ -146,10 +148,10 @@ export default function EditarOrdenPage() {
             <div className="row wrap gap-2" style={{ alignItems: "flex-end", padding: "12px 16px", borderBottom: "1.5px solid var(--ds-color-gray-100)", background: "color-mix(in srgb, var(--ds-color-green-100) 6%, var(--ds-tint-base))" }}>
               <div style={{ flex: "1 1 280px", minWidth: 220 }}>
                 <label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Agregar artículo</label>
-                <Combobox items={itemsBc} value={qaCode} onChange={(k) => { setQaCode(k); const it = itemsBc.find((x) => x.code === k); if (it?.precioUltimo) setQaPrecio(String(it.precioUltimo)); }} getKey={(i) => i.code} getLabel={(i) => etiquetaArticulo(i)} getSearch={(i) => `${i.code} ${i.descripcion}`} asegurarGrupos={(i) => i.tipo ?? "inventario"} minChars={2} placeholder="Buscar artículo del catálogo…" />
+                <Combobox items={itemsBc} value={qaCode} onChange={(k) => { setQaCode(k); const it = itemsBc.find((x) => x.code === k); if (it?.precioUltimo && mismaMoneda(currency, "CRC")) setQaPrecio(String(it.precioUltimo)); }} getKey={(i) => i.code} getLabel={(i) => etiquetaArticulo(i)} getSearch={(i) => `${i.code} ${i.descripcion}`} asegurarGrupos={(i) => i.tipo ?? "inventario"} minChars={2} placeholder="Buscar artículo del catálogo…" />
               </div>
               <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</label><Input type="number" min={0} value={qaQty} onChange={(e) => setQaQty(e.target.value)} placeholder="0" style={{ width: 90 }} /></div>
-              <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Precio</label><Input type="number" min={0} value={qaPrecio} onChange={(e) => setQaPrecio(e.target.value)} placeholder="0" style={{ width: 110 }} />{(() => { const it = itemsBc.find((x) => x.code === qaCode); return it?.precioUltimo ? <div className="ds-body-sm ds-muted" style={{ marginTop: 2 }}>últ. compra {money(it.precioUltimo, currency)}{it.unidad ? `/${it.unidad}` : ""}</div> : null; })()}</div>
+              <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Precio</label><Input type="number" min={0} value={qaPrecio} onChange={(e) => setQaPrecio(e.target.value)} placeholder="0" style={{ width: 110 }} />{(() => { const it = itemsBc.find((x) => x.code === qaCode); return it?.precioUltimo ? <div className="ds-body-sm ds-muted" style={{ marginTop: 2 }}>últ. compra {money(it.precioUltimo, "CRC")}{it.unidad ? `/${it.unidad}` : ""}{mismaMoneda(currency, "CRC") ? "" : ` · esta orden va en ${currency}`}</div> : null; })()}</div>
               <Button variant="outline" onClick={agregarLinea} disabled={!qaCode || !(Number(qaQty) > 0)}>+ Agregar línea</Button>
             </div>
           ) : (

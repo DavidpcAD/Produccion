@@ -4,7 +4,7 @@ import { bcExistencias } from "@/lib/compras/bc";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/bc/existencias?itemNo=M01-0001  ó  ?locationCode=OR-4321  (al menos uno).
+// GET /api/compras/bc/existencias?itemNo=M01-0001  ó  ?locationCode=OR-4321 (al menos uno).
 // Devuelve el stock neto físico por ubicación/variante desde BC (inventoryByLocation).
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

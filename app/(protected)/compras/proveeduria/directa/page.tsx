@@ -49,7 +49,11 @@ export default function OrdenDirectaPage() {
   function agregarLinea() {
     const it = itemsBc.find((x) => x.code === qaCode);
     if (!it || !(Number(qaQty) > 0)) { toast("Elegí un artículo y una cantidad.", "error"); return; }
-    setRows((rs) => [...rs, { key: `m-${uid()}`, articuloId: it.code, descripcion: it.descripcion, unidad: it.unidad, obra: "", cantidad: String(Number(qaQty)), precio: String(Number(qaPrecio) || it.precioUltimo || 0), iva: "13", descuento: "0" }]);
+    // El costo del catálogo (items.unitCost de BC) está en COLONES: en una orden en otra
+    // moneda no sirve como precio y es mejor dejar la línea en 0 que poner un número que
+    // está bien en colones y mal en dólares (~456x).
+    const respaldo = mismaMoneda(currency, "CRC") ? (it.precioUltimo || 0) : 0;
+    setRows((rs) => [...rs, { key: `m-${uid()}`, articuloId: it.code, descripcion: it.descripcion, unidad: it.unidad, obra: "", cantidad: String(Number(qaQty)), precio: String(Number(qaPrecio) || respaldo), iva: "13", descuento: "0" }]);
     setQaCode(""); setQaQty(""); setQaPrecio("");
   }
 
@@ -124,7 +128,8 @@ export default function OrdenDirectaPage() {
               <Combobox items={itemsBc} value={qaCode} onChange={(k) => {
                   setQaCode(k);
                   const it = itemsBc.find((x) => x.code === k);
-                  if (it?.precioUltimo) setQaPrecio(String(it.precioUltimo)); // respaldo inmediato
+                  // Respaldo inmediato mientras responde BC, solo si la orden va en colones.
+                  if (it?.precioUltimo && mismaMoneda(currency, "CRC")) setQaPrecio(String(it.precioUltimo));
                   // La ruta es /api/compras/bc/lastprice (antes apuntaba a /api/bc/lastprice,
                   // que no existe: el 404 se tragaba y el precio de BC nunca llegaba).
                   // El precio viene por UNIDAD BASE del artículo, que es la misma con la que
@@ -141,7 +146,7 @@ export default function OrdenDirectaPage() {
                 }} getKey={(i) => i.code} getLabel={(i) => etiquetaArticulo(i)} getSearch={(i) => `${i.code} ${i.descripcion}`} asegurarGrupos={(i) => i.tipo ?? "inventario"} minChars={2} placeholder="Buscar artículo del catálogo…" />
             </div>
             <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Cantidad</label><Input type="number" min={0} value={qaQty} onChange={(e) => setQaQty(e.target.value)} placeholder="0" style={{ width: 90 }} /></div>
-            <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Precio</label><Input type="number" min={0} value={qaPrecio} onChange={(e) => setQaPrecio(e.target.value)} placeholder="0" style={{ width: 110 }} />{(() => { const it = itemsBc.find((x) => x.code === qaCode); return it?.precioUltimo ? <div className="ds-body-sm ds-muted" style={{ marginTop: 2 }}>últ. compra {money(it.precioUltimo, currency)}{it.unidad ? `/${it.unidad}` : ""}</div> : null; })()}</div>
+            <div><label className="ds-label ds-muted" style={{ display: "block", marginBottom: 4 }}>Precio</label><Input type="number" min={0} value={qaPrecio} onChange={(e) => setQaPrecio(e.target.value)} placeholder="0" style={{ width: 110 }} />{(() => { const it = itemsBc.find((x) => x.code === qaCode); return it?.precioUltimo ? <div className="ds-body-sm ds-muted" style={{ marginTop: 2 }}>últ. compra {money(it.precioUltimo, "CRC")}{it.unidad ? `/${it.unidad}` : ""}{mismaMoneda(currency, "CRC") ? "" : ` · esta orden va en ${currency}`}</div> : null; })()}</div>
             <Button variant="outline" onClick={agregarLinea} disabled={!qaCode || !(Number(qaQty) > 0)}>+ Agregar línea</Button>
           </div>
           <div className="ds-table-wrap" style={{ boxShadow: "none" }}>

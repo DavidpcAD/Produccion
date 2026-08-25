@@ -4,7 +4,7 @@ import { bcPostedReceiptLines } from "@/lib/compras/bc";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/bc/recepciones-registradas?vendor=&item=&doc=
+// GET /api/compras/bc/recepciones-registradas?vendor=&item=&doc=
 // Líneas de recepciones de compra YA REGISTRADAS (albaranes) para asignarles un
 // cargo de producto (flete de un tercero). Filtros: proveedor del material,
 // artículo, N.º de recepción. Nunca 500: si la API custom aún no está publicada,

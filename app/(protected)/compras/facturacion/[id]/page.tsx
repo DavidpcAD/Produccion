@@ -8,7 +8,7 @@ import { IconWarning } from "@/components/compras/icons";
 import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { money, distribuirCargo, num, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo, todayISO } from "@/lib/compras/helpers";
+import { money, cantidadEntreUnidades, distribuirCargo, num, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo, todayISO, type UnidadItem } from "@/lib/compras/helpers";
 import type { MotivoNC } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
@@ -25,6 +25,9 @@ const METODOS_CARGO: { v: string; label: string }[] = [
   { v: "Volume", label: "Por volumen" },
 ];
 const IVA_CARGO = 0.13; // BC recalcula; esto es solo el estimado que se muestra.
+
+/** Stock de un artículo en BC: cantidad total y la unidad (BASE) en que viene. */
+type StockItem = { cantidad: number; unidad: string } | null;
 
 export default function RegistrarFacturaPage() {
   const { id } = useParams<{ id: string }>();
@@ -71,7 +74,16 @@ export default function RegistrarFacturaPage() {
   const [preview, setPreview] = useState(false);
   const [guardando, setGuardando] = useState(false);
   // Confirmación de inventario (stock BC antes → después de registrar).
-  const [confirmInv, setConfirmInv] = useState<null | { itemNo: string; desc: string; antes: number | null; recibido: number; despues: number | null }[]>(null);
+  // antes/despues vienen de BC en unidad BASE; recibido es lo que tecleó bodega, en la
+  // unidad de la LÍNEA (desde que la solicitud elige unidad, puede ser EST). Para
+  // comprobar el movimiento hay que compararlos en la MISMA unidad: recibidoBase.
+  // recibidoBase = null → no se sabe el factor, así que no se comprueba nada.
+  const [confirmInv, setConfirmInv] = useState<null | {
+    itemNo: string; desc: string; antes: number | null; despues: number | null;
+    recibido: number; unidadDoc: string; recibidoBase: number | null; unidadBase: string;
+    /** false en servicios / no inventariables: no hay inventario que comprobar. */
+    mueveInventario: boolean;
+  }[]>(null);
   // Líneas marcadas para NOTA DE CRÉDITO (dañado / menos cantidad / precio distinto).
   const [marcadas, setMarcadas] = useState<Record<string, { motivo: MotivoNC; cantidad: string; precio: string }>>({});
   const marcarLinea = (l: { id: string; cantidad: number; precioUnitario: number }) =>
@@ -132,18 +144,46 @@ export default function RegistrarFacturaPage() {
     ? distribuirCargo(fleteAplicado, articulo.map((l) => ({ ...l, cantidad: Number(recibir[l.id] || 0) })))
     : {};
 
-  // Stock total (todas las ubicaciones) por artículo, desde BC — para confirmar
-  // el "antes → después" al registrar. null = BC no devolvió stock.
-  async function stockDeItems(items: string[]): Promise<Record<string, number | null>> {
+  // Stock total (todas las ubicaciones) por artículo, desde BC — para confirmar el
+  // "antes → después" al registrar. VIENE EN UNIDAD BASE del artículo (M06-0009 son
+  // gramos), que no es necesariamente la unidad de la línea de la orden: por eso se
+  // guarda también la unidad. null = BC no devolvió stock (o el artículo no mueve
+  // inventario, como un servicio): ahí no hay nada que comprobar.
+  //
+  // Ojo con la ruta: es /api/compras/bc/existencias. Estuvo apuntando a
+  // /api/bc/existencias, que no existe, así que esta comprobación nunca corrió — el
+  // modal siempre decía "s/d" y nadie lo notó.
+  async function stockDeItems(items: string[]): Promise<Record<string, StockItem>> {
     const pares = await Promise.all(items.map(async (it) => {
       try {
-        const r = await fetch(`/api/bc/existencias?itemNo=${encodeURIComponent(it)}`);
+        const r = await fetch(`/api/compras/bc/existencias?itemNo=${encodeURIComponent(it)}`);
         const d = await r.json().catch(() => ({}));
+        // La ruta responde 500 si BC falla, y 200 con [] cuando BC contestó y no hay
+        // filas: eso es stock CERO conocido (artículo que nunca se recibió), no "no se
+        // sabe". Si no se distinguiera, la primera recepción de un artículo mostraría
+        // "s/d" en vez de comprobarse.
         if (!r.ok || !Array.isArray(d.existencias)) return [it, null] as const;
-        return [it, d.existencias.reduce((s: number, e: any) => s + (Number(e.cantidad) || 0), 0)] as const;
+        const filas = d.existencias as { cantidad?: number; unidad?: string }[];
+        const cantidad = filas.reduce((s, e) => s + (Number(e.cantidad) || 0), 0);
+        return [it, { cantidad, unidad: (filas.find((e) => e.unidad)?.unidad ?? "").trim() }] as const;
       } catch { return [it, null] as const; }
     }));
     return Object.fromEntries(pares);
+  }
+
+  /** Unidades (con factor) y ficha (tipo + unidad base) de varios artículos. Las
+   *  unidades sirven para pasar lo recibido —que va en la unidad de la LÍNEA— a unidad
+   *  base, que es como BC mueve el inventario; el TIPO, para no comprobar inventario en
+   *  un SERVICIO, que no lo mueve (y que en BC igual devuelve filas de existencias:
+   *  S24-0021 "SUBCONTRATO ELECTRICO" trae 23). */
+  type FichaItem = { tipo: string; base: string };
+  async function unidadesYFichas(items: string[]): Promise<{ porItem: Record<string, UnidadItem[]>; fichas: Record<string, FichaItem> }> {
+    if (!items.length) return { porItem: {}, fichas: {} };
+    try {
+      const r = await fetch(`/api/compras/bc/unidades?items=${encodeURIComponent(items.join(","))}`);
+      const d = r.ok ? await r.json() : {};
+      return { porItem: (d?.porItem ?? {}) as Record<string, UnidadItem[]>, fichas: (d?.fichas ?? {}) as Record<string, FichaItem> };
+    } catch { return { porItem: {}, fichas: {} }; }
   }
 
   async function registrar() {
@@ -164,7 +204,7 @@ export default function RegistrarFacturaPage() {
     setGuardando(true);
     let aviso = ""; let bcOk = false;
     const items = [...new Set(bcLineas.map((l) => l.itemNo))];
-    let antes: Record<string, number | null> = {};
+    let antes: Record<string, StockItem> = {};
     try {
       // Registrar (Recibir + Facturar) en BC con todos sus movimientos contables.
       if (orden!.bcNumber && bcLineas.length) {
@@ -203,9 +243,43 @@ export default function RegistrarFacturaPage() {
       if (bcOk) {
         // Stock DESPUÉS → mostramos la confirmación antes→después (el modal navega al cerrar).
         const despues = await stockDeItems(items);
+        // Factores para pasar lo recibido a unidad base: BC mueve el inventario en base
+        // (la compra que en la factura dice "1 EST" en el inventario son 255.000 GR),
+        // así que sin convertir, el ✅/⚠️ compararía gramos contra estañones y marcaría
+        // descuadre en TODO artículo multi-unidad aunque BC estuviera perfecto.
+        const { porItem: uoms, fichas } = await unidadesYFichas(items);
         setConfirmInv(items.map((it) => {
-          const qty = bcLineas.filter((l) => l.itemNo === it).reduce((s, l) => s + l.qty, 0);
-          return { itemNo: it, desc: articulo.find((a) => a.articuloId === it)?.descripcion ?? it, antes: antes[it] ?? null, recibido: qty, despues: despues[it] ?? null };
+          const suyas = articulo.filter((l) => l.articuloId === it && Number(recibir[l.id] || 0) > 0);
+          const qty = suyas.reduce((acc, l) => acc + Number(recibir[l.id] || 0), 0);
+          // Unidad del documento: solo se muestra si todas las líneas del artículo van en
+          // la misma (si no, sumar en unidad de documento no significaría nada).
+          const unidades = [...new Set(suyas.map((l) => (l.unidad ?? "").trim().toUpperCase()).filter(Boolean))];
+          const unidadDoc = unidades.length === 1 ? unidades[0] : "";
+          const lista = uoms[it] ?? [];
+          const stock = antes[it] ?? despues[it];
+          // La unidad base sale de las existencias; si el artículo no tiene ninguna fila
+          // (stock 0), de la ficha del artículo.
+          const unidadBase = (stock?.unidad || fichas[it]?.base || "").trim();
+          // Se suma en BASE línea por línea (cada una con su factor).
+          let recibidoBase: number | null = 0;
+          for (const l of suyas) {
+            const u = (l.unidad ?? "").trim();
+            const q = Number(recibir[l.id] || 0);
+            // Sin unidad en la línea = como venía antes: ya estaba en base.
+            const f = !u ? 1 : lista.find((x) => x.code.toUpperCase() === u.toUpperCase())?.factor;
+            if (!f || !(f > 0)) { recibidoBase = null; break; }   // factor desconocido: no se comprueba
+            const enBase = cantidadEntreUnidades(q, f, 1);
+            if (enBase == null) { recibidoBase = null; break; }
+            recibidoBase += enBase;
+          }
+          // Un SERVICIO no mueve inventario: comprobar su stock daría ⚠️ siempre.
+          const tipo = fichas[it]?.tipo ?? "inventario";
+          return {
+            itemNo: it, desc: articulo.find((a) => a.articuloId === it)?.descripcion ?? it,
+            antes: antes[it]?.cantidad ?? null, despues: despues[it]?.cantidad ?? null,
+            recibido: qty, unidadDoc, recibidoBase, unidadBase,
+            mueveInventario: tipo === "inventario",
+          };
         }));
         setGuardando(false);
       } else {
@@ -507,20 +581,41 @@ export default function RegistrarFacturaPage() {
             footer={<Button onClick={() => { setConfirmInv(null); router.push("/compras/facturacion"); }}>Listo</Button>}
           >
             <p className="ds-label">Stock en Business Central <span className="ds-strong">antes → después</span> de registrar esta factura:</p>
+            <p className="ds-body-sm ds-muted" style={{ marginTop: 4 }}>
+              Compara el TOTAL de cada artículo en todas las ubicaciones. Confirma que entró la
+              cantidad correcta; no distingue entre líneas, variantes ni obras de la misma orden.
+            </p>
             <div className="ds-table-wrap" style={{ boxShadow: "none", border: "1.5px solid var(--ds-color-gray-100)", marginTop: 8 }}>
               <table className="ds-table">
                 <thead><tr><th>Artículo</th><th className="ds-num">Antes</th><th className="ds-num">Facturado</th><th className="ds-num">Después</th><th></th></tr></thead>
                 <tbody>
                   {confirmInv.map((x) => {
-                    const sd = x.antes == null || x.despues == null;
-                    const ok = !sd && Math.abs((x.despues as number) - ((x.antes as number) + x.recibido)) < 1e-6;
+                    // Todo se compara en unidad BASE, que es como BC mueve el inventario.
+                    // Sin stock (servicios, artículos que no mueven inventario) o sin
+                    // factor conocido no se comprueba: "s/d" antes que un ⚠️ que miente.
+                    const sd = !x.mueveInventario || x.antes == null || x.despues == null || x.recibidoBase == null;
+                    // Tolerancia: 1e-6 es demasiado fino cuando el factor tiene decimales
+                    // (LT = 244,01914 GR) y la cantidad se guarda con 4: 3 LT dan
+                    // 732,05742 GR y la app redondea a 732,0574. Eso no es un descuadre.
+                    const esperado = (x.antes as number) + (x.recibidoBase as number);
+                    const ok = !sd && Math.abs((x.despues as number) - esperado) <= Math.max(0.01, Math.abs(esperado) * 1e-9);
+                    const u = x.unidadBase ? ` ${x.unidadBase}` : "";
+                    // Lo que tecleó bodega, cuando su unidad no es la base: "2 EST".
+                    const enDoc = x.unidadDoc && x.unidadBase && x.unidadDoc !== x.unidadBase.toUpperCase()
+                      ? `${num.format(x.recibido)} ${x.unidadDoc}` : "";
                     return (
                       <tr key={x.itemNo}>
                         <td>{x.desc}<div className="ds-body-sm ds-muted">{x.itemNo}</div></td>
-                        <td className="ds-num">{x.antes == null ? "—" : num.format(x.antes)}</td>
-                        <td className="ds-num ds-strong" style={{ color: "var(--ds-color-green-300)" }}>+{num.format(x.recibido)}</td>
-                        <td className="ds-num ds-strong">{x.despues == null ? "—" : num.format(x.despues)}</td>
-                        <td className="ds-num">{sd ? <span className="ds-muted" title="BC no devolvió stock">s/d</span> : ok ? "✅" : <span title="El cambio no coincide con lo facturado" style={{ color: "var(--ds-color-red-200)" }}>⚠️</span>}</td>
+                        <td className="ds-num">{x.antes == null ? "—" : `${num.format(x.antes)}${u}`}</td>
+                        <td className="ds-num ds-strong" style={{ color: "var(--ds-color-green-300)" }}>
+                          +{x.recibidoBase == null ? num.format(x.recibido) : `${num.format(x.recibidoBase)}${u}`}
+                          {enDoc && <div className="ds-body-sm ds-muted" style={{ fontWeight: 400 }}>{enDoc}</div>}
+                        </td>
+                        <td className="ds-num ds-strong">{x.despues == null ? "—" : `${num.format(x.despues)}${u}`}</td>
+                        <td className="ds-num">{sd
+                          ? <span className="ds-muted" title={!x.mueveInventario ? "Servicio o no inventariable: no mueve inventario" : x.recibidoBase == null ? "No se sabe la equivalencia de la unidad de la línea: no se puede comprobar" : "BC no devolvió existencias de este artículo"}>{x.mueveInventario ? "s/d" : "—"}</span>
+                          : ok ? "✅"
+                          : <span title="El cambio de inventario no coincide con lo facturado" style={{ color: "var(--ds-color-red-200)" }}>⚠️</span>}</td>
                       </tr>
                     );
                   })}

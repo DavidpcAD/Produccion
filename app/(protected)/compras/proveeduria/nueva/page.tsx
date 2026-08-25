@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
@@ -240,7 +240,9 @@ export default function ArmarOrdenPage() {
     setRows((rs) => rs.map((r) => {
       if (Number(r.precio) > 0) return r;
       const lp = lastPrice(r);
-      return typeof lp === "number" && lp > 0 ? { ...r, precio: String(lp) } : r;
+      if (!(typeof lp === "number" && lp > 0)) return r;
+      sugeridos.current.add(r.pedidoLineaId);   // lo puso la app, no la persona
+      return { ...r, precio: String(lp) };
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bcPrices, itemsBc, proveedorId, ordenes, uomPorItem]);
@@ -255,9 +257,19 @@ export default function ArmarOrdenPage() {
   function elegirProveedor(id: string) {
     setProveedorId(id);
     const p = catProv.find((x) => x.id === id);
-    if (p) setCurrency(p.currencyCode ?? "");
+    const nueva = p?.currencyCode ?? "";
+    // Cambiar de moneda invalida los precios que se habían propuesto: ¢442.434 no son
+    // $442.434 (~456x). Se limpian los que puso la app —los sugeridos— para que el
+    // prellenado vuelva a correr con la moneda nueva, o queden en 0 para teclearlos.
+    if (!mismaMoneda(nueva, currency)) {
+      setRows((rs) => rs.map((r) => (sugeridos.current.has(r.pedidoLineaId) ? { ...r, precio: "0" } : r)));
+    }
+    if (p) setCurrency(nueva);
   }
 
+  // Líneas cuyo precio lo propuso la app (no lo tecleó el comprador): son las que se
+  // pueden limpiar si cambia la moneda de la orden.
+  const sugeridos = useRef<Set<string>>(new Set());
   const [guardando, setGuardando] = useState(false);
 
   // "Guardar como abierta": solo registra la orden local como borrador/abierta.

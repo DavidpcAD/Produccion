@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bcUnidadesDeItem, bcUnidadesDeItems } from "@/lib/compras/bc";
+import { bcUnidadesDeItem, bcUnidadesDeItems, bcItemFichas } from "@/lib/compras/bc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,8 +17,12 @@ export async function GET(req: Request) {
   const varios = (sp.get("items") ?? "").split(",").map((c) => c.trim()).filter(Boolean);
   try {
     if (varios.length) {
-      const mapa = await bcUnidadesDeItems(varios);
-      return NextResponse.json({ porItem: Object.fromEntries(mapa) });
+      // Además de las unidades, el TIPO y la unidad base de cada artículo: quien compara
+      // movimientos de inventario necesita saber que un SERVICIO no mueve inventario
+      // (en BC un servicio igual devuelve filas de existencias, así que no se puede
+      // deducir del stock).
+      const [mapa, fichas] = await Promise.all([bcUnidadesDeItems(varios), bcItemFichas(varios)]);
+      return NextResponse.json({ porItem: Object.fromEntries(mapa), fichas: Object.fromEntries(fichas) });
     }
     return NextResponse.json({ unidades: await bcUnidadesDeItem(item) });
   } catch (e) {
