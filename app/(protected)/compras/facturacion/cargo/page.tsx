@@ -16,6 +16,10 @@ type RcptLine = {
   documentNo: string; lineNo: number; vendorNo: string; itemNo: string;
   descripcion: string; locationCode: string; cantidad: number;
   precioUnitario: number; importe: number; pesoBruto: number; volumen: number; fecha: string;
+  // La cantidad de la recepción va en la unidad del DOCUMENTO (puede ser ESTAÑÓN o
+  // CUBETA, no la unidad base), y el importe en la moneda de ESA recepción — que no es
+  // la del transportista que factura el flete.
+  unidad?: string; factor?: number; cantidadBase?: number; moneda?: string;
 };
 const lineKey = (l: { documentNo: string; lineNo: number }) => `${l.documentNo}#${l.lineNo}`;
 
@@ -106,7 +110,12 @@ export default function CargoSobreFacturaPage() {
       if (vendorCode) qs.set("vendor", vendorCode);
       if (matItem.trim()) qs.set("item", matItem.trim());
       if (docNo.trim()) qs.set("doc", docNo.trim());
-      const r = await fetch(`/api/bc/recepciones-registradas?${qs.toString()}`);
+      // Ruta correcta: /api/compras/bc/recepciones-registradas. Apuntaba a
+      // /api/bc/recepciones-registradas, que no existe: el commit de julio que movió las
+      // rutas corrigió las otras tres de ESTE archivo y se saltó esta. El 404 devuelve
+      // HTML, así que r.json() reventaba y el catch lo mostraba como si BC no
+      // respondiera — la pantalla llevaba desde entonces sin poder buscar nada.
+      const r = await fetch(`/api/compras/bc/recepciones-registradas?${qs.toString()}`);
       const d = await r.json();
       setResultados(Array.isArray(d.lineas) ? d.lineas : []);
       if (d.error) setBuscarError(String(d.error));
@@ -122,6 +131,12 @@ export default function CargoSobreFacturaPage() {
   const [metodo, setMetodo] = useState("Amount"); // Amount|Equally|Weight|Volume
   const previewReparto = metodo === "Amount" || metodo === "Equally";
   const importeSel = lineasSel.reduce((s, l) => s + (l.importe || 0), 0);
+  // Las recepciones no vienen todas en la misma moneda (hay compras de este mismo
+  // artículo en colones y en dólares). El reparto "Por importe" pesa cada línea por su
+  // importe, así que sumar ¢ con $ da un reparto sin sentido. No se bloquea —el reparto
+  // real lo hace BC en moneda local— pero la previsualización avisa.
+  const monedasSel = [...new Set(lineasSel.map((l) => (l.moneda || "CRC").toUpperCase()))];
+  const mezclaMonedas = monedasSel.length > 1;
   const share = (l: RcptLine) => {
     if (cargoTotal <= 0 || !lineasSel.length) return 0;
     if (metodo === "Equally") return cargoTotal / lineasSel.length;
@@ -290,12 +305,14 @@ export default function CargoSobreFacturaPage() {
               <div className="mt-4">
                 {buscarError && (
                   <div className="ds-body-sm" style={{ color: "var(--ds-color-red-200)", marginBottom: 8 }}>
-                    No se pudieron traer las líneas de recepción de BC. {buscarError}
+                    No se pudieron traer las líneas de recepción de Business Central: {buscarError}
                   </div>
                 )}
                 {resultados.length === 0 ? (
                   <div className="empty" style={{ padding: "16px 0" }}>
-                    {buscarError ? "La API de recepciones registradas aún no responde (¿extensión BC publicada?)." : "No hay líneas de recepción para ese filtro."}
+                    {buscarError
+                      ? "Business Central devolvió un error (arriba está el motivo). Volvé a intentar; si sigue, avisá a sistemas con ese mensaje."
+                      : "No hay recepciones registradas con esos filtros. Probá con el N.º de recepción, o con otro proveedor o artículo."}
                   </div>
                 ) : (
                   <div className="ds-table-wrap" style={{ boxShadow: "none", maxHeight: 420, overflow: "auto" }}>
@@ -304,7 +321,7 @@ export default function CargoSobreFacturaPage() {
                         <tr>
                           <th style={{ width: 40 }}></th>
                           <th>Recepción</th><th>Artículo</th><th>Descripción</th><th>Almacén</th>
-                          <th className="ds-num">Cantidad</th><th className="ds-num">Importe</th>
+                          <th className="ds-num">Cantidad</th><th className="ds-num">Importe de la recepción</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -317,8 +334,17 @@ export default function CargoSobreFacturaPage() {
                               <td className="ds-body-sm">{l.itemNo}</td>
                               <td><div className="ds-truncate" title={l.descripcion} style={{ maxWidth: 240 }}>{l.descripcion}</div></td>
                               <td className="ds-muted ds-body-sm">{l.locationCode}</td>
-                              <td className="ds-num ds-body-sm">{l.cantidad}</td>
-                              <td className="ds-num ds-strong">{money(l.importe || 0, currency)}</td>
+                              <td className="ds-num ds-body-sm">
+                                {l.cantidad}{l.unidad ? ` ${l.unidad}` : ""}
+                                {/* Si la unidad del documento no es la base, se dice a
+                                    cuánto equivale: "1 EST" no significa nada solo. */}
+                                {l.unidad && (l.factor ?? 1) > 1 && (l.cantidadBase ?? 0) > 0 && (
+                                  <div className="ds-label ds-muted" style={{ fontWeight: 400 }}>= {l.cantidadBase}</div>
+                                )}
+                              </td>
+                              {/* El importe es de la recepción del MATERIAL, en la moneda de
+                                  ESA factura — no en la del transportista que cobra el flete. */}
+                              <td className="ds-num ds-strong">{money(l.importe || 0, l.moneda || "CRC")}</td>
                             </tr>
                           );
                         })}
@@ -326,7 +352,18 @@ export default function CargoSobreFacturaPage() {
                     </table>
                   </div>
                 )}
-                {lineasSel.length > 0 && <p className="ds-body-sm ds-muted mt-2">{lineasSel.length} línea(s) seleccionada(s).</p>}
+                {lineasSel.length > 0 && (
+                  <p className="ds-body-sm ds-muted mt-2">
+                    {lineasSel.length} línea(s) seleccionada(s).
+                    {mezclaMonedas && (
+                      <span style={{ color: "var(--ds-color-red-200)" }}>
+                        {" "}Ojo: hay líneas en {monedasSel.join(" y ")}. La vista previa del reparto por importe
+                        suma monedas distintas, así que esos números son solo referencia — el reparto real lo
+                        calcula Business Central en moneda local.
+                      </span>
+                    )}
+                  </p>
+                )}
               </div>
             )}
           </Card>

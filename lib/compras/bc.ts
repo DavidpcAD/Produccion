@@ -561,6 +561,17 @@ export type BcPostedReceiptLine = {
   importe: number;       // importe de la línea (base del reparto "Por importe")
   pesoBruto: number;     // Gross Weight (base del reparto "Por peso")
   volumen: number;       // Unit Volume (base del reparto "Por volumen")
+  /** Unidad del DOCUMENTO (EST, CUB…): la cantidad de arriba está en esta unidad.
+   *  BC la devuelve y hasta ahora se descartaba, así que la pantalla mostraba "1"
+   *  cuando en BC eso era "1 ESTAÑÓN" (255.000 gramos). */
+  unidad: string;
+  /** Cuántas unidades BASE trae esa unidad (qtyPerUnitOfMeasure) y la cantidad ya
+   *  expresada en base (quantityBase), que es como se mueve el inventario. */
+  factor: number;
+  cantidadBase: number;
+  /** Moneda del documento de la recepción. NO es necesariamente la del cargo que se
+   *  le va a asignar: el material lo facturó su proveedor y el flete lo factura otro. */
+  moneda: string;
   fecha: string;         // fecha de registro (posting date)
 };
 
@@ -594,6 +605,10 @@ export async function bcPostedReceiptLines(opts: { vendorNo?: string; itemNo?: s
       importe: Number(r.lineAmount ?? r.LineAmount ?? r.amount ?? r.Amount ?? 0) || 0,
       pesoBruto: Number(r.grossWeight ?? r.GrossWeight ?? 0) || 0,
       volumen: Number(r.unitVolume ?? r.UnitVolume ?? 0) || 0,
+      unidad: (r.unitOfMeasureCode ?? r.UnitOfMeasureCode ?? "").toString().trim(),
+      factor: Number(r.qtyPerUnitOfMeasure ?? r.QtyPerUnitOfMeasure ?? 0) || 0,
+      cantidadBase: Number(r.quantityBase ?? r.QuantityBase ?? 0) || 0,
+      moneda: (r.currencyCode ?? r.CurrencyCode ?? "").toString().trim(),
       fecha: r.postingDate ?? r.PostingDate ?? "",
     }))
     .filter((l) => l.documentNo && l.lineNo > 0);
