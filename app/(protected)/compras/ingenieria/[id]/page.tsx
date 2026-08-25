@@ -138,7 +138,7 @@ export default function PedidoDetallePage() {
               <thead>
                 <tr>
                   <th>Servicio</th><th>Obra</th><th>Actividad</th>
-                  <th className="ds-num">Monto</th><th className="ds-num">Recibido</th>
+                  <th className="ds-num">Cantidad</th><th className="ds-num">Monto</th><th className="ds-num">Recibido</th>
                 </tr>
               </thead>
               <tbody>
@@ -149,6 +149,7 @@ export default function PedidoDetallePage() {
                       <td>{l.descripcion}</td>
                       <td className="ds-muted">{obraDeLinea(l, pedido) || pedido.obraCodigo || "—"}</td>
                       <td className="ds-muted">{l.taskNo ? `${l.taskNo}${l.taskDescr ? ` — ${l.taskDescr}` : ""}` : "—"}</td>
+                      <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                       <td className="ds-num ds-strong">{money(montoDeLineaSubcontrato(ordenes, l.id), monedaSub)}</td>
                       <td className="ds-num">{recibido ? <Badge tone="green">Sí</Badge> : <span className="ds-pending-text">Pendiente</span>}</td>
                     </tr>
@@ -157,7 +158,7 @@ export default function PedidoDetallePage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} className="ds-strong">Total del subcontrato</td>
+                  <td colSpan={4} className="ds-strong">Total del subcontrato</td>
                   <td className="ds-num ds-strong">{money(totalSub, monedaSub)}</td>
                   <td />
                 </tr>

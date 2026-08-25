@@ -1147,7 +1147,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     && proveedorOk && montosOk
     && obrasChocadas.length === 0 && validLines.every((l) => !necesitaVariante(l));
   // Total del subcontrato (para la confirmación y el pie del panel).
-  const totalSub = useMemo(() => validLines.reduce((t, l) => t + (l.monto ?? 0), 0), [validLines]);
+  const totalSub = useMemo(() => validLines.reduce((t, l) => t + l.cantidad * (l.monto ?? 0), 0), [validLines]);
 
   function reset() {
     setTipo("material"); setDestinoMat("almacen"); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
@@ -1353,7 +1353,25 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       return;
     }
     // El material nuevo se agrega ARRIBA (primero) dentro de su obra.
-    setLineas((ls) => [{ key: uid(), grupoKey, articuloId, variantCode, variantNombre, cantidad, obraCodigo, obraNombre }, ...ls]);
+    const key = uid();
+    setLineas((ls) => [{ key, grupoKey, articuloId, variantCode, variantNombre, cantidad, obraCodigo, obraNombre }, ...ls]);
+    // Y en cuanto BC contesta con sus unidades, la línea FIJA la suya. Si no, la unidad
+    // se calcularía al vuelo y la etiqueta pasaría sola de la base a la unidad de compra
+    // cuando llega la respuesta: quien tecleó "100" viendo GR terminaría pidiendo 100
+    // ESTAÑONES. Solo se fija mientras la línea está intacta (nadie tecleó todavía);
+    // si ya se tocó, se respeta lo que la persona está viendo y ella la cambia a mano
+    // —y ahí sí se convierte la cantidad.
+    const art = catArticulos.find((x) => x.id === articuloId);
+    if (art?.code) {
+      getUnidades(art.code).then((us) => {
+        const porDefecto = unidadPorDefecto(us, art.unidad, art.unidadCompra, art.tipo);
+        if (!porDefecto) return;
+        setLineas((ls) => ls.map((l) => (
+          l.key === key && !l.unidad && l.cantidad === cantidad && l.monto == null && !l.detalle
+            ? { ...l, unidad: porDefecto } : l
+        )));
+      });
+    }
   }
 
   // ── Tarjetas de obra (grupos) ───────────────────────────────────────────────
@@ -1474,7 +1492,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
           const gs = grupos.find((x) => x.key === l.grupoKey);
           return {
             articuloId: a.id, descripcion: l.detalle?.trim() || a.descripcion,
-            cantidad: 1, unidad: a.unidad, almacen: l.obraCodigo || "",
+            cantidad: l.cantidad, unidad: unidadDe(l) || a.unidad, almacen: l.obraCodigo || "",
             obraCodigo: l.obraCodigo || undefined,
             notas: l.notas?.trim() || undefined,
             taskNo: gs?.taskNo || undefined, taskDescr: gs?.taskNombre || undefined,
@@ -1526,7 +1544,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       return {
         tipo: "articulo" as const, articuloId: a.id,
         pedidoLineaId: pl?.id, pedidoNumero: p.numero,
-        descripcion, cantidad: 1, unidad: a.unidad,
+        descripcion, cantidad: l.cantidad, unidad: unidadDe(l) || a.unidad,
         // El servicio no entra a ningún almacén: se consume contra el proyecto + la
         // tarea (BC ni acepta almacén en una línea de artículo de tipo servicio).
         almacen: "", precioUnitario: l.monto ?? 0, ivaPct: 13,
@@ -1685,7 +1703,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                         onChange={(v: string) => setCurrency(v === "CRC" ? "" : v)} />
                     </div>
                     <span className="ds-muted ds-label">
-                      El servicio se contrata completo: se aprueba, se crea la orden en Business Central y se recibe la factura al terminar.
+                      Cantidad × precio por unidad. El servicio se contrata completo: se aprueba, se crea la orden en Business Central y se recibe la factura al terminar.
                     </span>
                   </div>
                 )}
@@ -1814,12 +1832,23 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                                           <span className="ds-body-sm ds-strong">{a?.descripcion ?? "—"}</span>
                                           <span className="ds-muted ds-label">{a?.code}</span>
                                         </div>
+                                        {/* CANTIDAD × PRECIO: un subcontrato puede ser "5 ventanas
+                                            a ¢350.000" y no un monto suelto (pedido de David,
+                                            24/08/2026). Con cantidad 1 se ve igual que antes. */}
+                                        <Cantidad value={l.cantidad} onChange={(n) => setLinea(l.key, { cantidad: n })} />
+                                        <UnidadBtn unidades={unidadesDe(l)} value={unidadDe(l)} base={a?.unidad ?? ""} onPick={(code) => cambiarUnidad(l, code)} />
+                                        <span className="ds-muted ds-label">×</span>
                                         <Monto value={l.monto} onChange={(n) => setLinea(l.key, { monto: n })} currency={currency} />
                                         <button type="button" onClick={() => delLinea(l.key)} aria-label="Quitar servicio"
                                           style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ds-color-gray-400)", display: "grid", placeItems: "center", padding: 6, borderRadius: 8, flexShrink: 0 }}>
                                           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
                                         </button>
                                       </div>
+                                      {l.cantidad > 1 && (l.monto ?? 0) > 0 && (
+                                        <span className="ds-muted ds-label" style={{ textAlign: "right" }}>
+                                          {num.format(l.cantidad)} × {money(l.monto ?? 0, currency)} = <strong>{money(l.cantidad * (l.monto ?? 0), currency)}</strong>
+                                        </span>
+                                      )}
                                       {/* El alcance es lo que va a leer el proveedor en la orden de BC. Si se
                                           deja vacío queda la descripción del servicio del catálogo. */}
                                       <input value={l.detalle ?? ""} onChange={(e) => setLinea(l.key, { detalle: e.target.value })}

@@ -216,7 +216,14 @@ async function bcItemExtra(): Promise<Map<string, { cost?: number; categoria?: s
     // 'lastDirectCost'"), y con el $select inválido esta consulta fallaba SIEMPRE:
     // el mapa salía vacío y ni el costo ni la categoría ni el tipo llegaban. Se pide
     // `unitCost` (el costo unitario del ítem), que ya era el fallback previsto.
-    let url: string | null = `${stdRoot()}/companies(${cid})/items?$select=number,unitCost,itemCategoryCode,type&$top=5000`;
+    // SIN $top: con `$top=5000` BC devuelve EXACTAMENTE 5.000 filas y NO manda
+    // @odata.nextLink, así que el resto se perdía en silencio. En el entorno de
+    // producción hay 5.502 artículos: se cortaban 502, y como el catálogo viene ordenado
+    // por código, los que quedaban afuera eran justo los SERVICIOS (S20-* … S24-*). Se
+    // veía como "el buscador de subcontratos solo ofrece 2 servicios" (24/08/2026) y
+    // además esos 502 artículos quedaban sin costo y sin categoría.
+    // Comprobado contra BC: con $top → 5.000 items y 2 servicios; sin $top → 5.502 y 114.
+    let url: string | null = `${stdRoot()}/companies(${cid})/items?$select=number,unitCost,itemCategoryCode,type`;
     let guard = 0;
     while (url && guard++ < 20) {
       const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
