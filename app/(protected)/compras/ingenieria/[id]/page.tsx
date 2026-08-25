@@ -7,7 +7,7 @@ import { Badge, Button, Card, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, esConsumoInmediato, esSubcontrato, formatDate, money, montoDeLineaSubcontrato, num, obraDeLinea, ordenesDePedido, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, destinoLabel, esConsumoInmediato, esSubcontrato, formatDate, money, montoDeLineaSubcontrato, num, obraDeLinea, ordenesDePedido, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
 export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +31,11 @@ export default function PedidoDetallePage() {
   // SUBCONTRATO: el proveedor y los montos viven en la orden que se creó junto con la
   // solicitud (la tabla del pedido no tiene precio).
   const esSub = esSubcontrato(pedido);
+  // Consumo directo: el material no entra al inventario, se consume contra la obra Y su
+  // ACTIVIDAD (Job Task) en BC. La tarea la eligió el ingeniero al crear el pedido, así
+  // que la tabla la muestra: sin ella no se ve contra qué se va a consumir. Si el pedido
+  // no es consumo directo no hay tarea (va al almacén general) y la columna no aparece.
+  const conTarea = pedido.lineas.some((l) => !!l.taskNo);
   const ordenSub = esSub ? ordenesDePedido(ordenes, pedido)[0] : undefined;
   const monedaSub = ordenSub?.currencyCode ?? "";
   const totalSub = esSub ? pedido.lineas.reduce((t, l) => t + montoDeLineaSubcontrato(ordenes, l.id), 0) : 0;
@@ -174,6 +179,7 @@ export default function PedidoDetallePage() {
                 <tr>
                   <th>Artículo</th>
                   {pedido.tipoSolicitud === "material" && <th>Obra</th>}
+                  {conTarea && <th>Actividad</th>}
                   <th>Almacén</th><th className="ds-num">Solicitado</th>
                   <th className="ds-num">En orden</th><th className="ds-num">Recibido</th><th className="ds-num">Por recibir</th>
                 </tr>
@@ -186,7 +192,11 @@ export default function PedidoDetallePage() {
                     <tr key={l.id}>
                       <td>{l.descripcion}</td>
                       {pedido.tipoSolicitud === "material" && <td className="ds-muted">{obraDeLinea(l, pedido) || "—"}</td>}
-                      <td className="ds-muted">{l.almacen || (l.taskNo ? obraDeLinea(l, pedido) : "—")}</td>
+                      {conTarea && <td className="ds-muted">{l.taskNo ? `${l.taskNo}${l.taskDescr ? ` — ${l.taskDescr}` : ""}` : "—"}</td>}
+                      {/* Almacén de destino, igual que lo resuelve Proveeduría al armar la orden:
+                          consumo directo → el almacén de la obra (mismo código que el proyecto en
+                          BC); si no es consumo directo el material entra al almacén general. */}
+                      <td className="ds-muted">{l.almacen || (l.taskNo ? obraDeLinea(l, pedido) : ALMACEN_GENERAL)}</td>
                       <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                       <td className="ds-num">{num.format(l.cantidadOrdenada)}</td>
                       <td className="ds-num ds-strong">{num.format(recibido)}</td>
