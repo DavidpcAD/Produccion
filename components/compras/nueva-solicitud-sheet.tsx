@@ -22,7 +22,7 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, redondearCantidad, saltarCantidad, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
@@ -1202,6 +1202,18 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     for (const pl2 of lineasIn) {
       if (!pl2.code) continue;
       let a = catArticulos.find((x) => x.code === pl2.code) ?? extras.find((x) => x.code === pl2.code);
+      // Código con la VARIANTE PEGADA ("M11-0066 -VAR 01"): así quedaron 12 líneas de las
+      // plantillas de Bodega. Se separa y se busca el artículo REAL, así la línea nace con
+      // su unidad de BC (GAL, CUBETA…) en vez del "UND" de relleno, con precio, y con la
+      // variante en su campo — que además es lo que BC exige para poder lanzarla.
+      let variantePegada: string | undefined;
+      if (!a) {
+        const sep = separarVariantePegada(pl2.code);
+        if (sep.variantCode) {
+          const base = catArticulos.find((x) => x.code === sep.code) ?? extras.find((x) => x.code === sep.code);
+          if (base) { a = base; variantePegada = sep.variantCode; }
+        }
+      }
       if (!a) {
         a = { id: pl2.code, code: pl2.code, descripcion: pl2.descripcion || pl2.code, unidad: pl2.unidad || "UND", almacenDefault: "", precioReferencia: 0, tipo: "inventario" };
         extras.push(a);
@@ -1222,7 +1234,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       // La UNIDAD viaja con la línea (plantilla nueva o pedido copiado): sin esto la
       // cantidad quedaría pensada en una unidad y expresada en la base. Las plantillas
       // viejas la traen vacía y la resuelve el efecto que fija la unidad por defecto.
-      rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: pl2.variantCode, variantNombre: pl2.variantNombre, cantidad: pl2.cantidad || 1, unidad: (pl2.unidad ?? "").trim() || undefined, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
+      // La variante: la de la línea, o la que venía pegada al código. El nombre de la
+      // variante, cuando venía pegada, es la descripción que traía la plantilla ("MINIO
+      // ROJO"), que es justamente la de la variante y no la del artículo.
+      const vCode = pl2.variantCode || variantePegada;
+      const vNombre = pl2.variantNombre || (variantePegada ? pl2.descripcion : undefined);
+      // La unidad de la plantilla solo se respeta si trae algo: las de Bodega la
+      // guardaron vacía, y ahí manda la del artículo de BC.
+      rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: vCode, variantNombre: vNombre, cantidad: pl2.cantidad || 1, unidad: (pl2.unidad ?? "").trim() || undefined, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
     }
     return { grupos: nuevosGrupos, rows, extras };
   }

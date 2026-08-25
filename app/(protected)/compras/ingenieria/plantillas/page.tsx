@@ -7,7 +7,7 @@ import { Combobox } from "@/components/compras/combobox";
 import { IconEdit } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
-import { etiquetaArticulo, redondearCantidad, saltarCantidad, type UnidadItem } from "@/lib/compras/helpers";
+import { etiquetaArticulo, redondearCantidad, saltarCantidad, separarVariantePegada, type UnidadItem } from "@/lib/compras/helpers";
 import type { Articulo } from "@/lib/compras/types";
 
 type Etapa = { id: number; codigo: string; nombre: string };
@@ -368,14 +368,27 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
       const cantCol = Math.max(...numHits) > 0 ? numHits.indexOf(Math.max(...numHits)) : -1;
       const nuevas: Linea[] = [];
       let sinMatch = 0;
+      let separadas = 0;
       for (const r of aoa) {
-        const it = byCode.get(norm(r[codeCol]));
-        if (!it) { if (norm(r[codeCol])) sinMatch++; continue; }
-        nuevas.push({ code: it.code, descripcion: it.descripcion, unidad: it.unidad, cantidad: cantCol >= 0 ? (Number(r[cantCol]) || 0) : 0, obraCodigo: "" });
+        const crudo = String(r[codeCol] ?? "");
+        let it = byCode.get(norm(crudo));
+        let variantCode: string | undefined;
+        // Los reportes de BC imprimen el artículo con su variante pegada
+        // ("M11-0066 -VAR 01"). Antes esas filas se omitían en silencio (o peor: se
+        // guardaban así y la solicitud nacía sin unidad y sin precio). Se separan.
+        if (!it) {
+          const sep = separarVariantePegada(crudo);
+          if (sep.variantCode) {
+            const base = byCode.get(norm(sep.code));
+            if (base) { it = base; variantCode = sep.variantCode; separadas++; }
+          }
+        }
+        if (!it) { if (norm(crudo)) sinMatch++; continue; }
+        nuevas.push({ code: it.code, descripcion: it.descripcion, unidad: it.unidad, cantidad: cantCol >= 0 ? (Number(r[cantCol]) || 0) : 0, obraCodigo: "", variantCode });
       }
       if (!nuevas.length) { toast("Ninguna fila coincidió con el catálogo de BC.", "error"); return; }
       setLineas((L) => [...nuevas, ...L]);
-      toast(`Se importaron ${nuevas.length} material(es)${sinMatch ? ` · ${sinMatch} sin coincidencia (omitidos)` : ""}. Revisá cantidades y guardá la plantilla.`, "success");
+      toast(`Se importaron ${nuevas.length} material(es)${separadas ? ` · ${separadas} traían la variante pegada al código y se separó` : ""}${sinMatch ? ` · ${sinMatch} sin coincidencia (omitidos)` : ""}. Revisá cantidades y guardá la plantilla.`, "success");
     } catch (e) {
       toast(`No pude leer el Excel: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {

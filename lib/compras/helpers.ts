@@ -52,6 +52,22 @@ export function destinoDeLinea(l: Pick<PedidoLinea, "obraCodigo" | "almacen">, p
 // El factor de cada unidad (`qtyPerUnitOfMeasure`) es cuántas unidades BASE trae, y
 // la base es la de factor 1. Todo se convierte pasando por la base.
 
+// ─── Código con la VARIANTE PEGADA ──────────────────────────────────────────────
+// Los reportes de BC imprimen el artículo y su variante juntos ("M11-0066 -VAR 01"), y
+// de ahí salieron tres plantillas que Bodega armó el 22/07/2026 (Ferretería, EPA,
+// Lanco): 12 líneas con el código así. Una solicitud hecha desde esas plantillas nacía
+// con un código que en BC NO EXISTE, y eso arrastraba todo lo demás: no se encontraba el
+// artículo, así que la unidad caía al "UND" por defecto (cuando en BC es GAL o CUBETA),
+// no había precio ("sin historial"), la variante quedaba en NULL y la línea no se podía
+// lanzar a BC. Se ve en Proveeduría como una pintura en cubeta que dice UND y vale 0.
+// Los dos formatos que aparecen en los datos: "M08-0123-VAR 01" y "M11-0081 -VAR 12".
+export function separarVariantePegada(code: string): { code: string; variantCode?: string } {
+  const t = (code ?? "").trim();
+  const m = /^(.+?)\s*-VAR\s+([A-Za-z0-9._-]+)$/i.exec(t);
+  if (!m) return { code: t };
+  return { code: m[1].trim(), variantCode: m[2].trim() };
+}
+
 /** Unidad de un artículo tal como viene de BC (itemUnitsOfMeasure). */
 export type UnidadItem = { code: string; factor: number };
 
