@@ -44,6 +44,10 @@
        Dimension de la obra). Si el entorno tiene publicada una versión anterior
        de la extensión, la acción no existe: el script AVISA y sigue sin tocar
        esos dos campos (no los borra).
+     - `estado` viene del `status` del Job (Planning/Quote/Open/Completed), que NO
+       es el bloqueo: una obra BLOQUEADA en BC igual llega como "Open" porque el
+       campo Job.Blocked no está expuesto en el API. Por eso el sync nunca pisa un
+       `estado` local que ya sea 'Blocked'.
      - BC usa `0001-01-01` como "sin fecha" → se guarda NULL.
      - El entorno sale de BC_BASE_URL (o BC_TENANT_ID + BC_ENVIRONMENT). Acá el
        parseo SÍ tolera la URL sin `/api` al final, a diferencia de
@@ -215,7 +219,16 @@ for (const j of jobs) {
   if (SOLO_NUEVAS) continue;
   const diff = [];
   if (b.nombreMostrado !== null && b.nombreMostrado !== cur.nombreMostrado) diff.push(['nombreMostrado', cur.nombreMostrado, b.nombreMostrado]);
-  if (b.estado !== null && b.estado !== cur.estado) diff.push(['estado', cur.estado, b.estado]);
+  // `estado`: NUNCA resucitar una obra que el app dejó bloqueada. El `status` del
+  // Job de BC es Planning/Quote/Open/Completed — el bloqueo vive en OTRO campo
+  // (Job.Blocked) que el API custom `jobs` no expone, así que una obra bloqueada
+  // igual llega acá como "Open". Sin esta guarda, el primer bloqueo hecho desde el
+  // app se deshacía en la siguiente corrida del sync.
+  // Pendiente (necesita publish de la extensión): exponer `blocked` en la API page
+  // del Job y mapearlo, para que BC vuelva a ser el dueño del estado.
+  if (b.estado !== null && b.estado !== cur.estado && String(cur.estado ?? '').toLowerCase() !== 'blocked') {
+    diff.push(['estado', cur.estado, b.estado]);
+  }
   if (!mismaFecha(cur.fechaInicio, b.fechaInicio)) diff.push(['fechaInicio', cur.fechaInicio, b.fechaInicio]);
   if (!mismaFecha(cur.fechaFin, b.fechaFin)) diff.push(['fechaFin', cur.fechaFin, b.fechaFin]);
   if (!mismaFecha(cur.fechaCreacionObra, b.fechaCreacionObra)) diff.push(['fechaCreacionObra', cur.fechaCreacionObra, b.fechaCreacionObra]);
