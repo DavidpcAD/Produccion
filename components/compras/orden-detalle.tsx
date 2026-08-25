@@ -7,7 +7,7 @@ import { IconChevronDown } from "@/components/compras/icons";
 import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { money, num, formatDate, numeroOrden, tieneBc, ordenBadge, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
+import { money, num, formatDate, etiquetaInterna, numeroOrden, tieneBc, ordenBadge, ordenConsumoDirecto, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Vista de detalle de una orden, reutilizada por Proveeduría, Aprobación y Bodega.
@@ -68,6 +68,9 @@ export function OrdenDetalle({
   const peds = ordenPedidos(orden);
   const maquinas = ordenMaquinas(orden, pedidos);
   const esDirecta = ordenEsDirecta(orden);
+  // Consumo directo: el material NO entra a inventario, el costo se carga a la obra
+  // (proyecto + tarea). Va arriba porque cambia qué significa recibir esta orden.
+  const cd = ordenConsumoDirecto(orden);
   const recs = recepciones.filter((r) => r.ordenId === orden.id);
   const subtotal = orden.lineas.filter((l) => l.tipo === "articulo").reduce((s, l) => s + ordenLineaImporte(l), 0);
   const iva = orden.lineas.filter((l) => l.tipo === "articulo").reduce((s, l) => s + ordenLineaImporte(l) * ((l.ivaPct || 0) / 100), 0);
@@ -82,8 +85,18 @@ export function OrdenDetalle({
             <h1 className="ds-heading">{numeroOrden(orden)}</h1>
             <Badge tone={b.tone}>{b.label}</Badge>
             {esDirecta && <Badge tone="yellow">Directa</Badge>}
+            {cd.hay && (
+              <Badge tone="ink" title={`Se consume contra ${cd.destinos.join(" · ")}. El material NO entra a inventario: el costo va a la obra.`}>
+                CD · consumo directo{cd.parcial ? " (parcial)" : ""}
+              </Badge>
+            )}
           </div>
-          <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · emitida {formatDate(orden.fecha)} · recibido {ordenRecibidoPct(orden)}%{tieneBc(orden) ? ` · interno ${orden.numero}` : ""}</p>
+          <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · emitida {formatDate(orden.fecha)} · recibido {ordenRecibidoPct(orden)}%{tieneBc(orden) ? ` · ${etiquetaInterna(orden.numero)}` : ""}</p>
+          {cd.hay && (
+            <p className="ds-body-sm" style={{ color: "var(--ds-color-green-200)" }}>
+              {cd.parcial ? `${cd.lineas} de sus líneas se consumen` : "Se consume"} contra <span className="ds-strong">{cd.destinos.join(" · ")}</span> · no entra a inventario
+            </p>
+          )}
           {maquinas.length > 0 && <p className="ds-body-sm ds-muted">Máquina: <span className="ds-strong">{maquinas.join(", ")}</span></p>}
           {orden.almacenRecepcion && <p className="ds-body-sm ds-muted">Recepción en almacén <span className="ds-strong">{orden.almacenRecepcion}</span></p>}
           <div className="row gap-2 wrap mt-2">

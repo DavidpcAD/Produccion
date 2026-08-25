@@ -108,8 +108,8 @@ export const Textarea = (p: React.TextareaHTMLAttributes<HTMLTextAreaElement>) =
 );
 
 // ---------------------------------------------------------------- Badge
-export function Badge({ tone = "gray", children }: { tone?: string; children: React.ReactNode }) {
-  return <span className={`ds-badge ds-badge--${tone}`}>{children}</span>;
+export function Badge({ tone = "gray", title, children }: { tone?: string; title?: string; children: React.ReactNode }) {
+  return <span className={`ds-badge ds-badge--${tone}`} title={title}>{children}</span>;
 }
 
 // ---------------------------------------------------------------- Card

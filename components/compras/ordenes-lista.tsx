@@ -7,7 +7,7 @@ import { Badge, ProgressBar } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { IconChevronDown } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
-import { money, formatDate, ordenBadge, ordenRecibidoPct, ordenSubtotal, ordenPedidos, ordenEsDirecta, ordenLineaImporte, num, numeroOrden } from "@/lib/compras/helpers";
+import { money, formatDate, ordenBadge, ordenConsumoDirecto, ordenRecibidoPct, ordenSubtotal, ordenPedidos, ordenEsDirecta, ordenLineaImporte, num, numeroOrden } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Lista de órdenes reutilizable (Proveeduría / Aprobación / Bodega), sobre DataTable
@@ -53,7 +53,29 @@ export function OrdenesLista({
       id: "recibido", header: "Recibido", accessorFn: (o) => ordenRecibidoPct(o), meta: { label: "Recibido" }, enableColumnFilter: false,
       cell: (c) => <ProgressBar compact value={ordenRecibidoPct(c.row.original)} total={100} />,
     },
-    { id: "estado", header: "Estado", accessorFn: (o) => ordenBadge(o.estado).label, meta: { label: "Estado" }, cell: (c) => { const b = ordenBadge(c.row.original.estado); return <Badge tone={b.tone}>{b.label}</Badge>; } },
+    // OJO: el accessor es lo que usan el filtro de la columna (igualdad exacta), las
+    // vistas guardadas y el export — así que vale SOLO el estado. El tag de consumo
+    // directo se pinta en la celda y se busca/filtra por su propia columna "cd".
+    {
+      id: "estado", header: "Estado", meta: { label: "Estado" },
+      accessorFn: (o) => ordenBadge(o.estado).label,
+      cell: (c) => {
+        const o = c.row.original; const b = ordenBadge(o.estado); const cd = ordenConsumoDirecto(o);
+        return (
+          <span className="row gap-2 wrap">
+            <Badge tone={b.tone}>{b.label}</Badge>
+            {cd.hay && <Badge tone="ink" title={`Se consume contra ${cd.destinos.join(" · ")}. No entra a inventario.`}>CD{cd.parcial ? " parcial" : ""}</Badge>}
+          </span>
+        );
+      },
+    },
+    // Consumo directo en columna aparte: así se puede filtrar por él sin ensuciar
+    // el estado. El material de estas líneas NO entra a inventario.
+    {
+      id: "cd", header: "Destino", meta: { label: "Consumo directo" },
+      accessorFn: (o) => { const cd = ordenConsumoDirecto(o); return cd.hay ? (cd.parcial ? "Consumo directo (parcial)" : "Consumo directo") : "A almacén"; },
+      cell: (c) => <span className="ds-body-sm ds-muted">{c.getValue()}</span>,
+    },
   ], [proveedores]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderLineas = (o: Orden) => (

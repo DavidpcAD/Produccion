@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Badge } from "@/components/compras/ui";
-import { money, num, ordenLineaImporte, ordenLineaPendiente } from "@/lib/compras/helpers";
+import { money, num, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenLineaPendiente } from "@/lib/compras/helpers";
 import type { Orden, OrdenLinea } from "@/lib/compras/types";
 
 export function OrderLinesTable({ orden, showRecepcion = true, solicitudHref }: { orden: Orden; showRecepcion?: boolean; solicitudHref?: (l: OrdenLinea) => string | null }) {
@@ -40,7 +40,13 @@ export function OrderLinesTable({ orden, showRecepcion = true, solicitudHref }: 
                     })()}
                   </div>
                 </td>
-                <td className="ds-muted hide-mobile">{l.almacen}</td>
+                {/* En consumo directo el "almacén" es la obra: se marca para que no se
+                    lea como una recepción a bodega. */}
+                <td className="ds-muted hide-mobile">
+                  {ordenLineaEsConsumoDirecto(l)
+                    ? <span title={`Consumo directo contra ${l.proyecto} · tarea ${l.taskNo}: no entra a inventario`}>{l.almacen || l.proyecto} <Badge tone="ink">CD</Badge></span>
+                    : l.almacen}
+                </td>
                 <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                 {showRecepcion && <td className="ds-num">{num.format(l.cantidadRecibida)}</td>}
                 {showRecepcion && (

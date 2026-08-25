@@ -648,6 +648,24 @@ export function pedidoProgreso(p: Pedido, ordenes: Orden[]): PedidoProgreso {
   };
 }
 
+// ─── Consumo directo de una ORDEN ───────────────────────────────────────────────
+// Una línea se consume contra la obra (NO entra a inventario) solo cuando lleva
+// proyecto Y tarea: BC exige los dos (ver lib/compras/aprobar.ts). Con obra pero sin
+// tarea el material va al Almacén General. Se muestra en la lista y en el detalle
+// para que quien aprueba sepa, antes de lanzar, que ese costo se carga a la obra.
+export function ordenLineaEsConsumoDirecto(l: Pick<OrdenLinea, "proyecto" | "taskNo">): boolean {
+  return !!(l.proyecto && l.taskNo);
+}
+
+/** Resumen del consumo directo de una orden: si lo hay, si es de SOLO algunas líneas
+ *  y contra qué obra/tarea. `destinos` sale ordenado y sin repetidos. */
+export function ordenConsumoDirecto(o: Orden): { hay: boolean; parcial: boolean; lineas: number; destinos: string[] } {
+  const articulos = o.lineas.filter((l) => l.tipo === "articulo");
+  const cd = articulos.filter(ordenLineaEsConsumoDirecto);
+  const destinos = [...new Set(cd.map((l) => `${l.proyecto} · tarea ${l.taskNo}`))].sort();
+  return { hay: cd.length > 0, parcial: cd.length > 0 && cd.length < articulos.length, lineas: cd.length, destinos };
+}
+
 export function ordenBadge(estado: Orden["estado"]): { label: string; tone: string } {
   switch (estado) {
     case "abierto": return { label: "Abierto", tone: "gray" };

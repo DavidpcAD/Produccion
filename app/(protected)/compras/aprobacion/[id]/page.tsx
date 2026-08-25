@@ -25,6 +25,13 @@ export default function AprobacionOrdenDetallePage() {
     return <AppShell role="aprobacion"><main className="page"><div className="empty">{cargando ? "Cargando orden…" : "Orden no encontrada."}</div></main></AppShell>;
   }
 
+  // "Volver" (y el rechazo) regresan a la lista de donde salió la orden: pendientes y
+  // abiertas se ven en "Órdenes por aprobar" (sus KPI filtran); las ya aprobadas viven
+  // en "Todas las órdenes", que no incluye las que siguen en proveeduría.
+  const enAprobacion = orden.estado === "pendiente_aprobacion" || orden.estado === "abierto";
+  const volverHref = enAprobacion ? "/compras/aprobacion" : "/compras/aprobacion/todas";
+  const volverLabel = enAprobacion ? "Volver a órdenes por aprobar" : "Volver a órdenes";
+
   // Aprobar (Luis Roberto): crea y LANZA el pedido en BC en un paso. La orden solo
   // pasa a "lanzado" si BC de verdad la creó con líneas y la lanzó; si BC falla,
   // queda pendiente y se muestra el motivo real (ver lib/aprobar.ts).
@@ -42,7 +49,7 @@ export default function AprobacionOrdenDetallePage() {
     await devolverOrden(orden!.id, motivo.trim());
     toast(`${numeroOrden(orden!)} devuelta a proveeduría`, "info");
     setRechazarOpen(false);
-    router.push("/compras/aprobacion");
+    router.push(volverHref);
   }
 
   const acciones = orden.estado === "pendiente_aprobacion" ? (
@@ -54,7 +61,7 @@ export default function AprobacionOrdenDetallePage() {
 
   return (
     <AppShell role="aprobacion">
-      <OrdenDetalle orden={orden} volverHref="/compras/aprobacion/todas" volverLabel="Volver a órdenes" acciones={acciones} />
+      <OrdenDetalle orden={orden} volverHref={volverHref} volverLabel={volverLabel} acciones={acciones} />
       {rechazarOpen && (
         <Modal title={`Rechazar ${numeroOrden(orden)}`} onClose={() => setRechazarOpen(false)}
           footer={<><Button variant="outline" onClick={() => setRechazarOpen(false)}>Cancelar</Button><Button variant="red" onClick={confirmarRechazo}>Rechazar y devolver</Button></>}>

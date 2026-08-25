@@ -899,6 +899,21 @@
 .oc-scope .dt-exp-btn.is-open svg { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) { .oc-scope .dt-exp-btn svg { transition: none; } }
 
+/* Cabecera de la tarjeta de aprobación que ABRE la orden (detalle + historial).
+   La flecha y el checkbox viven FUERA de este link: expandir o seleccionar para
+   el lote no debe navegar. */
+.oc-scope .oc-open-row { flex: 1 1 200px; min-width: 150px; align-items: flex-start; color: inherit; text-decoration: none;
+  border-radius: 10px; padding: 4px 8px; margin: -4px -8px; transition: background .12s ease; }
+/* En celular la orden se lleva su propia línea: leerla completa gana a
+   ahorrar una línea con la flecha y el check. */
+@media (max-width: 640px) { .oc-scope .oc-open-row { flex-basis: 100%; } }
+.oc-scope .oc-open-row:hover { background: color-mix(in srgb, var(--ds-color-green-100) 10%, transparent); }
+.oc-scope .oc-open-row:hover .oc-open-row__num { text-decoration: underline; text-underline-offset: 3px; }
+.oc-scope .oc-open-row:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 2px; }
+.oc-scope .oc-open-row__hint { color: var(--ds-color-green-200); opacity: 0; transition: opacity .12s ease; }
+.oc-scope .oc-open-row:hover .oc-open-row__hint, .oc-scope .oc-open-row:focus-visible .oc-open-row__hint { opacity: 1; }
+@media (hover: none) { .oc-scope .oc-open-row__hint { opacity: 1; } }
+
 /* Botón Exportar del toolbar (a la derecha) + chips CSV/PDF del menú. */
 .oc-scope .dt-export-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 18px; border-radius: var(--ds-radius-xl); border: 0; background: var(--ds-surface); color: var(--ds-text); font: inherit; font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); cursor: pointer; box-shadow: var(--ds-shadow-01); transition: box-shadow .12s ease, transform .06s ease; }
 .oc-scope .dt-export-btn svg { color: var(--ds-color-green-200); }
