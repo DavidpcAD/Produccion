@@ -1054,6 +1054,19 @@ export async function bcCompletarProyectoTarea(
   }
   if (!asignaciones.length) return { aplicadas: 0, pendientes };
 
+  // Con el workflow de aprobación de BC activo (MS-POAPW-01/02) el pedido espera
+  // "Pendiente de aprobación", y BC no deja tocar líneas en ese estado ("Status must
+  // be equal to 'Open'"). Reabrirlo cancela la solicitud y permite escribir la tarea;
+  // el Release que viene justo después la vuelve a mandar Y la aprueba en el mismo
+  // paso (AdelantePO_ReleaseOrder), así que el rastro de aprobación no se pierde.
+  const est = await bcEstadoPedido(orderNo);
+  if (est.enAprobacion) {
+    try { await bcReabrirPedido(orderNo); }
+    catch (e) {
+      return { aplicadas: 0, pendientes, error: `el pedido está pendiente de aprobación en BC y no se pudo reabrir para ponerle la tarea del consumo directo: ${String((e as Error)?.message ?? e)}` };
+    }
+  }
+
   const error = await bcAplicarAsignaciones(orderNo, asignaciones);
   if (error) {
     for (const a of asignaciones) pendientes.push({ lineNo: a.lineNo, itemNo: lineas.find((l) => l.lineNo === a.lineNo)?.itemNo ?? "", motivo: "BC no aceptó el proyecto/tarea" });
@@ -1365,6 +1378,49 @@ export async function bcPedidoTieneRecepciones(orderNo: string): Promise<boolean
     if (!res.ok) return null;
     return (((await res.json())?.value ?? []).length > 0);
   } catch { return null; }
+}
+
+// Manda el pedido a APROBACIÓN en BC (workflows MS-POAPW-01/02) SIN aprobarlo:
+// queda "Pendiente de aprobación" con su solicitud abierta, así quien mira BC ve qué
+// está esperando visto bueno. Lo llama la app cuando una orden pasa a
+// `pendiente_aprobacion` y ya tiene pedido en BC; el "Aprobar y lanzar" de Aprobación
+// después lo aprueba y lo lanza (AdelantePO_ReleaseOrder).
+//
+// El codeunit es tolerante a propósito: si el pedido ya está esperando aprobación, o ya
+// está lanzado, o ningún workflow aplica a ese documento, no hace nada y devuelve el
+// estado tal cual. Por eso reintentar (reenviar a aprobación) nunca duplica solicitudes.
+export async function bcEnviarAAprobacion(orderNo: string): Promise<string> {
+  if (!orderNo) throw new Error("Falta el número de pedido para enviar a aprobación.");
+  const cid = await getStdCompanyId();
+  const url = `${odataRoot()}/AdelantePO_SendForApproval?company=${encodeURIComponent(cid)}`;
+  const res = await bcFetch(url, {
+    method: "POST", cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderNo }),
+  });
+  if (!res.ok) throw new Error(mensajeBcLegible((await res.text()).slice(0, 600)));
+  const d: any = await res.json().catch(() => ({}));
+  return d?.value ?? "Pending Approval";
+}
+
+// Reabre (Reopen) el pedido en BC y, si tenía una solicitud de aprobación viva, la
+// CANCELA (el codeunit llama a OnCancelPurchaseApprovalRequest antes del Reopen).
+// La app lo necesita en los dos caminos que devuelven una orden a Proveeduría —
+// rechazar desde Aprobación y "cancelar envío" / "volver a abrir" desde Proveeduría —
+// porque si no, el pedido se queda en BC "Pendiente de aprobación" (o Lanzado) con la
+// solicitud abierta y nadie puede editarlo.
+export async function bcReabrirPedido(orderNo: string): Promise<string> {
+  if (!orderNo) throw new Error("Falta el número de pedido para reabrir.");
+  const cid = await getStdCompanyId();
+  const url = `${odataRoot()}/AdelantePO_ReopenOrder?company=${encodeURIComponent(cid)}`;
+  const res = await bcFetch(url, {
+    method: "POST", cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderNo }),
+  });
+  if (!res.ok) throw new Error(mensajeBcLegible((await res.text()).slice(0, 600)));
+  const d: any = await res.json().catch(() => ({}));
+  return d?.value ?? "Open";
 }
 
 // Lanza (Release) un Pedido de compra en BC -> estado "Lanzado".

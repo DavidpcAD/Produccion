@@ -12,9 +12,10 @@ export default function ProveeduriaPedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { pedidos, ordenes, setBorrador, devolverPedido, cargando } = useStore();
+  const { pedidos, ordenes, setBorrador, devolverLineasPedido, cargando } = useStore();
   const [devolverOpen, setDevolverOpen] = useState(false);
   const [motivo, setMotivo] = useState("");
+  const [lineasSel, setLineasSel] = useState<string[]>([]);
 
   const pedido = pedidos.find((p) => p.id === id);
   if (!pedido) {
@@ -25,6 +26,9 @@ export default function ProveeduriaPedidoDetallePage() {
   const total = pedido.lineas.reduce((s, l) => s + l.cantidad, 0);
   const rec = pedido.lineas.reduce((s, l) => s + recibidoDeLineaPedido(ordenes, l.id), 0);
   const hayPendiente = pedido.lineas.some((l) => pedidoLineaPendiente(l) > 0);
+  // Solo se puede devolver una línea que Proveeduría todavía NO ordenó: si ya tiene
+  // orden de compra, queda bloqueada y no aparece para elegir.
+  const lineasDevolvibles = pedido.lineas.filter((l) => l.cantidadOrdenada === 0);
 
   function crearOC() {
     const lineas = pedido!.lineas
@@ -34,10 +38,20 @@ export default function ProveeduriaPedidoDetallePage() {
     setBorrador(lineas);
     router.push("/compras/proveeduria/nueva");
   }
+  function abrirDevolver() {
+    setLineasSel(lineasDevolvibles.map((l) => l.id));
+    setMotivo("");
+    setDevolverOpen(true);
+  }
+  function toggleLinea(id: string) {
+    setLineasSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
   async function confirmarDevolver() {
     if (!motivo.trim()) { toast("Escribí el motivo de la devolución.", "error"); return; }
-    await devolverPedido(pedido!.id, motivo.trim());
-    toast(`${pedido!.numero} devuelto a Ingeniería.`, "info");
+    if (!lineasSel.length) { toast("Elegí al menos una línea para devolver.", "error"); return; }
+    const todo = lineasSel.length === pedido!.lineas.length;
+    await devolverLineasPedido(pedido!.id, lineasSel, motivo.trim());
+    toast(todo ? `${pedido!.numero} devuelto a Ingeniería.` : `${lineasSel.length} línea(s) de ${pedido!.numero} devuelta(s) a Ingeniería.`, "info");
     setDevolverOpen(false);
     router.push("/compras/proveeduria/solicitudes");
   }
@@ -57,7 +71,7 @@ export default function ProveeduriaPedidoDetallePage() {
           </div>
           <div className="row gap-3" style={{ alignItems: "center" }}>
             <div className="row gap-2" style={{ alignItems: "center" }}><QtyRing recibida={rec} total={total} /><span className="ds-body-sm ds-muted">entregado</span></div>
-            <Button variant="red" onClick={() => setDevolverOpen(true)}>Devolver al ingeniero</Button>
+            <Button variant="red" onClick={abrirDevolver} disabled={!lineasDevolvibles.length}>Devolver al ingeniero</Button>
             <Button onClick={crearOC} disabled={!hayPendiente}>Crear orden de compra →</Button>
           </div>
         </div>
@@ -76,7 +90,12 @@ export default function ProveeduriaPedidoDetallePage() {
               <tbody>
                 {pedido.lineas.map((l) => (
                   <tr key={l.id}>
-                    <td><div className="ds-truncate" title={l.descripcion} style={{ maxWidth: 260 }}>{l.descripcion}</div></td>
+                    <td>
+                      <div className="row gap-2" style={{ alignItems: "center" }}>
+                        <div className="ds-truncate" title={l.descripcion} style={{ maxWidth: 260 }}>{l.descripcion}</div>
+                        {l.devuelta && <Badge tone="red">Devuelta</Badge>}
+                      </div>
+                    </td>
                     <td className="ds-muted ds-body-sm">{destinoDeLinea(l, pedido) || "—"}</td>
                     <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                     <td className="ds-num">{num.format(l.cantidadOrdenada)}</td>
@@ -95,7 +114,18 @@ export default function ProveeduriaPedidoDetallePage() {
       {devolverOpen && (
         <Modal title={`Devolver ${pedido.numero} a Ingeniería`} onClose={() => setDevolverOpen(false)}
           footer={<><Button variant="outline" onClick={() => setDevolverOpen(false)}>Cancelar</Button><Button variant="red" onClick={confirmarDevolver}>Devolver</Button></>}>
-          <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>Indicá qué debe corregir el ingeniero. Le llega una notificación y el pedido queda en estado “Devuelto”.</p>
+          <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>
+            Elegí qué línea(s) debe corregir el ingeniero. Las que ya tienen orden de compra no se pueden devolver y no aparecen acá.
+            Si devolvés todas, el pedido completo vuelve a Ingeniería; si es solo alguna, el resto sigue su curso normal.
+          </p>
+          <div className="col gap-1" style={{ border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 12, padding: "6px 0", marginBottom: 12, maxHeight: 220, overflowY: "auto" }}>
+            {lineasDevolvibles.map((l) => (
+              <label key={l.id} className="row gap-2" style={{ alignItems: "center", padding: "6px 12px", cursor: "pointer" }}>
+                <input type="checkbox" checked={lineasSel.includes(l.id)} onChange={() => toggleLinea(l.id)} />
+                <span className="ds-body-sm">{l.descripcion} <span className="ds-muted">· {num.format(l.cantidad)} {l.unidad}</span></span>
+              </label>
+            ))}
+          </div>
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo de la devolución…" rows={4} style={{ width: "100%" }} />
         </Modal>
       )}

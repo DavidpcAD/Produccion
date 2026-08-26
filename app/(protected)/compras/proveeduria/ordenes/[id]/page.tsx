@@ -25,8 +25,11 @@ export default function ProvOrdenDetallePage() {
   };
 
   async function act(estado: NonNullable<typeof orden>["estado"], msg: string) {
-    await setOrdenEstado(orden!.id, estado);
-    toast(msg, "success");
+    const r = await setOrdenEstado(orden!.id, estado);
+    // El estado en la app ya cambió; si BC no acompañó (mandar a aprobación el pedido /
+    // reabrirlo cancelando la solicitud), el motivo se muestra en vez de cantar éxito.
+    if (r?.bcAviso) toast(`${msg} · ⚠️ ${r.bcAviso}`, "error");
+    else toast(msg, "success");
   }
 
   const acciones = (

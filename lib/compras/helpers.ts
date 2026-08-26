@@ -523,11 +523,19 @@ export function ordenMaquinas(o: Orden, pedidos: Pedido[]): string[] {
 }
 
 // Devoluciones pendientes para un rol (misma lógica que DevolucionesView): solicitudes
-// devueltas (pedido "devuelto") + órdenes rechazadas por Aprobación ("rechazado").
+// devueltas (pedido "devuelto" o con líneas puntuales devueltas) + órdenes rechazadas
+// por Aprobación ("rechazado").
 export function devolucionesCount(role: Role, pedidos: Pedido[], ordenes: Orden[]): number {
-  const solic = (role === "ingenieria" || role === "proveeduria") ? pedidos.filter((p) => p.estado === "devuelto").length : 0;
+  const solic = (role === "ingenieria" || role === "proveeduria") ? pedidos.filter((p) => pedidoTieneDevolucion(p)).length : 0;
   const ords = (role === "proveeduria" || role === "aprobacion" || role === "facturacion") ? ordenes.filter((o) => o.estado === "rechazado").length : 0;
   return solic + ords;
+}
+
+// Un pedido tiene algo que devolver al ingeniero si el pedido ENTERO está devuelto
+// (flujo viejo) o si Proveeduría devolvió solo alguna(s) línea(s) puntual(es) (el
+// resto del pedido sigue su curso normal, así que su estado no cambia).
+export function pedidoTieneDevolucion(p: Pedido): boolean {
+  return p.estado === "devuelto" || p.lineas.some((l) => l.devuelta);
 }
 
 // Orden "directa" = compra armada sin partir de una solicitud (ninguna línea

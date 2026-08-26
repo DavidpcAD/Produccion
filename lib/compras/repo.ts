@@ -114,6 +114,7 @@ function mapPedido(p: any, lineas: any[]): Pedido {
         obraCodigo: (l.obra ?? (obraVieja ? l.locationCode : null)) || undefined,
         variantCode: l.variantCode ?? undefined, cantidadOrdenada: Number(l.quantityOrdenado ?? 0), notas: l.notaCreador ?? undefined,
         taskNo: l.taskNo ?? undefined, taskDescr: l.taskDescr ?? undefined,
+        devuelta: codigoDeId(l.idEstado) === "devuelto",
       };
     }),
   };
@@ -193,15 +194,17 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
   const tx = new sql.Transaction(pool);
   await tx.begin();
   try {
-    // Solo se puede editar si NO tiene nada ordenado por proveeduría.
+    // Las líneas que Proveeduría ya puso en una orden de compra quedan intactas
+    // (no se tocan): solo se reemplazan las que siguen sin ordenar, incluidas las
+    // que Proveeduría devolvió para corregir. Antes se rechazaba TODO el pedido
+    // si tenía algo ordenado, aunque fuera solo 1 de varias líneas.
     const chk = await new sql.Request(tx).input("id", sql.Int, input.id).query(
       `SELECT p.pedidoNo,
-              (SELECT ISNULL(SUM(quantityOrdenado),0) FROM dbo.PedidoCompraDet WHERE idPedidoCompra=p.idPedidoCompra) AS ordenado
+              (SELECT MAX(lineNum) FROM dbo.PedidoCompraDet WHERE idPedidoCompra=p.idPedidoCompra) AS maxLineNum
        FROM dbo.PedidoCompra p WHERE p.idPedidoCompra=@id AND p.esEliminada=0`
     );
     const row = chk.recordset[0];
     if (!row) throw new Error("Pedido no encontrado");
-    if (Number(row.ordenado) > 0) throw new Error("El pedido ya tiene orden de compra; no se puede editar");
 
     await new sql.Request(tx)
       .input("id", sql.Int, input.id)
@@ -216,9 +219,10 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
               proyecto=@proyecto, prioridad=@prioridad, notaCreador=@notaCreador,
               fechaModificacion=getdate(), modificadoPor=@modificadoPor WHERE idPedidoCompra=@id`);
 
-    // Reemplazar líneas (seguro: no hay órdenes que las referencien).
-    await new sql.Request(tx).input("id", sql.Int, input.id).query("DELETE FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@id");
-    let line = 10000;
+    // Reemplazar SOLO las líneas sin ordenar (las que ya tienen orden de compra se
+    // preservan tal cual, sin que las órdenes que las referencian se rompan).
+    await new sql.Request(tx).input("id", sql.Int, input.id).query("DELETE FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@id AND quantityOrdenado=0");
+    let line = Number(row.maxLineNum ?? 0) + 10000;
     for (const l of input.lineas) {
       await new sql.Request(tx)
         .input("idPedidoCompra", sql.Int, input.id)
@@ -238,6 +242,51 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
       line += 10000;
     }
     await logMov(tx, { entidad: "pedido", idEntidad: input.id, documentoNo: row.pedidoNo, tipoMovimiento: "editado", usuario: input.usuario, rol: input.rol });
+    await tx.commit();
+  } catch (e) {
+    await tx.rollback();
+    throw e;
+  }
+}
+
+export async function devolverLineasPedido(id: number, lineaIds: number[], motivo: string, usuario: string, rol: Role): Promise<void> {
+  await ensureEstados();
+  const pool = await getPool();
+  const idDevuelto = await idDeEstado("devuelto");
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    const head = await new sql.Request(tx).input("id", sql.Int, id).query(
+      "SELECT pedidoNo FROM dbo.PedidoCompra WHERE idPedidoCompra=@id AND esEliminada=0"
+    );
+    if (!head.recordset[0]) throw new Error("Pedido no encontrado");
+    const pedidoNo = head.recordset[0].pedidoNo as string;
+
+    const todas = await new sql.Request(tx).input("id", sql.Int, id).query(
+      "SELECT idPedidoCompraDet, descripcion, quantityOrdenado FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@id"
+    );
+    const elegidas = todas.recordset.filter((r: any) => lineaIds.includes(r.idPedidoCompraDet));
+    if (!elegidas.length) throw new Error("Elegí al menos una línea para devolver.");
+    if (elegidas.some((r: any) => Number(r.quantityOrdenado) > 0)) throw new Error("Esa línea ya tiene orden de compra; no se puede devolver.");
+
+    for (const r of elegidas) {
+      await new sql.Request(tx)
+        .input("id", sql.Int, r.idPedidoCompraDet).input("e", sql.Int, idDevuelto).input("u", sql.NVarChar(100), usuario)
+        .query("UPDATE dbo.PedidoCompraDet SET idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u WHERE idPedidoCompraDet=@id");
+    }
+
+    // Si se devuelven TODAS las líneas del pedido, se comporta como la devolución
+    // completa de siempre: el pedido entero pasa a "devuelto" y sale de la cola
+    // activa de Proveeduría. Si es parcial, el pedido sigue su curso normal.
+    const devuelveTodo = elegidas.length === todas.recordset.length;
+    if (devuelveTodo) {
+      await new sql.Request(tx).input("id", sql.Int, id).input("e", sql.Int, idDevuelto).input("u", sql.NVarChar(100), usuario)
+        .query("UPDATE dbo.PedidoCompra SET idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u WHERE idPedidoCompra=@id");
+    }
+
+    const mot = motivo?.trim();
+    const detalle = `Devuelto(s) ${elegidas.length} línea(s): ${elegidas.map((r: any) => r.descripcion).join(", ")}${mot ? ` · Motivo: ${mot}` : ""}`;
+    await logMov(tx, { entidad: "pedido", idEntidad: id, documentoNo: pedidoNo, tipoMovimiento: "devuelto", estadoNuevo: devuelveTodo ? "devuelto" : undefined, detalle, usuario, rol });
     await tx.commit();
   } catch (e) {
     await tx.rollback();

@@ -49,6 +49,11 @@ interface RegistrarRecepcionInput {
   facturaEnRevision?: boolean;
 }
 
+/** Lo que devuelven las acciones que además tienen que mover el pedido en BC: si BC no
+ *  se pudo poner al día, `bcAviso` trae el motivo real para mostrarlo (el estado en la
+ *  app sí cambió). `void` = todo bien, o modo mock. */
+type AvisoBc = { bcAviso?: string } | void;
+
 interface StoreShape {
   role: Role | null;
   setRole: (r: Role | null) => void;
@@ -80,14 +85,20 @@ interface StoreShape {
   updateOrden: (id: string, input: NewOrdenInput) => Promise<void>;
   // `motivo` + `tipoMovimiento`: para dejar en el HISTORIAL por qué falló algo (ej. BC
   // rechazó el lanzamiento) sin cambiar el estado de la orden.
-  setOrdenEstado: (id: string, estado: Orden["estado"], extra?: { bcNumber?: string; bcDeepLink?: string; motivo?: string; tipoMovimiento?: string }) => Promise<void>;
+  // Devuelve `bcAviso` cuando el estado SÍ cambió en la app pero BC no se pudo poner al
+  // día (mandar a aprobación / reabrir): la pantalla lo muestra en vez de cantar éxito.
+  setOrdenEstado: (id: string, estado: Orden["estado"], extra?: { bcNumber?: string; bcDeepLink?: string; motivo?: string; tipoMovimiento?: string }) => Promise<AvisoBc>;
 
   registrarRecepcion: (input: RegistrarRecepcionInput) => Promise<Recepcion>;
   // MODO 2: registrar la factura de una recepción que quedó EN REVISIÓN (Kattya).
   facturarRecepcion: (recepcionId: string, numeroFactura: string) => Promise<void>;
 
   devolverPedido: (id: string, motivo: string) => Promise<void>;
-  devolverOrden: (id: string, motivo: string) => Promise<void>;
+  // Devuelve solo LÍNEAS puntuales del pedido (las que Proveeduría no compró aún):
+  // el resto sigue su curso normal. Si se devuelven TODAS las líneas del pedido,
+  // se comporta como devolverPedido (el pedido entero pasa a "devuelto").
+  devolverLineasPedido: (id: string, lineaIds: string[], motivo: string) => Promise<void>;
+  devolverOrden: (id: string, motivo: string) => Promise<AvisoBc>;
 
   // Notas de crédito (Bodega): líneas de factura con problema para emitir NC.
   notasCredito: NotaCreditoLinea[];
@@ -324,7 +335,12 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
           pedidos: d.pedidos.map((x) => (x.id === id ? {
             ...x, tipoSolicitud: input.tipoSolicitud, obraCodigo: input.obraCodigo, obraNombre: input.obraNombre,
             maquinaNo: input.maquinaNo, maquinaNombre: input.maquinaNombre, prioridad: input.prioridad, notas: input.notas,
-            lineas: input.lineas.map((l) => ({ ...l, id: uid(), cantidadOrdenada: 0 })),
+            // Las líneas con orden de compra quedan intactas (bloqueadas); solo se
+            // reemplazan las que seguían sin ordenar (pendientes o devueltas).
+            lineas: [
+              ...x.lineas.filter((l) => l.cantidadOrdenada > 0),
+              ...input.lineas.map((l) => ({ ...l, id: uid(), cantidadOrdenada: 0 })),
+            ],
           } : x)),
           movimientos: [mov, ...d.movimientos],
         };
@@ -443,9 +459,9 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
 
     const setOrdenEstado: StoreShape["setOrdenEstado"] = async (id, estado, extra) => {
       if (USE_API) {
-        await api.patchOrdenEstado(id, { estado, usuario: persona, rol: rolActual, bcNumber: extra?.bcNumber, motivo: extra?.motivo, tipoMovimiento: extra?.tipoMovimiento });
+        const r: any = await api.patchOrdenEstado(id, { estado, usuario: persona, rol: rolActual, bcNumber: extra?.bcNumber, motivo: extra?.motivo, tipoMovimiento: extra?.tipoMovimiento });
         await refreshFromApi();
-        return;
+        return r?.bcAviso ? { bcAviso: String(r.bcAviso) } : undefined;
       }
       setData((d) => {
         const prevo = d.ordenes.find((o) => o.id === id);
@@ -558,14 +574,46 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       });
     };
 
+    // ---------------- DEVOLVER LÍNEAS PUNTUALES DE UN PEDIDO ----------------
+    const devolverLineasPedido: StoreShape["devolverLineasPedido"] = async (id, lineaIds, motivo) => {
+      if (USE_API) {
+        await api.devolverLineasPedido(id, { lineaIds: lineaIds.map(Number), motivo, usuario: persona, rol: rolActual });
+        await refreshFromApi();
+        return;
+      }
+      setData((d) => {
+        const prev = d.pedidos.find((p) => p.id === id);
+        if (!prev) return d;
+        const elegidas = prev.lineas.filter((l) => lineaIds.includes(l.id));
+        if (!elegidas.length) return d;
+        // Si se devuelven TODAS las líneas, el pedido completo pasa a "devuelto"
+        // (igual que antes); si es parcial, el pedido sigue su curso normal y solo
+        // esas líneas quedan marcadas.
+        const devuelveTodo = elegidas.length === prev.lineas.length;
+        const detalle = `Devuelto(s) ${elegidas.length} línea(s): ${elegidas.map((l) => l.descripcion).join(", ")}${motivo ? ` · Motivo: ${motivo}` : ""}`;
+        const mov = mkMov({ entidad: "pedido", idEntidad: id, documentoNo: prev.numero, tipoMovimiento: "devuelto", estadoAnterior: prev.estado, estadoNuevo: devuelveTodo ? "devuelto" : undefined, detalle });
+        const notif = mkNotif("devuelto", `Tu solicitud ${prev.numero} tiene ${elegidas.length} línea(s) devuelta(s)${motivo ? `: ${motivo}` : ""}`, `/compras/ingenieria/${id}`, "ingenieria");
+        return {
+          ...d,
+          pedidos: d.pedidos.map((p) => (p.id === id ? {
+            ...p,
+            estado: devuelveTodo ? ("devuelto" as Pedido["estado"]) : p.estado,
+            lineas: p.lineas.map((l) => (lineaIds.includes(l.id) ? { ...l, devuelta: true } : l)),
+          } : p)),
+          movimientos: [mov, ...d.movimientos],
+          notificaciones: [notif, ...d.notificaciones],
+        };
+      });
+    };
+
     // ---------------- DEVOLVER / DENEGAR ORDEN A PROVEEDURÍA ----------------
     // Luis Roberto (Aprobación) devuelve/deniega una orden. El motivo es
     // obligatorio (lo valida la UI) y queda en el historial + como nota de la orden.
     const devolverOrden: StoreShape["devolverOrden"] = async (id, motivo) => {
       if (USE_API) {
-        await api.patchOrdenEstado(id, { estado: "rechazado", usuario: persona, rol: rolActual, motivo });
+        const r: any = await api.patchOrdenEstado(id, { estado: "rechazado", usuario: persona, rol: rolActual, motivo });
         await refreshFromApi();
-        return;
+        return r?.bcAviso ? { bcAviso: String(r.bcAviso) } : undefined;
       }
       setData((d) => {
         const prev = d.ordenes.find((o) => o.id === id);
@@ -636,7 +684,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       maquinas: seed.maquinas, almacenes: seed.almacenes,
       pedidos: data.pedidos, ordenes: data.ordenes, recepciones: data.recepciones, movimientos: data.movimientos,
       addPedido, editPedido, updatePedido, setPedidoEstado, deletePedido,
-      createOrden, updateOrden, setOrdenEstado, registrarRecepcion, facturarRecepcion, devolverPedido, devolverOrden, reset,
+      createOrden, updateOrden, setOrdenEstado, registrarRecepcion, facturarRecepcion, devolverPedido, devolverLineasPedido, devolverOrden, reset,
       notasCredito, marcarNotasCredito, cargarNotasCredito,
       notificaciones: data.notificaciones, marcarNotifsLeidas, marcarNotifLeida,
       planCategorias: data.planCategorias, planFilas: data.planFilas,

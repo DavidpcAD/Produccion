@@ -46,8 +46,9 @@ export default function AprobacionOrdenDetallePage() {
   // registrada en el historial y como notificación.
   async function confirmarRechazo() {
     if (!motivo.trim()) { toast("Escribí el motivo del rechazo.", "error"); return; }
-    await devolverOrden(orden!.id, motivo.trim());
-    toast(`${numeroOrden(orden!)} devuelta a proveeduría`, "info");
+    const r = await devolverOrden(orden!.id, motivo.trim());
+    if (r?.bcAviso) toast(`${numeroOrden(orden!)} devuelta a proveeduría · ⚠️ ${r.bcAviso}`, "error");
+    else toast(`${numeroOrden(orden!)} devuelta a proveeduría`, "info");
     setRechazarOpen(false);
     router.push(volverHref);
   }

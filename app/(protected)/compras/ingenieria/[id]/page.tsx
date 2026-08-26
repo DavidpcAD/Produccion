@@ -28,6 +28,10 @@ export default function PedidoDetallePage() {
   const b = pedidoBadge(pedido.estado);
   const t = tipoSolicitudBadge(pedido.tipoSolicitud);
   const ordenado = pedido.lineas.some((l) => l.cantidadOrdenada > 0);
+  // Proveeduría devolvió alguna línea puntual para corregir (código de material
+  // equivocado, etc.): el resto del pedido sigue su curso normal, así que el pedido
+  // puede estar "aprobado" (no "devuelto") y aun así tener algo para editar.
+  const hayLineasDevueltas = pedido.lineas.some((l) => l.devuelta);
   // SUBCONTRATO: el proveedor y los montos viven en la orden que se creó junto con la
   // solicitud (la tabla del pedido no tiene precio).
   const esSub = esSubcontrato(pedido);
@@ -43,7 +47,14 @@ export default function PedidoDetallePage() {
   // Semilla del pedido: la usa "Copiar" (crea uno nuevo con las mismas líneas) y
   // "Editar" (el MISMO drawer, guardando sobre este pedido). La pantalla completa
   // vieja ya no existe.
-  const seedPedido: NuevaSolicitudSeed = {
+  const lineaASeed = (l: (typeof pedido.lineas)[number]) => ({
+    code: l.articuloId, cantidad: l.cantidad,
+    obraCodigo: pedido.tipoSolicitud === "material" ? (obraDeLinea(l, pedido) || undefined) : undefined,
+    variantCode: l.variantCode, descripcion: l.descripcion, unidad: l.unidad,
+    // La actividad (tarea) del consumo directo viaja con la línea.
+    taskNo: l.taskNo, taskDescr: l.taskDescr,
+  });
+  const seedBase = {
     tipo: pedido.tipoSolicitud,
     prioridad: pedido.prioridad,
     notas: pedido.notas,
@@ -53,21 +64,21 @@ export default function PedidoDetallePage() {
     // Almacén elegido (tag ALM / pedido de Stock): se copia tal cual.
     almacen: pedido.lineas.find((l) => !!l.almacen && !l.taskNo)?.almacen || undefined,
     idClasificacion: pedido.idClasificacion ?? null,
-    lineas: pedido.lineas.map((l) => ({
-      code: l.articuloId, cantidad: l.cantidad,
-      obraCodigo: pedido.tipoSolicitud === "material" ? (obraDeLinea(l, pedido) || undefined) : undefined,
-      variantCode: l.variantCode, descripcion: l.descripcion, unidad: l.unidad,
-      // La actividad (tarea) del consumo directo viaja con la línea.
-      taskNo: l.taskNo, taskDescr: l.taskDescr,
-    })),
   };
+  // "Copiar" arranca un pedido nuevo: lleva TODAS las líneas, incluidas las que ya
+  // tienen orden de compra (son solo la semilla de un pedido distinto).
+  const seedPedido: NuevaSolicitudSeed = { ...seedBase, lineas: pedido.lineas.map(lineaASeed) };
+  // "Editar" sigue siendo ESTE pedido: las líneas con orden de compra quedan
+  // bloqueadas (el repo las preserva tal cual) y no se ofrecen para editar; solo
+  // entran las que faltan por ordenar (pendientes o devueltas por Proveeduría).
+  const seedEdicion: NuevaSolicitudSeed = { ...seedBase, lineas: pedido.lineas.filter((l) => l.cantidadOrdenada === 0).map(lineaASeed) };
 
   return (
     <AppShell role="ingenieria">
       <NuevaSolicitudSheet open={copiarOpen} setOpen={setCopiarOpen} seed={seedPedido} />
       {/* Editar = el mismo drawer, sobre este pedido. */}
       <NuevaSolicitudSheet open={editarOpen} setOpen={setEditarOpen}
-        editar={{ id: pedido.id, numero: pedido.numero, seed: seedPedido }} />
+        editar={{ id: pedido.id, numero: pedido.numero, seed: seedEdicion }} />
       <main className="page">
         <div className="back-link" onClick={() => router.push("/compras/ingenieria")}>Volver a pedidos</div>
         <div className="page__head">
@@ -119,16 +130,28 @@ export default function PedidoDetallePage() {
                 </Button>
               </>
             )}
-            {pedido.estado === "aprobado" && !ordenado && (
+            {pedido.estado === "aprobado" && !ordenado && !hayLineasDevueltas && (
               <Button variant="outline" onClick={async () => { await setPedidoEstado(pedido.id, "borrador"); toast("Pedido reabierto como borrador"); }}>
                 Volver a borrador
               </Button>
             )}
-            {pedido.estado === "aprobado" && ordenado && (
+            {!esSub && pedido.estado === "aprobado" && hayLineasDevueltas && (
+              <Button variant="outline" onClick={() => setEditarOpen(true)}>
+                Corregir línea(s) devuelta(s)
+              </Button>
+            )}
+            {pedido.estado === "aprobado" && ordenado && !hayLineasDevueltas && (
               <span className="ds-muted ds-label" style={{ alignSelf: "center" }}>Proveeduría ya generó orden de compra · no editable</span>
             )}
           </div>
         </div>
+
+        {hayLineasDevueltas && (
+          <Card flat className="mt-2" style={{ background: "color-mix(in srgb, var(--ds-color-red-100) 10%, var(--ds-tint-base))" }}>
+            <span className="ds-label ds-muted">Proveeduría devolvió {pedido.lineas.filter((l) => l.devuelta).length} línea(s) para corregir</span>
+            <p style={{ margin: "4px 0 0" }}>Revisá el motivo en el historial y corregilas con “Corregir línea(s) devuelta(s)”.</p>
+          </Card>
+        )}
 
         {pedido.notas && (
           <Card flat className="mt-2"><span className="ds-muted ds-label">Notas:</span> {pedido.notas}</Card>
@@ -190,7 +213,12 @@ export default function PedidoDetallePage() {
                   const porRecibir = Math.max(0, l.cantidad - recibido);
                   return (
                     <tr key={l.id}>
-                      <td>{l.descripcion}</td>
+                      <td>
+                        <div className="row gap-2" style={{ alignItems: "center" }}>
+                          <div className="ds-truncate" style={{ maxWidth: 220 }}>{l.descripcion}</div>
+                          {l.devuelta && <Badge tone="red">Devuelta</Badge>}
+                        </div>
+                      </td>
                       {pedido.tipoSolicitud === "material" && <td className="ds-muted">{obraDeLinea(l, pedido) || "—"}</td>}
                       {conTarea && <td className="ds-muted">{l.taskNo ? `${l.taskNo}${l.taskDescr ? ` — ${l.taskDescr}` : ""}` : "—"}</td>}
                       {/* Almacén de destino, igual que lo resuelve Proveeduría al armar la orden:

@@ -54,8 +54,12 @@ export function OrdenDetalle({
         body: JSON.stringify({ orderNo: orden.bcNumber }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) toast(`BC ${orden.bcNumber}: ${d.status ?? "lanzado"}`, "success");
-      else toast(`No se pudo lanzar en BC: ${d.error ?? r.status}`, "error");
+      // `r.ok` solo no alcanza: con la sesión vencida el proxy redirige a /login y el
+      // fetch termina en un 200 de HTML sin JSON — y este botón decía "lanzado" sin
+      // haber tocado BC (caso del 26/08/2026). El éxito lo declara el body (`d.ok`).
+      if (r.ok && d.ok) toast(`BC ${orden.bcNumber}: ${d.status ?? (d.yaLanzado ? "ya estaba lanzado" : "lanzado")}`, "success");
+      else if (r.ok && !("ok" in d)) toast("No se pudo lanzar en BC: la sesión parece vencida. Recargá la página y volvé a entrar.", "error");
+      else toast(`No se pudo lanzar en BC: ${d.error ?? `HTTP ${r.status}`}`, "error");
     } catch (e: any) {
       toast(`No se pudo lanzar en BC: ${String(e?.message ?? e)}`, "error");
     } finally {

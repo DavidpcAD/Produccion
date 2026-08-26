@@ -7,13 +7,14 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, formatDate, numeroOrden } from "@/lib/compras/helpers";
+import { destinoLabel, formatDate, numeroOrden, pedidoTieneDevolucion } from "@/lib/compras/helpers";
 import type { Role } from "@/lib/compras/types";
 
 type Dev = { id: string; tipo: "Solicitud" | "Orden"; numero: string; contra: string; motivo: string; fecha: string; href: string };
 
 // Bandeja de devoluciones, compartida por todos los roles. Reúne:
-//  • Solicitudes que Proveeduría devolvió a Ingeniería (pedido.estado = "devuelto")
+//  • Solicitudes que Proveeduría devolvió a Ingeniería (pedido entero, o solo
+//    alguna(s) línea(s) puntual(es) — el resto del pedido sigue su curso normal)
 //  • Órdenes que Aprobación rechazó a Proveeduría (orden.estado = "rechazado")
 // Cada rol ve las que le competen y entra a corregirlas.
 export function DevolucionesView({ role }: { role: Role }) {
@@ -25,10 +26,13 @@ export function DevolucionesView({ role }: { role: Role }) {
     const verSolicitudes = role === "ingenieria" || role === "proveeduria";
     const verOrdenes = role === "proveeduria" || role === "aprobacion" || role === "facturacion";
     if (verSolicitudes) {
-      for (const p of pedidos.filter((p) => p.estado === "devuelto")) {
+      for (const p of pedidos.filter((p) => pedidoTieneDevolucion(p))) {
+        const lineasDevueltas = p.lineas.filter((l) => l.devuelta);
         out.push({
           id: p.id, tipo: "Solicitud", numero: p.numero, contra: destinoLabel(p),
-          motivo: (p.notas ?? "").replace(/^↩\s*Devuelto:\s*/i, "").split(" · ")[0] || "—",
+          motivo: lineasDevueltas.length && p.estado !== "devuelto"
+            ? `${lineasDevueltas.length} línea(s): ${lineasDevueltas.map((l) => l.descripcion).join(", ")}`
+            : (p.notas ?? "").replace(/^↩\s*Devuelto:\s*/i, "").split(" · ")[0] || "—",
           fecha: p.fecha, href: role === "ingenieria" ? `/compras/ingenieria/${p.id}` : `/compras/proveeduria/solicitudes/${p.id}`,
         });
       }

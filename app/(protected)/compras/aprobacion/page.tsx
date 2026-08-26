@@ -73,8 +73,11 @@ export default function AprobacionPage() {
   async function confirmarRechazo() {
     if (!rechObj) return;
     if (!motivo.trim()) { toast("Escribí el motivo del rechazo.", "error"); return; }
-    await devolverOrden(rechObj.id, motivo.trim());
-    toast(`Orden ${rechObj.numero} devuelta a proveeduría`, "info");
+    const r = await devolverOrden(rechObj.id, motivo.trim());
+    // Si BC no se pudo poner al día (reabrir + cancelar la solicitud del workflow), se
+    // dice: si no, el pedido queda "Pendiente de aprobación" en BC y nadie sabría por qué.
+    if (r?.bcAviso) toast(`Orden ${rechObj.numero} devuelta a proveeduría · ⚠️ ${r.bcAviso}`, "error");
+    else toast(`Orden ${rechObj.numero} devuelta a proveeduría`, "info");
     setSel((s) => { const n = new Set(s); n.delete(rechObj.id); return n; });
     setRechObj(null); setMotivo("");
   }

@@ -6,11 +6,14 @@
 import type { Orden } from "./types";
 import { ALMACEN_GENERAL, numeroOrden } from "./helpers";
 
+// El retorno (`bcAviso`) existe para los estados que el PATCH sincroniza con BC
+// (enviar a aprobación / reabrir); acá no aplica — "lanzado" lo maneja este archivo
+// contra BC directamente — así que se acepta y se ignora.
 type SetOrdenEstado = (
   id: string,
   estado: Orden["estado"],
   extra?: { bcNumber?: string; bcDeepLink?: string; motivo?: string; tipoMovimiento?: string },
-) => Promise<void>;
+) => Promise<{ bcAviso?: string } | void>;
 
 /** Tipo de movimiento con el que se registra un lanzamiento fallido en el historial. */
 const MOV_FALLO = "lanzamiento_fallido";

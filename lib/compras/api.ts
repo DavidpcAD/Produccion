@@ -26,6 +26,8 @@ export const api = {
   getPedido: (id: string): Promise<Pedido> => fetch(`/api/compras/pedidos/${id}`).then(jsonOrThrow),
   patchPedidoEstado: (id: string, body: unknown) =>
     fetch(`/api/compras/pedidos/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+  devolverLineasPedido: (id: string, body: unknown) =>
+    fetch(`/api/compras/pedidos/${id}/devolver-lineas`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
   putPedido: (id: string, body: unknown) =>
     fetch(`/api/compras/pedidos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
   deletePedido: (id: string, body: unknown) =>

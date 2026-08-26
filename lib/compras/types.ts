@@ -122,6 +122,11 @@ export interface PedidoLinea {
   taskDescr?: string;       // descripción de la tarea (para mostrar / BC)
   cantidadOrdenada: number; // cuánto de esta línea ya pasó a una orden
   notas?: string;
+  /** Proveeduría la devolvió a Ingeniería para corregir (ej. código de material
+   *  equivocado), sin tocar las demás líneas del pedido. Solo puede pasar en una
+   *  línea sin nada ordenado (cantidadOrdenada = 0): si ya tiene orden de compra
+   *  queda bloqueada, no se devuelve. Se limpia sola al guardar la corrección. */
+  devuelta?: boolean;
 }
 
 export interface Pedido {
