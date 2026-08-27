@@ -28,7 +28,7 @@ export function OrdenDetalle({
   // compartida; Proveeduría la manda a la suya, donde además puede ordenarla.
   pedidoHref?: (p: Pedido) => string;
 }) {
-  const { proveedores, recepciones, pedidos } = useStore();
+  const { proveedores, recepciones, pedidos, movimientos } = useStore();
   const router = useRouter();
   const toast = useToast();
   const [verFactura, setVerFactura] = useState<string | null>(null);
@@ -87,6 +87,17 @@ export function OrdenDetalle({
   // (proyecto + tarea). Va arriba porque cambia qué significa recibir esta orden.
   const cd = ordenConsumoDirecto(orden);
   const recs = recepciones.filter((r) => r.ordenId === orden.id);
+  // "Reintentar lanzar en BC" es para DESATASCAR un lanzamiento que falló, no un
+  // atajo para lanzar sin aprobar. Solo aparece si el último movimiento de la orden
+  // es el intento fallido que deja aprobar.ts ("lanzamiento_fallido") y la orden
+  // sigue sin lanzarse: si después la editaron, la reabrieron o la reenviaron, el
+  // camino vuelve a ser "Aprobar y lanzar".
+  const falloAlLanzar = (() => {
+    if (!orden.bcNumber || orden.estado === "lanzado" || orden.estado === "completado") return false;
+    const movs = movimientos.filter((m) => m.entidad === "orden" && m.idEntidad === orden.id);
+    const fallo = movs.filter((m) => m.tipoMovimiento === "lanzamiento_fallido").sort((a, b) => a.fecha.localeCompare(b.fecha)).at(-1);
+    return !!fallo && !movs.some((m) => m.fecha > fallo.fecha);
+  })();
   const subtotal = orden.lineas.filter((l) => l.tipo === "articulo").reduce((s, l) => s + ordenLineaImporte(l), 0);
   const iva = orden.lineas.filter((l) => l.tipo === "articulo").reduce((s, l) => s + ordenLineaImporte(l) * ((l.ivaPct || 0) / 100), 0);
   const flete = orden.lineas.filter((l) => l.tipo === "cargo").reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
@@ -144,8 +155,8 @@ export function OrdenDetalle({
             <button className="link-btn" title="Abrir el Pedido en Business Central (editar · vista previa de registro · registrar)"
               onClick={() => window.open(orden.bcDeepLink!, "_blank")}>↗ Abrir en BC</button>
           )}
-          {orden.bcNumber && (
-            <button className="link-btn" disabled={relanzando} title="Reintentar el lanzamiento (Release) en BC del pedido ya creado"
+          {falloAlLanzar && (
+            <button className="link-btn" disabled={relanzando} title={`El último intento de lanzar ${orden.bcNumber} en BC falló. Reintentar el Release del pedido ya creado.`}
               onClick={reintentarLanzar}>{relanzando ? "Lanzando…" : "↻ Reintentar lanzar en BC"}</button>
           )}
           {acciones}
