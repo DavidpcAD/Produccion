@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge, ProgressBar } from "@/components/compras/ui";
@@ -17,10 +17,14 @@ export function OrdenesLista({
   ordenes,
   hrefDetalle,
   vacio = "No hay órdenes.",
+  acciones,
 }: {
   ordenes: Orden[];
   hrefDetalle: (id: string) => string;
   vacio?: string;
+  // Botón propio del rol al final de cada fila (Bodega: "Registrar factura").
+  // Memoizalo en la página (useCallback): entra en las deps de las columnas.
+  acciones?: (o: Orden) => ReactNode;
 }) {
   const { proveedores } = useStore();
   const router = useRouter();
@@ -76,7 +80,14 @@ export function OrdenesLista({
       accessorFn: (o) => { const cd = ordenConsumoDirecto(o); return cd.hay ? (cd.parcial ? "Consumo directo (parcial)" : "Consumo directo") : "A almacén"; },
       cell: (c) => <span className="ds-body-sm ds-muted">{c.getValue()}</span>,
     },
-  ], [proveedores]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Acción del rol. Va al final y no ordena ni filtra: es un botón, no un dato.
+    // El clic no burbujea para no disparar además el clic de la fila.
+    ...(acciones ? [{
+      id: "accion", header: "", accessorFn: () => "", meta: { label: "Acción" },
+      enableSorting: false, enableColumnFilter: false,
+      cell: (c: any) => <span className="row" onClick={(e) => e.stopPropagation()}>{acciones(c.row.original)}</span>,
+    } as ColumnDef<Orden, any>] : []),
+  ], [proveedores, acciones]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderLineas = (o: Orden) => (
     <table className="ds-table" style={{ boxShadow: "none", background: "transparent" }}>
@@ -163,7 +174,7 @@ export function OrdenesLista({
                   <div className="ds-table-wrap" style={{ boxShadow: "none", borderRadius: 0 }}>
                     <table className="ds-table">
                       <thead>
-                        <tr><th>N.º</th><th>Solicitudes</th><th>Fecha</th><th className="ds-num">Total</th><th>Recibido</th><th>Estado</th></tr>
+                        <tr><th>N.º</th><th>Solicitudes</th><th>Fecha</th><th className="ds-num">Total</th><th>Recibido</th><th>Estado</th>{acciones && <th></th>}</tr>
                       </thead>
                       <tbody>
                         {g.ords.map((o) => {
@@ -176,6 +187,7 @@ export function OrdenesLista({
                               <td className="ds-num ds-strong">{money(ordenSubtotal(o), o.currencyCode)}</td>
                               <td><ProgressBar compact value={ordenRecibidoPct(o)} total={100} /></td>
                               <td><Badge tone={b.tone}>{b.label}</Badge></td>
+                              {acciones && <td><span className="row" onClick={(e) => e.stopPropagation()}>{acciones(o)}</span></td>}
                             </tr>
                           );
                         })}
