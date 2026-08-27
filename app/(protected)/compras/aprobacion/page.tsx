@@ -7,7 +7,7 @@ import { Badge, Button, Card, Modal, Textarea, Tile, useToast } from "@/componen
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
 import { AprobarControl } from "@/components/compras/aprobar-control";
-import { money, formatDate, num, numeroOrden, ordenBadge, ordenConsumoDirecto, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas, ordenTotalConIva } from "@/lib/compras/helpers";
+import { money, formatDate, num, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas, ordenTotalConIva } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Los KPI de arriba son el filtro de la lista: cada uno muestra las órdenes de ese
@@ -155,6 +155,9 @@ export default function AprobacionPage() {
             // Consumo directo: el costo se carga a la obra y el material NO entra a
             // inventario. Quien aprueba tiene que verlo ANTES de lanzar.
             const cd = ordenConsumoDirecto(o);
+            // Un solo almacén destino → va en el encabezado y la tabla muestra la
+            // OBRA por línea (compacto, se lee en teléfono). Mezcla → columna Almacén.
+            const alm = ordenAlmacenDestino(o);
             return (
               <Card key={o.id}>
                 <div className="row wrap gap-3" style={{ alignItems: "flex-start" }}>
@@ -187,7 +190,10 @@ export default function AprobacionPage() {
                       </span>
                       <span className="ds-muted ds-label">{o.proveedorNo ?? prov(o.proveedorId)?.code} · {o.proveedorNombre ?? prov(o.proveedorId)?.nombre} · {formatDate(o.fecha)}</span>
                       <span className="ds-muted ds-body-sm">
-                        {articulos.length} línea(s){maquinas.length > 0 ? ` · Máquina: ${maquinas.join(", ")}` : ""}
+                        {articulos.length} línea(s)
+                        {alm.codigo && <> · Almacén destino: <span className="ds-strong">{alm.codigo}</span></>}
+                        {alm.mixto && <> · Varios almacenes (ver líneas)</>}
+                        {maquinas.length > 0 ? ` · Máquina: ${maquinas.join(", ")}` : ""}
                         <span className="oc-open-row__hint ds-strong"> · Ver detalle e historial ↗</span>
                       </span>
                       {cd.hay && (
@@ -208,18 +214,19 @@ export default function AprobacionPage() {
                   <div className="ds-table-wrap mt-3" style={{ boxShadow: "none", border: "1.5px solid var(--ds-color-gray-100)" }}>
                     <table className="ds-table">
                       <thead>
-                        <tr><th className="hide-mobile">Tipo</th><th>Descripción</th><th className="hide-mobile">Almacén</th><th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Importe</th></tr>
+                        <tr><th className="hide-mobile">Tipo</th><th>Descripción</th><th>Obra</th>{alm.mixto && <th className="hide-mobile">Almacén</th>}<th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Importe</th></tr>
                       </thead>
                       <tbody>
                         {o.lineas.map((l) => (
                           <tr key={l.id}>
                             <td className="hide-mobile">{l.tipo === "cargo" ? <Badge tone="yellow">Cargo</Badge> : <Badge tone="gray">Artículo</Badge>}</td>
                             <td>{l.descripcion}{l.pedidoNumero && <div className="ds-body-sm ds-muted">{l.pedidoNumero}</div>}</td>
-                            <td className="ds-muted ds-body-sm hide-mobile">
+                            <td className="ds-muted ds-body-sm">
                               {l.tipo === "articulo" && ordenLineaEsConsumoDirecto(l)
-                                ? <span title={`Consumo directo contra ${l.proyecto} · tarea ${l.taskNo}`}>{l.proyecto} · tarea {l.taskNo} <Badge tone="ink">CD</Badge></span>
-                                : l.almacen}
+                                ? <span title={`Consumo directo contra ${l.proyecto} · tarea ${l.taskNo}: no entra a inventario`}>{l.obra || l.proyecto} <Badge tone="ink">CD</Badge></span>
+                                : (l.obra || "—")}
                             </td>
+                            {alm.mixto && <td className="ds-muted ds-body-sm hide-mobile">{l.almacen || "—"}</td>}
                             <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                             <td className="ds-num">{money(l.precioUnitario, o.currencyCode)}</td>
                             <td className="ds-num ds-strong">{money(ordenLineaImporte(l), o.currencyCode)}</td>

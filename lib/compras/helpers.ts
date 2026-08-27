@@ -674,6 +674,17 @@ export function ordenConsumoDirecto(o: Orden): { hay: boolean; parcial: boolean;
   return { hay: cd.length > 0, parcial: cd.length > 0 && cd.length < articulos.length, lineas: cd.length, destinos };
 }
 
+// ─── Almacén destino de una ORDEN ───────────────────────────────────────────────
+// El almacén al que entra lo que SÍ va a inventario (las líneas de consumo directo
+// no entran). Si todas comparten uno, va en el encabezado ("Almacén destino: X") y
+// la tabla no necesita columna Almacén; `mixto` = hay varios y se muestra por línea.
+export function ordenAlmacenDestino(o: Orden): { codigo?: string; mixto: boolean } {
+  const alms = [...new Set(o.lineas
+    .filter((l) => l.tipo === "articulo" && !ordenLineaEsConsumoDirecto(l))
+    .map((l) => l.almacen).filter(Boolean))];
+  return { codigo: alms.length === 1 ? alms[0] : undefined, mixto: alms.length > 1 };
+}
+
 export function ordenBadge(estado: Orden["estado"]): { label: string; tone: string } {
   switch (estado) {
     case "abierto": return { label: "Abierto", tone: "gray" };
@@ -709,10 +720,12 @@ export function nextNumero(prefix: string, existentes: string[]): string {
   return `${prefix}-${String(max + 1).padStart(6, "0")}`;
 }
 
-// Solo almacenes físicos (códigos ALM-*). Oculta bodegas de obra (VN-M.28, etc.),
-// que no son ubicaciones físicas de recepción y no deben ofrecerse al armar órdenes.
+// Almacenes físicos de recepción: los mismos de bodega que ofrece la solicitud
+// (ALM-*, fábricas F-*, GEN-*, Herramienta, Maquinaria). Oculta bodegas de obra
+// (VN-M.28, etc.), que no son ubicaciones físicas de recepción. Antes solo dejaba
+// ALM-* y una compra directa no podía recibirse en F-MADERAS (caso MEXICHEM 26/08).
 export function almacenesFisicos<T extends { codigo: string }>(list: T[]): T[] {
-  return list.filter((a) => a.codigo.toUpperCase().startsWith("ALM-"));
+  return list.filter((a) => esAlmacenDeBodega(a.codigo));
 }
 
 // N.º con el que se conoce una orden. Desde que Proveeduría crea el Pedido de compra

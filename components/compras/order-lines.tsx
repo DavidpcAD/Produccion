@@ -29,7 +29,8 @@ export function OrderLinesTable({ orden, showRecepcion = true, solicitudHref }: 
                   {l.descripcion}
                   <div className="ds-body-sm ds-muted">
                     {(() => {
-                      const rest = [l.proyecto && `Proy. ${l.proyecto}`, l.taskNo && `Tarea ${l.taskNo}`, l.descuentoPct ? `−${l.descuentoPct}%` : null].filter(Boolean).join(" · ");
+                      // La obra solo si NO es consumo directo (ahí ya se lee en Proy./Tarea).
+                      const rest = [!ordenLineaEsConsumoDirecto(l) && l.obra && `Obra ${l.obra}`, l.proyecto && `Proy. ${l.proyecto}`, l.taskNo && `Tarea ${l.taskNo}`, l.descuentoPct ? `−${l.descuentoPct}%` : null].filter(Boolean).join(" · ");
                       const href = l.pedidoNumero ? solicitudHref?.(l) : null;
                       return <>
                         {l.pedidoNumero && (href

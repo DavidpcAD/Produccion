@@ -166,6 +166,10 @@ export interface OrdenLinea {
   variantCode?: string;     // variante del item (obligatoria en BC para items con variantes)
   pedidoLineaId?: string;   // enlace N:M a la línea de pedido origen
   pedidoNumero?: string;
+  /** Obra de la línea, heredada de la línea de pedido origen (la orden no la
+   *  persiste; la resuelve el join de repo.listOrdenes/getOrden). En consumo
+   *  directo la obra además viaja como `proyecto` (Job No. de BC). */
+  obra?: string;
   descripcion: string;
   cantidad: number;
   unidad: string;

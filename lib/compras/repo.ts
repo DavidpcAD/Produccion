@@ -338,9 +338,18 @@ export async function listOrdenes(): Promise<Orden[]> {
              -- ingeniería) y la orden de proveeduría la deja en NULL. Sin variante, BC
              -- rechaza el lanzamiento: "Variant Code must have a value in Purchase Line"
              -- (casos CP-005149 y CP-004973, 24/08/2026). Se hereda de la línea origen.
-             COALESCE(d.variantCode, pd.variantCode) AS variantCodeEfectivo
+             COALESCE(d.variantCode, pd.variantCode) AS variantCodeEfectivo,
+             -- El PED-… que originó la línea. Sin esto la app pintaba TODA orden como
+             -- "Compra directa · sin solicitud de origen" aunque naciera de un pedido.
+             pc.pedidoNo AS pedidoNoOrigen,
+             -- La OBRA de la línea, heredada del pedido origen. Mismo compat que
+             -- mapPedido: en líneas viejas de material la obra viajaba en locationCode
+             -- (la columna obra existía sin usarse) y de último cae a la del pedido.
+             COALESCE(pd.obra, CASE WHEN ISNULL(pc.tipoSolicitud,'material') = 'material'
+                                    THEN COALESCE(NULLIF(pd.locationCode,''), pc.obra) END) AS obraOrigen
       FROM dbo.OrdenCompraDet d
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
+      LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
       ORDER BY d.idOrdenCompraDet`);
   return h.recordset.map((o) => mapOrden(o, d.recordset.filter((x) => x.idOrdenCompra === o.idOrdenCompra)));
 }
@@ -360,9 +369,18 @@ export async function getOrden(id: number): Promise<Orden | null> {
              -- ingeniería) y la orden de proveeduría la deja en NULL. Sin variante, BC
              -- rechaza el lanzamiento: "Variant Code must have a value in Purchase Line"
              -- (casos CP-005149 y CP-004973, 24/08/2026). Se hereda de la línea origen.
-             COALESCE(d.variantCode, pd.variantCode) AS variantCodeEfectivo
+             COALESCE(d.variantCode, pd.variantCode) AS variantCodeEfectivo,
+             -- El PED-… que originó la línea. Sin esto la app pintaba TODA orden como
+             -- "Compra directa · sin solicitud de origen" aunque naciera de un pedido.
+             pc.pedidoNo AS pedidoNoOrigen,
+             -- La OBRA de la línea, heredada del pedido origen. Mismo compat que
+             -- mapPedido: en líneas viejas de material la obra viajaba en locationCode
+             -- (la columna obra existía sin usarse) y de último cae a la del pedido.
+             COALESCE(pd.obra, CASE WHEN ISNULL(pc.tipoSolicitud,'material') = 'material'
+                                    THEN COALESCE(NULLIF(pd.locationCode,''), pc.obra) END) AS obraOrigen
       FROM dbo.OrdenCompraDet d
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
+      LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
       WHERE d.idOrdenCompra = @id
       ORDER BY d.idOrdenCompraDet`);
   return mapOrden(h.recordset[0], d.recordset);
@@ -385,7 +403,7 @@ function mapOrden(o: any, lineas: any[]): Orden {
       // La variante se hereda del pedido si la orden no la trae (ver el COALESCE del
       // query): sin ella BC rechaza el lanzamiento.
       articuloId: l.itemNo ?? undefined, variantCode: (l.variantCodeEfectivo ?? l.variantCode) ?? undefined, pedidoLineaId: l.idPedidoCompraDet ? String(l.idPedidoCompraDet) : undefined,
-      pedidoNumero: undefined, descripcion: l.descripcion ?? "", cantidad: Number(l.quantity ?? 0),
+      pedidoNumero: l.pedidoNoOrigen ?? undefined, obra: l.obraOrigen ?? undefined, descripcion: l.descripcion ?? "", cantidad: Number(l.quantity ?? 0),
       unidad: l.unitOfMeasureCode ?? "", almacen: l.locationCode ?? "", precioUnitario: Number(l.directUnitCost ?? 0),
       ivaPct: Number(l.vatPct ?? 0), descuentoPct: Number(l.lineDiscountPct ?? 0) || undefined,
       proyecto: l.jobNo ?? undefined, taskNo: (l.taskNoEfectivo ?? l.taskNo) ?? undefined,

@@ -7,7 +7,7 @@ import { IconChevronDown } from "@/components/compras/icons";
 import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { money, num, formatDate, etiquetaInterna, numeroOrden, tieneBc, ordenBadge, ordenConsumoDirecto, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
+import { money, num, formatDate, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Vista de detalle de una orden, reutilizada por Proveeduría, Aprobación y Bodega.
@@ -71,6 +71,7 @@ export function OrdenDetalle({
   const b = ordenBadge(orden.estado);
   const peds = ordenPedidos(orden);
   const maquinas = ordenMaquinas(orden, pedidos);
+  const alm = ordenAlmacenDestino(orden);
   const esDirecta = ordenEsDirecta(orden);
   // Consumo directo: el material NO entra a inventario, el costo se carga a la obra
   // (proyecto + tarea). Va arriba porque cambia qué significa recibir esta orden.
@@ -95,14 +96,18 @@ export function OrdenDetalle({
               </Badge>
             )}
           </div>
-          <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · emitida {formatDate(orden.fecha)} · recibido {ordenRecibidoPct(orden)}%{tieneBc(orden) ? ` · ${etiquetaInterna(orden.numero)}` : ""}</p>
+          <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · emitida {formatDate(orden.fecha)} · recibido {ordenRecibidoPct(orden)}%</p>
           {cd.hay && (
             <p className="ds-body-sm" style={{ color: "var(--ds-color-green-200)" }}>
               {cd.parcial ? `${cd.lineas} de sus líneas se consumen` : "Se consume"} contra <span className="ds-strong">{cd.destinos.join(" · ")}</span> · no entra a inventario
             </p>
           )}
           {maquinas.length > 0 && <p className="ds-body-sm ds-muted">Máquina: <span className="ds-strong">{maquinas.join(", ")}</span></p>}
-          {orden.almacenRecepcion && <p className="ds-body-sm ds-muted">Recepción en almacén <span className="ds-strong">{orden.almacenRecepcion}</span></p>}
+          {/* Almacén al que entra el material (lo que no es consumo directo). Único →
+              se dice acá arriba; mezcla → se lee por línea en la tabla. */}
+          {(alm.codigo || alm.mixto || orden.almacenRecepcion) && (
+            <p className="ds-body-sm ds-muted">Almacén destino: <span className="ds-strong">{alm.codigo ?? (alm.mixto ? "varios (ver líneas)" : orden.almacenRecepcion)}</span></p>
+          )}
           <div className="row gap-2 wrap mt-2">
             {esDirecta ? (
               <span className="ds-muted ds-body-sm">Compra directa · sin solicitud de origen</span>

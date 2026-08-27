@@ -75,13 +75,17 @@ export default function OrdenDirectaPage() {
     if (!puedeCrear) { toast("Seleccioná un proveedor y agregá al menos una línea.", "error"); return; }
     setGuardando(true);
     try {
+      // El "Almacén de recepción" va en CADA línea: es lo único que se persiste y lo
+      // que viaja a BC como locationCode. Antes la línea llevaba el texto de la obra
+      // como almacén y el elegido no llegaba a ningún lado → todo caía a ALM-GRAL,
+      // aunque el proveedor entregara en otra bodega (caso F-MADERAS, 26/08).
       const ls: Omit<OrdenLinea, "id" | "cantidadRecibida" | "cantidadFacturada">[] = rows.map((r) => ({
         tipo: "articulo", articuloId: r.articuloId, pedidoNumero: "Manual",
-        descripcion: r.descripcion, cantidad: Number(r.cantidad), unidad: r.unidad, almacen: r.obra,
+        descripcion: r.descripcion, cantidad: Number(r.cantidad), unidad: r.unidad, almacen,
         precioUnitario: Number(r.precio), ivaPct: Number(r.iva) || 0, descuentoPct: Number(r.descuento) || 0,
         proyecto: r.obra || undefined,
       }));
-      if (fleteNum > 0) ls.push({ tipo: "cargo", descripcion: "FLETE / TRANSPORTE", cantidad: 1, unidad: "UND", almacen: rows[0]?.obra ?? "", precioUnitario: fleteNum, ivaPct: 13 });
+      if (fleteNum > 0) ls.push({ tipo: "cargo", descripcion: "FLETE / TRANSPORTE", cantidad: 1, unidad: "UND", almacen, precioUnitario: fleteNum, ivaPct: 13 });
       const orden = await createOrden({ proveedorId, proveedorNo: provSel?.code, proveedorNombre: provSel?.nombre, currencyCode: currency, almacenRecepcion: almacen, lineas: ls });
       if (aprobar) await setOrdenEstado(orden.id, "pendiente_aprobacion");
       toast(`Orden directa ${numeroOrden(orden)} ${aprobar ? "enviada a aprobación" : "guardada como abierta"}`, "success");
@@ -113,7 +117,7 @@ export default function OrdenDirectaPage() {
             <Field label="Flete / transporte" help="Opcional, se distribuye al facturar">
               <Input type="number" min={0} value={flete} onChange={(e) => setFlete(e.target.value)} placeholder="0" />
             </Field>
-            <Field label="Almacén de recepción" help="Dónde entra el material en BC (por defecto el General)">
+            <Field label="Almacén de recepción" help="Dónde entra el material en BC — aplica a todas las líneas (por defecto el General)">
               <Select value={almacen} onChange={(e) => setAlmacen(e.target.value)}>
                 {catAlm.map((a) => <option key={a.codigo} value={a.codigo}>{a.codigo} — {a.nombre}</option>)}
               </Select>
