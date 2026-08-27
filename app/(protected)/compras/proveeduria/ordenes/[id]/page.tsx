@@ -11,18 +11,12 @@ export default function ProvOrdenDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes, pedidos, setOrdenEstado, cargando } = useStore();
+  const { ordenes, setOrdenEstado, cargando } = useStore();
 
   const orden = ordenes.find((o) => o.id === id);
   if (!orden) {
     return <AppShell role="proveeduria"><main className="page"><div className="empty">{cargando ? "Cargando orden…" : "Orden no encontrada."}</div></main></AppShell>;
   }
-  // Link de cada línea a su solicitud de origen (para ver quién la pidió).
-  const solicitudHref = (l: NonNullable<typeof orden>["lineas"][number]) => {
-    const p = (l.pedidoLineaId && pedidos.find((x) => x.lineas.some((ln) => ln.id === l.pedidoLineaId)))
-      || (l.pedidoNumero && pedidos.find((x) => x.numero === l.pedidoNumero));
-    return p ? `/compras/proveeduria/solicitudes/${p.id}` : null;
-  };
 
   async function act(estado: NonNullable<typeof orden>["estado"], msg: string) {
     const r = await setOrdenEstado(orden!.id, estado);
@@ -60,7 +54,9 @@ export default function ProvOrdenDetallePage() {
 
   return (
     <AppShell role="proveeduria">
-      <OrdenDetalle orden={orden} volverHref="/compras/proveeduria/ordenes" volverLabel="Volver a órdenes" acciones={acciones} solicitudHref={solicitudHref} />
+      <OrdenDetalle orden={orden} volverHref="/compras/proveeduria/ordenes" volverLabel="Volver a órdenes" acciones={acciones}
+        // Proveeduría abre la solicitud en SU vista: desde ahí la ordena o la devuelve.
+        pedidoHref={(p) => `/compras/proveeduria/solicitudes/${p.id}`} />
     </AppShell>
   );
 }

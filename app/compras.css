@@ -276,6 +276,13 @@
    que no debe confundirse con el gris claro de Stock. */
 .oc-scope .ds-badge--ink { background: var(--ds-color-gray-500); color: var(--ds-color-white); }
 
+/* Chip que es un enlace (p.ej. la solicitud de origen de una orden): se ve igual,
+   pero se puede abrir. */
+.oc-scope .badge-link { display: inline-flex; text-decoration: none; border-radius: 999px; }
+.oc-scope .badge-link .ds-badge { cursor: pointer; transition: background .12s ease, color .12s ease; }
+.oc-scope .badge-link:hover .ds-badge { background: var(--ds-color-gray-200); color: var(--ds-text); }
+.oc-scope .badge-link:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 2px; }
+
 /* =====================  QUANTITY SELECTOR (ring)  ===================== */
 .oc-scope .ds-qty-selector {
   position: relative; width: 44px; height: 44px; border: 0; background: transparent; cursor: default; padding: 0;

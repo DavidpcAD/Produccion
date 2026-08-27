@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
@@ -370,7 +371,14 @@ export default function RegistrarFacturaPage() {
             {orden.almacenRecepcion && <p className="ds-body-sm ds-muted">Recepción en almacén <span className="ds-strong">{orden.almacenRecepcion}</span></p>}
             <div className="row gap-2 wrap mt-2">
               <span className="ds-muted ds-body-sm">Solicitudes origen:</span>
-              {[...new Set(orden.lineas.filter((l) => l.pedidoNumero).map((l) => l.pedidoNumero!))].map((n) => <Badge key={n} tone="gray">{n}</Badge>)}
+              {[...new Set(orden.lineas.filter((l) => l.pedidoNumero).map((l) => l.pedidoNumero!))].map((n) => {
+                // El chip abre la solicitud de origen (solo lectura): para ver quién
+                // pidió el material sin salirse de la recepción.
+                const ped = pedidos.find((p) => p.numero === n);
+                return ped
+                  ? <Link key={n} href={`/compras/solicitud/${ped.id}`} className="badge-link" title={`Abrir la solicitud ${n}`}><Badge tone="gray">{n}</Badge></Link>
+                  : <Badge key={n} tone="gray">{n}</Badge>;
+              })}
               {orden.lineas.every((l) => !l.pedidoNumero) && <span className="ds-muted ds-body-sm">—</span>}
             </div>
           </div>

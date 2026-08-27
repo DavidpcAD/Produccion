@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, useToast } from "@/components/compras/ui";
 import { IconChevronDown } from "@/components/compras/icons";
@@ -8,7 +9,7 @@ import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
 import { money, num, formatDate, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
-import type { Orden } from "@/lib/compras/types";
+import type { Orden, Pedido } from "@/lib/compras/types";
 
 // Vista de detalle de una orden, reutilizada por Proveeduría, Aprobación y Bodega.
 // `acciones` son los botones específicos de cada rol (aprobar, recibir, etc.).
@@ -17,13 +18,15 @@ export function OrdenDetalle({
   volverHref,
   volverLabel = "Volver",
   acciones,
-  solicitudHref,
+  pedidoHref,
 }: {
   orden: Orden;
   volverHref: string;
   volverLabel?: string;
   acciones?: React.ReactNode;
-  solicitudHref?: (l: Orden["lineas"][number]) => string | null;
+  // A dónde lleva una solicitud de origen. Por defecto, a la vista de solo lectura
+  // compartida; Proveeduría la manda a la suya, donde además puede ordenarla.
+  pedidoHref?: (p: Pedido) => string;
 }) {
   const { proveedores, recepciones, pedidos } = useStore();
   const router = useRouter();
@@ -70,6 +73,13 @@ export function OrdenDetalle({
   const prov = proveedores.find((p) => p.id === orden.proveedorId);
   const b = ordenBadge(orden.estado);
   const peds = ordenPedidos(orden);
+  // Solicitud de origen (por número, o por la línea exacta cuando se sabe cuál es).
+  const hrefSolicitud = (numero?: string | null, lineaId?: string | null) => {
+    const p = (lineaId ? pedidos.find((x) => x.lineas.some((ln) => ln.id === lineaId)) : undefined)
+      ?? (numero ? pedidos.find((x) => x.numero === numero) : undefined);
+    if (!p) return null;
+    return pedidoHref ? pedidoHref(p) : `/compras/solicitud/${p.id}`;
+  };
   const maquinas = ordenMaquinas(orden, pedidos);
   const alm = ordenAlmacenDestino(orden);
   const esDirecta = ordenEsDirecta(orden);
@@ -114,7 +124,12 @@ export function OrdenDetalle({
             ) : (
               <>
                 <span className="ds-muted ds-body-sm">Solicitudes origen:</span>
-                {peds.map((n) => <Badge key={n} tone="gray">{n}</Badge>)}
+                {peds.map((n) => {
+                  const href = hrefSolicitud(n);
+                  return href
+                    ? <Link key={n} href={href} className="badge-link" title={`Abrir la solicitud ${n}`}><Badge tone="gray">{n}</Badge></Link>
+                    : <Badge key={n} tone="gray">{n}</Badge>;
+                })}
               </>
             )}
           </div>
@@ -138,7 +153,7 @@ export function OrdenDetalle({
       </div>
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        <OrderLinesTable orden={orden} solicitudHref={solicitudHref} />
+        <OrderLinesTable orden={orden} solicitudHref={(l) => hrefSolicitud(l.pedidoNumero, l.pedidoLineaId)} />
       </Card>
 
       <div className="row mt-6" style={{ justifyContent: "flex-end" }}>
