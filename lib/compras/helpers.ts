@@ -257,6 +257,7 @@ export function tipoSolicitudBadge(t: TipoSolicitud): { label: string; tone: str
   return t === "repuesto" ? { label: "Repuesto", tone: "yellow" }
     : t === "stock" ? { label: "Stock", tone: "gray" }
     : t === "subcontrato" ? { label: "Subcontrato", tone: "ink" }
+    : t === "activo" ? { label: "Activo fijo", tone: "ink" }
     : { label: "Material", tone: "green" };
 }
 
@@ -680,7 +681,9 @@ export function ordenConsumoDirecto(o: Orden): { hay: boolean; parcial: boolean;
 // la tabla no necesita columna Almacén; `mixto` = hay varios y se muestra por línea.
 export function ordenAlmacenDestino(o: Orden): { codigo?: string; mixto: boolean } {
   const alms = [...new Set(o.lineas
-    .filter((l) => l.tipo === "articulo" && !ordenLineaEsConsumoDirecto(l))
+    // Los activos fijos tampoco cuentan: no entran a inventario, así que no tienen
+    // almacén destino que mostrar.
+    .filter((l) => l.tipo === "articulo" && !l.esActivo && !ordenLineaEsConsumoDirecto(l))
     .map((l) => l.almacen).filter(Boolean))];
   return { codigo: alms.length === 1 ? alms[0] : undefined, mixto: alms.length > 1 };
 }

@@ -549,6 +549,44 @@ export function resolverItemChargeNo(cargo: { chargeNo?: string; descripcion?: s
   return (process.env.BC_ITEM_CHARGE_FLETE || "").trim();
 }
 
+// ─── ACTIVOS FIJOS ──────────────────────────────────────────────────────────────
+// Catálogo de Activos Fijos de BC (AF-0001…) para las solicitudes de tipo "activo".
+// Sale de la API ESTÁNDAR, no de la custom: la estándar trae además la CLASE
+// (HERR / MAQ / VEH) y la subclase, que es como la gente los reconoce en la lista de
+// BC, y el flag `blocked`. La custom (adelante/inventory/fixedAssets) solo da
+// no/description/blocked, así que queda de respaldo por si la estándar no responde.
+export type BcActivo = { no: string; descripcion: string; clase?: string; subclase?: string; ubicacion?: string; serie?: string };
+
+export async function bcActivosFijos(): Promise<BcActivo[]> {
+  const mapear = (r: any): BcActivo => ({
+    no: r.number ?? r.no ?? r.No ?? "",
+    descripcion: (r.displayName ?? r.description ?? r.Description ?? "").trim(),
+    clase: (r.classCode ?? r.FAClassCode ?? "").toString().trim() || undefined,
+    subclase: (r.subclassCode ?? "").toString().trim() || undefined,
+    ubicacion: (r.fixedAssetLocationCode ?? "").toString().trim() || undefined,
+    serie: (r.serialNumber ?? "").toString().trim() || undefined,
+  });
+  // Un activo BLOQUEADO en BC no admite movimientos: no se ofrece para comprar.
+  const vivos = (rows: any[]) => rows.filter((r) => !(r.blocked ?? r.Blocked)).map(mapear).filter((a) => a.no);
+  try {
+    const cid = await getStdCompanyId();
+    const out: any[] = [];
+    let url: string | null = `${stdRoot()}/companies(${cid})/fixedAssets?$top=1000`;
+    while (url) {
+      const res: Response = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
+      if (!res.ok) throw new Error(`BC activos ${res.status}`);
+      const d: any = await res.json();
+      out.push(...(d.value ?? []));
+      url = d["@odata.nextLink"] ?? null;
+    }
+    return vivos(out).sort((a, b) => a.no.localeCompare(b.no));
+  } catch {
+    // Respaldo: la API custom de Adelante (sin clase, pero con el N.º y la descripción).
+    try { return vivos(await listCustom("inventory", "fixedAssets", { next: { revalidate: 300 } } as RequestInit)).sort((a, b) => a.no.localeCompare(b.no)); }
+    catch { return []; }
+  }
+}
+
 export type BcPostedReceiptLine = {
   documentNo: string;    // N.º de recepción registrada (albarán), p.ej. CR-000003
   lineNo: number;        // N.º de línea dentro de la recepción
@@ -806,6 +844,10 @@ async function getStdVariantId(itemNo: string, code: string): Promise<string | n
 
 // ---- Escritura: crear Pedido de compra (Purchase Order) por la API ESTÁNDAR ----
 export type NuevaLineaBc = { itemNo: string; cantidad: number; precio?: number; descripcion?: string; variantCode?: string; jobNo?: string; jobTaskNo?: string; jobLineType?: string; locationCode?: string;
+  /** La línea compra un ACTIVO FIJO: en BC va como línea tipo "Activo fijo" y el
+   *  `itemNo` es el N.º del activo (AF-0001), no un artículo. No lleva almacén ni
+   *  variante: un activo no entra a inventario. */
+  esActivo?: boolean;
   /** Unidad con la que se le pide al proveedor (EST, PQT…). Ver `unidadParaBc`: solo
    *  viaja a BC cuando NO es la unidad base del artículo. */
   unidad?: string };
@@ -1176,9 +1218,11 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   // editable y el Release falla). El catálogo de los buscadores trae los tres tipos,
   // así que acá se consulta el tipo y se les manda la línea SIN almacén; el proyecto
   // + la tarea sí se les pone (el consumo contra la obra se registra igual).
-  const fichasItem = await bcItemFichas(lineas.map((l) => l.itemNo));
+  const fichasItem = await bcItemFichas(lineas.filter((l) => !l.esActivo).map((l) => l.itemNo));
   const tiposItem = new Map([...fichasItem].map(([no, f]) => [no, f.tipo] as const));
-  const sinAlmacen = (l: NuevaLineaBc) => (tiposItem.get(l.itemNo) ?? "inventario") !== "inventario";
+  // Un ACTIVO FIJO tampoco lleva almacén: no entra a inventario (el campo ni siquiera
+  // es editable en una línea tipo Activo fijo y el Release fallaría).
+  const sinAlmacen = (l: NuevaLineaBc) => !!l.esActivo || (tiposItem.get(l.itemNo) ?? "inventario") !== "inventario";
   // UNIDAD de la línea. Si no se la mandamos, BC NO usa la unidad base: usa la
   // `Purch. Unit of Measure` del artículo. Comprobado en el Sandbox con M06-0009 (base
   // GR, compra EST): la misma línea, con y sin unidad en el POST, queda en EST. O sea
@@ -1200,7 +1244,7 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
   };
   // ¿La descripción la manda la APP o la ficha del artículo de BC? Solo los que no
   // son de inventario (servicio / no inventariable) llevan la de la app.
-  const descripcionPropia = (l: NuevaLineaBc) => !!(l.descripcion ?? "").trim() && sinAlmacen(l);
+  const descripcionPropia = (l: NuevaLineaBc) => !l.esActivo && !!(l.descripcion ?? "").trim() && sinAlmacen(l);
   const almacenDe = (l: NuevaLineaBc) => (sinAlmacen(l) ? "" : esConsumo(l) ? (l.locationCode || l.jobNo!) : (l.locationCode || locFallback));
   // Se resuelven ANTES de crear nada en BC: si a una línea de consumo le falta el
   // almacén de su obra, abortamos sin dejar un pedido a medias en BC (y NUNCA se cae a
@@ -1218,7 +1262,9 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
     const consumo = esConsumo(l);
     const locCode = almacenDe(l);
     const locId = locCode ? locIds.get(locCode) ?? null : null;
-    const lineBody: Record<string, unknown> = { lineType: "Item", lineObjectNumber: l.itemNo, quantity: l.cantidad };
+    // Un activo fijo va como línea tipo "Activo fijo" (enum purchaseLineType de BC) y
+    // su `lineObjectNumber` es el N.º del activo (AF-0001), no un artículo.
+    const lineBody: Record<string, unknown> = { lineType: l.esActivo ? "Fixed Asset" : "Item", lineObjectNumber: l.itemNo, quantity: l.cantidad };
     // La unidad va ANTES del precio a propósito: BC aplica las propiedades en el orden
     // del JSON y al validar la unidad recalcula el Direct Unit Cost de la línea. Si
     // fuera después, pisaría el precio negociado.

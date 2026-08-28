@@ -48,12 +48,15 @@ export async function aprobarYLanzar(
     // almacén, y una línea con obra pero sin tarea terminaba sin job y sin almacén
     // (caía en el almacén por defecto de BC).
     .map((l) => {
-      const consumo = !!(l.proyecto && l.taskNo);
+      const consumo = !!(l.proyecto && l.taskNo) && !l.esActivo;
       // Obra SIN tarea = material de obra que entra a inventario: va SIEMPRE al Almacén
       // General, nunca al almacén de la obra. (La línea de pedido guarda la obra en
       // `almacen`, y la app de proveeduría la copia tal cual a la orden; sin esto el
       // material se recibe en el almacén de la obra.)
       const materialABodega = !!l.proyecto && !l.taskNo;
+      // ACTIVO FIJO: la línea no es un artículo, es el activo (AF-0001). No lleva
+      // almacén (no entra a inventario) ni obra: en BC va como tipo "Activo fijo".
+      const esActivo = !!l.esActivo;
       // Almacén REAL de la línea: el que eligió el pedido (tag ALM / Stock: Almacén
       // General, Agregados, Herramienta…). Si viene el código de la OBRA (pedidos
       // viejos, donde la obra viajaba en el almacén) no sirve como almacén de
@@ -71,7 +74,8 @@ export async function aprobarYLanzar(
         jobTaskNo: consumo ? l.taskNo : undefined,
         // Consumo inmediato: el almacén de la OBRA (en BC tiene el mismo código que el
         // proyecto). BC lo exige en las líneas de artículo y no impide el consumo.
-        locationCode: consumo ? l.proyecto : (materialABodega ? (almacenReal || ALMACEN_GENERAL) : (almacenReal || undefined)),
+        locationCode: esActivo ? undefined : consumo ? l.proyecto : (materialABodega ? (almacenReal || ALMACEN_GENERAL) : (almacenReal || undefined)),
+        esActivo: esActivo || undefined,
       };
     });
   // Cargos de producto (Item Charge): TODAS las líneas tipo "cargo" con precio, cada

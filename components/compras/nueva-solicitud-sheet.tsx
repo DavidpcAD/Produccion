@@ -131,6 +131,7 @@ const TIPOS: { v: TipoSolicitud; label: string; destino: string }[] = [
   { v: "repuesto", label: "Repuesto", destino: "Máquina" },
   { v: "stock", label: "Stock", destino: "Almacén" },
   { v: "subcontrato", label: "Subcontrato", destino: "Obra" },
+  { v: "activo", label: "Activo fijo", destino: "Activo" },
 ];
 // TAG del pedido (chiquito, al lado del tipo): ALM = entra a inventario del almacén
 // REAL elegido · CD = consumo directo, no entra a inventario. Stock siempre es a un
@@ -865,12 +866,17 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // catálogo cargado (ej. BC no devolvió el catálogo completo). Así la plantilla
   // agrega sus líneas igual, usando la info que ella misma trae.
   const [extraArt, setExtraArt] = useState<Articulo[]>([]);
+  // ACTIVOS FIJOS (AF-0001…). Son otro catálogo de BC, no artículos, así que se cargan
+  // aparte y solo cuando se elige el tipo "Activo fijo". Se representan con la misma
+  // forma que un Articulo —con id = code = el N.º del activo— para que el resto de la
+  // pantalla (buscador, líneas, guardado) funcione sin ramificaciones.
+  const [bcActivos, setBcActivos] = useState<Articulo[] | null>(null);
   const catArticulos = useMemo(() => {
-    const base = bcArt ?? articulos;
+    const base = [...(bcArt ?? articulos), ...(bcActivos ?? [])];
     if (!extraArt.length) return base;
     const codes = new Set(base.map((a) => a.code));
     return [...base, ...extraArt.filter((e) => !codes.has(e.code))];
-  }, [bcArt, articulos, extraArt]);
+  }, [bcArt, articulos, extraArt, bcActivos]);
   const catObras = bcObras ?? obras;
   const catAlm = bcAlm ?? almacenes;
   // Proveedores (subcontratistas) desde BC. Solo hace falta en Subcontrato, así que
@@ -1000,7 +1006,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const [stockReady, setStockReady] = useState(false);
   // Con almacén (tag ALM o pedido de Stock) se muestran las columnas de existencias
   // del almacén ELEGIDO; en consumo directo no hay inventario que mirar.
-  const usaAlmacen = tipo === "stock" || (tipo !== "subcontrato" && destinoMat === "almacen");
+  const usaAlmacen = tipo === "stock" || (tipo !== "subcontrato" && tipo !== "activo" && destinoMat === "almacen");
   const verStock = usaAlmacen && !!almacenSel;
   useEffect(() => {
     if (!verStock) { setStockReady(false); setStockPorCode({}); return; }
@@ -1042,6 +1048,27 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     });
   }, [verStock, stockReady, stockPorCode, lineas, catArticulos, uomMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // El catálogo de activos se pide la primera vez que se elige el tipo "Activo fijo"
+  // (no en el montaje: es otro catálogo y la mayoría de los pedidos no lo usan).
+  useEffect(() => {
+    if (tipo !== "activo" || bcActivos) return;
+    let cancel = false;
+    fetch("/api/compras/bc/activos")
+      .then((r) => (r.ok ? r.json() : { activos: [] }))
+      .then((d) => {
+        if (cancel) return;
+        setBcActivos(((d.activos ?? []) as any[]).map((a) => ({
+          // id = code = el N.º del activo: es lo que se guarda en la línea y lo que
+          // viaja a BC como N.º de la línea tipo "Activo fijo".
+          id: a.no, code: a.no, descripcion: a.descripcion || a.no,
+          unidad: "UND", almacenDefault: a.clase ?? "", precioReferencia: 0,
+          tipo: "no-inventario" as Articulo["tipo"],
+        })));
+      })
+      .catch(() => { /* sin catálogo: el buscador queda vacío y no se puede pedir */ });
+    return () => { cancel = true; };
+  }, [tipo, bcActivos]);
+
   const tipoMeta = TIPOS.find((t) => t.v === tipo)!;
   const esMaterial = tipo === "material";
   const esRepuesto = tipo === "repuesto";
@@ -1049,8 +1076,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // SUBCONTRATO: servicio contratado contra la obra. El ingeniero arma la solicitud
   // Y la orden de compra (proveedor + montos), que nace pendiente de aprobación.
   const esSub = tipo === "subcontrato";
-  // Repuesto y Stock no llevan obra: una sola lista de materiales (grupo SOLO).
-  const sinObra = esRepuesto || esStock;
+  // ACTIVO FIJO: se compra un activo de BC (AF-0001). No lleva obra ni almacén —no
+  // entra a inventario ni se consume contra un proyecto— y no usa plantillas.
+  const esActivoTipo = tipo === "activo";
+  // Repuesto, Stock y Activo no llevan obra: una sola lista (grupo SOLO).
+  const sinObra = esRepuesto || esStock || esActivoTipo;
   // Consumo directo de material: se consume contra proyecto + tarea de la obra.
   const esConsumo = esMaterial && destinoMat === "consumo";
   // Las obras BLOQUEADAS en BC no se ofrecen: BC no les deja cargar material, así que
@@ -1097,7 +1127,13 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     const base = servicios.length ? servicios : catArticulos;
     return base.map((a) => ({ id: a.id, title: a.descripcion, sub: a.code }));
   }, [catArticulos]);
-  const itemsBuscador = esSub ? servicioItems : articuloItems;
+  // El buscador de un pedido de activos lista los ACTIVOS de BC con su clase
+  // (HERR / MAQ / VEH), que es como se reconocen en la lista de BC.
+  const activoItems: Item[] = useMemo(
+    () => (bcActivos ?? []).map((a) => ({ id: a.id, title: a.descripcion, sub: a.almacenDefault ? `${a.code} · ${a.almacenDefault}` : a.code })),
+    [bcActivos],
+  );
+  const itemsBuscador = esSub ? servicioItems : esActivoTipo ? activoItems : articuloItems;
   const provItems: Item[] = useMemo(() => catProv.map((p) => ({ id: p.id, title: p.nombre, sub: p.code })), [catProv]);
   const provSel = catProv.find((p) => p.id === proveedorId);
   const destinoNombre = destinoItems.find((d) => d.id === destino)?.title ?? "";
@@ -1125,6 +1161,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // Material: cada línea debe tener obra (su tarjeta debe tener obra elegida).
   // Repuesto: máquina. Stock: almacén.
   const destinoOk = (esMaterial || esSub) ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo))
+    // Un activo ES su propio destino: no hay obra, máquina ni almacén que elegir.
+    : esActivoTipo ? validLines.length > 0
     : esRepuesto ? !!destino : !!almacenSel;
   // Subcontrato: proveedor obligatorio (es quien va a facturar) y todas las líneas
   // con monto. Sin monto la orden no se puede lanzar a BC (línea sin precio).
@@ -1524,7 +1562,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         // tarea); con tag ALM o en Stock es el almacén elegido; en consumo directo de
         // REPUESTO va al almacén de MAQUINARIA (BC no puede dejar la línea fuera de
         // inventario sin proyecto+tarea, y el repuesto va contra una máquina).
-        const almacenLinea = esConsumo ? (l.obraCodigo || "") : usaAlmacen ? almacenSel : ALMACEN_MAQUINARIA;
+        // Un ACTIVO no lleva almacén: en BC la línea es tipo "Activo fijo" y el campo
+        // ni siquiera es editable (mandarlo haría fallar el lanzamiento).
+        const almacenLinea = esActivoTipo ? "" : esConsumo ? (l.obraCodigo || "") : usaAlmacen ? almacenSel : ALMACEN_MAQUINARIA;
         // Si se eligió variante, se guarda la descripción de la variante (más específica);
         // si no, la descripción base del material.
         // unidad: la que ELIGIÓ la persona (EST, PQT…), no la base del catálogo. Es lo
@@ -1727,7 +1767,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                   </div>
                 )}
 
-                {!esStock && !esSub && (
+                {!esStock && !esSub && !esActivoTipo && (
                   /* Sin <Field>: el DS le fija 370px de ancho y el almacén quedaba
                      angosto. Rótulo propio + fila (el tag y el almacén en la misma
                      línea, centrados por .row) a lo ancho del panel. */
@@ -1755,7 +1795,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                     </div>
                     <div style={{ flex: "1 1 220px", minWidth: 0 }}>{plantillaBtn}</div>
                   </div>
-                ) : esSub ? null : plantillaBtn}
+                ) : (esSub || esActivoTipo) ? null : plantillaBtn}
 
                 {(esMaterial || esSub) ? (
                   /* MATERIAL: una TARJETA por obra; adentro, sus materiales. */

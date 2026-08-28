@@ -114,6 +114,9 @@ function mapPedido(p: any, lineas: any[]): Pedido {
         obraCodigo: (l.obra ?? (obraVieja ? l.locationCode : null)) || undefined,
         variantCode: l.variantCode ?? undefined, cantidadOrdenada: Number(l.quantityOrdenado ?? 0), notas: l.notaCreador ?? undefined,
         taskNo: l.taskNo ?? undefined, taskDescr: l.taskDescr ?? undefined,
+        // Un pedido de ACTIVO solo lleva activos: la marca se deriva del tipo, así no
+        // hace falta una columna nueva en PedidoCompraDet.
+        esActivo: (p.tipoSolicitud ?? "material") === "activo" || undefined,
         devuelta: codigoDeId(l.idEstado) === "devuelto",
       };
     }),
@@ -346,7 +349,10 @@ export async function listOrdenes(): Promise<Orden[]> {
              -- mapPedido: en líneas viejas de material la obra viajaba en locationCode
              -- (la columna obra existía sin usarse) y de último cae a la del pedido.
              COALESCE(pd.obra, CASE WHEN ISNULL(pc.tipoSolicitud,'material') = 'material'
-                                    THEN COALESCE(NULLIF(pd.locationCode,''), pc.obra) END) AS obraOrigen
+                                    THEN COALESCE(NULLIF(pd.locationCode,''), pc.obra) END) AS obraOrigen,
+             -- Tipo del pedido origen: si es 'activo', la línea compra un ACTIVO FIJO y
+             -- en BC va como línea tipo "Activo fijo" (su itemNo es el N.º del activo).
+             pc.tipoSolicitud AS tipoSolicitudOrigen
       FROM dbo.OrdenCompraDet d
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
@@ -377,7 +383,10 @@ export async function getOrden(id: number): Promise<Orden | null> {
              -- mapPedido: en líneas viejas de material la obra viajaba en locationCode
              -- (la columna obra existía sin usarse) y de último cae a la del pedido.
              COALESCE(pd.obra, CASE WHEN ISNULL(pc.tipoSolicitud,'material') = 'material'
-                                    THEN COALESCE(NULLIF(pd.locationCode,''), pc.obra) END) AS obraOrigen
+                                    THEN COALESCE(NULLIF(pd.locationCode,''), pc.obra) END) AS obraOrigen,
+             -- Tipo del pedido origen: si es 'activo', la línea compra un ACTIVO FIJO y
+             -- en BC va como línea tipo "Activo fijo" (su itemNo es el N.º del activo).
+             pc.tipoSolicitud AS tipoSolicitudOrigen
       FROM dbo.OrdenCompraDet d
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
@@ -403,7 +412,9 @@ function mapOrden(o: any, lineas: any[]): Orden {
       // La variante se hereda del pedido si la orden no la trae (ver el COALESCE del
       // query): sin ella BC rechaza el lanzamiento.
       articuloId: l.itemNo ?? undefined, variantCode: (l.variantCodeEfectivo ?? l.variantCode) ?? undefined, pedidoLineaId: l.idPedidoCompraDet ? String(l.idPedidoCompraDet) : undefined,
-      pedidoNumero: l.pedidoNoOrigen ?? undefined, obra: l.obraOrigen ?? undefined, descripcion: l.descripcion ?? "", cantidad: Number(l.quantity ?? 0),
+      pedidoNumero: l.pedidoNoOrigen ?? undefined, obra: l.obraOrigen ?? undefined,
+      esActivo: l.tipoSolicitudOrigen === "activo" || undefined,
+      descripcion: l.descripcion ?? "", cantidad: Number(l.quantity ?? 0),
       unidad: l.unitOfMeasureCode ?? "", almacen: l.locationCode ?? "", precioUnitario: Number(l.directUnitCost ?? 0),
       ivaPct: Number(l.vatPct ?? 0), descuentoPct: Number(l.lineDiscountPct ?? 0) || undefined,
       proyecto: l.jobNo ?? undefined, taskNo: (l.taskNoEfectivo ?? l.taskNo) ?? undefined,

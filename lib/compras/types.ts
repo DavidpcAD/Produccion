@@ -23,7 +23,10 @@ export type LineType = "articulo" | "cargo"; // 'cargo' = flete / cargo de produ
 // stock = compra para bodega/inventario · subcontrato = servicio contratado contra
 // la obra (en BC no hay módulo de subcontratos: es un pedido de compra a un
 // proveedor, con proyecto + tarea, que el ingeniero arma completo).
-export type TipoSolicitud = "material" | "repuesto" | "stock" | "subcontrato";
+// 'activo' = compra de un ACTIVO FIJO de BC (AF-0001…): no entra a inventario ni se
+// consume contra una obra; en BC la línea es de tipo "Activo fijo" y su N.º es el del
+// activo, no un artículo.
+export type TipoSolicitud = "material" | "repuesto" | "stock" | "subcontrato" | "activo";
 // Destino del material/repuesto pedido (el "tag" ALM/CD del pedido):
 //   'almacen' → entra a inventario de un almacén REAL elegido (ALM-GRAL, F-AGREGADO, …)
 //   'consumo' → consumo directo: no entra a inventario (material: contra obra + tarea)
@@ -122,6 +125,9 @@ export interface PedidoLinea {
   taskDescr?: string;       // descripción de la tarea (para mostrar / BC)
   cantidadOrdenada: number; // cuánto de esta línea ya pasó a una orden
   notas?: string;
+  /** La línea compra un ACTIVO FIJO: `articuloId` es el N.º del activo (AF-0001) y
+   *  no un artículo del catálogo. Se deriva del tipo del pedido, no se persiste. */
+  esActivo?: boolean;
   /** Proveeduría la devolvió a Ingeniería para corregir (ej. código de material
    *  equivocado), sin tocar las demás líneas del pedido. Solo puede pasar en una
    *  línea sin nada ordenado (cantidadOrdenada = 0): si ya tiene orden de compra
@@ -170,6 +176,9 @@ export interface OrdenLinea {
    *  persiste; la resuelve el join de repo.listOrdenes/getOrden). En consumo
    *  directo la obra además viaja como `proyecto` (Job No. de BC). */
   obra?: string;
+  /** La línea compra un ACTIVO FIJO (`articuloId` = AF-0001). Igual que `obra`, se
+   *  hereda del pedido origen en el join; a BC va como línea tipo "Activo fijo". */
+  esActivo?: boolean;
   descripcion: string;
   cantidad: number;
   unidad: string;

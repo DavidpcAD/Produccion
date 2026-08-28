@@ -102,7 +102,8 @@ export default function ArmarOrdenPage() {
         if (l) {
           const consumo = p.tipoSolicitud === "material" && !!l.taskNo;
           info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", descripcion: l.descripcion, unidad: l.unidad,
-            almacen: consumo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
+            // Un ACTIVO FIJO no lleva almacén (no entra a inventario): no cae al General.
+            almacen: p.tipoSolicitud === "activo" ? "" : consumo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
             proyecto: consumo ? obraDeLinea(l, p) : "", tarea: l.taskNo ?? "" };
           break;
         }
@@ -186,7 +187,7 @@ export default function ArmarOrdenPage() {
       descripcion: l.descripcion, unidad: l.unidad,
       // Mismo criterio que arriba: con tarea → proyecto + tarea (almacén de la obra);
       // sin tarea → el almacén elegido en el pedido, o el General si no trae.
-      almacen: p.tipoSolicitud === "material" && l.taskNo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
+      almacen: p.tipoSolicitud === "activo" ? "" : p.tipoSolicitud === "material" && l.taskNo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
       cantidad: String(pend), precio: String(hist || 0), iva: "13", descuento: "0",
       proyecto: p.tipoSolicitud === "material" && l.taskNo ? obraDeLinea(l, p) : "", tarea: l.taskNo ?? "",
     }]);
