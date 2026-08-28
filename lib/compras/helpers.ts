@@ -526,8 +526,11 @@ export function ordenMaquinas(o: Orden, pedidos: Pedido[]): string[] {
 // Devoluciones pendientes para un rol (misma lógica que DevolucionesView): solicitudes
 // devueltas (pedido "devuelto" o con líneas puntuales devueltas) + órdenes rechazadas
 // por Aprobación ("rechazado").
-export function devolucionesCount(role: Role, pedidos: Pedido[], ordenes: Orden[]): number {
-  const solic = (role === "ingenieria" || role === "proveeduria") ? pedidos.filter((p) => pedidoTieneDevolucion(p)).length : 0;
+export function devolucionesCount(role: Role, pedidos: Pedido[], ordenes: Orden[], me?: Sesion): number {
+  // El badge tiene que contar lo MISMO que muestra la bandeja: al ingeniero solo sus
+  // solicitudes devueltas (si no, decía "2" y adentro veía una o ninguna).
+  const mias = (p: Pedido) => role !== "ingenieria" || veTodoEnCompras(me ?? null) || pedidoEsDelUsuario(p, me ?? null);
+  const solic = (role === "ingenieria" || role === "proveeduria") ? pedidos.filter((p) => pedidoTieneDevolucion(p) && mias(p)).length : 0;
   const ords = (role === "proveeduria" || role === "aprobacion" || role === "facturacion") ? ordenes.filter((o) => o.estado === "rechazado").length : 0;
   return solic + ords;
 }

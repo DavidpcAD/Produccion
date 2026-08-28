@@ -74,7 +74,6 @@ const ROLE_META: Record<Role, { label: string; persona: string; home: string; na
 
 export function AppShell({ role, children }: { role: Role; children: React.ReactNode }) {
   const { role: current, setRole, usuario, setUsuario, hydrated, pedidos, ordenes, errorCarga, reintentarCarga, cargando } = useStore();
-  const devolCount = devolucionesCount(role, pedidos, ordenes);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -82,6 +81,8 @@ export function AppShell({ role, children }: { role: Role; children: React.React
   // (sesión JWT + roles). En vez de rebotar al login propio de OC, ADOPTAMOS el rol que
   // pide la página actual y tomamos el nombre de usuario de la sesión de la base.
   const baseSession = useSession();
+  // El badge cuenta lo mismo que muestra la bandeja (al ingeniero, solo lo suyo).
+  const devolCount = devolucionesCount(role, pedidos, ordenes, baseSession);
   useEffect(() => {
     if (!hydrated) return;
     if (current !== role) setRole(role);

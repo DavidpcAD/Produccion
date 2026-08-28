@@ -7,7 +7,8 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, formatDate, numeroOrden, pedidoTieneDevolucion } from "@/lib/compras/helpers";
+import { useSession } from "@/hooks/useSession";
+import { destinoLabel, formatDate, numeroOrden, pedidoEsDelUsuario, pedidoTieneDevolucion, veTodoEnCompras } from "@/lib/compras/helpers";
 import type { Role } from "@/lib/compras/types";
 
 type Dev = { id: string; tipo: "Solicitud" | "Orden"; numero: string; contra: string; motivo: string; fecha: string; href: string };
@@ -19,6 +20,7 @@ type Dev = { id: string; tipo: "Solicitud" | "Orden"; numero: string; contra: st
 // Cada rol ve las que le competen y entra a corregirlas.
 export function DevolucionesView({ role }: { role: Role }) {
   const { pedidos, ordenes } = useStore();
+  const me = useSession();
   const router = useRouter();
 
   const items = useMemo<Dev[]>(() => {
@@ -26,7 +28,14 @@ export function DevolucionesView({ role }: { role: Role }) {
     const verSolicitudes = role === "ingenieria" || role === "proveeduria";
     const verOrdenes = role === "proveeduria" || role === "aprobacion" || role === "facturacion";
     if (verSolicitudes) {
-      for (const p of pedidos.filter((p) => pedidoTieneDevolucion(p))) {
+      // El ingeniero ve SOLO las devoluciones de SUS solicitudes: la devolución es
+      // "corregí esto y reenvialo", y solo la puede corregir quien la pidió (mismo
+      // criterio que su lista de solicitudes). Proveeduría sí las ve todas: es quien
+      // las devolvió. El Super Admin también, para poder revisar.
+      // Mientras la sesión carga (me === null) no se muestra ninguna.
+      const mias = (p: Parameters<typeof pedidoEsDelUsuario>[0]) =>
+        role !== "ingenieria" || veTodoEnCompras(me) || pedidoEsDelUsuario(p, me);
+      for (const p of pedidos.filter((p) => pedidoTieneDevolucion(p) && mias(p))) {
         const lineasDevueltas = p.lineas.filter((l) => l.devuelta);
         out.push({
           id: p.id, tipo: "Solicitud", numero: p.numero, contra: destinoLabel(p),
@@ -47,7 +56,7 @@ export function DevolucionesView({ role }: { role: Role }) {
       }
     }
     return out;
-  }, [pedidos, ordenes, role]);
+  }, [pedidos, ordenes, role, me]);
 
   const columns = useMemo<ColumnDef<Dev, any>[]>(() => [
     { id: "tipo", header: "Tipo", accessorFn: (d) => d.tipo, meta: { label: "Tipo" }, cell: (c) => <Badge tone={c.getValue() === "Orden" ? "red" : "yellow"}>{c.getValue()}</Badge> },
