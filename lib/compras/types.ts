@@ -124,6 +124,11 @@ export interface PedidoLinea {
   taskNo?: string;          // N.º tarea proyecto (Job Task) — consumo inmediato
   taskDescr?: string;       // descripción de la tarea (para mostrar / BC)
   cantidadOrdenada: number; // cuánto de esta línea ya pasó a una orden
+  /** ¿Una orden de compra referencia esta línea? Es la verdad (la FK de
+   *  OrdenCompraDet), y NO siempre coincide con cantidadOrdenada > 0: hay líneas con
+   *  0 ordenado que sí están en una orden. Si está en una orden, no se puede borrar,
+   *  reemplazar ni devolver. Lo resuelve el repo al leer. */
+  enOrden?: boolean;
   notas?: string;
   /** La línea compra un ACTIVO FIJO: `articuloId` es el N.º del activo (AF-0001) y
    *  no un artículo del catálogo. Se deriva del tipo del pedido, no se persiste. */

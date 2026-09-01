@@ -27,11 +27,13 @@ export default function PedidoDetallePage() {
   }
   const b = pedidoBadge(pedido.estado);
   const t = tipoSolicitudBadge(pedido.tipoSolicitud);
-  const ordenado = pedido.lineas.some((l) => l.cantidadOrdenada > 0);
+  const ordenado = pedido.lineas.some((l) => l.cantidadOrdenada > 0 || l.enOrden);
   // Proveeduría devolvió alguna línea puntual para corregir (código de material
   // equivocado, etc.): el resto del pedido sigue su curso normal, así que el pedido
   // puede estar "aprobado" (no "devuelto") y aun así tener algo para editar.
   const hayLineasDevueltas = pedido.lineas.some((l) => l.devuelta);
+  // Devueltas que NO se pueden corregir porque una orden ya las referencia.
+  const lineasDevueltasTrabadas = pedido.lineas.filter((l) => l.devuelta && l.enOrden);
   // SUBCONTRATO: el proveedor y los montos viven en la orden que se creó junto con la
   // solicitud (la tabla del pedido no tiene precio).
   const esSub = esSubcontrato(pedido);
@@ -71,7 +73,7 @@ export default function PedidoDetallePage() {
   // "Editar" sigue siendo ESTE pedido: las líneas con orden de compra quedan
   // bloqueadas (el repo las preserva tal cual) y no se ofrecen para editar; solo
   // entran las que faltan por ordenar (pendientes o devueltas por Proveeduría).
-  const seedEdicion: NuevaSolicitudSeed = { ...seedBase, lineas: pedido.lineas.filter((l) => l.cantidadOrdenada === 0).map(lineaASeed) };
+  const seedEdicion: NuevaSolicitudSeed = { ...seedBase, lineas: pedido.lineas.filter((l) => l.cantidadOrdenada === 0 && !l.enOrden).map(lineaASeed) };
 
   return (
     <AppShell role="ingenieria">
@@ -150,6 +152,17 @@ export default function PedidoDetallePage() {
           <Card flat className="mt-2" style={{ background: "color-mix(in srgb, var(--ds-color-red-100) 10%, var(--ds-tint-base))" }}>
             <span className="ds-label ds-muted">Proveeduría devolvió {pedido.lineas.filter((l) => l.devuelta).length} línea(s) para corregir</span>
             <p style={{ margin: "4px 0 0" }}>Revisá el motivo en el historial y corregilas con “Corregir línea(s) devuelta(s)”.</p>
+            {/* Una línea devuelta que ADEMÁS quedó metida en una orden no se puede
+                corregir acá: la orden la referencia. Sin este aviso el editor se abría
+                sin esa línea y no se entendía por qué. */}
+            {lineasDevueltasTrabadas.length > 0 && (
+              <p className="ds-body-sm" style={{ margin: "6px 0 0" }}>
+                <span className="ds-strong">{lineasDevueltasTrabadas.map((l) => l.descripcion).join(", ")}</span>
+                {lineasDevueltasTrabadas.length === 1 ? " ya está" : " ya están"} en una orden de compra, así que no
+                {lineasDevueltasTrabadas.length === 1 ? " aparece" : " aparecen"} en el editor. Pedile a Proveeduría que
+                {lineasDevueltasTrabadas.length === 1 ? " la quite" : " las quite"} de la orden y volvé a intentar.
+              </p>
+            )}
           </Card>
         )}
 

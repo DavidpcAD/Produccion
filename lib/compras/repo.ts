@@ -75,7 +75,12 @@ export async function listPedidos(): Promise<Pedido[]> {
   await ensureEstados();
   const pool = await getPool();
   const h = await pool.request().query("SELECT * FROM dbo.PedidoCompra WHERE esEliminada = 0 ORDER BY idPedidoCompra DESC");
-  const d = await pool.request().query("SELECT * FROM dbo.PedidoCompraDet ORDER BY idPedidoCompraDet");
+  // `enOrden` es la verdad de "esta línea ya está en una orden": la FK de
+  // OrdenCompraDet. NO alcanza con quantityOrdenado, que solo se incrementa al crear
+  // la orden desde ESTA app y quedó en 0 en líneas que sí tienen orden (4 casos en
+  // AdelantePRO al 28/08/2026) — de ahí el "DELETE conflicted with the REFERENCE
+  // constraint" al corregir una devolución (PED-000023).
+  const d = await pool.request().query(`SELECT d.*, (CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet o WHERE o.idPedidoCompraDet = d.idPedidoCompraDet) THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d ORDER BY d.idPedidoCompraDet`);
   return h.recordset.map((p) => mapPedido(p, d.recordset.filter((x) => x.idPedidoCompra === p.idPedidoCompra)));
 }
 
@@ -84,7 +89,7 @@ export async function getPedido(id: number): Promise<Pedido | null> {
   const pool = await getPool();
   const h = await pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.PedidoCompra WHERE idPedidoCompra=@id");
   if (!h.recordset.length) return null;
-  const d = await pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@id ORDER BY idPedidoCompraDet");
+  const d = await pool.request().input("id", sql.Int, id).query(`SELECT d.*, (CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet o WHERE o.idPedidoCompraDet = d.idPedidoCompraDet) THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d WHERE d.idPedidoCompra=@id ORDER BY d.idPedidoCompraDet`);
   return mapPedido(h.recordset[0], d.recordset);
 }
 
@@ -117,6 +122,7 @@ function mapPedido(p: any, lineas: any[]): Pedido {
         // Un pedido de ACTIVO solo lleva activos: la marca se deriva del tipo, así no
         // hace falta una columna nueva en PedidoCompraDet.
         esActivo: (p.tipoSolicitud ?? "material") === "activo" || undefined,
+        enOrden: Number(l.enOrden ?? 0) === 1 || undefined,
         devuelta: codigoDeId(l.idEstado) === "devuelto",
       };
     }),
@@ -224,7 +230,13 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
 
     // Reemplazar SOLO las líneas sin ordenar (las que ya tienen orden de compra se
     // preservan tal cual, sin que las órdenes que las referencian se rompan).
-    await new sql.Request(tx).input("id", sql.Int, input.id).query("DELETE FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@id AND quantityOrdenado=0");
+    // El guard REAL es la FK, no quantityOrdenado: hay líneas con 0 ordenado que sí
+    // están en una orden, y borrarlas rompía el guardado entero con
+    // "The DELETE statement conflicted with the REFERENCE constraint".
+    await new sql.Request(tx).input("id", sql.Int, input.id).query(
+      `DELETE FROM dbo.PedidoCompraDet
+        WHERE idPedidoCompra=@id AND quantityOrdenado=0
+          AND NOT EXISTS (SELECT 1 FROM dbo.OrdenCompraDet o WHERE o.idPedidoCompraDet = dbo.PedidoCompraDet.idPedidoCompraDet)`);
     let line = Number(row.maxLineNum ?? 0) + 10000;
     for (const l of input.lineas) {
       await new sql.Request(tx)
@@ -266,11 +278,15 @@ export async function devolverLineasPedido(id: number, lineaIds: number[], motiv
     const pedidoNo = head.recordset[0].pedidoNo as string;
 
     const todas = await new sql.Request(tx).input("id", sql.Int, id).query(
-      "SELECT idPedidoCompraDet, descripcion, quantityOrdenado FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@id"
+      `SELECT d.idPedidoCompraDet, d.descripcion, d.quantityOrdenado, (CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet o WHERE o.idPedidoCompraDet = d.idPedidoCompraDet) THEN 1 ELSE 0 END) AS enOrden
+         FROM dbo.PedidoCompraDet d WHERE d.idPedidoCompra=@id`
     );
     const elegidas = todas.recordset.filter((r: any) => lineaIds.includes(r.idPedidoCompraDet));
     if (!elegidas.length) throw new Error("Elegí al menos una línea para devolver.");
-    if (elegidas.some((r: any) => Number(r.quantityOrdenado) > 0)) throw new Error("Esa línea ya tiene orden de compra; no se puede devolver.");
+    // Mismo criterio que el borrado: una línea que YA está en una orden no se devuelve
+    // (devolverla dejaba al ingeniero con una corrección que no se puede guardar).
+    if (elegidas.some((r: any) => Number(r.quantityOrdenado) > 0 || Number(r.enOrden ?? 0) === 1))
+      throw new Error("Esa línea ya está en una orden de compra; no se puede devolver. Quitala de la orden primero.");
 
     for (const r of elegidas) {
       await new sql.Request(tx)
