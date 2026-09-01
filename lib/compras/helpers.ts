@@ -1,5 +1,5 @@
 import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
-import { recibeSoloLoSuyo } from "../permissions";
+import { almacenesQueRecibe } from "../permissions";
 
 // Almacén de inventario por defecto (el General). El pedido puede elegir OTRO
 // almacén real (Agregados, Herramienta, Maquinaria…): eso viaja en `almacen` de la
@@ -196,14 +196,14 @@ export function veTodoEnCompras(me: Sesion): boolean {
   return me.modules?.length ? me.modules.includes('admin') : (me.nivelAdmin ?? 0) >= 4;
 }
 
-/** ¿Ve SOLO su material en la recepción? Fábrica de Maderas es un satélite: pide su
- *  material y recibe únicamente las órdenes que salieron de sus propias solicitudes.
- *  Bodega (la bodega central), Ingeniería y Super Admin reciben TODO — si no, el
- *  material de los ingenieros no lo podría recibir nadie. */
-export function soloRecibeLoSuyo(me: Sesion): boolean {
+/** Almacenes en los que recibe este usuario, o `null` si recibe TODO lo que llega.
+ *  Fábrica de Maderas es un satélite: recibe lo que entra a SUS bodegas. Bodega (la
+ *  bodega central), Ingeniería y Super Admin reciben TODO — si no, el material de los
+ *  ingenieros no lo podría recibir nadie. */
+export function almacenesDeRecepcion(me: Sesion): string[] | null {
   const m = me?.modules ?? [];
-  if (m.includes('ingenieria') || m.includes('admin')) return false;
-  return recibeSoloLoSuyo(me?.roleNames);
+  if (m.includes('ingenieria') || m.includes('admin')) return null;
+  return almacenesQueRecibe(me?.roleNames);
 }
 
 /** ¿Este pedido lo creó el usuario de la sesión? `creadoPorId` es el id estable
@@ -228,6 +228,30 @@ export function ordenesDeMisPedidos(ordenes: Orden[], pedidos: Pedido[], me: Ses
   return ordenes.filter((o) => o.lineas.some((l) =>
     (l.pedidoLineaId && lineasMias.has(l.pedidoLineaId)) || (l.pedidoNumero && numerosMios.has(l.pedidoNumero)),
   ));
+}
+
+/**
+ * Lo que le toca RECIBIR a este usuario. Quien recibe todo (bodega central,
+ * ingeniería, Super Admin) ve las órdenes tal cual. Una fábrica satélite ve las
+ * órdenes cuyo material entra a alguno de SUS almacenes —la haya pedido quien la
+ * haya pedido, incluso si es una compra directa sin solicitud— más las que salieron
+ * de sus propias solicitudes, que ya venía viendo.
+ *
+ * El filtro era antes SOLO "las órdenes de mis solicitudes", y ese fue el reporte de
+ * Fábrica de Maderas del 01/09/2026 ("cuando busco la factura no me sale, solo me
+ * salen las que yo pedí"): en AdelantePRO hay 21 órdenes con material a
+ * F-MADERAS / F-MAD-NUE y 13 las pidió otra persona (o no tienen solicitud), así que
+ * no le aparecían para facturar — CP-000097 entre ellas, con tres facturas ya
+ * registradas contra ella. El almacén es el dato correcto: el material llega a la
+ * fábrica, no a quien lo escribió.
+ */
+export function ordenesQueRecibe(ordenes: Orden[], pedidos: Pedido[], me: Sesion): Orden[] {
+  const almacenes = almacenesDeRecepcion(me);
+  if (!almacenes) return ordenes;
+  const mios = new Set(almacenes.map((a) => a.trim().toUpperCase()));
+  const deMisPedidos = new Set(ordenesDeMisPedidos(ordenes, pedidos, me).map((o) => o.id));
+  return ordenes.filter((o) => deMisPedidos.has(o.id)
+    || o.lineas.some((l) => mios.has((l.almacen ?? "").trim().toUpperCase())));
 }
 
 /**

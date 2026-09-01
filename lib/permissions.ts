@@ -149,25 +149,40 @@ export function moduloPublicado(m: Modulo): boolean {
 
 const norm = (s?: string) => (s ?? '').trim().toLowerCase();
 
+/** Roles "satélite": una fábrica que pide su material y recibe SOLO lo que entra a
+ *  SUS bodegas. La bodega central, en cambio, recibe todo lo que llega.
+ *  Los códigos son los de la tabla Location de BC. Ojo con Maderas: son DOS bodegas
+ *  de la misma fábrica —F-MADERAS ("Fabrica Maderas") y F-MAD-NUE ("Fabrica Maderas
+ *  Nuevas")—, y en producción llega material a las dos. */
+const ALMACENES_DE_FABRICA: { rol: RegExp; almacenes: string[] }[] = [
+  { rol: /^fabrica.*madera/, almacenes: ['F-MADERAS', 'F-MAD-NUE'] },
+];
+
+/** Almacenes en los que recibe este usuario, o `null` si recibe TODO lo que llega.
+ *  Se decide por el NOMBRE del rol y no por el módulo, porque Bodega y Fábrica de
+ *  Maderas llevan los mismos módulos y se diferencian justo en esto.
+ *  Una fábrica que todavía no esté en el mapa de arriba cae en `null` (recibe todo),
+ *  que es exactamente lo que hace hoy: acá no se le quita acceso a nadie. */
+export function almacenesQueRecibe(roleNames?: string[]): string[] | null {
+  const codigos = new Set<string>();
+  for (const r of roleNames ?? []) {
+    const n = norm(r);
+    for (const f of ALMACENES_DE_FABRICA) if (f.rol.test(n)) f.almacenes.forEach((a) => codigos.add(a));
+  }
+  return codigos.size ? [...codigos] : null;
+}
+
+/** ¿Es el rol de una fábrica satélite? (Fábrica de Maderas, hoy la única). */
+function esFabricaMaderas(n: string): boolean {
+  return n.startsWith('fabrica') && n.includes('madera');
+}
+
 /**
  * Módulos de un rol de Producción, según su NOMBRE y su TIPO (dbo.TipoRol).
  * Los roles de Producción (idApp 10) comparten nombre (Administracion ×3,
  * Ingenieria ×3) y se distinguen por el tipo — igual que en la pantalla de roles.
  * '*' = todo · undefined = no es rol de Producción (no cuenta).
  */
-/** Roles "satélite" que piden su material y reciben SOLO lo suyo (hoy: Fábrica de
- *  Maderas). La bodega central, en cambio, recibe todo lo que llega. */
-function esFabricaMaderas(n: string): boolean {
-  return n.startsWith('fabrica') && n.includes('madera');
-}
-
-/** ¿Este usuario, en la recepción, ve solo el material de sus propias solicitudes?
- *  Se decide por el NOMBRE del rol y no por el módulo, porque Bodega y Fábrica de
- *  Maderas llevan los mismos módulos y se diferencian justo en esto. */
-export function recibeSoloLoSuyo(roleNames?: string[]): boolean {
-  return (roleNames ?? []).some((r) => esFabricaMaderas(norm(r)));
-}
-
 function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefined {
   const n = norm(nombre), t = norm(tipo);
   // Super Admin (por nombre o por tipo de "Administracion")
@@ -196,7 +211,7 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   // Nada más: no entra a proveeduría, aprobación ni a las herramientas del ingeniero.
   if (n === 'bodega') return ['bodega', 'recepcion'];
   // Fábrica de Maderas: igual que Bodega —pide y recibe—, pero es un satélite: solo
-  // ve el material de SUS propias solicitudes (ver recibeSoloLoSuyo).
+  // recibe el material que entra a SUS bodegas (ver almacenesQueRecibe).
   if (esFabricaMaderas(n)) return ['bodega', 'recepcion'];
   // Legacy / nombres explícitos
   if (n.startsWith('digitacion') || n.startsWith('digitación') || n === 'digitador') return ['concreto'];

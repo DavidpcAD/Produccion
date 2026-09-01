@@ -7,7 +7,7 @@ import { Button, Card, Tile } from "@/components/compras/ui";
 import { OrdenesLista } from "@/components/compras/ordenes-lista";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { ordenEsParcial, ordenesDeMisPedidos, soloRecibeLoSuyo } from "@/lib/compras/helpers";
+import { almacenesDeRecepcion, ordenEsParcial, ordenesQueRecibe } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 type Filtro = "porRecibir" | "parcial" | "completado" | "todas";
@@ -19,13 +19,11 @@ export default function FacturacionPage() {
   const [filtro, setFiltro] = useState<Filtro>("porRecibir");
   const listaRef = useRef<HTMLDivElement>(null);
 
-  // Fábrica de Maderas recibe SOLO su material: se ven únicamente las órdenes que
-  // salieron de sus propias solicitudes. Ingeniería y Super Admin ven todas.
-  const soloMias = soloRecibeLoSuyo(me);
-  const ordenes = useMemo(
-    () => (soloMias ? ordenesDeMisPedidos(ordenesAll, pedidos, me) : ordenesAll),
-    [soloMias, ordenesAll, pedidos, me],
-  );
+  // Fábrica de Maderas recibe SOLO su material: las órdenes cuyo material entra a sus
+  // bodegas (F-MADERAS / F-MAD-NUE), las pida quien las pida, más las de sus propias
+  // solicitudes. Bodega central, Ingeniería y Super Admin ven todas.
+  const soloSuFabrica = almacenesDeRecepcion(me) !== null;
+  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, pedidos, me), [ordenesAll, pedidos, me]);
 
   // Lo que le toca a bodega: lo que está por llegar y lo que ya se recibió. Las
   // órdenes que siguen en proveeduría o en aprobación no se listan acá.
@@ -70,7 +68,7 @@ export default function FacturacionPage() {
         <div className="page__head">
           <div className="page__title">
             <h1 className="ds-heading">Órdenes por recibir</h1>
-            <p className="ds-muted">Registrá la factura cuando el material llega a bodega. Soporta entregas parciales. Tocá un panel para filtrar.{soloMias ? " Acá salen solo las órdenes de tus solicitudes." : ""}</p>
+            <p className="ds-muted">Registrá la factura cuando el material llega a bodega. Soporta entregas parciales. Tocá un panel para filtrar.{soloSuFabrica ? " Acá salen las órdenes que traen material a tu fábrica y las de tus solicitudes." : ""}</p>
           </div>
         </div>
 
@@ -89,8 +87,8 @@ export default function FacturacionPage() {
         {/* Sin nada por recibir: el pie que manda a "Todas las órdenes" NO se muestra a
             quien solo ve lo suyo — esa pestaña es de contabilidad y no la tiene. */}
         {filtro === "porRecibir" && porRecibir.length === 0 ? (
-          <Card><div className="empty" style={{ lineHeight: 1.6 }}>No hay órdenes pendientes de recibir.<br />{soloMias
-            ? <span className="ds-muted ds-body-sm">Acá aparecen las órdenes que proveeduría arma con <strong>tus solicitudes</strong>, cuando quedan lanzadas.</span>
+          <Card><div className="empty" style={{ lineHeight: 1.6 }}>No hay órdenes pendientes de recibir.<br />{soloSuFabrica
+            ? <span className="ds-muted ds-body-sm">Acá aparecen las órdenes que traen material a <strong>tu fábrica</strong> —las haya pedido quien las haya pedido— y las que salen de <strong>tus solicitudes</strong>, cuando quedan lanzadas.</span>
             : <span className="ds-muted ds-body-sm">Para ver todas las órdenes y sus facturas, abrí la pestaña <strong>“Recibidas”</strong> arriba.</span>}</div></Card>
         ) : (
           <OrdenesLista key={filtro} ordenes={lista} hrefDetalle={hrefDetalle} acciones={acciones} vacio="No hay órdenes en esta categoría." />

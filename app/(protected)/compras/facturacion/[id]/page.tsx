@@ -9,7 +9,7 @@ import { IconWarning } from "@/components/compras/icons";
 import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { money, cantidadEntreUnidades, distribuirCargo, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesDeMisPedidos, soloRecibeLoSuyo, todayISO, type UnidadItem } from "@/lib/compras/helpers";
+import { money, cantidadEntreUnidades, distribuirCargo, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesQueRecibe, todayISO, type UnidadItem } from "@/lib/compras/helpers";
 import type { MotivoNC, Orden } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
@@ -45,13 +45,10 @@ export default function RegistrarFacturaPage() {
   const toast = useToast();
   const { ordenes: ordenesAll, pedidos, proveedores, registrarRecepcion, marcarNotasCredito, cargando } = useStore();
   const me = useSession();
-  // Fábrica de Maderas recibe SOLO su material: una orden que no salió de una de sus
-  // solicitudes no existe para ella, tampoco escribiendo la URL a mano.
-  const soloMias = soloRecibeLoSuyo(me);
-  const ordenes = useMemo(
-    () => (soloMias ? ordenesDeMisPedidos(ordenesAll, pedidos, me) : ordenesAll),
-    [soloMias, ordenesAll, pedidos, me],
-  );
+  // Fábrica de Maderas recibe SOLO su material: una orden que no trae material a sus
+  // bodegas ni salió de una de sus solicitudes no existe para ella, tampoco
+  // escribiendo la URL a mano.
+  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, pedidos, me), [ordenesAll, pedidos, me]);
 
   const orden = ordenes.find((o) => o.id === id);
 
