@@ -213,28 +213,57 @@ export function pedidoEsDelUsuario(p: Pick<Pedido, "creadoPorId" | "solicitante"
   return (!!me.username && p.creadoPorId === me.username) || (!!me.nombre && p.solicitante === me.nombre);
 }
 
+/** Órdenes que salieron de los pedidos de este usuario. El enlace pedido↔orden vive
+ *  a nivel de LÍNEA (`pedidoLineaId`); `pedidoNumero` se usa de respaldo. */
+export function ordenesDeMisPedidos(ordenes: Orden[], pedidos: Pedido[], me: Sesion): Orden[] {
+  const lineasMias = new Set<string>();
+  const numerosMios = new Set<string>();
+  for (const p of pedidos) {
+    if (!pedidoEsDelUsuario(p, me)) continue;
+    numerosMios.add(p.numero);
+    for (const l of p.lineas) lineasMias.add(l.id);
+  }
+  if (!lineasMias.size && !numerosMios.size) return [];
+  return ordenes.filter((o) => o.lineas.some((l) =>
+    (l.pedidoLineaId && lineasMias.has(l.pedidoLineaId)) || (l.pedidoNumero && numerosMios.has(l.pedidoNumero)),
+  ));
+}
+
+/** ¿Esta orden trae material de la fábrica? Cuenta el ALMACÉN de la línea Y TAMBIÉN
+ *  la OBRA: el código de la fábrica se usa de las dos formas —F-MAD-NUE es a la vez
+ *  una bodega de BC y una "obra"— y hay material pedido PARA la fábrica que entra al
+ *  Almacén General, así que la orden queda en ALM-GRAL y mirando solo el almacén no
+ *  aparecía (CP-005229, de PED-000049, ya facturada; al 01/09/2026 es el único caso,
+ *  y el diagnóstico de scripts/ lo vigila). */
+function ordenEsDeLaFabrica(o: Orden, codigos: Set<string>): boolean {
+  const es = (v?: string) => codigos.has((v ?? "").trim().toUpperCase());
+  return o.lineas.some((l) => es(l.almacen) || es(l.obra));
+}
+
+/** Qué subconjunto de órdenes está viendo la persona en las pantallas de recepción. */
+export type AlcanceRecepcion = "todas" | "fabrica" | "mias";
+
 /**
- * Lo que le toca RECIBIR a este usuario. Quien recibe todo (bodega central,
- * ingeniería, Super Admin) ve las órdenes tal cual. Una fábrica satélite ve
- * EXACTAMENTE las órdenes cuyo material entra a alguno de SUS almacenes: la haya
- * pedido quien la haya pedido, incluso si es una compra directa sin solicitud.
+ * Órdenes de una vista de recepción, según el alcance elegido.
  *
- * Quién escribió la solicitud no sirve para esto, y se probó en las dos direcciones
- * contra AdelantePRO con la Fábrica de Maderas:
- *  · se queda CORTO — en Maderas piden varias personas (alessandra, bryana, anabg) y
- *    hay compra directa: 12 órdenes con material a la fábrica no le aparecían para
- *    facturar, CP-000097 entre ellas con tres facturas ya registradas;
- *  · y se pasa — la misma persona digita solicitudes de OTRAS fábricas, así que le
- *    salían 12 órdenes a F-AGREGADO / F-METALES / ALM-SSO que ella no recibe.
- * Con el almacén solo, quedan las 20 que son de verdad suyas. No se pierde nada por
- * el camino: no hay una sola línea cuyo pedido pidiera Maderas y cuya orden acabara
- * en otro almacén (verificado 01/09/2026).
+ * Historia corta de por qué esto es una ELECCIÓN y no una regla fija (01/09/2026):
+ * la Fábrica de Maderas estaba encerrada en "las órdenes de mis solicitudes", y ese
+ * criterio falla en las dos direcciones — en la fábrica piden varias personas
+ * (alessandra, bryana, anabg) y además hay compra directa, así que se le escondían
+ * 12 órdenes con material suyo; y la misma persona digita solicitudes de OTRAS
+ * fábricas, así que se le mostraban 12 que no recibe. Acotar por bodega arregla las
+ * dos, pero tampoco alcanza: "me llegan facturas que tengo que registrar que no me
+ * salen", así que lo que pidieron ella y Bryan fue poder ver TODAS. De ahí el
+ * selector: `todas` por defecto, y `fabrica` / `mias` para acotar cuando conviene.
  */
-export function ordenesQueRecibe(ordenes: Orden[], me: Sesion): Orden[] {
+export function ordenesDelAlcance(ordenes: Orden[], pedidos: Pedido[], me: Sesion, alcance: AlcanceRecepcion): Orden[] {
+  if (alcance === "mias") return ordenesDeMisPedidos(ordenes, pedidos, me);
   const almacenes = almacenesDeRecepcion(me);
-  if (!almacenes) return ordenes;
-  const mios = new Set(almacenes.map((a) => a.trim().toUpperCase()));
-  return ordenes.filter((o) => o.lineas.some((l) => mios.has((l.almacen ?? "").trim().toUpperCase())));
+  if (alcance === "fabrica" && almacenes) {
+    const codigos = new Set(almacenes.map((a) => a.trim().toUpperCase()));
+    return ordenes.filter((o) => ordenEsDeLaFabrica(o, codigos));
+  }
+  return ordenes;
 }
 
 /**

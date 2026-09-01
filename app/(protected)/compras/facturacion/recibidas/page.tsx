@@ -1,26 +1,27 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Card, Tile } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { almacenesDeRecepcion, formatDate, numeroOrden, ordenesQueRecibe } from "@/lib/compras/helpers";
+import { AlcanceOrdenes } from "@/components/compras/alcance-ordenes";
+import { almacenesDeRecepcion, formatDate, numeroOrden, ordenesDelAlcance, type AlcanceRecepcion } from "@/lib/compras/helpers";
 
 // Bodega (recibe): historial de lo que se recibió, con quién lo recibió.
 // Pensada para celular/tablet: tarjetas grandes, sin tablas anchas.
 export default function RecibidasPage() {
-  const { recepciones: recepcionesAll, ordenes: ordenesAll, proveedores } = useStore();
+  const { recepciones: recepcionesAll, ordenes: ordenesAll, pedidos, proveedores } = useStore();
   const me = useSession();
-  // Mismo criterio que "Órdenes por recibir": Fábrica de Maderas ve el material que
-  // entra a sus bodegas y el de sus propias solicitudes.
-  const soloSuFabrica = almacenesDeRecepcion(me) !== null;
-  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, me), [ordenesAll, me]);
+  // Mismo selector que "Órdenes por recibir", y las recepciones siguen a las órdenes.
+  const [alcance, setAlcance] = useState<AlcanceRecepcion>("todas");
+  const esFabrica = almacenesDeRecepcion(me) !== null;
+  const ordenes = useMemo(() => ordenesDelAlcance(ordenesAll, pedidos, me, alcance), [ordenesAll, pedidos, me, alcance]);
   const recepciones = useMemo(() => {
-    if (!soloSuFabrica) return recepcionesAll;
+    if (alcance === "todas") return recepcionesAll;
     const ids = new Set(ordenes.map((o) => o.id));
     return recepcionesAll.filter((r) => ids.has(r.ordenId));
-  }, [soloSuFabrica, recepcionesAll, ordenes]);
+  }, [alcance, recepcionesAll, ordenes]);
   const ordenDe = (ordenId: string) => ordenes.find((o) => o.id === ordenId);
   const provNombre = (ordenId: string) => {
     const o = ordenDe(ordenId);
@@ -44,6 +45,8 @@ export default function RecibidasPage() {
             <p className="ds-muted">Material que ya recibiste en bodega. Queda registrado quién lo recibió.</p>
           </div>
         </div>
+
+        <div className="mt-2"><AlcanceOrdenes valor={alcance} onChange={setAlcance} conFabrica={esFabrica} /></div>
 
         <div className="tiles mt-2">
           <Tile value={lista.length} label="Recepciones" accent="var(--ds-color-green-100)" />

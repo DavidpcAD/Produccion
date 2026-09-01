@@ -8,8 +8,7 @@ import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/co
 import { IconWarning } from "@/components/compras/icons";
 import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
-import { useSession } from "@/hooks/useSession";
-import { money, cantidadEntreUnidades, distribuirCargo, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, ordenesQueRecibe, todayISO, type UnidadItem } from "@/lib/compras/helpers";
+import { money, cantidadEntreUnidades, distribuirCargo, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, todayISO, type UnidadItem } from "@/lib/compras/helpers";
 import type { MotivoNC, Orden } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
@@ -43,13 +42,11 @@ export default function RegistrarFacturaPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes: ordenesAll, pedidos, proveedores, registrarRecepcion, marcarNotasCredito, cargando } = useStore();
-  const me = useSession();
-  // Fábrica de Maderas recibe SOLO su material: una orden que no trae material a sus
-  // bodegas ni salió de una de sus solicitudes no existe para ella, tampoco
-  // escribiendo la URL a mano.
-  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, me), [ordenesAll, me]);
-
+  const { ordenes, pedidos, proveedores, registrarRecepcion, marcarNotasCredito, cargando } = useStore();
+  // Sin recorte por rol: quien tiene el módulo de recepción registra la factura de
+  // cualquier orden. Maderas y Bryan pidieron ver TODAS justamente porque les llegan
+  // facturas de material que no digitaron ellos (01/09/2026); el selector de la lista
+  // es una comodidad para acotar, no un permiso.
   const orden = ordenes.find((o) => o.id === id);
 
   const articulo = (orden?.lineas ?? []).filter((l) => l.tipo === "articulo");

@@ -1,13 +1,13 @@
-// Comprobación del arreglo del 01/09/2026 en "Recepción de facturas".
+// Los tres alcances de "Recepción de facturas", medidos contra la base real.
 //
-// Fábrica de Maderas reportó que no le aparecían las facturas que busca. El filtro
-// viejo era "las órdenes que salieron de MIS solicitudes"; el nuevo es "las órdenes
-// cuyo material entra a MIS bodegas (F-MADERAS / F-MAD-NUE)" — ver
-// lib/compras/helpers.ts (ordenesQueRecibe) y lib/permissions.ts (almacenesQueRecibe).
+// Historia (01/09/2026): la Fábrica de Maderas estaba encerrada en "las órdenes de
+// MIS solicitudes" y no encontraba las facturas que tenía que registrar. Ese criterio
+// falla en las dos direcciones —en la fábrica digitan varias personas, y la misma
+// persona digita para otras fábricas—, así que se pasó a acotar por BODEGA; y como
+// aun así seguían llegando facturas que no salían, lo que pidieron fue ver TODAS con
+// un selector para acotar. Este script mide los tres alcances tal como los calcula
+// `ordenesDelAlcance` (lib/compras/helpers.ts).
 //
-// Quién digitó la solicitud fallaba en las DOS direcciones, y el script las mide:
-//   B = a su fábrica pero pedidas por otro → el filtro viejo se las escondía;
-//   C = suyas pero a otra fábrica → el filtro viejo se las mostraba de más.
 //   node scripts/diag-recepcion-maderas.mjs [usuario] [base]
 import sql from 'mssql';
 import fs from 'fs';
@@ -16,7 +16,9 @@ const env = fs.readFileSync('.env.local', 'utf8');
 for (const l of env.split('\n')) { const m = l.match(/^([A-Z_0-9]+)=(.*)$/); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim(); }
 const USER = process.argv[2] ?? 'alessandra';
 const DB   = process.argv[3] ?? 'AdelantePRO';
-const ALMACENES = ['F-MADERAS', 'F-MAD-NUE'];
+// Los códigos de la fábrica, que en los datos aparecen como ALMACÉN y como OBRA.
+const FABRICA = ['F-MADERAS', 'F-MAD-NUE'];
+const inFab = (col) => `UPPER(LTRIM(RTRIM(ISNULL(${col},'')))) IN ('${FABRICA.join("','")}')`;
 
 const pool = await new sql.ConnectionPool({
   server: process.env.DB_SERVER, user: process.env.DB_USER, password: process.env.DB_PASSWORD,
@@ -24,52 +26,38 @@ const pool = await new sql.ConnectionPool({
   options: { encrypt: true, trustServerCertificate: false },
 }).connect();
 
-// Una fila por orden lanzada/completada, con los dos criterios resueltos.
 const filas = (await pool.request().input('u', sql.NVarChar(100), USER).query(`
-  SELECT o.ordenNo, o.bcNo, e.estado, o.proveedorNombre, CONVERT(varchar(10),o.fechaEmision,120) AS fecha,
+  SELECT o.ordenNo, o.bcNo, e.estado, o.proveedorNombre,
          CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet d
                            JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
                            JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra AND pc.esEliminada = 0
                            WHERE d.idOrdenCompra = o.idOrdenCompra AND pc.creadoPor = @u) THEN 1 ELSE 0 END AS mia,
+         -- "De mi fábrica" mira el ALMACÉN de la línea Y la OBRA del pedido origen:
+         -- F-MAD-NUE se usa de las dos formas, y hay material PARA la fábrica que
+         -- entra al Almacén General (PED-000023 → CP-005192).
          CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet d
+                           LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
                            WHERE d.idOrdenCompra = o.idOrdenCompra
-                             AND UPPER(LTRIM(RTRIM(d.locationCode))) IN ('${ALMACENES.join("','")}')) THEN 1 ELSE 0 END AS fabrica,
-         STUFF((SELECT DISTINCT ', '+d2.locationCode FROM dbo.OrdenCompraDet d2
-                 WHERE d2.idOrdenCompra = o.idOrdenCompra FOR XML PATH('')),1,2,'') AS almacenes,
+                             AND (${inFab('d.locationCode')} OR ${inFab('pd.obra')})) THEN 1 ELSE 0 END AS fabrica,
+         CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet d
+                           WHERE d.idOrdenCompra = o.idOrdenCompra AND ${inFab('d.locationCode')}) THEN 1 ELSE 0 END AS fabricaSoloAlmacen,
          (SELECT COUNT(*) FROM dbo.RecepcionCompra r WHERE r.idOrdenCompra = o.idOrdenCompra) AS recepciones
   FROM dbo.OrdenCompra o
   JOIN dbo.Estado e ON e.idEstado = o.idEstado
   WHERE o.esEliminada = 0 AND e.estado IN ('Lanzado','Completado')
   ORDER BY o.bcNo`)).recordset;
 
-const A = filas.filter((f) => f.mia && f.fabrica);
-const B = filas.filter((f) => !f.mia && f.fabrica);
-const C = filas.filter((f) => f.mia && !f.fabrica);
-const cols = (f) => ({ bcNo: f.bcNo, ordenNo: f.ordenNo, estado: f.estado, almacenes: f.almacenes, proveedor: (f.proveedorNombre ?? '').slice(0, 34), recepciones: f.recepciones });
+const fab = filas.filter((f) => f.fabrica);
+const mias = filas.filter((f) => f.mia);
+console.log(`\n== ${DB} · ${USER} ==`);
+console.log(`  Todas ................. ${filas.length}`);
+console.log(`  De mi fábrica ......... ${fab.length}   (${fab.filter((f) => !f.mia).length} las digitó otra persona)`);
+console.log(`  De mis solicitudes .... ${mias.length}   (${mias.filter((f) => !f.fabrica).length} NO son de la fábrica)`);
 
-console.log(`\n== ${DB} · ${USER} · órdenes lanzadas/completadas en el sistema: ${filas.length} ==`);
-console.log(`   filtro viejo (mis solicitudes) ......... ${A.length + C.length}`);
-console.log(`   filtro nuevo (mis bodegas) ............. ${A.length + B.length}`);
-console.log(`     A · suyas Y a su fábrica ............ ${A.length}`);
-console.log(`     B · a su fábrica, pedidas por otro .. ${B.length}  (el viejo las escondía)`);
-console.log(`     C · suyas, a OTRA fábrica ........... ${C.length}  (el viejo las mostraba de más)`);
-
-console.log(`\nB · las que RECUPERA (${B.reduce((s, f) => s + f.recepciones, 0)} recepciones que no veía):`);
-console.table(B.map(cols));
-console.log(`\nC · las que DEJA de ver (no las recibe ella):`);
-console.table(C.map(cols));
-
-// Red de seguridad: si un pedido pidió Maderas y su orden acabó en otro almacén, el
-// filtro por bodega lo perdería. Al 01/09/2026 no hay ninguno; si aparece, sale acá.
-const perdidas = (await pool.request().query(`
-  SELECT o.bcNo, pc.pedidoNo, pc.creadoPor, ISNULL(NULLIF(d.locationCode,''),'(vacío)') AS ordenAlm, d.descripcion
-  FROM dbo.OrdenCompraDet d
-  JOIN dbo.OrdenCompra o ON o.idOrdenCompra = d.idOrdenCompra AND o.esEliminada = 0
-  JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
-  JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra AND pc.esEliminada = 0
-  WHERE UPPER(LTRIM(RTRIM(pd.locationCode))) IN ('${ALMACENES.join("','")}')
-    AND UPPER(LTRIM(RTRIM(ISNULL(d.locationCode,'')))) NOT IN ('${ALMACENES.join("','")}')`)).recordset;
-console.log(`\nLíneas pedidas para la fábrica que la orden mandó a otro almacén: ${perdidas.length}`);
-if (perdidas.length) console.table(perdidas);
+// Las que "De mi fábrica" solo agarra por la OBRA: si esto crece, es que se está
+// pidiendo material para la fábrica que entra a otra bodega.
+const porObra = fab.filter((f) => !f.fabricaSoloAlmacen);
+console.log(`\nDe la fábrica por OBRA pero en otra bodega (${porObra.length}):`);
+console.table(porObra.map((f) => ({ bcNo: f.bcNo, ordenNo: f.ordenNo, estado: f.estado, proveedor: (f.proveedorNombre ?? '').slice(0, 34), recepciones: f.recepciones })));
 
 await pool.close();
