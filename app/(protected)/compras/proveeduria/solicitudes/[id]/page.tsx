@@ -23,8 +23,10 @@ export default function ProveeduriaPedidoDetallePage() {
   }
   const hayPendiente = pedido.lineas.some((l) => pedidoLineaPendiente(l) > 0);
   // Solo se puede devolver una línea que Proveeduría todavía NO ordenó: si ya tiene
-  // orden de compra, queda bloqueada y no aparece para elegir.
-  const lineasDevolvibles = pedido.lineas.filter((l) => l.cantidadOrdenada === 0);
+  // orden de compra, queda bloqueada y no aparece para elegir. El criterio es el
+  // mismo del servidor (`enOrden` = la FK a una orden viva); con solo mirar
+  // cantidadOrdenada se podían elegir líneas que el guardado después rechazaba.
+  const lineasDevolvibles = pedido.lineas.filter((l) => l.cantidadOrdenada === 0 && !l.enOrden);
 
   function crearOC() {
     const lineas = pedido!.lineas

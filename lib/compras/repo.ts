@@ -71,16 +71,26 @@ export async function health() {
 }
 
 // ----------------------------------------------------------------- PEDIDOS
+/** ¿Una orden de compra VIVA referencia esta línea de pedido? Es la verdad de "ya
+ *  está en una orden": la FK de OrdenCompraDet. NO alcanza con quantityOrdenado, que
+ *  solo se incrementa al crear la orden desde ESTA app y quedó en 0 en líneas que sí
+ *  tienen orden (4 casos en AdelantePRO al 28/08/2026) — de ahí el "DELETE conflicted
+ *  with the REFERENCE constraint" al corregir una devolución.
+ *  Las órdenes ELIMINADAS no cuentan: al borrar una orden (se hace desde la app de
+ *  proveeduría) sus líneas quedan físicamente en OrdenCompraDet, pero la orden ya no
+ *  existe para nadie. Contarlas dejaba la línea devuelta fuera del editor del
+ *  ingeniero, que abría vacío (PED-000023 · PERLING, cuya única orden era la borrada
+ *  CP-000070). `det` es la columna con el id de línea de pedido a comparar. */
+const enOrdenViva = (det: string) => `EXISTS (
+    SELECT 1 FROM dbo.OrdenCompraDet o
+      JOIN dbo.OrdenCompra oc ON oc.idOrdenCompra = o.idOrdenCompra AND oc.esEliminada = 0
+     WHERE o.idPedidoCompraDet = ${det})`;
+
 export async function listPedidos(): Promise<Pedido[]> {
   await ensureEstados();
   const pool = await getPool();
   const h = await pool.request().query("SELECT * FROM dbo.PedidoCompra WHERE esEliminada = 0 ORDER BY idPedidoCompra DESC");
-  // `enOrden` es la verdad de "esta línea ya está en una orden": la FK de
-  // OrdenCompraDet. NO alcanza con quantityOrdenado, que solo se incrementa al crear
-  // la orden desde ESTA app y quedó en 0 en líneas que sí tienen orden (4 casos en
-  // AdelantePRO al 28/08/2026) — de ahí el "DELETE conflicted with the REFERENCE
-  // constraint" al corregir una devolución (PED-000023).
-  const d = await pool.request().query(`SELECT d.*, (CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet o WHERE o.idPedidoCompraDet = d.idPedidoCompraDet) THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d ORDER BY d.idPedidoCompraDet`);
+  const d = await pool.request().query(`SELECT d.*, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d ORDER BY d.idPedidoCompraDet`);
   return h.recordset.map((p) => mapPedido(p, d.recordset.filter((x) => x.idPedidoCompra === p.idPedidoCompra)));
 }
 
@@ -89,7 +99,7 @@ export async function getPedido(id: number): Promise<Pedido | null> {
   const pool = await getPool();
   const h = await pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.PedidoCompra WHERE idPedidoCompra=@id");
   if (!h.recordset.length) return null;
-  const d = await pool.request().input("id", sql.Int, id).query(`SELECT d.*, (CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet o WHERE o.idPedidoCompraDet = d.idPedidoCompraDet) THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d WHERE d.idPedidoCompra=@id ORDER BY d.idPedidoCompraDet`);
+  const d = await pool.request().input("id", sql.Int, id).query(`SELECT d.*, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d WHERE d.idPedidoCompra=@id ORDER BY d.idPedidoCompraDet`);
   return mapPedido(h.recordset[0], d.recordset);
 }
 
@@ -228,6 +238,18 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
               proyecto=@proyecto, prioridad=@prioridad, notaCreador=@notaCreador,
               fechaModificacion=getdate(), modificadoPor=@modificadoPor WHERE idPedidoCompra=@id`);
 
+    // Una orden ELIMINADA sigue teniendo sus líneas en OrdenCompraDet apuntando al
+    // pedido: esa FK muerta bloqueaba el borrado de la línea. La orden ya no existe
+    // para nadie, así que se le suelta el vínculo (la línea de la orden borrada queda
+    // como estaba, solo sin apuntar al pedido) y la corrección puede guardarse.
+    await new sql.Request(tx).input("id", sql.Int, input.id).query(
+      `UPDATE od SET od.idPedidoCompraDet = NULL
+         FROM dbo.OrdenCompraDet od
+         JOIN dbo.OrdenCompra ord ON ord.idOrdenCompra = od.idOrdenCompra AND ord.esEliminada = 1
+         JOIN dbo.PedidoCompraDet d ON d.idPedidoCompraDet = od.idPedidoCompraDet
+        WHERE d.idPedidoCompra=@id AND d.quantityOrdenado=0
+          AND NOT ${enOrdenViva("d.idPedidoCompraDet")}`);
+
     // Reemplazar SOLO las líneas sin ordenar (las que ya tienen orden de compra se
     // preservan tal cual, sin que las órdenes que las referencian se rompan).
     // El guard REAL es la FK, no quantityOrdenado: hay líneas con 0 ordenado que sí
@@ -278,7 +300,7 @@ export async function devolverLineasPedido(id: number, lineaIds: number[], motiv
     const pedidoNo = head.recordset[0].pedidoNo as string;
 
     const todas = await new sql.Request(tx).input("id", sql.Int, id).query(
-      `SELECT d.idPedidoCompraDet, d.descripcion, d.quantityOrdenado, (CASE WHEN EXISTS (SELECT 1 FROM dbo.OrdenCompraDet o WHERE o.idPedidoCompraDet = d.idPedidoCompraDet) THEN 1 ELSE 0 END) AS enOrden
+      `SELECT d.idPedidoCompraDet, d.descripcion, d.quantityOrdenado, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden
          FROM dbo.PedidoCompraDet d WHERE d.idPedidoCompra=@id`
     );
     const elegidas = todas.recordset.filter((r: any) => lineaIds.includes(r.idPedidoCompraDet));
