@@ -10,12 +10,12 @@ import { almacenesDeRecepcion, formatDate, numeroOrden, ordenesQueRecibe } from 
 // Bodega (recibe): historial de lo que se recibió, con quién lo recibió.
 // Pensada para celular/tablet: tarjetas grandes, sin tablas anchas.
 export default function RecibidasPage() {
-  const { recepciones: recepcionesAll, ordenes: ordenesAll, pedidos, proveedores } = useStore();
+  const { recepciones: recepcionesAll, ordenes: ordenesAll, proveedores } = useStore();
   const me = useSession();
   // Mismo criterio que "Órdenes por recibir": Fábrica de Maderas ve el material que
   // entra a sus bodegas y el de sus propias solicitudes.
   const soloSuFabrica = almacenesDeRecepcion(me) !== null;
-  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, pedidos, me), [ordenesAll, pedidos, me]);
+  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, me), [ordenesAll, me]);
   const recepciones = useMemo(() => {
     if (!soloSuFabrica) return recepcionesAll;
     const ids = new Set(ordenes.map((o) => o.id));

@@ -48,7 +48,7 @@ export default function RegistrarFacturaPage() {
   // Fábrica de Maderas recibe SOLO su material: una orden que no trae material a sus
   // bodegas ni salió de una de sus solicitudes no existe para ella, tampoco
   // escribiendo la URL a mano.
-  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, pedidos, me), [ordenesAll, pedidos, me]);
+  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, me), [ordenesAll, me]);
 
   const orden = ordenes.find((o) => o.id === id);
 

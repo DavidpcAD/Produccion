@@ -13,7 +13,7 @@ import type { Orden } from "@/lib/compras/types";
 type Filtro = "porRecibir" | "parcial" | "completado" | "todas";
 
 export default function FacturacionPage() {
-  const { ordenes: ordenesAll, pedidos } = useStore();
+  const { ordenes: ordenesAll } = useStore();
   const me = useSession();
   const router = useRouter();
   const [filtro, setFiltro] = useState<Filtro>("porRecibir");
@@ -23,7 +23,7 @@ export default function FacturacionPage() {
   // bodegas (F-MADERAS / F-MAD-NUE), las pida quien las pida, más las de sus propias
   // solicitudes. Bodega central, Ingeniería y Super Admin ven todas.
   const soloSuFabrica = almacenesDeRecepcion(me) !== null;
-  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, pedidos, me), [ordenesAll, pedidos, me]);
+  const ordenes = useMemo(() => ordenesQueRecibe(ordenesAll, me), [ordenesAll, me]);
 
   // Lo que le toca a bodega: lo que está por llegar y lo que ya se recibió. Las
   // órdenes que siguen en proveeduría o en aprobación no se listan acá.

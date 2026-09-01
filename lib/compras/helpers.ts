@@ -213,45 +213,28 @@ export function pedidoEsDelUsuario(p: Pick<Pedido, "creadoPorId" | "solicitante"
   return (!!me.username && p.creadoPorId === me.username) || (!!me.nombre && p.solicitante === me.nombre);
 }
 
-/** Órdenes que salieron de los pedidos de este usuario. El enlace pedido↔orden vive
- *  a nivel de LÍNEA (`pedidoLineaId`): `pedidoNumero` solo existe en el catálogo de
- *  prueba — en SQL viene vacío (ver repo.ts), así que no se puede depender de él. */
-export function ordenesDeMisPedidos(ordenes: Orden[], pedidos: Pedido[], me: Sesion): Orden[] {
-  const lineasMias = new Set<string>();
-  const numerosMios = new Set<string>();
-  for (const p of pedidos) {
-    if (!pedidoEsDelUsuario(p, me)) continue;
-    numerosMios.add(p.numero);
-    for (const l of p.lineas) lineasMias.add(l.id);
-  }
-  if (!lineasMias.size && !numerosMios.size) return [];
-  return ordenes.filter((o) => o.lineas.some((l) =>
-    (l.pedidoLineaId && lineasMias.has(l.pedidoLineaId)) || (l.pedidoNumero && numerosMios.has(l.pedidoNumero)),
-  ));
-}
-
 /**
  * Lo que le toca RECIBIR a este usuario. Quien recibe todo (bodega central,
- * ingeniería, Super Admin) ve las órdenes tal cual. Una fábrica satélite ve las
- * órdenes cuyo material entra a alguno de SUS almacenes —la haya pedido quien la
- * haya pedido, incluso si es una compra directa sin solicitud— más las que salieron
- * de sus propias solicitudes, que ya venía viendo.
+ * ingeniería, Super Admin) ve las órdenes tal cual. Una fábrica satélite ve
+ * EXACTAMENTE las órdenes cuyo material entra a alguno de SUS almacenes: la haya
+ * pedido quien la haya pedido, incluso si es una compra directa sin solicitud.
  *
- * El filtro era antes SOLO "las órdenes de mis solicitudes", y ese fue el reporte de
- * Fábrica de Maderas del 01/09/2026 ("cuando busco la factura no me sale, solo me
- * salen las que yo pedí"): en AdelantePRO hay 21 órdenes con material a
- * F-MADERAS / F-MAD-NUE y 13 las pidió otra persona (o no tienen solicitud), así que
- * no le aparecían para facturar — CP-000097 entre ellas, con tres facturas ya
- * registradas contra ella. El almacén es el dato correcto: el material llega a la
- * fábrica, no a quien lo escribió.
+ * Quién escribió la solicitud no sirve para esto, y se probó en las dos direcciones
+ * contra AdelantePRO con la Fábrica de Maderas:
+ *  · se queda CORTO — en Maderas piden varias personas (alessandra, bryana, anabg) y
+ *    hay compra directa: 12 órdenes con material a la fábrica no le aparecían para
+ *    facturar, CP-000097 entre ellas con tres facturas ya registradas;
+ *  · y se pasa — la misma persona digita solicitudes de OTRAS fábricas, así que le
+ *    salían 12 órdenes a F-AGREGADO / F-METALES / ALM-SSO que ella no recibe.
+ * Con el almacén solo, quedan las 20 que son de verdad suyas. No se pierde nada por
+ * el camino: no hay una sola línea cuyo pedido pidiera Maderas y cuya orden acabara
+ * en otro almacén (verificado 01/09/2026).
  */
-export function ordenesQueRecibe(ordenes: Orden[], pedidos: Pedido[], me: Sesion): Orden[] {
+export function ordenesQueRecibe(ordenes: Orden[], me: Sesion): Orden[] {
   const almacenes = almacenesDeRecepcion(me);
   if (!almacenes) return ordenes;
   const mios = new Set(almacenes.map((a) => a.trim().toUpperCase()));
-  const deMisPedidos = new Set(ordenesDeMisPedidos(ordenes, pedidos, me).map((o) => o.id));
-  return ordenes.filter((o) => deMisPedidos.has(o.id)
-    || o.lineas.some((l) => mios.has((l.almacen ?? "").trim().toUpperCase())));
+  return ordenes.filter((o) => o.lineas.some((l) => mios.has((l.almacen ?? "").trim().toUpperCase())));
 }
 
 /**
