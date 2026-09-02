@@ -557,25 +557,36 @@ export default function PartidasPage() {
           Ningún resultado para “{q}”.
         </div>
       ) : (
-        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+        // Con catálogo por obra (admin / fábrica) cada obra es su propia tarjeta;
+        // con catálogo compartido (vivienda / infra) es una sola.
+        <div className={porObra ? 'space-y-3' : ''}>
           {arbol.map(sec => (
-            <div key={sec.obra ?? SIN_OBRA}>
+            <div key={sec.obra ?? SIN_OBRA} className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
               {/* Nivel 0 (solo admin/fábrica): la obra de BC dueña de la estructura */}
               {sec.obra && (
                 <button
                   onClick={() => setObrasAbiertas(s => toggleSet(s, sec.obra!))}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-black text-white text-left"
+                  title={obraAbierta(sec.obra) ? 'Colapsar la obra' : `Ver la estructura de ${sec.obra}`}
+                  className={
+                    'w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors ' +
+                    // Abierta: sin borde propio — el primer grupo ya trae su border-y.
+                    (obraAbierta(sec.obra) ? '' : 'hover:bg-ds-gray-100/70')
+                  }
                 >
-                  <span className={'transition-transform shrink-0 ' + (obraAbierta(sec.obra) ? 'rotate-90' : '')}>
-                    <Icon name="chevron-right" size="sm" color="#ffffff" />
+                  <span className={'text-ds-gray-400 transition-transform shrink-0 ' + (obraAbierta(sec.obra) ? 'rotate-90' : '')}>
+                    <Icon name="chevron-right" size="sm" color="currentColor" />
                   </span>
-                  <span className="font-mono text-xs font-bold">{sec.obra}</span>
-                  <span className="text-xs text-white/60 truncate flex-1">
+                  <span className="font-mono text-xs font-bold text-ds-ink bg-ds-gray-100 border border-ds-gray-200 rounded-ds px-2 py-0.5 shrink-0">
+                    {sec.obra}
+                  </span>
+                  <span className="text-sm font-semibold text-ds-ink truncate flex-1 min-w-0">
                     {obrasDelTipo.find(o => o.numeroObra === sec.obra)?.nombre ?? ''}
                   </span>
-                  <span className="text-[11px] text-white/60 shrink-0">
-                    {plural(sec.grupos.length, termGrupoLow, termGrupoPlural)} · {plural(sec.totalPartidas, 'partida', 'partidas')} · {plural(sec.totalSubs, 'subpartida', 'subpartidas')}
+                  <span className="text-[11px] text-ds-gray-400 shrink-0 hidden sm:block whitespace-nowrap">
+                    {plural(sec.grupos.length, termGrupoLow, termGrupoPlural)} · {plural(sec.totalPartidas, 'partida', 'partidas')}
+                    {sec.totalSubs > 0 ? ` · ${plural(sec.totalSubs, 'subpartida', 'subpartidas')}` : ''}
                   </span>
+                  <span className="text-[11px] text-ds-gray-400 shrink-0 sm:hidden">{sec.totalPartidas}</span>
                 </button>
               )}
 
