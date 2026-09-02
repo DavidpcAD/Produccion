@@ -22,33 +22,35 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!idEtapa) return NextResponse.json({ error: 'Elegí la etapa' }, { status: 400 });
   if (!codigo) return NextResponse.json({ error: 'El código es requerido' }, { status: 400 });
   if (!nombre) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 });
-  if (codigo.length > 20) return NextResponse.json({ error: 'El código no puede superar 20 caracteres' }, { status: 400 });
-  if (nombre.length > 100) return NextResponse.json({ error: 'El nombre no puede superar 100 caracteres' }, { status: 400 });
+  if (codigo.length > 50) return NextResponse.json({ error: 'El código no puede superar 50 caracteres' }, { status: 400 });
+  if (nombre.length > 150) return NextResponse.json({ error: 'El nombre no puede superar 150 caracteres' }, { status: 400 });
 
   const db = await getAdelanteDb();
   try {
-    // Único DENTRO del tipo de obra (infraestructura repite los códigos de
-    // vivienda a propósito: son catálogos aparte).
+    // Único DENTRO DEL GRUPO (índice UX_partidas_grupo_codigo): infra repite a
+    // propósito los códigos de vivienda, y cada obra administrativa/fábrica trae
+    // los suyos de BC (G1.1 existe en siete casas).
     const dup = await db.request()
-      .input('cod', sql.VarChar(20), codigo)
+      .input('cod', sql.VarChar(50), codigo)
       .input('id', sql.Int, idPartida)
       .input('idE', sql.Int, idEtapa)
-      .query(`SELECT 1 AS ok
-              FROM pro_obc.partidas p
-              JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
-              WHERE p.codigo = @cod AND p.id <> @id
-                AND g.tipo_obra = (SELECT tipo_obra FROM pro_obc.grupos_partida WHERE id = @idE)`);
+      .query('SELECT 1 AS ok FROM pro_obc.partidas WHERE codigo = @cod AND id <> @id AND grupo_id = @idE');
     if (dup.recordset.length > 0) {
-      return NextResponse.json({ error: `Ya existe otra partida con el código "${codigo}"` }, { status: 409 });
+      return NextResponse.json({ error: `Ya existe otra partida con el código "${codigo}" en esa etapa` }, { status: 409 });
     }
 
+    // El puente con BC (bc_task_no) sigue al código mientras venga espejado —que
+    // es el caso normal: el código de la partida ES el "Posting" de BC. Si alguien
+    // lo desacopló a mano, se respeta.
     const upd = await db.request()
       .input('id', sql.Int, idPartida)
-      .input('codigo', sql.VarChar(20), codigo)
-      .input('nombre', sql.NVarChar(100), nombre)
+      .input('codigo', sql.VarChar(50), codigo)
+      .input('nombre', sql.NVarChar(150), nombre)
       .input('idEtapa', sql.Int, idEtapa)
       .query(`
-        UPDATE pro_obc.partidas SET codigo = @codigo, nombre = @nombre, grupo_id = @idEtapa
+        UPDATE pro_obc.partidas
+        SET codigo = @codigo, nombre = @nombre, grupo_id = @idEtapa,
+            bc_task_no = CASE WHEN bc_task_no IS NULL OR bc_task_no = codigo THEN @codigo ELSE bc_task_no END
         WHERE id = @id
       `);
     if (upd.rowsAffected[0] === 0) {

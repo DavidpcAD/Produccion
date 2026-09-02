@@ -8,10 +8,15 @@ const TIPOS_CASA = new Set(['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea']);
 // Crear una subpartida en el catálogo unificado (pro_obc.sub_partidas +
 // sub_partida_tipos). Amarrada a una partida existente. Solo Super Admin (nivel 4).
 //
-// El TIPO DE OBRA sale de la partida (grupos_partida.tipo_obra), no del cliente:
-//   VIVIENDA -> sprint obligatorio + al menos un tipo de casa (lo que usa Avance).
-//   INFRA    -> sin sprint (NULL) y sin tipos de casa: infraestructura no se
-//               planifica por sprint ni por tipo de casa.
+// Las subpartidas son el ÚNICO nivel que no existe en Business Central: BC llega
+// hasta la partida ("Posting"). Este nivel es 100% de SQL.
+//
+// El TIPO DE OBRA sale de la partida (grupos_partida.tipo_obra), no del cliente, y
+// con él las dos reglas que trae pro_obc.tipos_obra:
+//   usa_sprints    -> sprint obligatorio (hoy solo vivienda: es lo que usa Avance).
+//   usa_tipos_casa -> al menos un tipo de casa (hoy solo vivienda).
+// Los demás tipos (infra, administrativas, fábrica, torres) guardan sprint NULL y
+// sin tipos de casa: no se planifican por sprint ni por tipo de casa.
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 4) {
@@ -42,33 +47,42 @@ export async function POST(req: NextRequest) {
   try {
     const p = await db.request()
       .input('idP', sql.Int, idPartida)
-      .query(`SELECT p.id, g.tipo_obra AS tipoObra
+      .query(`SELECT p.id, g.tipo_obra AS tipoObra, g.bc_works_no AS bcWorksNo,
+                     t.usa_sprints AS usaSprints, t.usa_tipos_casa AS usaTiposCasa
               FROM pro_obc.partidas p
               JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+              JOIN pro_obc.tipos_obra t ON t.codigo = g.tipo_obra
               WHERE p.id = @idP`);
     if (p.recordset.length === 0) {
       return NextResponse.json({ error: 'La partida no existe' }, { status: 400 });
     }
     const tipoObra = String(p.recordset[0].tipoObra ?? 'VIVIENDA').toUpperCase();
-    const esInfra = tipoObra === 'INFRA';
+    const bcWorksNo: string | null = p.recordset[0].bcWorksNo ?? null;
+    const usaSprints = !!p.recordset[0].usaSprints;
+    const usaTiposCasa = !!p.recordset[0].usaTiposCasa;
 
-    // Sprint y tipos de casa solo aplican en vivienda; en infra se guardan vacíos.
-    if (!esInfra) {
-      if (numSprint < 1 || numSprint > 50) return NextResponse.json({ error: 'Sprint inválido (1–50)' }, { status: 400 });
-      if (tiposCasa.length === 0) return NextResponse.json({ error: 'Elegí al menos un tipo de casa' }, { status: 400 });
+    if (usaSprints && (numSprint < 1 || numSprint > 50)) {
+      return NextResponse.json({ error: 'Sprint inválido (1–50)' }, { status: 400 });
     }
-    const sprintGuardado = esInfra ? null : numSprint;
-    const tiposGuardados = esInfra ? [] : tiposCasa;
+    if (usaTiposCasa && tiposCasa.length === 0) {
+      return NextResponse.json({ error: 'Elegí al menos un tipo de casa' }, { status: 400 });
+    }
+    const sprintGuardado = usaSprints ? numSprint : null;
+    const tiposGuardados = usaTiposCasa ? tiposCasa : [];
 
-    // Códigos únicos DENTRO del tipo de obra: infra repite a propósito los códigos
-    // de vivienda (1.1.1, 2.1.1…) — son catálogos aparte.
+    // Códigos únicos DENTRO del catálogo que se está viendo: el tipo de obra y —en
+    // administrativas y fábricas— la obra de BC dueña de la estructura. Infra
+    // repite a propósito los códigos de vivienda (1.1.1, 2.1.1…) y cada casa de
+    // socio repite los suyos (G1.1.1) — son catálogos aparte.
     const dup = await db.request()
       .input('cod', sql.VarChar(50), codigo)
       .input('tipo', sql.VarChar(20), tipoObra)
+      .input('obra', sql.VarChar(20), bcWorksNo)
       .query(`SELECT 1 AS ok FROM pro_obc.sub_partidas sp
               JOIN pro_obc.partidas p ON p.id = sp.partida_id
               JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
-              WHERE sp.codigo = @cod AND g.tipo_obra = @tipo`);
+              WHERE sp.codigo = @cod AND g.tipo_obra = @tipo
+                AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')`);
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe una subpartida con el código "${codigo}"` }, { status: 409 });
     }

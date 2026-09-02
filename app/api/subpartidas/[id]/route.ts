@@ -8,8 +8,10 @@ const TIPOS_CASA = new Set(['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea']);
 // Editar una subpartida del catálogo unificado (pro_obc.sub_partidas +
 // sub_partida_tipos). Solo Super Admin (nivel 4).
 //
-// Como en el POST, el tipo de obra sale de la partida a la que ya está amarrada:
-// vivienda exige sprint + tipos de casa; infra los guarda vacíos (no aplican).
+// Como en el POST, las reglas salen del tipo de obra de la partida a la que ya
+// está amarrada (pro_obc.tipos_obra): usa_sprints exige sprint y usa_tipos_casa
+// exige al menos un tipo de casa —hoy solo vivienda—; los demás tipos (infra,
+// administrativas, fábrica, torres) los guardan vacíos.
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 4) {
@@ -39,33 +41,42 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const act = await db.request()
       .input('id', sql.Int, idSubPartida)
-      .query(`SELECT g.tipo_obra AS tipoObra
+      .query(`SELECT g.tipo_obra AS tipoObra, g.bc_works_no AS bcWorksNo,
+                     t.usa_sprints AS usaSprints, t.usa_tipos_casa AS usaTiposCasa
               FROM pro_obc.sub_partidas sp
               JOIN pro_obc.partidas p ON p.id = sp.partida_id
               JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+              JOIN pro_obc.tipos_obra t ON t.codigo = g.tipo_obra
               WHERE sp.id = @id`);
     if (act.recordset.length === 0) {
       return NextResponse.json({ error: 'La subpartida no existe' }, { status: 404 });
     }
     const tipoObra = String(act.recordset[0].tipoObra ?? 'VIVIENDA').toUpperCase();
-    const esInfra = tipoObra === 'INFRA';
+    const bcWorksNo: string | null = act.recordset[0].bcWorksNo ?? null;
+    const usaSprints = !!act.recordset[0].usaSprints;
+    const usaTiposCasa = !!act.recordset[0].usaTiposCasa;
 
-    if (!esInfra) {
-      if (numSprint < 1 || numSprint > 50) return NextResponse.json({ error: 'Sprint inválido (1–50)' }, { status: 400 });
-      if (tiposCasa.length === 0) return NextResponse.json({ error: 'Elegí al menos un tipo de casa' }, { status: 400 });
+    if (usaSprints && (numSprint < 1 || numSprint > 50)) {
+      return NextResponse.json({ error: 'Sprint inválido (1–50)' }, { status: 400 });
     }
-    const sprintGuardado = esInfra ? null : numSprint;
-    const tiposGuardados = esInfra ? [] : tiposCasa;
+    if (usaTiposCasa && tiposCasa.length === 0) {
+      return NextResponse.json({ error: 'Elegí al menos un tipo de casa' }, { status: 400 });
+    }
+    const sprintGuardado = usaSprints ? numSprint : null;
+    const tiposGuardados = usaTiposCasa ? tiposCasa : [];
 
-    // Duplicados de código: únicos dentro del mismo tipo de obra.
+    // Duplicados de código: únicos dentro del catálogo que se está viendo (tipo de
+    // obra + obra de BC en administrativas y fábricas).
     const dup = await db.request()
       .input('cod', sql.VarChar(50), codigo)
       .input('id', sql.Int, idSubPartida)
       .input('tipo', sql.VarChar(20), tipoObra)
+      .input('obra', sql.VarChar(20), bcWorksNo)
       .query(`SELECT 1 AS ok FROM pro_obc.sub_partidas sp
               JOIN pro_obc.partidas p ON p.id = sp.partida_id
               JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
-              WHERE sp.codigo = @cod AND sp.id <> @id AND g.tipo_obra = @tipo`);
+              WHERE sp.codigo = @cod AND sp.id <> @id AND g.tipo_obra = @tipo
+                AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')`);
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe otra subpartida con el código "${codigo}"` }, { status: 409 });
     }

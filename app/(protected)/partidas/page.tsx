@@ -16,18 +16,42 @@ import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 const TIPOS_CASA = ['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea'] as const;
 
-interface Etapa { idEtapa: number; codigo: string; nombre: string }
-interface Partida { idPartida: number; codigo: string; nombre: string; idEtapa: number | null; activo?: boolean }
+// El catálogo es un ÁRBOL de tres niveles por tipo de obra:
+//   grupo (etapa/sistema/área/proceso/torre) → partida → subpartida
+// Los dos primeros niveles existen también en Business Central (capítulo "Total" y
+// partida "Posting" de la obra); las subpartidas son solo de esta base.
+interface TipoObra {
+  codigo: string; letra: string; nombre: string;
+  terminoGrupo: string; terminoGrupoPlural: string;
+  usaSprints: boolean; usaTiposCasa: boolean; genero: 'F' | 'M';
+  /** true = un solo catálogo para todas las obras del tipo (vivienda / infra). */
+  catalogoCompartido: boolean;
+  grupos?: number; partidas?: number; subpartidas?: number; obras?: number;
+  obrasBC?: { numeroObra: string; nombre: string }[];
+}
+interface Etapa {
+  idEtapa: number; codigo: string; nombre: string;
+  bcTaskNo: string | null; bcWorksNo: string | null;
+}
+interface Partida {
+  idPartida: number; codigo: string; nombre: string; idEtapa: number | null;
+  activo?: boolean; bcTaskNo: string | null;
+}
 interface SubPartida {
   idSubPartida: number; codigo: string; nombre: string; idPartida: number;
-  // En infraestructura no hay sprint ni tipos de casa: esas dos cosas son del
-  // catálogo de vivienda (es lo que consume Avance), así que vienen null/vacío.
+  // Sprint y tipos de casa son del mundo vivienda (es lo que consume Avance); en
+  // los demás tipos vienen null/vacío.
   numSprint: number | null; esCritica: boolean; descripcion: string | null;
   activo: boolean; tiposCasa: string[];
 }
 
 const EMPTY_SUB = { idEtapa: '', idPartida: '', codigo: '', nombre: '', numSprint: '1', esCritica: false, descripcion: '', activo: true, tiposCasa: [] as string[] };
 const EMPTY_PART = { idEtapa: '', codigo: '', nombre: '' };
+const EMPTY_ETAPA = { codigo: '', nombre: '', bcWorksNo: '', bcTaskNo: '' };
+
+const SIN_OBRA = '—compartido—';
+const porCodigo = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
+const plural = (n: number, sing: string, plu: string) => `${n} ${n === 1 ? sing : plu}`;
 
 export default function PartidasPage() {
   const session = useSession();
@@ -37,6 +61,10 @@ export default function PartidasPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  const [tipos, setTipos] = useState<TipoObra[]>([]);
+  const [tipoCodigo, setTipoCodigo] = useState('VIVIENDA');
+  const [tipo, setTipo] = useState<TipoObra | null>(null);
+  const [obraFiltro, setObraFiltro] = useState('');
   const [etapas, setEtapas] = useState<Etapa[]>([]);
   const [partidas, setPartidas] = useState<Partida[]>([]);
   const [subpartidas, setSubpartidas] = useState<SubPartida[]>([]);
@@ -46,18 +74,28 @@ export default function PartidasPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState('');
-  const [selPartida, setSelPartida] = useState<number | null>(null);
-  // Catálogo que se está viendo: vivienda (casas) o infraestructura. Son catálogos
-  // aparte en pro_obc (grupos_partida.tipo_obra) y repiten códigos entre sí.
-  const [tipoObra, setTipoObra] = useState<'VIVIENDA' | 'INFRA'>('VIVIENDA');
-  const esVivienda = tipoObra === 'VIVIENDA';
+
+  // Estado del árbol. Los grupos arrancan ABIERTOS (se guarda lo cerrado) y las
+  // partidas CERRADAS (se guarda lo abierto): abrir una partida es justamente el
+  // gesto de "ver sus subpartidas".
+  const [gruposCerrados, setGruposCerrados] = useState<Set<number>>(new Set());
+  const [partidasAbiertas, setPartidasAbiertas] = useState<Set<number>>(new Set());
+  const [obrasAbiertas, setObrasAbiertas] = useState<Set<string>>(new Set());
+
   const puede = mounted && isSuperAdmin;
-  // El grupo del catálogo se llama "Etapa" en vivienda y "Sistema" en infra
-  // (mismo objeto pro_obc.grupos_partida, distinto rótulo por tipo de obra).
-  const termEtapa = esVivienda ? 'Etapa' : 'Sistema';
-  const termEtapaLow = esVivienda ? 'etapa' : 'sistema';
-  const termEtapasPlural = esVivienda ? 'etapas' : 'sistemas';
-  const nuevaEtapaLabel = esVivienda ? 'Nueva etapa' : 'Nuevo sistema';
+  const termGrupo = tipo?.terminoGrupo ?? 'Etapa';
+  const termGrupoLow = termGrupo.toLowerCase();
+  const termGrupoPlural = (tipo?.terminoGrupoPlural ?? 'Etapas').toLowerCase();
+  // Concordancia del rótulo del nivel 1: "Nueva etapa" / "Nuevo proceso",
+  // "esta área" / "este sistema" (pro_obc.tipos_obra.genero).
+  const fem = (tipo?.genero ?? 'F') === 'F';
+  const nuevoGrupo = `${fem ? 'Nueva' : 'Nuevo'} ${termGrupoLow}`;
+  const elGrupo = `${fem ? 'la' : 'el'} ${termGrupoLow}`;
+  const unGrupo = `${fem ? 'una' : 'un'} ${termGrupoLow}`;
+  const esteGrupo = `${fem ? 'esta' : 'este'} ${termGrupoLow}`;
+  const usaSprints = !!tipo?.usaSprints;
+  const usaTiposCasa = !!tipo?.usaTiposCasa;
+  const porObra = !!tipo && !tipo.catalogoCompartido;
 
   // Modal subpartida (crear/editar)
   const [subOpen, setSubOpen] = useState(false);
@@ -72,28 +110,50 @@ export default function PartidasPage() {
   const [partForm, setPartForm] = useState({ ...EMPTY_PART });
   const setPart = (k: keyof typeof partForm, v: string) => setPartForm(p => ({ ...p, [k]: v }));
 
-  // Modal etapa/sistema (crear) — grupo del catálogo
+  // Modal grupo (crear) — nivel 1 del árbol
   const [etapaOpen, setEtapaOpen] = useState(false);
-  const [etapaForm, setEtapaForm] = useState({ codigo: '', nombre: '' });
+  const [etapaForm, setEtapaForm] = useState({ ...EMPTY_ETAPA });
   const setEt = (k: keyof typeof etapaForm, v: string) => setEtapaForm(p => ({ ...p, [k]: v }));
 
-  function cambiarTipo(t: 'VIVIENDA' | 'INFRA') {
-    if (t === tipoObra) return;
-    setSelPartida(null);
+  // Modal "Traer de BC"
+  const [bcOpen, setBcOpen] = useState(false);
+  const [bcObra, setBcObra] = useState('');
+  const [bcSync, setBcSync] = useState<false | 'ver' | 'traer'>(false);
+  const [bcPreview, setBcPreview] = useState<null | {
+    obrasProcesadas: number; gruposCreados: number; partidasCreadas: number;
+    gruposActualizados: number; partidasActualizadas: number;
+    detalle: { obra: string; fuente: string; compania?: string | null; version?: string | null; gruposCreados: string[]; partidasCreadas: string[] }[];
+  }>(null);
+
+  function cambiarTipo(t: string) {
+    if (t === tipoCodigo) return;
     setQ('');
-    setTipoObra(t);
+    setObraFiltro('');
+    setGruposCerrados(new Set());
+    setPartidasAbiertas(new Set());
+    setObrasAbiertas(new Set());
+    setTipoCodigo(t);
   }
+
+  const cargarTipos = useCallback(async () => {
+    const d = await fetch('/api/tipos-obra?conObras=1').then(r => (r.ok ? r.json() : null)).catch(() => null);
+    if (d?.tipos) setTipos(d.tipos);
+  }, []);
+  useEffect(() => { cargarTipos(); }, [cargarTipos]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const d = await fetch(`/api/partidas?tipo=${tipoObra}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
+    const qs = new URLSearchParams({ tipo: tipoCodigo });
+    if (obraFiltro) qs.set('obra', obraFiltro);
+    const d = await fetch(`/api/partidas?${qs}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
     if (d) {
+      setTipo(d.tipo ?? null);
       setEtapas(d.etapas ?? []);
       setPartidas(d.partidas ?? []);
       setSubpartidas(d.subpartidas ?? []);
     }
     setLoading(false);
-  }, [tipoObra]);
+  }, [tipoCodigo, obraFiltro]);
   useEffect(() => { load(); }, [load]);
 
   // Catálogo de sprints (para validar/elegir el N° de sprint de una subpartida).
@@ -104,13 +164,99 @@ export default function PartidasPage() {
       .catch(() => {});
   }, []);
 
-  // Conjunto de números de sprint válidos (numero_global del catálogo).
   const sprintsValidos = useMemo(() => new Set(sprintsCat.map(s => s.numero_global)), [sprintsCat]);
+  const tipoActual = useMemo(() => tipos.find(t => t.codigo === tipoCodigo) ?? null, [tipos, tipoCodigo]);
+  const obrasDelTipo = useMemo(() => tipoActual?.obrasBC ?? [], [tipoActual]);
 
   const partidasDeEtapa = useMemo(
     () => (subForm.idEtapa ? partidas.filter(p => String(p.idEtapa) === subForm.idEtapa) : []),
     [partidas, subForm.idEtapa],
   );
+
+  // ---- Árbol ----
+  const subsByPartida = useMemo(() => {
+    const m = new Map<number, SubPartida[]>();
+    for (const s of subpartidas) { if (!m.has(s.idPartida)) m.set(s.idPartida, []); m.get(s.idPartida)!.push(s); }
+    for (const arr of m.values()) arr.sort((a, b) => porCodigo(a.codigo, b.codigo));
+    return m;
+  }, [subpartidas]);
+
+  const term = q.trim();
+  const buscando = term.length > 0;
+
+  // Árbol filtrado: obra → grupos → partidas → subpartidas. Si el grupo o la
+  // partida coinciden con la búsqueda se muestran completos; si no, solo lo que
+  // coincida más abajo (y esas ramas quedan abiertas).
+  const arbol = useMemo(() => {
+    const match = (...vals: (string | null | undefined)[]) =>
+      !buscando || coincideBusqueda(vals.map(v => v ?? '').join(' '), term.toLowerCase());
+
+    const porEtapa = new Map<number, Partida[]>();
+    for (const p of partidas) {
+      if (p.idEtapa == null) continue;
+      if (!porEtapa.has(p.idEtapa)) porEtapa.set(p.idEtapa, []);
+      porEtapa.get(p.idEtapa)!.push(p);
+    }
+
+    const grupos = etapas.map(e => {
+      const grupoMatch = match(e.codigo, e.nombre, e.bcTaskNo, e.bcWorksNo);
+      const parts = (porEtapa.get(e.idEtapa) ?? [])
+        .sort((a, b) => porCodigo(a.codigo, b.codigo))
+        .map(p => {
+          const subs = subsByPartida.get(p.idPartida) ?? [];
+          const partidaMatch = grupoMatch || match(p.codigo, p.nombre, p.bcTaskNo);
+          const subsVisibles = partidaMatch ? subs : subs.filter(s => match(s.codigo, s.nombre));
+          return { partida: p, subs, subsVisibles, visible: partidaMatch || subsVisibles.length > 0, forzarAbierta: buscando && !partidaMatch && subsVisibles.length > 0 };
+        })
+        .filter(p => p.visible);
+      const totalSubs = (porEtapa.get(e.idEtapa) ?? []).reduce((n, p) => n + (subsByPartida.get(p.idPartida)?.length ?? 0), 0);
+      return {
+        etapa: e,
+        partidas: parts,
+        totalPartidas: (porEtapa.get(e.idEtapa) ?? []).length,
+        totalSubs,
+        visible: grupoMatch || parts.length > 0,
+      };
+    }).filter(g => g.visible);
+
+    // Agrupado por obra de BC cuando el catálogo es por obra (admin / fábrica).
+    const secciones = new Map<string, typeof grupos>();
+    for (const g of grupos) {
+      const k = g.etapa.bcWorksNo ?? SIN_OBRA;
+      if (!secciones.has(k)) secciones.set(k, []);
+      secciones.get(k)!.push(g);
+    }
+    return [...secciones.entries()]
+      .sort((a, b) => (a[0] === SIN_OBRA ? -1 : b[0] === SIN_OBRA ? 1 : porCodigo(a[0], b[0])))
+      .map(([obra, grupos]) => ({
+        obra: obra === SIN_OBRA ? null : obra,
+        grupos,
+        totalPartidas: grupos.reduce((n, g) => n + g.totalPartidas, 0),
+        totalSubs: grupos.reduce((n, g) => n + g.totalSubs, 0),
+      }));
+  }, [etapas, partidas, subsByPartida, buscando, term]);
+
+  // Con una sola obra (o buscando) no tiene sentido tenerla cerrada.
+  const obraAbierta = (obra: string | null) =>
+    obra === null || buscando || arbol.length === 1 || obrasAbiertas.has(obra);
+  const grupoAbierto = (id: number) => buscando || !gruposCerrados.has(id);
+  const partidaAbierta = (id: number, forzar: boolean) => forzar || partidasAbiertas.has(id);
+
+  const toggleSet = <T,>(set: Set<T>, v: T) => {
+    const n = new Set(set);
+    if (n.has(v)) n.delete(v); else n.add(v);
+    return n;
+  };
+  function expandirTodo() {
+    setGruposCerrados(new Set());
+    setPartidasAbiertas(new Set(partidas.map(p => p.idPartida)));
+    setObrasAbiertas(new Set(etapas.map(e => e.bcWorksNo).filter((o): o is string => !!o)));
+  }
+  function colapsarTodo() {
+    setGruposCerrados(new Set(etapas.map(e => e.idEtapa)));
+    setPartidasAbiertas(new Set());
+    setObrasAbiertas(new Set());
+  }
 
   // ---- Subpartida ----
   function abrirNuevaSub(idPartida?: number) {
@@ -119,8 +265,7 @@ export default function PartidasPage() {
     // subpartida existente (ej. 1.1 con hasta 1.1.5 → sugiere 1.1.6). Queda editable.
     let codigo = '';
     if (p) {
-      const nums = subpartidas
-        .filter(s => s.idPartida === p.idPartida)
+      const nums = (subsByPartida.get(p.idPartida) ?? [])
         .map(s => { const m = s.codigo.match(/\.(\d+)\s*$/); return m ? parseInt(m[1], 10) : NaN; })
         .filter(n => !Number.isNaN(n));
       codigo = `${p.codigo}.${(nums.length ? Math.max(...nums) : 0) + 1}`;
@@ -144,9 +289,8 @@ export default function PartidasPage() {
     if (!subForm.idPartida) { toast('Elegí la partida', 'warning'); return; }
     if (!subForm.codigo.trim()) { toast('El código es requerido', 'warning'); return; }
     if (!subForm.nombre.trim()) { toast('El nombre es requerido', 'warning'); return; }
-    // Sprint y tipos de casa solo se piden en vivienda; infra no los usa.
-    if (esVivienda) {
-      if (subForm.tiposCasa.length === 0) { toast('Elegí al menos un tipo de casa', 'warning'); return; }
+    if (usaTiposCasa && subForm.tiposCasa.length === 0) { toast('Elegí al menos un tipo de casa', 'warning'); return; }
+    if (usaSprints) {
       // El sprint debe existir en el catálogo (si el catálogo pudo cargarse).
       const nSprint = Number(subForm.numSprint) || 0;
       if (sprintsValidos.size > 0 && !sprintsValidos.has(nSprint)) {
@@ -163,17 +307,18 @@ export default function PartidasPage() {
         body: JSON.stringify({
           idPartida: Number(subForm.idPartida),
           codigo: subForm.codigo.trim(), nombre: subForm.nombre.trim(),
-          numSprint: esVivienda ? Number(subForm.numSprint) || 1 : null,
+          numSprint: usaSprints ? Number(subForm.numSprint) || 1 : null,
           esCritica: subForm.esCritica,
           descripcion: subForm.descripcion.trim() || null,
-          tiposCasa: esVivienda ? subForm.tiposCasa : [], activo: subForm.activo,
+          tiposCasa: usaTiposCasa ? subForm.tiposCasa : [], activo: subForm.activo,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast(data.error || 'No se pudo guardar la subpartida', 'error'); return; }
       toast(editing ? 'Subpartida actualizada' : 'Subpartida creada', 'success');
       setSubOpen(false);
-      await load();
+      setPartidasAbiertas(s => new Set(s).add(Number(subForm.idPartida)));
+      await Promise.all([load(), cargarTipos()]);
     } finally { setSaving(false); }
   }
   async function borrarSub(s: SubPartida) {
@@ -184,7 +329,7 @@ export default function PartidasPage() {
     if (!res.ok) { toast(data.error || 'No se pudo eliminar', 'error'); return; }
     toast('Subpartida eliminada', 'success');
     setSubOpen(false);
-    await load();
+    await Promise.all([load(), cargarTipos()]);
   }
 
   // ---- Partida ----
@@ -199,7 +344,7 @@ export default function PartidasPage() {
     setPartOpen(true);
   }
   async function guardarPart() {
-    if (!partForm.idEtapa) { toast(`Elegí ${esVivienda ? 'la etapa' : 'el sistema'}`, 'warning'); return; }
+    if (!partForm.idEtapa) { toast(`Elegí ${elGrupo}`, 'warning'); return; }
     if (!partForm.codigo.trim()) { toast('El código es requerido', 'warning'); return; }
     if (!partForm.nombre.trim()) { toast('El nombre es requerido', 'warning'); return; }
     setSaving(true);
@@ -214,9 +359,10 @@ export default function PartidasPage() {
       if (!res.ok) { toast(data.error || 'No se pudo guardar la partida', 'error'); return; }
       toast(editing ? 'Partida actualizada' : 'Partida creada', 'success');
       setPartOpen(false);
-      // Al crear, dejar seleccionada la nueva partida para agregarle subpartidas ahí mismo.
-      if (!editing && data?.idPartida) setSelPartida(Number(data.idPartida));
-      await load();
+      // Al crear, dejar la rama abierta para agregarle subpartidas ahí mismo.
+      setGruposCerrados(s => { const n = new Set(s); n.delete(Number(partForm.idEtapa)); return n; });
+      if (!editing && data?.idPartida) setPartidasAbiertas(s => new Set(s).add(Number(data.idPartida)));
+      await Promise.all([load(), cargarTipos()]);
     } finally { setSaving(false); }
   }
   async function borrarPart(p: Partida) {
@@ -227,12 +373,12 @@ export default function PartidasPage() {
     if (!res.ok) { toast(data.error || 'No se pudo eliminar', 'error'); return; }
     toast('Partida eliminada', 'success');
     setPartOpen(false);
-    await load();
+    await Promise.all([load(), cargarTipos()]);
   }
 
-  // ---- Etapa / Sistema (grupo del catálogo) ----
+  // ---- Grupo (etapa / sistema / área / proceso / torre) ----
   function abrirNuevaEtapa() {
-    setEtapaForm({ codigo: '', nombre: '' });
+    setEtapaForm({ ...EMPTY_ETAPA, bcWorksNo: porObra ? obraFiltro : '' });
     setEtapaOpen(true);
   }
   async function guardarEtapa() {
@@ -243,62 +389,64 @@ export default function PartidasPage() {
       const res = await fetch('/api/etapas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigo: etapaForm.codigo.trim(), nombre: etapaForm.nombre.trim(), tipoObra }),
+        body: JSON.stringify({
+          codigo: etapaForm.codigo.trim(), nombre: etapaForm.nombre.trim(), tipoObra: tipoCodigo,
+          bcWorksNo: porObra ? etapaForm.bcWorksNo.trim() : '',
+          bcTaskNo: etapaForm.bcTaskNo.trim(),
+        }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { toast(data.error || `No se pudo crear ${esVivienda ? 'la etapa' : 'el sistema'}`, 'error'); return; }
-      toast(esVivienda ? 'Etapa creada' : 'Sistema creado', 'success');
+      if (!res.ok) { toast(data.error || `No se pudo crear ${elGrupo}`, 'error'); return; }
+      toast(`${termGrupo} ${fem ? 'creada' : 'creado'}`, 'success');
       setEtapaOpen(false);
-      await load();
+      if (porObra && etapaForm.bcWorksNo.trim()) setObrasAbiertas(s => new Set(s).add(etapaForm.bcWorksNo.trim()));
+      await Promise.all([load(), cargarTipos()]);
     } finally { setSaving(false); }
   }
 
-  const grupos = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    const match = (...vals: (string | null | undefined)[]) => !term || coincideBusqueda(vals.map(v => v ?? '').join(' '), term);
-    const byPartida = new Map<number, SubPartida[]>();
-    for (const s of subpartidas) {
-      if (!byPartida.has(s.idPartida)) byPartida.set(s.idPartida, []);
-      byPartida.get(s.idPartida)!.push(s);
-    }
-    return etapas.map(e => ({
-      etapa: e,
-      partidas: partidas
-        .filter(p => p.idEtapa === e.idEtapa)
-        // Orden por código numérico (1.1, 1.2, … 4.1, 4.2) — no por orden de creación,
-        // para que una partida nueva (ej. 4.2) caiga en su lugar y no arriba de la 4.1.
-        .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }))
-        .map(p => {
-          const subs = byPartida.get(p.idPartida) ?? [];
-          const partidaMatches = match(p.codigo, p.nombre);
-          // Si la partida coincide, muestro todas sus subs; si no, solo las subs que coinciden.
-          const subsFiltradas = partidaMatches ? subs : subs.filter(s => match(s.codigo, s.nombre));
-          return { partida: p, subs: subsFiltradas, visible: partidaMatches || subsFiltradas.length > 0 };
-        })
-        .filter(p => p.visible),
-    })).filter(g => g.partidas.length > 0 || !term);
-  }, [etapas, partidas, subpartidas, q]);
-
-  // Subpartidas agrupadas por partida (para conteos y para el detalle).
-  const subsByPartida = useMemo(() => {
-    const m = new Map<number, SubPartida[]>();
-    for (const s of subpartidas) { if (!m.has(s.idPartida)) m.set(s.idPartida, []); m.get(s.idPartida)!.push(s); }
-    return m;
-  }, [subpartidas]);
-
-  const sel = selPartida != null ? partidas.find(p => p.idPartida === selPartida) ?? null : null;
-  const selEtapa = sel ? etapas.find(e => e.idEtapa === sel.idEtapa) ?? null : null;
-  const selSubs = useMemo(() => {
-    if (selPartida == null) return [];
-    return [...(subsByPartida.get(selPartida) ?? [])].sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
-  }, [selPartida, subsByPartida]);
-
-  // Mantener una partida seleccionada: si no hay o la actual ya no existe, tomar la primera.
-  useEffect(() => {
-    if (loading) return;
-    if (selPartida != null && partidas.some(p => p.idPartida === selPartida)) return;
-    setSelPartida(partidas[0]?.idPartida ?? null);
-  }, [loading, partidas, selPartida]);
+  // ---- Traer de BC ----
+  function abrirBC() {
+    setBcObra(porObra ? obraFiltro : '');
+    setBcPreview(null);
+    setBcOpen(true);
+  }
+  // dryRun: mira BC y dice qué crearía, sin escribir. En vivienda e infra importa
+  // de más, porque el catálogo es uno para todas las obras.
+  async function verQueTraeriaDeBC() {
+    setBcSync('ver');
+    try {
+      const res = await fetch('/api/partidas/sync-bc', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: tipoCodigo, obra: bcObra || undefined, dryRun: true }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(d.error || 'No se pudo leer BC', 'error'); return; }
+      setBcPreview(d);
+      for (const a of (d.avisos ?? []) as string[]) toast(a, 'warning');
+    } finally { setBcSync(false); }
+  }
+  async function traerDeBC() {
+    setBcSync('traer');
+    try {
+      const res = await fetch('/api/partidas/sync-bc', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: tipoCodigo, obra: bcObra || undefined }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(d.error || 'No se pudo traer de BC', 'error'); return; }
+      const nuevo = (d.gruposCreados ?? 0) + (d.partidasCreadas ?? 0);
+      toast(
+        nuevo === 0
+          ? `Sin cambios: BC no tiene nada que no esté ya en el catálogo (${plural(d.obrasProcesadas ?? 0, 'obra revisada', 'obras revisadas')}).`
+          : `De BC: ${plural(d.gruposCreados, termGrupoLow, termGrupoPlural)} y ${plural(d.partidasCreadas, 'partida', 'partidas')} nuevas en ${plural(d.obrasProcesadas ?? 0, 'obra', 'obras')}.`,
+        nuevo === 0 ? 'info' : 'success',
+      );
+      for (const a of (d.avisos ?? []) as string[]) toast(a, 'warning');
+      setBcOpen(false);
+      setBcPreview(null);
+      await Promise.all([load(), cargarTipos()]);
+    } finally { setBcSync(false); }
+  }
 
   if (mounted && session && !isSuperAdmin) {
     return (
@@ -310,27 +458,28 @@ export default function PartidasPage() {
     );
   }
 
+  const totalSubs = subpartidas.length;
+  const subtitulo = [
+    `${plural(partidas.length, 'partida', 'partidas')} en ${plural(etapas.length, termGrupoLow, termGrupoPlural)}`,
+    plural(totalSubs, 'subpartida', 'subpartidas'),
+    tipo?.nombre.toLowerCase(),
+    porObra && obraFiltro ? `obra ${obraFiltro}` : null,
+  ].filter(Boolean).join(' · ');
+
   return (
     <PageShell>
       <PageHeader
         title="Partidas y subpartidas"
-        subtitle={
-          esVivienda
-            ? `${subpartidas.length} subpartidas en ${partidas.length} partidas · vivienda`
-            : `${partidas.length} partidas en ${etapas.length} ${termEtapasPlural} · ${subpartidas.length} subpartidas · infraestructura`
-        }
+        subtitle={subtitulo}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
-              {([['Vivienda', 'VIVIENDA'], ['Infraestructura', 'INFRA']] as const).map(([label, val]) => (
-                <button key={val} onClick={() => cambiarTipo(val)}
-                  className={'px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (tipoObra === val ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
-                  {label}
-                </button>
-              ))}
-            </div>
             {puede && (
-              <Button variant="outline" onClick={abrirNuevaEtapa} icon={<Icon name="plus" size="sm" color="currentColor" />}>{nuevaEtapaLabel}</Button>
+              <Button variant="outline" onClick={abrirBC} icon={<Icon name="traslado" size="sm" color="currentColor" />}>
+                Traer de BC
+              </Button>
+            )}
+            {puede && (
+              <Button variant="outline" onClick={abrirNuevaEtapa} icon={<Icon name="plus" size="sm" color="currentColor" />}>{nuevoGrupo}</Button>
             )}
             {puede && (
               <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
@@ -341,121 +490,219 @@ export default function PartidasPage() {
 
       <CatalogoTabs />
 
-      {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-5">
-          <div className="space-y-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
-          <Skeleton className="h-80 w-full" rounded="rounded-ds-lg" />
+      {/* Tipos de obra: O · I · A · F · T (pro_obc.tipos_obra) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex flex-wrap rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
+          {(tipos.length > 0 ? tipos : [{ codigo: 'VIVIENDA', letra: 'O', nombre: 'Obra Vivienda' } as TipoObra]).map(t => (
+            <button key={t.codigo} onClick={() => cambiarTipo(t.codigo)}
+              title={`${t.letra} = ${t.nombre}${t.grupos != null ? ` · ${plural(t.grupos, t.terminoGrupo?.toLowerCase() ?? 'grupo', t.terminoGrupoPlural?.toLowerCase() ?? 'grupos')}, ${plural(t.partidas ?? 0, 'partida', 'partidas')}, ${plural(t.subpartidas ?? 0, 'subpartida', 'subpartidas')}` : ''}`}
+              className={'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (tipoCodigo === t.codigo ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
+              <span className={'inline-flex items-center justify-center h-4 w-4 rounded text-[10px] font-bold font-mono ' + (tipoCodigo === t.codigo ? 'bg-white/20 text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{t.letra}</span>
+              {t.nombre}
+              {t.partidas != null && <span className={'text-xs font-normal ' + (tipoCodigo === t.codigo ? 'text-white/70' : 'text-ds-gray-400')}>{t.partidas}</span>}
+            </button>
+          ))}
         </div>
-      ) : partidas.length === 0 ? (
-        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
-          No hay partidas todavía.{puede && ' Creá la primera con “Nueva partida”.'}
+      </div>
+
+      <p className="text-body-sm text-ds-gray-400">
+        {porObra
+          ? <>Las <span className="font-semibold text-ds-gray-500">{termGrupoPlural}</span> y <span className="font-semibold text-ds-gray-500">partidas</span> vienen de Business Central y cada obra tiene su propia estructura. Las <span className="font-semibold text-ds-gray-500">subpartidas</span> existen solo acá.</>
+          : <>Las <span className="font-semibold text-ds-gray-500">{termGrupoPlural}</span> y <span className="font-semibold text-ds-gray-500">partidas</span> son las de Business Central (capítulo y partida de la obra), compartidas por todas las obras del tipo. Las <span className="font-semibold text-ds-gray-500">subpartidas</span> existen solo acá.</>}
+      </p>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[240px] flex-1">
+          <Input placeholder="Buscar etapa, partida o subpartida…" value={q} onChange={e => setQ(e.target.value)} />
+        </div>
+        {porObra && (
+          <div className="min-w-[240px]">
+            <Combobox
+              value={obraFiltro}
+              onChange={v => { setObraFiltro(v); setObrasAbiertas(new Set()); }}
+              placeholder="Todas las obras"
+              options={[
+                { value: '', label: 'Todas las obras' },
+                ...obrasDelTipo.map(o => ({
+                  value: o.numeroObra,
+                  label: o.nombre ? `${o.numeroObra} — ${o.nombre}` : o.numeroObra,
+                  parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombre, weight: 'light' as const }],
+                  search: `${o.numeroObra} ${o.nombre}`,
+                })),
+              ]}
+            />
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" variant="ghost" onClick={expandirTodo}>Expandir todo</Button>
+          <Button size="sm" variant="ghost" onClick={colapsarTodo}>Colapsar todo</Button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+      ) : etapas.length === 0 ? (
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center">
+          <p className="text-ds-gray-400">
+            El catálogo de <span className="font-semibold text-ds-ink">{tipo?.nombre.toLowerCase() ?? tipoCodigo.toLowerCase()}</span> está vacío.
+          </p>
+          {puede && (
+            <p className="text-body-sm text-ds-gray-400 mt-2">
+              Creá {elGrupo} con “{nuevoGrupo}”, o traé la estructura que ya está en Business Central con “Traer de BC”.
+            </p>
+          )}
+        </div>
+      ) : arbol.length === 0 ? (
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400 text-sm">
+          Ningún resultado para “{q}”.
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr] gap-5 items-start">
-          {/* IZQUIERDA — lista de todas las partidas (seleccionable) */}
-          <div className="space-y-3">
-            <Input placeholder="Buscar partida o subpartida…" value={q} onChange={e => setQ(e.target.value)} />
-            <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
-              {grupos.length === 0 ? (
-                <div className="p-6 text-center text-ds-gray-400 text-sm">Ningún resultado para “{q}”.</div>
-              ) : (
-                <div className="max-h-[72vh] overflow-y-auto no-scrollbar">
-                  {grupos.map(({ etapa, partidas: parts }) => (
-                    <div key={etapa.idEtapa}>
-                      <div className="flex items-center gap-2 px-3 py-2 bg-ds-gray-100 border-y border-ds-gray-200 sticky top-0 z-10">
-                        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono">{etapa.codigo}</span>
-                        <span className="font-bold text-ds-ink text-xs uppercase tracking-wide truncate flex-1">{etapa.nombre}</span>
-                        {puede && (
-                          <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-400 hover:text-brand shrink-0" title={`Nueva partida en ${esVivienda ? 'esta etapa' : 'este sistema'}`}>
-                            <Icon name="plus" size="sm" color="currentColor" />
-                          </button>
-                        )}
-                      </div>
-                      {parts.map(({ partida }) => {
-                        const total = subsByPartida.get(partida.idPartida)?.length ?? 0;
-                        const active = selPartida === partida.idPartida;
-                        return (
-                          <button key={partida.idPartida} onClick={() => setSelPartida(partida.idPartida)}
-                            className={'w-full text-left px-3 py-2.5 flex items-center gap-2 border-l-2 transition ' + (active ? 'bg-brand-soft border-brand' : 'border-transparent hover:bg-ds-gray-100')}>
-                            <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{partida.codigo}</span>
-                            <span className="text-sm text-ds-ink truncate flex-1">{partida.nombre}</span>
-                            <span className="text-xs text-ds-gray-400 shrink-0">{total}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+          {arbol.map(sec => (
+            <div key={sec.obra ?? SIN_OBRA}>
+              {/* Nivel 0 (solo admin/fábrica): la obra de BC dueña de la estructura */}
+              {sec.obra && (
+                <button
+                  onClick={() => setObrasAbiertas(s => toggleSet(s, sec.obra!))}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-black text-white text-left"
+                >
+                  <span className={'transition-transform shrink-0 ' + (obraAbierta(sec.obra) ? 'rotate-90' : '')}>
+                    <Icon name="chevron-right" size="sm" color="#ffffff" />
+                  </span>
+                  <span className="font-mono text-xs font-bold">{sec.obra}</span>
+                  <span className="text-xs text-white/60 truncate flex-1">
+                    {obrasDelTipo.find(o => o.numeroObra === sec.obra)?.nombre ?? ''}
+                  </span>
+                  <span className="text-[11px] text-white/60 shrink-0">
+                    {plural(sec.grupos.length, termGrupoLow, termGrupoPlural)} · {plural(sec.totalPartidas, 'partida', 'partidas')} · {plural(sec.totalSubs, 'subpartida', 'subpartidas')}
+                  </span>
+                </button>
               )}
-            </div>
-          </div>
 
-          {/* DERECHA — detalle de la partida seleccionada */}
-          <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden min-h-[300px]">
-            {!sel ? (
-              <div className="p-12 text-center text-ds-gray-400 text-sm">Seleccioná una partida de la izquierda para ver y agregar sus subpartidas.</div>
-            ) : (
-              <>
-                <div className="px-5 py-4 border-b border-ds-gray-200 flex items-center gap-3 flex-wrap">
-                  {selEtapa && <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono shrink-0">{selEtapa.codigo}</span>}
-                  <span className="font-mono text-sm font-semibold text-ds-gray-500 shrink-0">{sel.codigo}</span>
-                  <h2 className="text-body font-bold text-ds-ink truncate flex-1 min-w-0">{sel.nombre}</h2>
-                  <span className="text-xs text-ds-gray-400 shrink-0">{selSubs.length} subpartidas</span>
-                  {puede && (
-                    <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                      <Button size="sm" variant="outline" onClick={() => abrirEditarPart(sel)} icon={<Icon name="edit" size="sm" color="currentColor" />}>Editar</Button>
-                      <Button size="sm" onClick={() => abrirNuevaSub(sel.idPartida)} icon={<Icon name="plus" size="sm" color="currentColor" />}>Agregar subpartida</Button>
-                    </div>
-                  )}
-                </div>
-                {selSubs.length === 0 ? (
-                  <div className="p-12 text-center text-ds-gray-300 text-sm">
-                    {`Esta partida no tiene subpartidas.${puede ? ' Agregá la primera con el botón de arriba.' : ''}`}
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-ds-gray-100 max-h-[62vh] overflow-y-auto no-scrollbar">
-                    {selSubs.map(s => (
-                      <li
-                        key={s.idSubPartida}
-                        onClick={puede ? () => abrirEditarSub(s) : undefined}
-                        title={puede ? (esVivienda ? 'Editar subpartida (sprint y tipos de casa)' : 'Editar subpartida') : undefined}
-                        className={'px-5 py-3 flex items-start gap-3 ' + (puede ? 'cursor-pointer hover:bg-ds-gray-100 transition-colors' : '')}
+              {obraAbierta(sec.obra) && sec.grupos.map(({ etapa, partidas: parts, totalPartidas, totalSubs: subsGrupo }) => {
+                const abierto = grupoAbierto(etapa.idEtapa);
+                return (
+                  <div key={etapa.idEtapa}>
+                    {/* Nivel 1 — grupo (etapa / sistema / área / proceso / torre) */}
+                    <div className="flex items-center gap-2 px-3 py-2 bg-ds-gray-100 border-y border-ds-gray-200">
+                      <button
+                        onClick={() => setGruposCerrados(s => toggleSet(s, etapa.idEtapa))}
+                        className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                        title={abierto ? 'Colapsar' : `Ver las partidas de ${etapa.nombre}`}
                       >
-                        <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 pt-0.5">{s.codigo}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={'text-sm truncate ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
-                            {s.esCritica && <Badge variant="red">Crítica</Badge>}
-                            {!s.activo && <Badge variant="gray">Inactiva</Badge>}
+                        <span className={'transition-transform shrink-0 ' + (abierto ? 'rotate-90' : '')}>
+                          <Icon name="chevron-right" size="sm" color="currentColor" />
+                        </span>
+                        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono shrink-0">{etapa.codigo}</span>
+                        <span className="font-bold text-ds-ink text-xs uppercase tracking-wide truncate">{etapa.nombre}</span>
+                        {etapa.bcTaskNo && (
+                          <span className="rounded bg-ds-surface border border-ds-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-ds-gray-400 shrink-0" title={`Capítulo ${etapa.bcTaskNo} de la obra en Business Central`}>
+                            BC {etapa.bcTaskNo}
+                          </span>
+                        )}
+                      </button>
+                      <span className="text-[11px] text-ds-gray-400 shrink-0 whitespace-nowrap">
+                        {plural(totalPartidas, 'partida', 'partidas')}
+                        {subsGrupo > 0 ? ` · ${plural(subsGrupo, 'subpartida', 'subpartidas')}` : ''}
+                      </span>
+                      {puede && (
+                        <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-400 hover:text-brand shrink-0" title={`Nueva partida en ${etapa.nombre}`}>
+                          <Icon name="plus" size="sm" color="currentColor" />
+                        </button>
+                      )}
+                    </div>
+
+                    {abierto && parts.length === 0 && (
+                      <div className="px-10 py-3 text-body-sm text-ds-gray-300">
+                        Sin partidas.{puede ? ' Agregá la primera con el “+”.' : ''}
+                      </div>
+                    )}
+
+                    {abierto && parts.map(({ partida, subs, subsVisibles, forzarAbierta }) => {
+                      const subAbierta = partidaAbierta(partida.idPartida, forzarAbierta);
+                      return (
+                        <div key={partida.idPartida} className="border-b border-ds-gray-100 last:border-b-0">
+                          {/* Nivel 2 — partida (existe en BC) */}
+                          <div className="flex items-center gap-2 pl-8 pr-3 py-2.5 hover:bg-ds-gray-100/60 transition-colors">
+                            <button
+                              onClick={() => setPartidasAbiertas(s => toggleSet(s, partida.idPartida))}
+                              className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                              title={subAbierta ? 'Colapsar subpartidas' : 'Ver subpartidas'}
+                            >
+                              <span className={'transition-transform shrink-0 ' + (subAbierta ? 'rotate-90' : '') + (subs.length === 0 ? ' opacity-30' : '')}>
+                                <Icon name="chevron-right" size="sm" color="currentColor" />
+                              </span>
+                              <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{partida.codigo}</span>
+                              <span className="text-sm text-ds-ink truncate">{partida.nombre}</span>
+                            </button>
+                            <span className="text-xs text-ds-gray-400 shrink-0">{subs.length}</span>
+                            {puede && (
+                              <>
+                                <button onClick={() => abrirEditarPart(partida)} className="text-ds-gray-400 hover:text-ds-ink shrink-0" title="Editar partida">
+                                  <Icon name="edit" size="sm" color="currentColor" />
+                                </button>
+                                <button onClick={() => abrirNuevaSub(partida.idPartida)} className="text-ds-gray-400 hover:text-brand shrink-0" title="Agregar subpartida">
+                                  <Icon name="plus" size="sm" color="currentColor" />
+                                </button>
+                              </>
+                            )}
                           </div>
-                          {/* Tipos de casa: solo vivienda (en infra no aplican). */}
-                          {esVivienda && (
-                            <div className="mt-1 flex flex-wrap items-center gap-1">
-                              {s.tiposCasa.length > 0
-                                ? s.tiposCasa.map(tc => (
-                                    <span key={tc} className="rounded bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-500">{tc}</span>
-                                  ))
-                                : <span className="text-[10px] font-semibold text-ds-red">Sin tipos de casa — clic para asignar</span>}
-                            </div>
+
+                          {/* Nivel 3 — subpartidas (solo en esta base, no en BC) */}
+                          {subAbierta && (
+                            subsVisibles.length === 0 ? (
+                              <div className="pl-16 pr-3 py-2.5 text-body-sm text-ds-gray-300 bg-ds-gray-100/40">
+                                Esta partida no tiene subpartidas.{puede ? ' Agregá la primera con el “+”.' : ''}
+                              </div>
+                            ) : (
+                              <ul className="bg-ds-gray-100/40">
+                                {subsVisibles.map(s => (
+                                  <li
+                                    key={s.idSubPartida}
+                                    onClick={puede ? () => abrirEditarSub(s) : undefined}
+                                    title={puede ? 'Editar subpartida' : undefined}
+                                    className={'pl-16 pr-3 py-2.5 flex items-start gap-3 border-t border-ds-gray-100 ' + (puede ? 'cursor-pointer hover:bg-ds-gray-100 transition-colors' : '')}
+                                  >
+                                    <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 pt-0.5">{s.codigo}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={'text-sm truncate ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
+                                        {s.esCritica && <Badge variant="red">Crítica</Badge>}
+                                        {!s.activo && <Badge variant="gray">Inactiva</Badge>}
+                                      </div>
+                                      {usaTiposCasa && (
+                                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                                          {s.tiposCasa.length > 0
+                                            ? s.tiposCasa.map(tc => (
+                                                <span key={tc} className="rounded bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-500">{tc}</span>
+                                              ))
+                                            : <span className="text-[10px] font-semibold text-ds-red">Sin tipos de casa — clic para asignar</span>}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {s.numSprint != null && (
+                                      <span className="rounded-full bg-ds-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ds-gray-500 shrink-0 whitespace-nowrap" title={`Sprint ${s.numSprint}`}>
+                                        Sprint {s.numSprint}
+                                      </span>
+                                    )}
+                                    {puede && (
+                                      <span className="text-ds-gray-400 p-1 shrink-0" aria-hidden>
+                                        <Icon name="edit" size="sm" color="currentColor" />
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            )
                           )}
                         </div>
-                        {s.numSprint != null && (
-                          <span className="rounded-full bg-ds-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ds-gray-500 shrink-0 whitespace-nowrap" title={`Sprint ${s.numSprint}`}>
-                            Sprint {s.numSprint}
-                          </span>
-                        )}
-                        {puede && (
-                          <span className="text-ds-gray-400 p-1 shrink-0" aria-hidden>
-                            <Icon name="edit" size="sm" color="currentColor" />
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
-          </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
 
@@ -478,15 +725,23 @@ export default function PartidasPage() {
       >
         <div className="space-y-4">
           <Combobox
-            label={termEtapa} required
+            label={termGrupo} required
             value={partForm.idEtapa}
             onChange={v => setPart('idEtapa', v)}
-            placeholder={`Seleccionar ${termEtapaLow}`}
-            options={etapas.map(e => ({ value: String(e.idEtapa), label: e.nombre, parts: [{ text: e.codigo, weight: 'bold' as const }, { text: e.nombre, weight: 'light' as const }], search: e.codigo }))}
+            placeholder={`Seleccionar ${termGrupoLow}`}
+            options={etapas.map(e => ({
+              value: String(e.idEtapa),
+              label: e.nombre,
+              parts: [
+                { text: e.bcWorksNo ? `${e.bcWorksNo} · ${e.codigo}` : e.codigo, weight: 'bold' as const },
+                { text: e.nombre, weight: 'light' as const },
+              ],
+              search: `${e.codigo} ${e.bcWorksNo ?? ''}`,
+            }))}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Código" placeholder="Ej. 1.3" value={partForm.codigo} onChange={e => setPart('codigo', e.target.value)} required maxLength={50} />
-            <Input label="Nombre" value={partForm.nombre} onChange={e => setPart('nombre', e.target.value)} required maxLength={100} />
+            <Input label="Código" placeholder="Ej. 1.3" value={partForm.codigo} onChange={e => setPart('codigo', e.target.value)} required maxLength={50} hint="Mismo código que la partida en BC" />
+            <Input label="Nombre" value={partForm.nombre} onChange={e => setPart('nombre', e.target.value)} required maxLength={150} />
           </div>
         </div>
       </Modal>
@@ -510,7 +765,7 @@ export default function PartidasPage() {
       >
         <div className="space-y-4">
           {subForm.idPartida ? (
-            // Partida ya definida por contexto (detalle o edición): se muestra fija.
+            // Partida ya definida por contexto (árbol o edición): se muestra fija.
             <div className="rounded-ds bg-ds-gray-100 px-4 py-3 text-sm">
               <span className="text-ds-gray-500">Partida: </span>
               {(() => {
@@ -521,22 +776,22 @@ export default function PartidasPage() {
           ) : (
             <>
               <p className="text-body-sm text-ds-gray-500">
-                La subpartida queda amarrada a una <span className="font-semibold text-ds-ink">partida</span> existente (y a su {termEtapaLow}).
+                La subpartida queda amarrada a una <span className="font-semibold text-ds-ink">partida</span> existente (y a su {termGrupoLow}).
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Combobox
-                  label={termEtapa} required
+                  label={termGrupo} required
                   value={subForm.idEtapa}
                   onChange={v => { setSub('idEtapa', v); setSub('idPartida', ''); }}
-                  placeholder={`Seleccionar ${termEtapaLow}`}
-                  options={etapas.map(e => ({ value: String(e.idEtapa), label: e.nombre, parts: [{ text: e.codigo, weight: 'bold' as const }, { text: e.nombre, weight: 'light' as const }], search: e.codigo }))}
+                  placeholder={`Seleccionar ${termGrupoLow}`}
+                  options={etapas.map(e => ({ value: String(e.idEtapa), label: e.nombre, parts: [{ text: e.bcWorksNo ? `${e.bcWorksNo} · ${e.codigo}` : e.codigo, weight: 'bold' as const }, { text: e.nombre, weight: 'light' as const }], search: `${e.codigo} ${e.bcWorksNo ?? ''}` }))}
                 />
                 <Combobox
                   label="Partida" required
                   value={subForm.idPartida}
                   onChange={v => setSub('idPartida', v)}
-                  placeholder={subForm.idEtapa ? 'Seleccionar partida' : `Elegí ${esVivienda ? 'una etapa' : 'un sistema'} primero`}
-                  emptyText={`Este ${termEtapaLow} no tiene partidas`}
+                  placeholder={subForm.idEtapa ? 'Seleccionar partida' : `Elegí ${unGrupo} primero`}
+                  emptyText={`${esteGrupo.charAt(0).toUpperCase() + esteGrupo.slice(1)} no tiene partidas`}
                   options={partidasDeEtapa.map(p => ({ value: String(p.idPartida), label: p.nombre, parts: [{ text: p.codigo, weight: 'bold' as const }, { text: p.nombre, weight: 'light' as const }], search: p.codigo }))}
                 />
               </div>
@@ -547,8 +802,8 @@ export default function PartidasPage() {
             <Input label="Nombre" value={subForm.nombre} onChange={e => setSub('nombre', e.target.value)} required maxLength={50} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Sprint: solo vivienda. Infraestructura no se planifica por sprint. */}
-            {!esVivienda ? null : sprintsCat.length > 0 ? (
+            {/* Sprint: solo los tipos que planifican por sprint (hoy, vivienda). */}
+            {!usaSprints ? null : sprintsCat.length > 0 ? (
               <Combobox
                 label="Sprint"
                 value={subForm.numSprint}
@@ -581,9 +836,8 @@ export default function PartidasPage() {
               </label>
             </div>
           </div>
-          {/* Tipos de casa a los que aplica la subpartida (mismo modelo que Avance).
-              Solo vivienda: en infra la subpartida aplica a la obra completa. */}
-          {esVivienda && (
+          {/* Tipos de casa a los que aplica la subpartida (mismo modelo que Avance). */}
+          {usaTiposCasa && (
             <div>
               <label className="block text-body-sm font-medium text-ds-ink mb-1.5">Tipos de casa <span className="text-ds-red">*</span></label>
               <div className="flex flex-wrap gap-2">
@@ -599,37 +853,143 @@ export default function PartidasPage() {
               </div>
             </div>
           )}
-          {!esVivienda && (
+          {!usaSprints && !usaTiposCasa && (
             <p className="text-body-sm text-ds-gray-400">
-              En infraestructura la subpartida no lleva sprint ni tipo de casa: aplica a la obra completa.
+              En {tipo?.nombre.toLowerCase() ?? 'este tipo de obra'} la subpartida no lleva sprint ni tipo de casa: aplica a la obra completa.
             </p>
           )}
           <Input label="Descripción (opcional)" value={subForm.descripcion} onChange={e => setSub('descripcion', e.target.value)} maxLength={4000} />
         </div>
       </Modal>
 
-      {/* Modal: etapa / sistema (crear) */}
+      {/* Modal: grupo (crear) */}
       <Modal
         open={etapaOpen}
         onClose={() => setEtapaOpen(false)}
-        title={nuevaEtapaLabel}
+        title={nuevoGrupo}
         footer={
           <div className="flex items-center gap-2 w-full">
             <div className="ml-auto flex items-center gap-2">
               <Button variant="outline" onClick={() => setEtapaOpen(false)}>Cancelar</Button>
-              <Button loading={saving} disabled={!etapaForm.codigo.trim() || !etapaForm.nombre.trim()} onClick={guardarEtapa}>{`Crear ${termEtapaLow}`}</Button>
+              <Button loading={saving} disabled={!etapaForm.codigo.trim() || !etapaForm.nombre.trim()} onClick={guardarEtapa}>{`Crear ${termGrupoLow}`}</Button>
             </div>
           </div>
         }
       >
         <div className="space-y-4">
           <p className="text-body-sm text-ds-gray-500">
-            Se crea en el catálogo de <span className="font-semibold text-ds-ink">{esVivienda ? 'vivienda' : 'infraestructura'}</span>.
+            Se crea en el catálogo de <span className="font-semibold text-ds-ink">{tipo?.nombre.toLowerCase() ?? tipoCodigo.toLowerCase()}</span>.
           </p>
+          {porObra && (
+            <Combobox
+              label="Obra de Business Central"
+              value={etapaForm.bcWorksNo}
+              onChange={v => setEt('bcWorksNo', v)}
+              placeholder="Compartida por todas las obras del tipo"
+              options={[
+                { value: '', label: 'Compartida por todas las obras del tipo' },
+                ...obrasDelTipo.map(o => ({
+                  value: o.numeroObra,
+                  label: o.nombre ? `${o.numeroObra} — ${o.nombre}` : o.numeroObra,
+                  parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombre, weight: 'light' as const }],
+                  search: `${o.numeroObra} ${o.nombre}`,
+                })),
+              ]}
+            />
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Código" placeholder={esVivienda ? 'Ej. gris, acabados' : 'Ej. pavimento, piscina'} value={etapaForm.codigo} onChange={e => setEt('codigo', e.target.value)} required maxLength={20} />
-            <Input label="Nombre" placeholder={esVivienda ? 'Ej. Obra Gris' : 'Ej. Estructura de Pavimento'} value={etapaForm.nombre} onChange={e => setEt('nombre', e.target.value)} required maxLength={100} />
+            <Input label="Código" placeholder="Ej. gris, FG, T1" value={etapaForm.codigo} onChange={e => setEt('codigo', e.target.value)} required maxLength={50} />
+            <Input label="Nombre" placeholder="Ej. Obra Gris" value={etapaForm.nombre} onChange={e => setEt('nombre', e.target.value)} required maxLength={150} />
           </div>
+          <Input
+            label="Capítulo en BC (opcional)"
+            placeholder="Ej. 1, FG, G1"
+            value={etapaForm.bcTaskNo}
+            onChange={e => setEt('bcTaskNo', e.target.value)}
+            maxLength={50}
+            hint="Código del capítulo (“Total”) de la obra en Business Central, si ya existe allá"
+          />
+        </div>
+      </Modal>
+
+      {/* Modal: traer de BC */}
+      <Modal
+        open={bcOpen}
+        onClose={() => setBcOpen(false)}
+        title="Traer estructura de Business Central"
+        footer={
+          <div className="flex items-center gap-2 w-full">
+            <div className="ml-auto flex items-center gap-2">
+              <Button variant="outline" onClick={() => setBcOpen(false)}>Cancelar</Button>
+              <Button variant="outline" loading={bcSync === 'ver'} onClick={verQueTraeriaDeBC}>Ver qué traería</Button>
+              <Button loading={bcSync === 'traer'} onClick={traerDeBC}>Traer</Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-body-sm text-ds-gray-500">
+            Lee el presupuesto de la obra en BC y agrega al catálogo de{' '}
+            <span className="font-semibold text-ds-ink">{tipo?.nombre.toLowerCase() ?? tipoCodigo.toLowerCase()}</span> los
+            capítulos que falten como <span className="font-semibold text-ds-ink">{termGrupoPlural}</span> y sus partidas como{' '}
+            <span className="font-semibold text-ds-ink">partidas</span>. No borra nada y no toca las subpartidas.
+          </p>
+          <Combobox
+            label="Obra"
+            value={bcObra}
+            onChange={v => { setBcObra(v); setBcPreview(null); }}
+            placeholder={`Todas las obras de ${tipo?.nombre.toLowerCase() ?? 'este tipo'}`}
+            options={[
+              { value: '', label: `Todas las obras de ${tipo?.nombre.toLowerCase() ?? 'este tipo'}` },
+              ...obrasDelTipo.map(o => ({
+                value: o.numeroObra,
+                label: o.nombre ? `${o.numeroObra} — ${o.nombre}` : o.numeroObra,
+                parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombre, weight: 'light' as const }],
+                search: `${o.numeroObra} ${o.nombre}`,
+              })),
+            ]}
+          />
+          {!porObra && (
+            <p className="text-body-sm text-ds-gray-400">
+              En {tipo?.nombre.toLowerCase()} el catálogo es uno para todas las obras: lo que traiga de esta obra queda
+              disponible para todas. Conviene usar “Ver qué traería” antes.
+            </p>
+          )}
+          {bcPreview && (
+            <div className="rounded-ds border border-ds-gray-200 bg-ds-gray-100/60 p-3 space-y-2">
+              <p className="text-body-sm text-ds-ink">
+                {bcPreview.gruposCreados + bcPreview.partidasCreadas === 0
+                  ? `Nada nuevo: lo de BC ya está en el catálogo (${plural(bcPreview.obrasProcesadas, 'obra revisada', 'obras revisadas')}).`
+                  : <>Traería <span className="font-semibold">{plural(bcPreview.gruposCreados, termGrupoLow, termGrupoPlural)}</span> y <span className="font-semibold">{plural(bcPreview.partidasCreadas, 'partida', 'partidas')}</span> nuevas de {plural(bcPreview.obrasProcesadas, 'obra', 'obras')}.</>}
+              </p>
+              {bcPreview.detalle.some(d => d.gruposCreados.length + d.partidasCreadas.length > 0) && (
+                <ul className="max-h-48 overflow-y-auto space-y-1.5 text-body-sm">
+                  {bcPreview.detalle.filter(d => d.gruposCreados.length + d.partidasCreadas.length > 0).map(d => (
+                    <li key={d.obra}>
+                      <span className="font-mono text-xs font-semibold text-ds-gray-500">{d.obra}</span>
+                      <span className="text-ds-gray-400">
+                        {' · '}
+                        {d.fuente === 'bc' ? 'BC en vivo'
+                          : d.fuente === 'bc-otra' ? `BC · compañía ${d.compania ?? 'anterior'}`
+                          : 'snapshot del ETL'}
+                        {d.version ? ` · versión ${d.version}` : ''}
+                      </span>
+                      <div className="pl-3 text-ds-gray-500">
+                        {[...d.gruposCreados.map(g => `${termGrupo}: ${g}`), ...d.partidasCreadas.map(p => `Partida: ${p}`)]
+                          .slice(0, 12).map(t => <div key={t} className="truncate">{t}</div>)}
+                        {d.gruposCreados.length + d.partidasCreadas.length > 12 && (
+                          <div className="text-ds-gray-400">…y {d.gruposCreados.length + d.partidasCreadas.length - 12} más</div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-body-sm text-ds-gray-400">
+                También refrescaría el nombre de {plural(bcPreview.gruposActualizados, `${termGrupoLow} que ya está`, `${termGrupoPlural} que ya están`)} y {plural(bcPreview.partidasActualizadas, 'partida que ya está', 'partidas que ya están')}.
+              </p>
+            </div>
+          )}
         </div>
       </Modal>
     </PageShell>
