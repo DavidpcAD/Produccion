@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
@@ -27,6 +28,29 @@ interface PresupExistente {
   fecha?: string | null;
 }
 interface Linea { taskNo: string; taskType?: string; description: string; lineAmount?: number; unitCost?: number; no?: string }
+// Cruce del Excel contra el catálogo de partidas de SQL (pro_obc): qué línea del
+// presupuesto ya existe como capítulo/partida del catálogo del tipo de obra y qué
+// no. Lo que falta se puede crear desde acá antes de subir a BC.
+interface CatalogoLinea {
+  taskNo: string; taskType: 'Total' | 'Posting'; description: string;
+  enCatalogo: boolean; nombreCatalogo: string | null;
+  /** Dónde está en el catálogo, o el capítulo donde caería si se crea. */
+  ubicacion: string | null;
+}
+interface CatalogoCheck {
+  obra: string;
+  areaCosteo: string;
+  tipo: {
+    codigo: string; letra: string; nombre: string;
+    terminoGrupo: string; terminoGrupoPlural: string; genero: 'F' | 'M';
+    catalogoCompartido: boolean;
+  };
+  resumen: {
+    capitulos: { total: number; enCatalogo: number };
+    partidas: { total: number; enCatalogo: number };
+  };
+  detalle: CatalogoLinea[];
+}
 interface PlantillaParsed { archivo: string; porTipo: Record<string, Linea[]>; totales: Record<string, number>; hojas: string[] }
 interface DescParsed { archivo: string; hoja: string | null; lineas: Linea[] }
 interface TotalesBC { salesLineAmount?: number; costLineAmount?: number; indirectCostLineAmount?: number; result?: number }
@@ -183,6 +207,13 @@ export default function PresupuestoPage() {
   const [presupExistente, setPresupExistente] = useState<PresupExistente | null>(null);
   const [presupExistenteLoading, setPresupExistenteLoading] = useState(false);
 
+  // Cruce con el catálogo de partidas (pro_obc) de la obra elegida.
+  const [catalogo, setCatalogo] = useState<CatalogoCheck | null>(null);
+  const [catalogoError, setCatalogoError] = useState<string | null>(null);
+  const [catalogoLoading, setCatalogoLoading] = useState(false);
+  const [catalogoCreando, setCatalogoCreando] = useState(false);
+  const [catalogoVerTodo, setCatalogoVerTodo] = useState(false);
+
   const obra = obras.find(o => String(o.idObra) === obraId);
 
   // Al cambiar de obra: resetea lo subido y precarga el área prorrateada que ya
@@ -206,6 +237,74 @@ export default function PresupuestoPage() {
       .finally(() => { if (!cancel) setPresupExistenteLoading(false); });
     return () => { cancel = true; };
   }, [obraId]);
+
+  // Líneas de ESTRUCTURA del Excel (código + nivel), sin montos: es lo que se
+  // cruza contra el catálogo. Un mismo código viene en Venta, Costo e Indirectos,
+  // así que se deduplica por código.
+  const lineasEstructura = useMemo(() => {
+    if (!plantilla) return [] as { taskNo: string; taskType: string; description: string }[];
+    const vistas = new Set<string>();
+    const out: { taskNo: string; taskType: string; description: string }[] = [];
+    for (const t of TIPO_SUBIBLES) {
+      for (const l of plantilla.porTipo[t] ?? []) {
+        const cod = String(l.taskNo ?? '').trim();
+        if (!cod || vistas.has(cod.toUpperCase())) continue;
+        vistas.add(cod.toUpperCase());
+        out.push({ taskNo: cod, taskType: l.taskType === 'Total' ? 'Total' : 'Posting', description: l.description ?? '' });
+      }
+    }
+    return out;
+  }, [plantilla]);
+
+  // Cruce contra el catálogo: se rehace al cambiar de obra o de plantilla.
+  const claveCruce = useMemo(
+    () => (obra && lineasEstructura.length > 0 ? `${obra.numeroObra}|${lineasEstructura.map(l => l.taskNo).join(',')}` : ''),
+    [obra, lineasEstructura],
+  );
+  useEffect(() => {
+    if (!claveCruce || !obra) { setCatalogo(null); setCatalogoError(null); return; }
+    let cancel = false;
+    setCatalogoLoading(true);
+    setCatalogoVerTodo(false);
+    fetch('/api/presupuesto/catalogo', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ worksNo: obra.numeroObra, lineas: lineasEstructura }),
+    })
+      .then(async r => ({ ok: r.ok, d: await r.json().catch(() => ({})) }))
+      .then(({ ok, d }) => {
+        if (cancel) return;
+        if (!ok) { setCatalogo(null); setCatalogoError(d.error || 'No se pudo cruzar con el catálogo'); return; }
+        setCatalogo(d); setCatalogoError(null);
+      })
+      .catch(() => { if (!cancel) { setCatalogo(null); setCatalogoError('No se pudo cruzar con el catálogo'); } })
+      .finally(() => { if (!cancel) setCatalogoLoading(false); });
+    return () => { cancel = true; };
+    // lineasEstructura y obra están dentro de claveCruce.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveCruce]);
+
+  // Crear en el catálogo las partidas/capítulos del Excel que faltan.
+  async function crearEnCatalogo() {
+    if (!obra) return;
+    setCatalogoCreando(true);
+    try {
+      const res = await fetch('/api/presupuesto/catalogo', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worksNo: obra.numeroObra, lineas: lineasEstructura, crear: true }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(d.error || 'No se pudieron crear en el catálogo', 'error'); return; }
+      setCatalogo(d);
+      const g = d.creado?.gruposCreados?.length ?? 0;
+      const p = d.creado?.partidasCreadas?.length ?? 0;
+      toast(
+        g + p === 0
+          ? 'No había nada que crear: el presupuesto ya está completo en el catálogo.'
+          : `Catálogo actualizado: ${p} partida(s) y ${g} ${d.tipo?.terminoGrupoPlural?.toLowerCase() ?? 'grupos'} nuevas.`,
+        'success',
+      );
+    } finally { setCatalogoCreando(false); }
+  }
 
   const load = useCallback(async () => {
     const o = await fetch('/api/obras?porPagina=1000').then(r => (r.ok ? r.json() : null)).catch(() => null);
@@ -564,6 +663,111 @@ export default function PresupuestoPage() {
         );
       })()}
 
+      {/* Cruce con el catálogo de partidas (pro_obc) — antes de subir a BC.
+          Los capítulos y partidas del Excel son los mismos códigos de tarea que
+          maneja BC; las subpartidas solo existen en el catálogo del app. */}
+      {plantilla && obraId && (
+        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <h2 className="text-body font-bold text-ds-ink">Cruce con el catálogo de partidas</h2>
+              <p className="text-ds-gray-400 text-xs">
+                Las partidas del Excel deben existir en el catálogo del app: es lo que después se desglosa en
+                subpartidas (ese nivel no existe en BC) y lo que usan Avance y los pedidos.
+              </p>
+            </div>
+            <Link href="/partidas" className="text-xs font-semibold text-ds-gray-500 underline underline-offset-2 hover:text-ds-ink shrink-0">
+              Ver el catálogo
+            </Link>
+          </div>
+
+          {catalogoLoading && (
+            <div className="rounded-ds bg-ds-gray-100 px-4 py-2.5 text-sm text-ds-gray-500">Cruzando el Excel con el catálogo…</div>
+          )}
+          {catalogoError && !catalogoLoading && (
+            <div className="rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow/10 px-4 py-2.5 text-sm text-ds-yellow-ink">{catalogoError}</div>
+          )}
+
+          {catalogo && !catalogoLoading && (() => {
+            const faltan = catalogo.detalle.filter(d => !d.enCatalogo);
+            const faltanPartidas = faltan.filter(d => d.taskType === 'Posting');
+            const faltanCapitulos = faltan.filter(d => d.taskType === 'Total');
+            const term = catalogo.tipo.terminoGrupoPlural.toLowerCase();
+            const mostrar = catalogoVerTodo ? faltan : faltan.slice(0, 10);
+            return (
+              <>
+                <div className="flex flex-wrap items-center gap-2 text-body-sm">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-black text-white px-2.5 py-0.5 text-xs font-semibold">
+                    <span className="font-mono">{catalogo.tipo.letra}</span> {catalogo.tipo.nombre}
+                  </span>
+                  <span className="text-ds-gray-400 text-xs">
+                    tipo tomado del área de costeo de la obra{catalogo.areaCosteo ? ` (${catalogo.areaCosteo})` : ''}
+                    {catalogo.tipo.catalogoCompartido ? ' · catálogo compartido por todas las obras del tipo' : ` · estructura propia de ${catalogo.obra}`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <MetricBC
+                    label="Partidas del Excel en el catálogo"
+                    value={`${catalogo.resumen.partidas.enCatalogo} de ${catalogo.resumen.partidas.total}`}
+                    accent={catalogo.resumen.partidas.enCatalogo === catalogo.resumen.partidas.total ? 'pos' : 'neg'}
+                  />
+                  <MetricBC
+                    label={`Capítulos del Excel como ${term}`}
+                    value={`${catalogo.resumen.capitulos.enCatalogo} de ${catalogo.resumen.capitulos.total}`}
+                    accent={catalogo.resumen.capitulos.enCatalogo === catalogo.resumen.capitulos.total ? 'pos' : 'neg'}
+                  />
+                </div>
+
+                {faltan.length === 0 ? (
+                  <div className="rounded-ds-lg border border-brand/40 bg-brand-soft px-4 py-2.5 flex items-center gap-2">
+                    <Icon name="check" size="sm" color="currentColor" />
+                    <span className="text-sm font-semibold text-ds-ink">Todo el presupuesto ya está en el catálogo.</span>
+                  </div>
+                ) : (
+                  <div className="rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow/10 p-4 space-y-3">
+                    <p className="text-sm font-semibold text-ds-ink">
+                      {faltanPartidas.length > 0 && `${faltanPartidas.length} partida${faltanPartidas.length === 1 ? '' : 's'}`}
+                      {faltanPartidas.length > 0 && faltanCapitulos.length > 0 && ' y '}
+                      {faltanCapitulos.length > 0 && `${faltanCapitulos.length} capítulo${faltanCapitulos.length === 1 ? '' : 's'}`}
+                      {' '}del Excel no {faltan.length === 1 ? 'está' : 'están'} en el catálogo.
+                    </p>
+                    <ul className="space-y-1 max-h-56 overflow-y-auto no-scrollbar">
+                      {mostrar.map(d => (
+                        <li key={`${d.taskType}-${d.taskNo}`} className="flex items-baseline gap-2 text-body-sm">
+                          <span className={'text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ' + (d.taskType === 'Total' ? 'bg-black text-white' : 'bg-white/70 text-ds-gray-500 border border-ds-yellow/50')}>
+                            {d.taskType === 'Total' ? 'Capítulo' : 'Partida'}
+                          </span>
+                          <span className="font-mono text-xs font-semibold text-ds-ink shrink-0">{d.taskNo}</span>
+                          <span className="text-ds-gray-600 truncate">{d.description}</span>
+                          {d.ubicacion && d.taskType === 'Posting' && (
+                            <span className="text-ds-gray-400 text-xs shrink-0">→ iría en {d.ubicacion}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    {faltan.length > mostrar.length && (
+                      <button type="button" onClick={() => setCatalogoVerTodo(true)}
+                        className="text-xs font-semibold text-ds-gray-500 underline underline-offset-2 hover:text-ds-ink">
+                        Ver las {faltan.length - mostrar.length} restantes
+                      </button>
+                    )}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Button size="sm" loading={catalogoCreando} onClick={crearEnCatalogo} icon={<Icon name="plus" size="sm" color="currentColor" />}>
+                        Crear {faltan.length === 1 ? 'la que falta' : `las ${faltan.length} que faltan`} en el catálogo
+                      </Button>
+                      <span className="text-xs text-ds-gray-500">
+                        Se agregan al catálogo de {catalogo.tipo.nombre.toLowerCase()}; las subpartidas se agregan después en Partidas.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Paso 3 — Guardar / Subir a Business Central */}
       {hayDatos && (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4">
@@ -637,6 +841,13 @@ export default function PresupuestoPage() {
                     </div>
                   ))}
                 </div>
+                {catalogo && catalogo.detalle.some(d => !d.enCatalogo) && (
+                  <div className="rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow/10 px-3 py-2 text-xs text-ds-yellow-ink">
+                    Ojo: {catalogo.detalle.filter(d => !d.enCatalogo).length} línea(s) del Excel todavía no están en el
+                    catálogo de partidas del app. Podés subir a BC igual, pero esas partidas no se van a poder
+                    desglosar en subpartidas ni usar en Avance hasta crearlas (botón “Crear las que faltan”).
+                  </div>
+                )}
                 <p className="text-xs text-ds-gray-400">Solo Venta, Costo e Indirectos se envían a Business Central. Los Capítulos van como suma de sus partidas. Al confirmar se crea/actualiza la versión en BC.</p>
               </div>
             );
