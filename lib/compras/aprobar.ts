@@ -76,6 +76,9 @@ export async function aprobarYLanzar(
         // proyecto). BC lo exige en las líneas de artículo y no impide el consumo.
         locationCode: esActivo ? undefined : consumo ? l.proyecto : (materialABodega ? (almacenReal || ALMACEN_GENERAL) : (almacenReal || undefined)),
         esActivo: esActivo || undefined,
+        // REPUESTO: la máquina a la que se le compra (heredada del pedido origen). En
+        // BC va en el N.º máquina de la línea; es lo que amarra el gasto a la máquina.
+        machineNo: l.maquinaNo || undefined,
       };
     });
   // Cargos de producto (Item Charge): TODAS las líneas tipo "cargo" con precio, cada
@@ -90,8 +93,8 @@ export async function aprobarYLanzar(
   // Líneas que van contra la obra (proyecto + tarea): lo que hay que asegurarse de
   // que BC tenga puesto antes de lanzar.
   const consumoDirecto = lineasBc
-    .filter((l) => l.jobNo && l.jobTaskNo)
-    .map((l) => ({ lineNo: l.lineNo, itemNo: l.itemNo, jobNo: l.jobNo!, jobTaskNo: l.jobTaskNo! }));
+    .filter((l) => (l.jobNo && l.jobTaskNo) || l.machineNo)
+    .map((l) => ({ lineNo: l.lineNo, itemNo: l.itemNo, jobNo: l.jobNo ?? "", jobTaskNo: l.jobTaskNo ?? "", machineNo: l.machineNo }));
 
   // Sin proveedor de BC o sin líneas: no hay nada que enviar a BC; se lanza local.
   if (!orden.proveedorNo || !lineasBc.length) {

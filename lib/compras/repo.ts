@@ -390,7 +390,11 @@ export async function listOrdenes(): Promise<Orden[]> {
                                     THEN COALESCE(NULLIF(pd.locationCode,''), pc.obra) END) AS obraOrigen,
              -- Tipo del pedido origen: si es 'activo', la línea compra un ACTIVO FIJO y
              -- en BC va como línea tipo "Activo fijo" (su itemNo es el N.º del activo).
-             pc.tipoSolicitud AS tipoSolicitudOrigen
+             pc.tipoSolicitud AS tipoSolicitudOrigen,
+             -- La MÁQUINA del pedido origen (repuesto de consumo directo). La orden no
+             -- la persiste: se hereda para poder escribirla en la línea de BC
+             -- (GomEqp Machine No.) al lanzar el pedido.
+             pc.maquinaNo AS maquinaOrigen
       FROM dbo.OrdenCompraDet d
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
@@ -424,7 +428,11 @@ export async function getOrden(id: number): Promise<Orden | null> {
                                     THEN COALESCE(NULLIF(pd.locationCode,''), pc.obra) END) AS obraOrigen,
              -- Tipo del pedido origen: si es 'activo', la línea compra un ACTIVO FIJO y
              -- en BC va como línea tipo "Activo fijo" (su itemNo es el N.º del activo).
-             pc.tipoSolicitud AS tipoSolicitudOrigen
+             pc.tipoSolicitud AS tipoSolicitudOrigen,
+             -- La MÁQUINA del pedido origen (repuesto de consumo directo). La orden no
+             -- la persiste: se hereda para poder escribirla en la línea de BC
+             -- (GomEqp Machine No.) al lanzar el pedido.
+             pc.maquinaNo AS maquinaOrigen
       FROM dbo.OrdenCompraDet d
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
@@ -451,6 +459,7 @@ function mapOrden(o: any, lineas: any[]): Orden {
       // query): sin ella BC rechaza el lanzamiento.
       articuloId: l.itemNo ?? undefined, variantCode: (l.variantCodeEfectivo ?? l.variantCode) ?? undefined, pedidoLineaId: l.idPedidoCompraDet ? String(l.idPedidoCompraDet) : undefined,
       pedidoNumero: l.pedidoNoOrigen ?? undefined, obra: l.obraOrigen ?? undefined,
+      maquinaNo: l.maquinaOrigen ?? undefined,
       esActivo: l.tipoSolicitudOrigen === "activo" || undefined,
       descripcion: l.descripcion ?? "", cantidad: Number(l.quantity ?? 0),
       unidad: l.unitOfMeasureCode ?? "", almacen: l.locationCode ?? "", precioUnitario: Number(l.directUnitCost ?? 0),

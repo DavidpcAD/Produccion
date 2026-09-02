@@ -587,6 +587,77 @@ export async function bcActivosFijos(): Promise<BcActivo[]> {
   }
 }
 
+// ─── MÁQUINAS (parque de maquinaria) ───────────────────────────────────────────
+// Catálogo de máquinas de BC (MAQ00005 "TRACTOR MASSEY FERGUSON MF6711"…): es la
+// tabla GomEqp Machine de la extensión Goom Parque Maquinaria, la misma lista que
+// sale en BC al elegir el "N.º máquina" de una línea de pedido. NO está en la API
+// custom de Adelante ni en la estándar (es una tabla de un tercero), así que se lee
+// por la página publicada `Maquinaria` (OData V4), que existe en Sandbox y en
+// Production y no depende de la extensión AdelanteAPI.
+export type BcMaquina = { no: string; nombre: string; placa?: string; activoFijo?: string };
+
+// La página `Maquinaria` de BC es LENTA: devolver las 132 máquinas tarda ~60 s (la
+// página trae flowfields de costos/ventas de la máquina y BC los calcula para cada
+// fila, sin importar el $select). No es algo que se arregle desde acá, así que:
+//   · el catálogo se guarda en memoria del proceso por 12 h (una máquina nueva del
+//     parque no aparece al instante, y con eso no hay problema),
+//   · las llamadas simultáneas comparten el MISMO fetch (el drawer dispara varias),
+//   · vencido el plazo se devuelve la lista vieja y se refresca por detrás, así
+//     nadie vuelve a esperar el minuto.
+// Lo que sí lo arreglaría de raíz: una API page propia en la extensión de Adelante
+// (grupo `inventory`, sin los flowfields), como se hizo con obras y almacenes.
+const MAQUINAS_TTL_MS = 12 * 60 * 60 * 1000;
+let maquinasCache: { rows: BcMaquina[]; exp: number } | null = null;
+let maquinasEnVuelo: Promise<BcMaquina[]> | null = null;
+
+async function bcMaquinasDeBc(): Promise<BcMaquina[]> {
+  const cid = await getStdCompanyId();
+  const campos = "No,Name,License_Plate,Cancellation_Date,Fixed_Asset_No";
+  const out: BcMaquina[] = [];
+  let url: string | null = `${odataRoot()}/Maquinaria?company=${encodeURIComponent(cid)}&$select=${campos}&$top=1000`;
+  let guard = 0;
+  while (url && guard++ < 10) {
+    const res: Response = await bcFetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`BC máquinas ${res.status}`);
+    const data = (await res.json()) as { value?: Record<string, unknown>[]; "@odata.nextLink"?: string };
+    for (const m of data.value ?? []) {
+      const no = String(m.No ?? "").trim();
+      if (!no) continue;
+      // Máquina DADA DE BAJA (fecha de cancelación puesta): no se le compran repuestos.
+      // BC deja la fecha en 0001-01-01 cuando está vigente.
+      const baja = String(m.Cancellation_Date ?? "").trim();
+      if (baja && baja !== "0001-01-01") continue;
+      out.push({
+        no,
+        nombre: String(m.Name ?? "").trim() || no,
+        placa: String(m.License_Plate ?? "").trim() || undefined,
+        activoFijo: String(m.Fixed_Asset_No ?? "").trim() || undefined,
+      });
+    }
+    url = (data["@odata.nextLink"] as string | undefined) ?? null;
+  }
+  return out.sort((a, b) => a.no.localeCompare(b.no));
+}
+
+export async function bcMaquinas(): Promise<BcMaquina[]> {
+  const ahora = Date.now();
+  const refrescar = () => {
+    if (!maquinasEnVuelo) {
+      maquinasEnVuelo = bcMaquinasDeBc()
+        .then((rows) => { if (rows.length) maquinasCache = { rows, exp: Date.now() + MAQUINAS_TTL_MS }; return rows; })
+        .catch(() => maquinasCache?.rows ?? [])
+        .finally(() => { maquinasEnVuelo = null; });
+    }
+    return maquinasEnVuelo;
+  };
+  // Lista vigente: se devuelve tal cual.
+  if (maquinasCache && maquinasCache.exp > ahora) return maquinasCache.rows;
+  // Vencida pero con datos: se devuelve la vieja y se refresca por detrás.
+  if (maquinasCache) { void refrescar(); return maquinasCache.rows; }
+  // Primera vez (o BC nunca respondió): toca esperar.
+  return refrescar();
+}
+
 export type BcPostedReceiptLine = {
   documentNo: string;    // N.º de recepción registrada (albarán), p.ej. CR-000003
   lineNo: number;        // N.º de línea dentro de la recepción
@@ -850,7 +921,9 @@ export type NuevaLineaBc = { itemNo: string; cantidad: number; precio?: number; 
   esActivo?: boolean;
   /** Unidad con la que se le pide al proveedor (EST, PQT…). Ver `unidadParaBc`: solo
    *  viaja a BC cuando NO es la unidad base del artículo. */
-  unidad?: string };
+  unidad?: string;
+  /** REPUESTO: N.º de la máquina a la que se le compra (GomEqp Machine No. de la línea). */
+  machineNo?: string };
 
 // La API estándar de purchaseOrderLine NO acepta `locationCode`; requiere
 // `locationId` (el systemId GUID del almacén). Lo resolvemos por código contra
@@ -882,7 +955,11 @@ export type CargoBc = { chargeNo?: string; descripcion?: string; cantidad?: numb
 // esos campos, igual que los cargos). El body manda assignmentsJson como STRING JSON
 // escapado (como PostInvoice), y el retorno `value` es a su vez un JSON string (doble
 // parseo). Idempotente y no tumba por línea: devuelve { updated, errors }.
-type AsignacionLineaBc = { lineNo: number; jobNo?: string; jobTaskNo?: string; jobLineType?: string; locationCode?: string };
+type AsignacionLineaBc = { lineNo: number; jobNo?: string; jobTaskNo?: string; jobLineType?: string; locationCode?: string;
+  /** N.º de MÁQUINA de la línea (GomEqp Machine No.): es el repuesto que se le compra
+   *  a esa máquina. El codeunit AdelantePO_SetLineJob no conoce el campo, así que
+   *  siempre lo termina escribiendo el plan B (la página publicada). */
+  machineNo?: string };
 export async function bcSetLineJobs(orderNo: string, asignaciones: AsignacionLineaBc[]): Promise<{ updated: number; errors: string }> {
   if (!orderNo || !asignaciones.length) return { updated: 0, errors: "" };
   const cid = await getStdCompanyId();
@@ -912,11 +989,11 @@ export async function bcSetLineJobs(orderNo: string, asignaciones: AsignacionLin
 // Purchase_Order_Line_Excel (OData V4), que existe en los dos entornos y no depende
 // de la extensión. Verificado contra Sandbox: borrar y poner Job No./Job Task No. por
 // PATCH funciona (200) y queda.
-type LineaJobBc = { lineNo: number; itemNo: string; jobNo: string; jobTaskNo: string; locationCode: string };
+type LineaJobBc = { lineNo: number; itemNo: string; jobNo: string; jobTaskNo: string; locationCode: string; machineNo: string };
 
 function paginaLineasUrl(cid: string, orderNo: string): string {
   const filtro = encodeURIComponent(`Document_No eq '${odataStr(orderNo)}'`);
-  return `${odataRoot()}/Purchase_Order_Line_Excel?company=${encodeURIComponent(cid)}&$filter=${filtro}&$select=Document_No,Line_No,No,Job_No,Job_Task_No,Location_Code`;
+  return `${odataRoot()}/Purchase_Order_Line_Excel?company=${encodeURIComponent(cid)}&$filter=${filtro}&$select=Document_No,Line_No,No,Job_No,Job_Task_No,Location_Code,GomEqp_Machine_No`;
 }
 
 /** Proyecto/tarea/almacén REALES de las líneas del pedido en BC. `null` = no se pudo leer. */
@@ -925,13 +1002,14 @@ async function bcLineasJob(orderNo: string): Promise<LineaJobBc[] | null> {
     const cid = await getStdCompanyId();
     const res = await bcFetch(paginaLineasUrl(cid, orderNo), { cache: "no-store" });
     if (!res.ok) return null;
-    const data = (await res.json()) as { value?: { Line_No?: number; No?: string; Job_No?: string; Job_Task_No?: string; Location_Code?: string }[] };
+    const data = (await res.json()) as { value?: { Line_No?: number; No?: string; Job_No?: string; Job_Task_No?: string; Location_Code?: string; GomEqp_Machine_No?: string }[] };
     return (data.value ?? []).map((l) => ({
       lineNo: Number(l.Line_No ?? 0),
       itemNo: String(l.No ?? "").trim(),
       jobNo: String(l.Job_No ?? "").trim(),
       jobTaskNo: String(l.Job_Task_No ?? "").trim(),
       locationCode: String(l.Location_Code ?? "").trim(),
+      machineNo: String(l.GomEqp_Machine_No ?? "").trim(),
     }));
   } catch { return null; }
 }
@@ -961,15 +1039,26 @@ export function mensajeProyectoSinTarea(lineas: { lineNo: number; itemNo: string
   return `hay ${lineas.length} línea(s) con obra y sin tarea (${detalle}). BC no lanza una línea con proyecto sin tarea: ponele la tarea (actividad) de la obra a esa línea y reintentá. Si el material no va contra la obra, quitale el proyecto al pedido.`;
 }
 
-/** Asignaciones que BC NO tiene puestas. `null` = no se pudo verificar (no concluir). */
-async function bcAsignacionesFaltantes(orderNo: string, asignaciones: AsignacionLineaBc[]): Promise<AsignacionLineaBc[] | null> {
+/** Asignaciones que BC NO tiene puestas. `null` = no se pudo verificar (no concluir).
+ *  `conMaquina` = si el N.º de máquina cuenta como faltante. Se mira al DECIDIR qué
+ *  escribir, pero NO en la verificación final: el proyecto/tarea es lo que decide si
+ *  el pedido se puede lanzar (sin eso el material entra a inventario en silencio),
+ *  mientras que la máquina es un dato del gasto — si BC no la acepta se avisa en el
+ *  log y el pedido igual se lanza, en vez de dejar la orden trabada. */
+async function bcAsignacionesFaltantes(
+  orderNo: string,
+  asignaciones: AsignacionLineaBc[],
+  conMaquina = true,
+): Promise<AsignacionLineaBc[] | null> {
   const enBc = await bcLineasJob(orderNo);
   if (!enBc) return null;
   return asignaciones.filter((a) => {
     const l = enBc.find((x) => x.lineNo === a.lineNo);
-    if (!l) return true;
+    // Línea que no está en BC: solo es un problema si había que ponerle proyecto/almacén.
+    if (!l) return conMaquina || !!a.jobNo || !!a.locationCode;
     if (a.jobNo && (l.jobNo !== a.jobNo || l.jobTaskNo !== (a.jobTaskNo ?? ""))) return true;
     if (a.locationCode && l.locationCode !== a.locationCode) return true;
+    if (conMaquina && a.machineNo && l.machineNo !== a.machineNo) return true;
     return false;
   });
 }
@@ -983,6 +1072,9 @@ async function bcSetLineJobPagina(orderNo: string, asignaciones: AsignacionLinea
     const body: Record<string, unknown> = {};
     if (a.jobNo) { body.Job_No = a.jobNo; body.Job_Task_No = a.jobTaskNo ?? ""; }
     if (a.locationCode) body.Location_Code = a.locationCode;
+    // N.º máquina del repuesto: la línea de BC lo lleva en GomEqp_Machine_No. Es la
+    // única vía desde la app — ni la API estándar ni el codeunit exponen el campo.
+    if (a.machineNo) body.GomEqp_Machine_No = a.machineNo;
     if (!Object.keys(body).length) continue;
     try {
       const res = await bcFetch(`${odataRoot()}/${key}?company=${encodeURIComponent(cid)}`, {
@@ -1002,18 +1094,25 @@ async function bcSetLineJobPagina(orderNo: string, asignaciones: AsignacionLinea
 async function bcAplicarAsignaciones(orderNo: string, asignaciones: AsignacionLineaBc[]): Promise<string | undefined> {
   if (!asignaciones.length) return undefined;
   // 1) El codeunit sigue siendo el camino principal (es el que el dev de BC mantiene).
+  //    Solo se le mandan las asignaciones CON proyecto: no conoce el N.º de máquina, y
+  //    una asignación sin jobNo podría dejarle la línea sin proyecto. La máquina la
+  //    escribe el plan B (la página publicada), que es la única vía para ese campo.
+  const paraCodeunit = asignaciones.filter((a) => !!a.jobNo);
   let quejaCodeunit = "";
-  try {
-    const r = await bcSetLineJobs(orderNo, asignaciones);
-    if (r.errors) quejaCodeunit = r.errors;
-  } catch (e: any) { quejaCodeunit = String(e?.message ?? e); }
+  if (paraCodeunit.length) {
+    try {
+      const r = await bcSetLineJobs(orderNo, paraCodeunit);
+      if (r.errors) quejaCodeunit = r.errors;
+    } catch (e: any) { quejaCodeunit = String(e?.message ?? e); }
+  }
   // 2) Verificar en BC. Si no se puede leer, se respeta la respuesta del codeunit.
   const faltan = await bcAsignacionesFaltantes(orderNo, asignaciones);
   if (faltan === null) return quejaCodeunit || undefined;
   if (!faltan.length) return undefined; // quedó puesto (aunque el codeunit se haya quejado)
   // 3) Plan B: escribirlo directo en la línea y volver a verificar.
   const plan = await bcSetLineJobPagina(orderNo, faltan);
-  const siguenFaltando = await bcAsignacionesFaltantes(orderNo, asignaciones);
+  // Verificación final: la máquina NO bloquea (ver bcAsignacionesFaltantes).
+  const siguenFaltando = await bcAsignacionesFaltantes(orderNo, asignaciones, false);
   if (siguenFaltando && !siguenFaltando.length) {
     console.warn(`BC ${orderNo}: el codeunit no aplicó proyecto/tarea (${quejaCodeunit || "sin error, pero la línea quedó vacía"}); se completó escribiendo la línea directo (${plan.updated} línea(s)). Revisar la versión de la extensión AdelanteAPI en este entorno.`);
     return undefined;
@@ -1047,14 +1146,16 @@ async function bcAplicarAsignaciones(orderNo: string, asignaciones: AsignacionLi
 //     aprueba se entera.
 // `pendientes` son las líneas de consumo directo que, después de intentarlo, siguen
 // SIN obra+tarea en BC: quien llama NO debe lanzar el pedido si hay alguna.
-export type LineaConsumoBc = { lineNo?: number; itemNo: string; jobNo: string; jobTaskNo: string };
+export type LineaConsumoBc = { lineNo?: number; itemNo: string; jobNo: string; jobTaskNo: string; machineNo?: string };
 export type PendienteConsumoBc = { lineNo: number; itemNo: string; motivo: string };
 
 export async function bcCompletarProyectoTarea(
   orderNo: string,
   cd: LineaConsumoBc[],
 ): Promise<{ aplicadas: number; pendientes: PendienteConsumoBc[]; error?: string }> {
-  const items = (cd ?? []).filter((l) => l.itemNo && l.jobNo && l.jobTaskNo);
+  // Se atienden las líneas con proyecto+tarea y también las que solo traen MÁQUINA
+  // (repuesto): el N.º máquina es un campo aparte y hay que dejarlo puesto igual.
+  const items = (cd ?? []).filter((l) => l.itemNo && ((l.jobNo && l.jobTaskNo) || l.machineNo));
   if (!orderNo || !items.length) return { aplicadas: 0, pendientes: [] };
   const enBc = await bcLineasJob(orderNo);
   // No se pudo LEER el pedido: no se puede afirmar que las líneas estén bien, y
@@ -1082,12 +1183,20 @@ export async function bcCompletarProyectoTarea(
   const asignaciones: AsignacionLineaBc[] = [];
   const pendientes: PendienteConsumoBc[] = [];
   for (const { linea, quiere } of pares) {
-    if (linea.jobTaskNo) continue;                       // ya tiene tarea en BC: se respeta
-    if (linea.jobNo && clave(linea.jobNo) !== clave(quiere.jobNo)) {
+    // Ya tiene tarea en BC: alguien la puso a mano y no se toca. Ojo: si además falta
+    // la MÁQUINA (repuesto), sí se escribe — es un campo aparte y no repunta costos.
+    if (linea.jobTaskNo && (!quiere.machineNo || linea.machineNo === quiere.machineNo)) continue;
+    if (linea.jobTaskNo) { asignaciones.push({ lineNo: linea.lineNo, machineNo: quiere.machineNo }); continue; }
+    if (quiere.jobNo && linea.jobNo && clave(linea.jobNo) !== clave(quiere.jobNo)) {
       pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `en BC está contra la obra ${linea.jobNo} y la solicitud dice ${quiere.jobNo}: no se toca desde acá` });
       continue;
     }
-    asignaciones.push({ lineNo: linea.lineNo, jobNo: quiere.jobNo, jobTaskNo: quiere.jobTaskNo, jobLineType: "None" });
+    asignaciones.push({
+      lineNo: linea.lineNo,
+      jobNo: quiere.jobNo || undefined, jobTaskNo: quiere.jobNo ? quiere.jobTaskNo : undefined,
+      jobLineType: quiere.jobNo ? "None" : undefined,
+      machineNo: quiere.machineNo || undefined,
+    });
   }
   // Líneas de consumo directo de la app que ni siquiera están en el pedido de BC.
   for (const q of items) {
@@ -1290,8 +1399,10 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
       // Capturar el Line No. (sequence) para poder setear proyecto/tarea/almacén después.
       const created: any = await resL.json().catch(() => ({}));
       const lineNo = Number(created?.sequence);
-      if (lineNo && (consumo || locCode)) asignaciones.push({
+      if (lineNo && (consumo || locCode || l.machineNo)) asignaciones.push({
         lineNo,
+        // REPUESTO: N.º de máquina de la línea (GomEqp Machine No.).
+        machineNo: l.machineNo || undefined,
         jobNo: consumo ? l.jobNo : undefined,
         jobTaskNo: consumo ? l.jobTaskNo : undefined,
         // "None" = Job Line Type en blanco, que es como están 95 de las 97 líneas con
@@ -1537,7 +1648,7 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
     // Servicio / no inventariable: sin almacén (BC no lo acepta). Ver bcCrearPedido.
     const soloServicio = (tiposResync.get(l.itemNo) ?? "inventario") !== "inventario";
     const locCode = soloServicio ? "" : conJob ? (l.locationCode || l.jobNo!) : (l.locationCode || "");
-    if (lineNo && (conJob || locCode)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "None") : undefined, locationCode: locCode || undefined });
+    if (lineNo && (conJob || locCode || l.machineNo)) asignaciones.push({ lineNo, jobNo: conJob ? l.jobNo : undefined, jobTaskNo: conJob ? l.jobTaskNo : undefined, jobLineType: conJob ? (l.jobLineType || "None") : undefined, locationCode: locCode || undefined, machineNo: l.machineNo || undefined });
     const patch: Record<string, unknown> = {};
     // La unidad PRIMERO (BC recalcula el costo al validarla) y solo si cambió.
     const uomR = unidadResync(l);

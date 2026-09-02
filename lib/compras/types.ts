@@ -185,6 +185,9 @@ export interface OrdenLinea {
   /** La línea compra un ACTIVO FIJO (`articuloId` = AF-0001). Igual que `obra`, se
    *  hereda del pedido origen en el join; a BC va como línea tipo "Activo fijo". */
   esActivo?: boolean;
+  /** REPUESTO: máquina del pedido origen (MAQ00012). Igual que `obra`, se hereda en el
+   *  join; a BC va en el N.º máquina de la línea (GomEqp Machine No.). */
+  maquinaNo?: string;
   descripcion: string;
   cantidad: number;
   unidad: string;

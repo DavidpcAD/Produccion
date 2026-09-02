@@ -12,7 +12,7 @@ import { HoverCard } from "@/components/compras/hover-card";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { devolucionInfo, esConsumoInmediato, formatDate, formatDiaMes, pedidoBadge, pedidoNumeroCorto, pedidoProgreso, tipoSolicitudBadge, type DevolucionInfo, pedidoEsDelUsuario, veTodoEnCompras } from "@/lib/compras/helpers";
+import { destinoCodigo, devolucionInfo, esConsumoInmediato, formatDate, formatDiaMes, pedidoBadge, pedidoNumeroCorto, pedidoProgreso, tipoSolicitudBadge, type DevolucionInfo, pedidoEsDelUsuario, veTodoEnCompras } from "@/lib/compras/helpers";
 import type { Pedido } from "@/lib/compras/types";
 
 type Filtro = "todas" | "material" | "repuesto" | "subcontrato" | "completado";
@@ -41,8 +41,10 @@ export default function IngenieriaPage() {
   const fuente = pedidos;         // mis solicitudes
   const ordenesFinal = ordenes;
 
-  const destCodigo = (p: Pedido) => (p.tipoSolicitud === "repuesto" ? p.maquinaNo : p.obraCodigo) ?? "—";
-  const destNombre = (p: Pedido) => (p.tipoSolicitud === "repuesto" ? p.maquinaNombre : p.obraNombre) ?? "";
+  // Repuesto: la MÁQUINA si es consumo directo; si va a inventario (tag ALM) no hay
+  // máquina y el destino es el ALMACÉN de sus líneas (ver destinoCodigo/destinoLabel).
+  const destCodigo = (p: Pedido) => destinoCodigo(p);
+  const destNombre = (p: Pedido) => (p.tipoSolicitud === "repuesto" ? (p.maquinaNombre ?? "") : (p.obraNombre ?? ""));
 
   // "Completada" = terminó todo el flujo (los 5 pasos con ✓, recibida y facturada).
   const esCompletada = (p: Pedido) => pedidoProgreso(p, ordenesFinal).completado;

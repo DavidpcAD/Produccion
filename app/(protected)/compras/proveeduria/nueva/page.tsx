@@ -6,7 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, numeroOrden, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, precioEnUnidad, mismaMoneda, ALMACEN_GENERAL, obraDeLinea, destinoDeLinea, type UnidadItem } from "@/lib/compras/helpers";
+import { money, numeroOrden, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, precioEnUnidad, mismaMoneda, ALMACEN_GENERAL, esLineaConsumoDirecto, obraDeLinea, destinoDeLinea, type UnidadItem } from "@/lib/compras/helpers";
 import type { OrdenLinea } from "@/lib/compras/types";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
@@ -100,7 +100,10 @@ export default function ArmarOrdenPage() {
         // ALM / pedido de Stock); si no trae almacén (pedido viejo, donde `almacen`
         // era la obra), cae al Almacén General — nunca al almacén de la obra.
         if (l) {
-          const consumo = p.tipoSolicitud === "material" && !!l.taskNo;
+          // Consumo directo: material contra obra + actividad, o repuesto contra el
+          // parque de maquinaria (proyecto MAQ · tarea CMAQ, que la solicitud ya trae
+          // en la línea). En los dos casos el proyecto de la línea es su `obra`.
+          const consumo = esLineaConsumoDirecto(l, p);
           info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", descripcion: l.descripcion, unidad: l.unidad,
             // Un ACTIVO FIJO no lleva almacén (no entra a inventario): no cae al General.
             almacen: p.tipoSolicitud === "activo" ? "" : consumo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
@@ -187,9 +190,9 @@ export default function ArmarOrdenPage() {
       descripcion: l.descripcion, unidad: l.unidad,
       // Mismo criterio que arriba: con tarea → proyecto + tarea (almacén de la obra);
       // sin tarea → el almacén elegido en el pedido, o el General si no trae.
-      almacen: p.tipoSolicitud === "activo" ? "" : p.tipoSolicitud === "material" && l.taskNo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
+      almacen: p.tipoSolicitud === "activo" ? "" : esLineaConsumoDirecto(l, p) ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
       cantidad: String(pend), precio: String(hist || 0), iva: "13", descuento: "0",
-      proyecto: p.tipoSolicitud === "material" && l.taskNo ? obraDeLinea(l, p) : "", tarea: l.taskNo ?? "",
+      proyecto: esLineaConsumoDirecto(l, p) ? obraDeLinea(l, p) : "", tarea: l.taskNo ?? "",
     }]);
   }
 

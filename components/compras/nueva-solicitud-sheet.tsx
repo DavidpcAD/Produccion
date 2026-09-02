@@ -21,8 +21,8 @@ import { ToggleCards } from "@/components/ds/ToggleCards/ToggleCards";
 import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
-import type { Almacen, Articulo, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, numeroOrden, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
+import type { Almacen, Articulo, Maquina, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, OBRA_MAQUINARIA, TAREA_PARQUE_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, numeroOrden, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
@@ -145,7 +145,7 @@ const ayudaDestino = (tipo: TipoSolicitud, d: DestinoMat) =>
   d === "almacen"
     ? "ALM: entra a inventario del almacén elegido; se consume después."
     : tipo === "repuesto"
-      ? "CD (consumo directo): se lo lleva la máquina; en BC la línea entra al almacén de Maquinaria (MAQ)."
+      ? "CD (consumo directo): se lo lleva la máquina. En BC la línea va al almacén MAQ y se consume contra el proyecto MAQUINARIA (MAQ) · tarea PARQUE MAQUINARIA (CMAQ), con el N.º de máquina en la línea."
       : "CD (consumo directo): se consume de una vez contra el proyecto y la tarea de la obra.";
 // Almacén de inventario al que entra el material que no es de consumo inmediato.
 const ALM_GENERAL = ALMACEN_GENERAL;
@@ -833,7 +833,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   /** Aviso al crear/enviar/guardar (la Matriz marca la celda con esto). */
   onGuardado?: (info: { numero: string; enviado: boolean }) => void;
 }) {
-  const { articulos, obras, maquinas, almacenes, proveedores, usuario, addPedido, editPedido, setPedidoEstado, createOrden, setOrdenEstado } = useStore();
+  const { articulos, obras, almacenes, proveedores, usuario, addPedido, editPedido, setPedidoEstado, createOrden, setOrdenEstado } = useStore();
   const toast = useToast();
 
   // Catálogo REAL de Business Central (respaldo al store si BC no responde).
@@ -871,6 +871,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // forma que un Articulo —con id = code = el N.º del activo— para que el resto de la
   // pantalla (buscador, líneas, guardado) funcione sin ramificaciones.
   const [bcActivos, setBcActivos] = useState<Articulo[] | null>(null);
+  // ACTIVIDADES (tareas de posteo) del proyecto MAQ. Son las mismas 5 para todos los
+  // repuestos (CMAQ, MACT, FOR, POL, CERTIF), así que se piden junto con las máquinas.
+  const [bcTareasMaq, setBcTareasMaq] = useState<{ jobTaskNo: string; descripcion: string }[] | null>(null);
+  // MÁQUINAS del parque de maquinaria (MAQ00005 "TRACTOR MASSEY FERGUSON MF6711"…).
+  // Salen de BC (tabla GomEqp Machine, la misma lista que se ve en la línea de un
+  // pedido de compra), no del store: las del store son datos de demo. Se piden la
+  // primera vez que se elige "Repuesto".
+  const [bcMaq, setBcMaq] = useState<Maquina[] | null>(null);
   const catArticulos = useMemo(() => {
     const base = [...(bcArt ?? articulos), ...(bcActivos ?? [])];
     if (!extraArt.length) return base;
@@ -901,6 +909,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // Se usa con el tag ALM (material/repuesto) y en el pedido de Stock.
   const [almacenSel, setAlmacenSel] = useState<string>(ALM_GENERAL);
   const [destino, setDestino] = useState(""); // repuesto → máquina
+  // REPUESTO en CD: el PROYECTO siempre es MAQ (MAQUINARIA), pero la ACTIVIDAD se
+  // elige entre las tareas de ese proyecto en BC (CMAQ, MACT, FOR, POL, CERTIF).
+  // Arranca en CMAQ (PARQUE MAQUINARIA COSTES), que es donde van los repuestos.
+  const [tareaMaq, setTareaMaq] = useState(TAREA_PARQUE_MAQUINARIA);
+  const [tareaMaqNombre, setTareaMaqNombre] = useState("PARQUE MAQUINARIA COSTES");
   // SUBCONTRATO: proveedor (subcontratista) y moneda de la orden.
   const [proveedorId, setProveedorId] = useState("");
   const [currency, setCurrency] = useState("");
@@ -1048,6 +1061,38 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     });
   }, [verStock, stockReady, stockPorCode, lineas, catArticulos, uomMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Las máquinas se piden la primera vez que se elige "Repuesto" (igual que los
+  // activos: es otro catálogo de BC y la mayoría de los pedidos no lo usa).
+  useEffect(() => {
+    if (tipo !== "repuesto" || bcMaq) return;
+    let cancel = false;
+    fetch("/api/compras/bc/maquinas")
+      .then((r) => (r.ok ? r.json() : { maquinas: [] }))
+      .then((d) => {
+        if (cancel) return;
+        setBcMaq(((d.maquinas ?? []) as any[]).map((m) => ({
+          id: m.no, no: m.no, nombre: m.nombre || m.no, placa: m.placa || undefined,
+        })));
+      })
+      .catch(() => { /* sin catálogo: el selector queda vacío y no se puede pedir CD */ });
+    return () => { cancel = true; };
+  }, [tipo, bcMaq]);
+
+  // Las actividades del proyecto MAQ, junto con las máquinas (mismo tipo de pedido).
+  useEffect(() => {
+    if (tipo !== "repuesto" || bcTareasMaq) return;
+    let cancel = false;
+    fetch(`/api/compras/bc/jobtasks?jobNo=${encodeURIComponent(OBRA_MAQUINARIA)}`)
+      .then((r) => (r.ok ? r.json() : { jobTasks: [] }))
+      .then((d) => {
+        if (cancel) return;
+        const rows = (d.jobTasks ?? []) as { jobTaskNo: string; descripcion: string; tipo: string }[];
+        setBcTareasMaq(rows.filter((t) => t.tipo === "Posting").map((t) => ({ jobTaskNo: t.jobTaskNo, descripcion: t.descripcion })));
+      })
+      .catch(() => { /* si BC no contesta queda la de por defecto (CMAQ) */ });
+    return () => { cancel = true; };
+  }, [tipo, bcTareasMaq]);
+
   // El catálogo de activos se pide la primera vez que se elige el tipo "Activo fijo"
   // (no en el montaje: es otro catálogo y la mayoría de los pedidos no lo usan).
   useEffect(() => {
@@ -1083,6 +1128,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const sinObra = esRepuesto || esStock || esActivoTipo;
   // Consumo directo de material: se consume contra proyecto + tarea de la obra.
   const esConsumo = esMaterial && destinoMat === "consumo";
+  // Consumo directo de REPUESTO: se lo lleva una máquina. No hay obra ni tarea que
+  // elegir —siempre es el proyecto MAQ (MAQUINARIA) · tarea CMAQ (PARQUE MAQUINARIA)
+  // y el almacén MAQ—, lo único que se elige es la MÁQUINA, el material y la cantidad.
+  // Con el tag ALM el repuesto entra a inventario del almacén elegido y no lleva máquina.
+  const esRepuestoCD = esRepuesto && destinoMat === "consumo";
   // Las obras BLOQUEADAS en BC no se ofrecen: BC no les deja cargar material, así que
   // el pedido nacería condenado a no poder lanzarse (caso VN-K.26 / CP-005132). Si la
   // obra ya venía elegida (copiar/editar/Matriz) igual se muestra, marcada.
@@ -1091,10 +1141,17 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     [catObras],
   );
   const obrasBloqueadas = useMemo(() => new Set(catObras.filter((o) => o.bloqueada).map((o) => o.codigo)), [catObras]);
+  const catMaquinas = useMemo(() => bcMaq ?? [], [bcMaq]);
+  const tareaMaqItems: Item[] = useMemo(() => {
+    const items = (bcTareasMaq ?? []).map((t) => ({ id: t.jobTaskNo, title: t.descripcion, sub: t.jobTaskNo }));
+    // Mientras BC no responde, la elegida (CMAQ por defecto) igual se lee en el campo.
+    if (tareaMaq && !items.some((i) => i.id === tareaMaq)) items.unshift({ id: tareaMaq, title: tareaMaqNombre || tareaMaq, sub: tareaMaq });
+    return items;
+  }, [bcTareasMaq, tareaMaq, tareaMaqNombre]);
   const destinoItems: Item[] = useMemo(() => {
-    if (esRepuesto) return maquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.no }));
+    if (esRepuesto) return catMaquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.placa ? `${m.no} · ${m.placa}` : m.no }));
     return obraItems;
-  }, [esRepuesto, obraItems, maquinas]);
+  }, [esRepuesto, obraItems, catMaquinas]);
   // Almacenes de BC donde se puede pedir: por defecto SOLO las bodegas (Almacén
   // General, Agregados, Maderas, Herramienta, Maquinaria, Generales…), que es lo que
   // se compra. Con "Ver todos" salen también las ubicaciones de obra/casa, por si
@@ -1163,7 +1220,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const destinoOk = (esMaterial || esSub) ? (validLines.length > 0 && validLines.every((l) => !!l.obraCodigo))
     // Un activo ES su propio destino: no hay obra, máquina ni almacén que elegir.
     : esActivoTipo ? validLines.length > 0
-    : esRepuesto ? !!destino : !!almacenSel;
+    // Repuesto: con CD hace falta la MÁQUINA; con ALM basta el almacén (almacenOk).
+    : esRepuesto ? (!esRepuestoCD || !!destino) : !!almacenSel;
   // Subcontrato: proveedor obligatorio (es quien va a facturar) y todas las líneas
   // con monto. Sin monto la orden no se puede lanzar a BC (línea sin precio).
   const proveedorOk = !esSub || !!proveedorId;
@@ -1174,6 +1232,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // Consumo inmediato: sin tarea BC no puede consumir contra el proyecto, así que la
   // actividad es obligatoria en cada obra que tenga líneas.
   const tareasOk = (!esConsumo && !esSub) || grupos.every((g) => !lineas.some((l) => l.grupoKey === g.key) || !!g.taskNo);
+  // Repuesto en CD: sin actividad BC no consume la línea contra el parque de maquinaria.
+  const tareaMaqOk = !esRepuestoCD || !!tareaMaq;
   // Obra bloqueada en BC: puede llegar por copiar/editar un pedido viejo, por plantilla
   // o desde la Matriz. No se puede pedir contra ella (BC rechaza la línea), así que se
   // avisa y no se deja seguir — mejor acá que con el pedido ya creado en BC.
@@ -1181,7 +1241,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     () => [...new Set(grupos.map((g) => g.obraCodigo).filter((c): c is string => !!c && obrasBloqueadas.has(c)))],
     [grupos, obrasBloqueadas],
   );
-  const canContinue = validLines.length > 0 && destinoOk && almacenOk && comentarioOk && tareasOk
+  const canContinue = validLines.length > 0 && destinoOk && almacenOk && comentarioOk && tareasOk && tareaMaqOk
     && proveedorOk && montosOk
     && obrasChocadas.length === 0 && validLines.every((l) => !necesitaVariante(l));
   // Total del subcontrato (para la confirmación y el pie del panel).
@@ -1189,6 +1249,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
 
   function reset() {
     setTipo("material"); setDestinoMat("almacen"); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
+    setTareaMaq(TAREA_PARQUE_MAQUINARIA); setTareaMaqNombre("PARQUE MAQUINARIA COSTES");
     setProveedorId(""); setCurrency("");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
     setCardMenuKey(null); setOpenMat([]); setPlantillaSel(""); setExtraArt([]); setConfirmPedir(false);
@@ -1317,6 +1378,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     setTipo(s.tipo);
     setDestinoMat(s.consumo ? "consumo" : "almacen");
     if (s.destino) setDestino(s.destino);
+    // Repuesto de consumo directo: la actividad del parque de maquinaria viene en las
+    // líneas del pedido copiado (no se pierde al copiar ni al editar).
+    if (s.tipo === "repuesto" && s.consumo) {
+      const t = s.lineas.find((l) => !!l.taskNo);
+      if (t?.taskNo) { setTareaMaq(t.taskNo); setTareaMaqNombre(t.taskDescr ?? ""); }
+    }
     if (s.almacen) setAlmacenSel(s.almacen);
     if (s.tipo === "stock") setFTipoPl("bodega");
     if (s.prioridad) setPrioridad(s.prioridad);
@@ -1532,8 +1599,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       // que la pantalla vieja de pedidos a bodega). Material: la obra, o "(varias)".
       obraCodigo: (esMaterial || esSub) ? h.codigo : esStock ? almacenSel : undefined,
       obraNombre: (esMaterial || esSub) ? h.nombre : esStock ? almacenNombre : undefined,
-      maquinaNo: esRepuesto ? destino : undefined,
-      maquinaNombre: esRepuesto ? destinoNombre : undefined,
+      // La MÁQUINA solo existe en el repuesto de consumo directo. Con el tag ALM el
+      // repuesto entra a inventario del almacén elegido y no se amarra a ninguna.
+      maquinaNo: esRepuestoCD ? destino : undefined,
+      maquinaNombre: esRepuestoCD ? destinoNombre : undefined,
       // Amarre a la celda de la Matriz (se conserva al editar).
       idClasificacion,
       solicitante: usuario ?? "",
@@ -1565,6 +1634,19 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         // Un ACTIVO no lleva almacén: en BC la línea es tipo "Activo fijo" y el campo
         // ni siquiera es editable (mandarlo haría fallar el lanzamiento).
         const almacenLinea = esActivoTipo ? "" : esConsumo ? (l.obraCodigo || "") : usaAlmacen ? almacenSel : ALMACEN_MAQUINARIA;
+        // REPUESTO en consumo directo: la línea va contra el parque de maquinaria —
+        // proyecto MAQ (MAQUINARIA) · tarea CMAQ (PARQUE MAQUINARIA COSTES), almacén
+        // MAQ (mismo código que el proyecto) — y la máquina viaja en el encabezado del
+        // pedido. Sin la tarea, BC no consume la línea: el repuesto quedaría de
+        // inventario en MAQ (es lo que venía pasando).
+        if (esRepuestoCD) {
+          return {
+            articuloId: a.id, descripcion: l.variantNombre || a.descripcion, cantidad: l.cantidad,
+            unidad: unidadDe(l) || a.unidad, almacen: ALMACEN_MAQUINARIA,
+            obraCodigo: OBRA_MAQUINARIA, taskNo: tareaMaq || TAREA_PARQUE_MAQUINARIA, taskDescr: tareaMaqNombre || undefined,
+            variantCode: l.variantCode || undefined, notas: l.notas?.trim() || undefined,
+          };
+        }
         // Si se eligió variante, se guarda la descripción de la variante (más específica);
         // si no, la descripción base del material.
         // unidad: la que ELIGIÓ la persona (EST, PQT…), no la base del catálogo. Es lo
@@ -1958,10 +2040,28 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                      materiales que se le piden al almacén (el almacén ya se eligió
                      arriba, en columna con la plantilla). */
                   <div className="col gap-4">
-                    {esRepuesto && (
+                    {/* MÁQUINA: solo en consumo directo. Con el tag ALM el repuesto entra
+                        al inventario del almacén elegido y no se amarra a una máquina. */}
+                    {esRepuestoCD && (
                       <div className="col gap-2">
-                        <span className="ds-form-field__label">{tipoMeta.destino}</span>
-                        <Dropdown placeholder={`Elegí ${tipoMeta.destino.toLowerCase()}…`} items={destinoItems} value={destino} onPick={setDestino} />
+                        <div className="row gap-3 wrap" style={{ alignItems: "flex-end" }}>
+                          <div className="col gap-2" style={{ flex: "1 1 260px", minWidth: 0 }}>
+                            <span className="ds-form-field__label">{tipoMeta.destino}</span>
+                            <Dropdown placeholder={bcMaq === null ? "Cargando máquinas…" : `Elegí ${tipoMeta.destino.toLowerCase()}…`} items={destinoItems} value={destino} onPick={setDestino} />
+                          </div>
+                          {/* ACTIVIDAD: el proyecto es siempre MAQ (MAQUINARIA), pero la
+                              tarea se elige — un repuesto normal va a CMAQ (PARQUE
+                              MAQUINARIA COSTES) y una mejora a MACT, por ejemplo. */}
+                          <div className="col gap-2" style={{ flex: "1 1 260px", minWidth: 0 }}>
+                            <span className="ds-form-field__label">Actividad (tarea) · proyecto MAQ</span>
+                            <Dropdown placeholder={bcTareasMaq === null ? "Cargando actividades…" : "Elegí actividad…"}
+                              items={tareaMaqItems} value={tareaMaq}
+                              onPick={(id) => { setTareaMaq(id); setTareaMaqNombre((bcTareasMaq ?? []).find((t) => t.jobTaskNo === id)?.descripcion ?? ""); }} />
+                          </div>
+                        </div>
+                        {bcMaq !== null && !catMaquinas.length && (
+                          <span className="ds-muted ds-label">No se pudo traer el parque de maquinaria de Business Central. Reintentá en un momento.</span>
+                        )}
                       </div>
                     )}
                     <div className="col gap-2">
@@ -2084,7 +2184,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                     ? <> en <strong>{gruposPreview.length} obra{gruposPreview.length !== 1 ? "s" : ""}</strong>, {esConsumo ? <strong>consumo directo (contra proyecto y tarea)</strong> : <>a <strong>{almacenNombre}</strong></>}</>
                     : esStock
                       ? <> para <strong>{almacenNombre}</strong></>
-                      : <> para <strong>{destinoNombre || tipoMeta.destino}</strong>{usaAlmacen ? <> · a <strong>{almacenNombre}</strong></> : <> · <strong>consumo directo</strong></>}</>}
+                      : esRepuesto && usaAlmacen
+                        ? <> a <strong>{almacenNombre}</strong></>
+                        : <> para <strong>{destinoNombre || tipoMeta.destino}</strong>{usaAlmacen ? <> · a <strong>{almacenNombre}</strong></> : <> · <strong>consumo directo</strong></>}</>}
                   {prioridad !== "normal" && <> · prioridad <strong>{PRIORIDADES.find((p) => p.v === prioridad)!.label}</strong></>}.
                 </p>
                 )}

@@ -12,6 +12,24 @@ export const ALMACEN_GENERAL = "ALM-GRAL";
 // contra una máquina, no contra una obra → la línea entra a MAQ.
 export const ALMACEN_MAQUINARIA = "MAQ";
 
+// PARQUE DE MAQUINARIA en BC: un repuesto de consumo directo no se consume contra una
+// obra sino contra el proyecto MAQ ("MAQUINARIA") y su tarea CMAQ ("PARQUE MAQUINARIA
+// COSTES"), con el N.º de máquina en la línea (campo GomEqp Machine No. del Purchase
+// Line). Verificado contra BC: el job MAQ existe y tiene la tarea CMAQ, y el almacén
+// MAQ tiene el mismo código que el proyecto (así el consumo y la ubicación coinciden).
+export const OBRA_MAQUINARIA = "MAQ";
+export const TAREA_PARQUE_MAQUINARIA = "CMAQ";
+
+/** La línea va CONTRA PROYECTO + TAREA (consumo directo), no a inventario. El
+ *  discriminante es la TAREA: material contra la obra+actividad, o repuesto contra
+ *  MAQ+CMAQ. Todo lo demás entra al almacén elegido. */
+export function esLineaConsumoDirecto(
+  l: Pick<PedidoLinea, "taskNo">,
+  p: Pick<Pedido, "tipoSolicitud">,
+): boolean {
+  return !!l.taskNo && (p.tipoSolicitud === "material" || p.tipoSolicitud === "repuesto");
+}
+
 // Almacenes de BODEGA: los que se pueden elegir como destino de un pedido. Son los
 // ALM-* (General, Barani, Salud Ocupacional), las fábricas F-* (Agregados, Maderas,
 // Metales, Muebles, Prefabricados), los generales GEN-* de cada proyecto, y
@@ -320,23 +338,33 @@ export function montoDeLineaSubcontrato(ordenes: Orden[], pedidoLineaId: string)
   return 0;
 }
 
-// Consumo inmediato: el pedido de obra cuyo material se consume de una vez contra
-// el proyecto + la tarea, en vez de entrar al inventario del Almacén General. NO es
-// un tipo de solicitud aparte: es un tag del pedido, y vive en la TAREA de sus líneas.
+// Consumo inmediato: el pedido cuyo material se consume de una vez contra el proyecto
+// + la tarea, en vez de entrar al inventario de un almacén. NO es un tipo de solicitud
+// aparte: es un tag del pedido, y vive en la TAREA de sus líneas (obra + actividad si
+// es material; MAQ + CMAQ si es un repuesto para una máquina).
 export function esConsumoInmediato(p: Pedido): boolean {
-  return p.tipoSolicitud === "material" && p.lineas.some((l) => !!l.taskNo);
+  return p.lineas.some((l) => esLineaConsumoDirecto(l, p));
+}
+
+/** Almacén al que va un repuesto pedido a inventario (tag ALM): no tiene máquina, el
+ *  destino es la bodega. Los repuestos de consumo directo sí traen máquina. */
+function almacenDeRepuesto(p: Pick<Pedido, "lineas">): string {
+  return p.lineas.find((l) => !!l.almacen)?.almacen ?? "";
 }
 
 export function destinoLabel(p: Pedido): string {
-  return p.tipoSolicitud === "repuesto"
-    ? `${p.maquinaNombre ?? p.maquinaNo ?? "Máquina"}`
-    : `${p.obraNombre ?? p.obraCodigo ?? "Obra"}`;
+  if (p.tipoSolicitud === "repuesto") {
+    return p.maquinaNombre ?? p.maquinaNo ?? almacenDeRepuesto(p) ?? "Máquina";
+  }
+  return `${p.obraNombre ?? p.obraCodigo ?? "Obra"}`;
 }
 
 // Código del destino (obra o máquina) — para mostrar el CÓDIGO de obra (VN-K.21),
-// no la descripción del proyecto.
+// no la descripción del proyecto. Un repuesto a inventario no tiene máquina: se
+// muestra su almacén.
 export function destinoCodigo(p: Pedido): string {
-  return (p.tipoSolicitud === "repuesto" ? p.maquinaNo : p.obraCodigo) ?? "—";
+  if (p.tipoSolicitud === "repuesto") return p.maquinaNo || almacenDeRepuesto(p) || "—";
+  return p.obraCodigo ?? "—";
 }
 
 // Nombres de obra "vacíos" que no le dicen nada a Proveeduría (vienen así de BC).
