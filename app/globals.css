@@ -246,6 +246,18 @@ body {
 .ds-search--normal,
 .ds-search--expanded { min-width: 0; }
 
+/* ── ESCALA DE z-index DEL APP (respetarla al agregar overlays) ──────────────
+     10-45  contenido: encabezados sticky de tablas, popovers dentro de la página
+     51     .fab--menu (hamburguesa de móvil)
+     55     .app-nav-overlay (velo del menú en móvil/tablet)
+     60     .app-nav (menú lateral)
+     70     modales, diálogos y drawers del app  ← components/ui/Modal.tsx
+     80-90  internos de compras (.oc-scope: modal-overlay 80, combo__menu 90)
+     100    portales de Combobox/DatePicker y los toasts
+   Un overlay por debajo de 60 queda TAPADO por el menú abierto en tablet (era el
+   caso de los modales en z-50: se veían cortados y grises por el velo del menú).
+   ─────────────────────────────────────────────────────────────────────────── */
+
 /* ── Sidebar (barmenu) — riel binario 72px ↔ 264px, solo por botón, sin hover.
    Columna SIEMPRE oscura (#2a2a2a), no cambia con el tema. ── */
 .app-shell { --nav-w: 264px; height: 100dvh; display: flex; flex-direction: column; overflow-x: clip; }

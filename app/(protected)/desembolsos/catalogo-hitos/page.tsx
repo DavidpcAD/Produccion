@@ -143,7 +143,7 @@ function EditarModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-ds bg-ds-surface p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-sub-sm font-bold">{esNuevo ? 'Nuevo hito' : `Editar ${hito!.Codigo}`}</h2>
         {!esNuevo && (

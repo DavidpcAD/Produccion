@@ -32,7 +32,10 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        // z-[70]: por ENCIMA del menú lateral (.app-nav, z-index 60) y de su velo
+        // (.app-nav-overlay, 55). Con z-50 el menú abierto en tablet se pintaba sobre
+        // el modal y el velo del menú lo dejaba gris. Ver la escala en globals.css.
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <motion.div
             className="absolute inset-0 bg-black/50"
             initial={{ opacity: 0 }}

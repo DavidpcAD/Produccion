@@ -117,7 +117,7 @@ export function AprobarControl({ onApprove, onReject, approveLabel = 'Aprobar', 
         <AnimatePresence>
           {open && (
             <motion.div
-              className="fixed inset-0 z-[60] sm:hidden flex flex-col items-center justify-center gap-6 p-6"
+              className="fixed inset-0 z-[70] sm:hidden flex flex-col items-center justify-center gap-6 p-6"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => { if (!draggingRef.current) setOpen(false); }}
               style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(2px)', touchAction: 'none' }}
