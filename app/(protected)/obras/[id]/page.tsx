@@ -22,6 +22,9 @@ interface Obra {
   descripcion: string | null;
   centroCosto: string | null;
   areaCosteo: string | null;
+  tipoObra?: string | null;
+  tipoObraEfectivo?: string | null;
+  tipoObraOrigen?: 'obra' | 'area';
   proyectoPadre: string | null;
   idProyecto: number | null;
   proyectoNombre: string | null;
@@ -159,6 +162,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [proyectos, setProyectos] = useState<{ IDProyecto: number; Nombre: string; CodigoBC: string }[]>([]);
+  const [tiposObra, setTiposObra] = useState<{ codigo: string; letra: string; nombre: string }[]>([]);
   // Bloqueo: el usuario elige a qué Postventa (obra PV-…) va la obra.
   const [bloqueoOpen, setBloqueoOpen] = useState(false);
   const [postventas, setPostventas] = useState<{ idObra: number; numeroObra: string; nombreMostrado: string | null }[]>([]);
@@ -179,6 +183,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
       .catch(() => setObra(null))
       .finally(() => setLoading(false));
     fetch('/api/proyectos').then(r => r.json()).then(d => setProyectos(d.data ?? [])).catch(() => {});
+    fetch('/api/tipos-obra').then(r => (r.ok ? r.json() : null)).then(d => setTiposObra(d?.tipos ?? [])).catch(() => {});
     fetch('/api/obras/postventas').then(r => r.json()).then(d => setPostventas(d.data ?? [])).catch(() => {});
     // Presupuesto de la obra desde BC (venta/coste/indirecto/resultado). Aparte del
     // fetch de la obra para no atrasar el detalle si BC tarda. (presupLoading arranca
@@ -278,6 +283,9 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
     );
   }
 
+  // Nombre del tipo de obra (el catálogo con el que trabaja): pro_obc.tipos_obra.
+  const tipoObraNombre = tiposObra.find(t => t.codigo === (obra.tipoObraEfectivo ?? obra.tipoObra))?.nombre ?? null;
+
   const secciones = [
     <Seccion key="general" titulo="General">
       <Campo label="Nombre mostrado" value={obra.nombreMostrado} />
@@ -335,6 +343,16 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
       )}
     </Seccion>,
     <Seccion key="dim" titulo="Dimensiones">
+      {/* El tipo define contra qué catálogo de partidas trabaja la obra. Si no se
+          eligió a mano, se deduce del área de costeo y se dice así. */}
+      <Campo
+        label="Tipo de obra"
+        value={
+          tipoObraNombre
+            ? obra.tipoObraOrigen === 'obra' ? tipoObraNombre : `${tipoObraNombre} (deducido del área de costeo)`
+            : null
+        }
+      />
       <Campo label="Área de costo (AC)" value={obra.areaCosteo} />
       <Campo label="Centro de costo (CC)" value={obra.centroCosto} />
     </Seccion>,

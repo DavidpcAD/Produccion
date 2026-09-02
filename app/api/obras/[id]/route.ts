@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth';
 import { bindObra } from '@/lib/obras';
 import { bcConfigured, setAreaProrrateadaJob } from '@/lib/bc-client';
 import { bcConstructionConfigured, setAreaProrrateadaWork } from '@/lib/bc-construction';
+import { getTipoObra, tipoObraDeAreaCosteo, TIPO_POR_DEFECTO } from '@/lib/partidas/tipos-obra';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -14,7 +15,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const db = await getDb();
   const res = await db.request().input('id', sql.BigInt, id).query(`
     SELECT o.idObra, o.numeroObra, o.nombreMostrado, o.descripcion, o.centroCosto,
-           o.areaCosteo, o.proyectoPadre, o.idProyecto, pr.nombre AS proyectoNombre,
+           o.areaCosteo, o.tipoObra, o.proyectoPadre, o.idProyecto, pr.nombre AS proyectoNombre,
            o.gerenteProyecto, o.idEncargado, o.ubicacion,
            o.estado, o.fechaInicio, o.fechaFin, o.areaProrrateadaM2,
            o.precioNormalMaquinaria, o.precioConcretoMaquinaria, o.origenPrincipal,
@@ -24,7 +25,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (res.recordset.length === 0) {
     return NextResponse.json({ error: 'Obra no encontrada' }, { status: 404 });
   }
-  return NextResponse.json(res.recordset[0]);
+  // Tipo efectivo: manda la columna y, si está vacía, se deduce del área de costeo.
+  const o = res.recordset[0] as Record<string, unknown>;
+  const explicito = String(o.tipoObra ?? '').trim().toUpperCase();
+  const efectivo = explicito || (await tipoObraDeAreaCosteo(String(o.areaCosteo ?? '')).catch(() => TIPO_POR_DEFECTO));
+  return NextResponse.json({ ...o, tipoObraEfectivo: efectivo, tipoObraOrigen: explicito ? 'obra' : 'area' });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,6 +42,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!body.numeroObra) {
     return NextResponse.json({ error: 'El número de obra es requerido' }, { status: 400 });
   }
+  const tipoObra = String(body.tipoObra ?? '').trim().toUpperCase();
+  if (tipoObra) {
+    const t = await getTipoObra(tipoObra).catch(() => null);
+    if (!t) return NextResponse.json({ error: `Tipo de obra desconocido "${tipoObra}"` }, { status: 400 });
+    body.tipoObra = t.codigo;
+  } else {
+    body.tipoObra = null;
+  }
   const db = await getDb();
   try {
     // El número de obra es la LLAVE del registro (BC, avances, presupuesto): no se
@@ -48,7 +61,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .query(`
         UPDATE dbo.Obra SET
           nombreMostrado = @nombreMostrado, descripcion = @descripcion,
-          centroCosto = @centroCosto, areaCosteo = @areaCosteo, proyectoPadre = @proyectoPadre,
+          centroCosto = @centroCosto, areaCosteo = @areaCosteo, tipoObra = @tipoObra,
+          proyectoPadre = @proyectoPadre,
           idProyecto = @idProyecto,
           areaProrrateadaM2 = @areaProrrateadaM2, gerenteProyecto = @gerenteProyecto,
           idEncargado = @idEncargado, ubicacion = @ubicacion, estado = @estado,

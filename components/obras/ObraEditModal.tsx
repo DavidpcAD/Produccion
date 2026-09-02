@@ -18,6 +18,9 @@ export interface ObraEditData {
   estado: string | null;
   centroCosto: string | null;
   areaCosteo: string | null;
+  /** Tipo elegido a mano (O/I/A/F/T). null = se deduce del área de costeo. */
+  tipoObra?: string | null;
+  tipoObraEfectivo?: string | null;
   idProyecto: number | null;
   origenPrincipal: string | null;
   gerenteProyecto: string | null;
@@ -69,6 +72,7 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
 
   // Valores de dimensión traídos de BC (Área de costeo / Centro de costo). Si BC
   // no responde, quedan vacíos y los campos degradan a texto libre.
+  const [tiposObra, setTiposObra] = useState<{ codigo: string; letra: string; nombre: string }[]>([]);
   const [dimAC, setDimAC] = useState<ComboOption[]>([]);
   const [dimCC, setDimCC] = useState<ComboOption[]>([]);
   const [dimLoading, setDimLoading] = useState(false);
@@ -88,6 +92,7 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
       estado: obra.estado ?? '',
       centroCosto: obra.centroCosto ?? '',
       areaCosteo: obra.areaCosteo ?? '',
+      tipoObra: obra.tipoObra ?? '',
       idProyecto: obra.idProyecto != null ? String(obra.idProyecto) : '',
       origenPrincipal: obra.origenPrincipal ?? '',
       gerenteProyecto: obra.gerenteProyecto ?? '',
@@ -100,6 +105,15 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
       esProcore: !!obra.esProcore,
     });
   }, [open, obra]);
+
+  // Tipos de obra del catálogo (O/I/A/F/T) para el selector.
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/tipos-obra')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setTiposObra(d?.tipos ?? []))
+      .catch(() => {});
+  }, [open]);
 
   // Al abrir el modal, traer los valores permitidos de AC/CC desde BC (una vez).
   useEffect(() => {
@@ -254,6 +268,27 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
         </Seccion>
 
         <Seccion titulo="Dimensiones y proyecto">
+          <div className="sm:col-span-2">
+            <Combobox
+              label="Tipo de obra"
+              value={String(form.tipoObra ?? '')}
+              onChange={v => set('tipoObra', v)}
+              placeholder={
+                obra?.tipoObraEfectivo
+                  ? `Deducido del área de costeo: ${tiposObra.find(t => t.codigo === obra.tipoObraEfectivo)?.nombre ?? obra.tipoObraEfectivo}`
+                  : 'Deducido del área de costeo'
+              }
+              options={tiposObra.map(t => ({
+                value: t.codigo, label: t.nombre,
+                parts: [{ text: t.letra, weight: 'bold' as const }, { text: t.nombre, weight: 'light' as const }],
+                search: `${t.letra} ${t.codigo} ${t.nombre}`,
+              }))}
+              emptyText="Sin tipos de obra en el catálogo"
+            />
+            <p className="text-xs text-ds-gray-400 mt-1.5">
+              Define contra qué catálogo de partidas trabaja la obra. Vacío = se deduce del área de costeo.
+            </p>
+          </div>
           {renderDim('areaCosteo', 'Área de costeo (AC)', dimAC)}
           {renderDim('centroCosto', 'Centro de costo (CC)', dimCC)}
           <Combobox label="Proyecto" value={String(form.idProyecto ?? '')} onChange={v => set('idProyecto', v)}

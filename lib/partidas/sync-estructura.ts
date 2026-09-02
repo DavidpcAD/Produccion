@@ -58,26 +58,24 @@ export async function nombreObra(obra: string): Promise<string> {
   }
 }
 
-/** Obras de BC que pertenecen a un tipo, según el área de costeo de dbo.Obra. */
+/**
+ * Obras del app que pertenecen a un tipo. Manda `dbo.Obra.tipoObra` (lo que
+ * eligió la gente al crear/editar la obra) y, si está vacío, se deduce del área
+ * de costeo de BC.
+ */
 export async function obrasDelTipo(tipo: string): Promise<string[]> {
   const [app, mapa] = await Promise.all([getDb(), mapaAreaCosteoTipo()]);
-  const r = await app.request().query<{ numeroObra: string; areaCosteo: string | null }>(
-    'SELECT numeroObra, areaCosteo FROM dbo.Obra ORDER BY numeroObra',
+  const r = await app.request().query<{ numeroObra: string; areaCosteo: string | null; tipoObra: string | null }>(
+    'SELECT numeroObra, areaCosteo, tipoObra FROM dbo.Obra ORDER BY numeroObra',
   );
   return r.recordset
-    .filter((o) => (mapa.get(String(o.areaCosteo ?? '').trim().toUpperCase()) ?? TIPO_POR_DEFECTO) === tipo)
+    .filter((o) => {
+      const explicito = String(o.tipoObra ?? '').trim().toUpperCase();
+      const efectivo = explicito || (mapa.get(String(o.areaCosteo ?? '').trim().toUpperCase()) ?? TIPO_POR_DEFECTO);
+      return efectivo === tipo;
+    })
     .map((o) => String(o.numeroObra).trim())
     .filter(Boolean);
-}
-
-/** Área de costeo de una obra en dbo.Obra. null si la obra no está. */
-export async function areaCosteoDeObra(obra: string): Promise<string | null> {
-  const app = await getDb();
-  const r = await app.request()
-    .input('no', sqlApp.NVarChar(50), obra)
-    .query<{ areaCosteo: string | null }>('SELECT TOP 1 areaCosteo FROM dbo.Obra WHERE numeroObra = @no');
-  if (r.recordset.length === 0) return null;
-  return String(r.recordset[0].areaCosteo ?? '').trim();
 }
 
 /** Capítulos y partidas del catálogo que aplican a una obra. */

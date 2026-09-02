@@ -1,5 +1,6 @@
 import 'server-only';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
+import { getDb, sql as sqlApp } from '@/lib/db';
 
 /**
  * TIPOS DE OBRA del catálogo (`pro_obc.tipos_obra`). Son cinco y los define el
@@ -137,6 +138,30 @@ export async function tipoObraDeAreaCosteo(areaCosteo: string | null | undefined
       'SELECT tipo_obra FROM pro_obc.tipo_obra_area_costeo WHERE area_costeo = @area',
     );
   return r.recordset[0]?.tipo_obra ?? TIPO_POR_DEFECTO;
+}
+
+/**
+ * De qué tipo es UNA obra del app. Manda lo que eligió la gente
+ * (`dbo.Obra.tipoObra`); si está vacío se deduce del área de costeo de BC, que es
+ * como funcionaba antes de que la obra tuviera tipo propio.
+ *
+ * Devuelve null solo si la obra no existe en dbo.Obra.
+ */
+export async function tipoObraDeObra(numeroObra: string): Promise<
+  { tipo: string; origen: 'obra' | 'area'; areaCosteo: string | null } | null
+> {
+  const app = await getDb();
+  const r = await app.request()
+    .input('no', sqlApp.NVarChar(50), String(numeroObra ?? '').trim())
+    .query<{ tipoObra: string | null; areaCosteo: string | null }>(
+      'SELECT TOP 1 tipoObra, areaCosteo FROM dbo.Obra WHERE numeroObra = @no',
+    );
+  const f = r.recordset[0];
+  if (!f) return null;
+  const explicito = String(f.tipoObra ?? '').trim().toUpperCase();
+  const areaCosteo = String(f.areaCosteo ?? '').trim() || null;
+  if (explicito) return { tipo: explicito, origen: 'obra', areaCosteo };
+  return { tipo: await tipoObraDeAreaCosteo(areaCosteo), origen: 'area', areaCosteo };
 }
 
 /** Mapa completo área de costeo → tipo de obra (para clasificar varias obras de una). */

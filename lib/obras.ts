@@ -11,6 +11,8 @@ export function bindObra(reqObj: SqlRequest, b: Record<string, unknown>): SqlReq
     .input('descripcion', sql.NVarChar, str(b.descripcion))
     .input('centroCosto', sql.NVarChar, str(b.centroCosto))
     .input('areaCosteo', sql.NVarChar, str(b.areaCosteo))
+    // Tipo de obra elegido a mano (O/I/A/F/T). NULL = se deduce del área de costeo.
+    .input('tipoObra', sql.VarChar(20), str(b.tipoObra))
     .input('proyectoPadre', sql.NVarChar, str(b.proyectoPadre))
     .input('idProyecto', sql.Int, num(b.idProyecto))
     .input('areaProrrateadaM2', sql.Decimal(18, 2), num(b.areaProrrateadaM2))

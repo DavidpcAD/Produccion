@@ -21,6 +21,10 @@ interface Obra {
   descripcion: string | null;
   centroCosto: string | null;
   areaCosteo: string | null;
+  /** Tipo elegido a mano (O/I/A/F/T). null = se deduce del área de costeo. */
+  tipoObra: string | null;
+  tipoObraEfectivo?: string | null;
+  tipoObraOrigen?: 'obra' | 'area';
   proyectoPadre: string | null;
   idProyecto: number | null;
   proyectoNombre: string | null;
@@ -41,11 +45,17 @@ interface Obra {
 
 const EMPTY: Record<string, string | boolean> = {
   numeroObra: '', nombreMostrado: '', descripcion: '', estado: '', centroCosto: '',
-  areaCosteo: '', proyectoPadre: '', idProyecto: '', gerenteProyecto: '', idEncargado: '', ubicacion: '',
+  areaCosteo: '', tipoObra: '', proyectoPadre: '', idProyecto: '', gerenteProyecto: '', idEncargado: '', ubicacion: '',
   fechaInicio: '', fechaFin: '', areaProrrateadaM2: '', precioNormalMaquinaria: '',
   precioConcretoMaquinaria: '', origenPrincipal: '', esBC: false, esProcore: false,
 };
 const PASOS = ['Datos', 'Dimensiones', 'Revisar'] as const;
+
+interface TipoObraOpt {
+  codigo: string; letra: string; nombre: string;
+  /** Áreas de costeo de BC que caen en este tipo (para avisar si no calza). */
+  areas?: string[];
+}
 
 const col = createColumnHelper<Obra>();
 
@@ -59,6 +69,8 @@ export default function ObrasPage() {
   const { toast } = useToast();
   const [obras, setObras] = useState<Obra[]>([]);
   const [proyectos, setProyectos] = useState<{ IDProyecto: number; Nombre: string; CodigoBC: string }[]>([]);
+  // Tipos de obra del catálogo (O/I/A/F/T) — pro_obc.tipos_obra.
+  const [tiposObra, setTiposObra] = useState<TipoObraOpt[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Record<string, string | boolean>>(EMPTY);
@@ -106,6 +118,23 @@ export default function ObrasPage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { fetch('/api/proyectos').then(r => r.json()).then(d => setProyectos(d.data ?? [])).catch(() => {}); }, []);
+  useEffect(() => { fetch('/api/tipos-obra').then(r => r.json()).then(d => setTiposObra(d.tipos ?? [])).catch(() => {}); }, []);
+
+  // Opciones de tipo de obra para los combos (letra + nombre).
+  const tipoOpts: ComboOption[] = tiposObra.map(t => ({
+    value: t.codigo,
+    label: t.nombre,
+    parts: [{ text: t.letra, weight: 'bold' as const }, { text: t.nombre, weight: 'light' as const }],
+    search: `${t.letra} ${t.codigo} ${t.nombre}`,
+  }));
+  const tipoPorCodigo = useMemo(() => new Map(tiposObra.map(t => [t.codigo, t])), [tiposObra]);
+  // Tipo al que apunta el área de costeo elegida, para avisar si no calza con el
+  // tipo marcado (el tipo marcado es el que manda).
+  const tipoSegunArea = useMemo(() => {
+    const area = String(form.areaCosteo ?? '').trim().toUpperCase();
+    if (!area) return null;
+    return tiposObra.find(t => (t.areas ?? []).some(a => a.trim().toUpperCase() === area)) ?? null;
+  }, [form.areaCosteo, tiposObra]);
 
   const set = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
@@ -146,6 +175,7 @@ export default function ObrasPage() {
 
   function nextStep() {
     if (step === 0 && !form.idProyecto) { toast('Seleccioná el proyecto de la obra', 'warning'); return; }
+    if (step === 0 && !form.tipoObra) { toast('Elegí el tipo de obra', 'warning'); return; }
     if (step === 0 && !validarNumero()) return;
     setStep(s => Math.min(s + 1, PASOS.length - 1));
   }
@@ -153,6 +183,7 @@ export default function ObrasPage() {
 
   async function handleCreate() {
     if (!form.idProyecto) { toast('Seleccioná el proyecto de la obra', 'warning'); return; }
+    if (!form.tipoObra) { toast('Elegí el tipo de obra', 'warning'); return; }
     if (!validarNumero()) return;
     setSaving(true);
     try {
@@ -202,6 +233,32 @@ export default function ObrasPage() {
         return (
           <span className={`inline-flex items-center gap-1.5 rounded-full px-3 h-7 text-[13px] font-semibold ${cfg.cls}`}>
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />{cfg.label}
+          </span>
+        );
+      },
+    }),
+    col.display({
+      id: 'tipoObra', header: 'Tipo',
+      meta: {
+        label: 'Tipo de obra',
+        exportValue: (o) => tipoPorCodigo.get(String(o.tipoObraEfectivo ?? ''))?.nombre ?? String(o.tipoObraEfectivo ?? ''),
+      },
+      cell: ({ row }) => {
+        const o = row.original;
+        const cod = String(o.tipoObraEfectivo ?? '');
+        const t = tipoPorCodigo.get(cod);
+        if (!t) return <span className="text-ds-gray-300">—</span>;
+        // Deducido del área de costeo = gris; elegido en la obra = negro.
+        const propio = o.tipoObraOrigen === 'obra';
+        return (
+          <span
+            className="inline-flex items-center gap-1.5 whitespace-nowrap"
+            title={propio ? 'Tipo elegido en la obra' : `Deducido del área de costeo${o.areaCosteo ? ` (${o.areaCosteo})` : ''}`}
+          >
+            <span className={'inline-flex items-center justify-center h-4 w-4 rounded text-[10px] font-bold font-mono ' + (propio ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>
+              {t.letra}
+            </span>
+            <span className={propio ? 'text-ds-ink' : 'text-ds-gray-500'}>{t.nombre}</span>
           </span>
         );
       },
@@ -333,6 +390,13 @@ export default function ObrasPage() {
                 options={proyectos.map(p => ({ value: String(p.IDProyecto), label: p.Nombre, parts: [{ text: p.Nombre, weight: 'bold' as const }, ...(p.CodigoBC ? [{ text: p.CodigoBC, weight: 'light' as const }] : [])], search: p.CodigoBC ?? '' }))}
                 placeholder="Seleccionar proyecto" />
               <p className="text-xs text-ds-gray-400 -mt-2">La obra queda amarrada a este proyecto (solo en el sistema; no viaja a Business Central).</p>
+              <Combobox label="Tipo de obra" value={String(form.tipoObra)} onChange={v => set('tipoObra', v)} required
+                options={tipoOpts} placeholder="Seleccionar tipo de obra"
+                emptyText="Sin tipos de obra en el catálogo" />
+              <p className="text-xs text-ds-gray-400 -mt-2">
+                Define contra qué catálogo de partidas y subpartidas trabaja la obra (Partidas y el cruce del
+                presupuesto). No viaja a Business Central.
+              </p>
               <Input label="Número de obra" value={String(form.numeroObra)} onChange={e => set('numeroObra', e.target.value)} required
                 maxLength={crearEnBC ? 10 : undefined}
                 hint={crearEnBC ? 'Se envía a Business Central · máx. 10 caracteres' : undefined} />
@@ -353,6 +417,17 @@ export default function ObrasPage() {
             <>
               <p className="text-body-sm text-ds-gray-400">Área de costo del proyecto.</p>
               {renderDim('AC', 'Área de costo (AC)')}
+              {/* El tipo marcado manda; esto solo avisa cuando el área de costeo de BC
+                  apunta a otro tipo, que casi siempre significa que uno de los dos
+                  está mal puesto. */}
+              {tipoSegunArea && form.tipoObra && tipoSegunArea.codigo !== form.tipoObra && (
+                <div className="rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow/10 px-4 py-2.5 text-xs text-ds-yellow-ink">
+                  Esta área de costeo ({String(form.areaCosteo)}) corresponde a{' '}
+                  <strong>{tipoSegunArea.nombre}</strong>, pero marcaste{' '}
+                  <strong>{tipoPorCodigo.get(String(form.tipoObra))?.nombre ?? String(form.tipoObra)}</strong>. Manda
+                  lo que marcaste; revisá que sea lo que querés.
+                </div>
+              )}
               <div className="rounded-ds border border-ds-gray-200 px-4 py-3 text-sm">
                 <span className="text-ds-gray-400 font-medium">Centro de costo (CC): </span>
                 <span className="text-ds-ink font-semibold">{String(form.numeroObra) || '—'}</span>
@@ -381,6 +456,7 @@ export default function ObrasPage() {
                 {[
                   ['N° de obra', form.numeroObra],
                   ['Nombre', form.nombreMostrado || '—'],
+                  ['Tipo de obra', tipoPorCodigo.get(String(form.tipoObra))?.nombre || '—'],
                   ['Descripción', form.descripcion || '—'],
                   ['Área de costo (AC)', form.areaCosteo || '—'],
                   ['Centro de costo (CC)', `${form.numeroObra || '—'} (automático)`],

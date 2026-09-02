@@ -3,6 +3,7 @@ import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { bindObra } from '@/lib/obras';
 import { bcConfigured, createWork, createProject } from '@/lib/bc-client';
+import { getTipoObra, mapaAreaCosteoTipo, TIPO_POR_DEFECTO } from '@/lib/partidas/tipos-obra';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     .input('offset', sql.Int, offset).input('porPagina', sql.Int, porPagina)
     .query(`
       SELECT o.idObra, o.numeroObra, o.nombreMostrado, o.descripcion, o.centroCosto,
-             o.areaCosteo, o.proyectoPadre, o.idProyecto, pr.nombre AS proyectoNombre,
+             o.areaCosteo, o.tipoObra, o.proyectoPadre, o.idProyecto, pr.nombre AS proyectoNombre,
              pr.esProductivo AS proyectoProductivo,
              o.gerenteProyecto, o.idEncargado, o.ubicacion,
              o.estado, o.fechaInicio, o.fechaFin, o.areaProrrateadaM2,
@@ -43,8 +44,22 @@ export async function GET(req: NextRequest) {
       OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
     `);
 
+  // Tipo de obra EFECTIVO: manda la columna tipoObra y, si está vacía, se deduce
+  // del área de costeo. El mapeo vive en pro_obc (otra base), así que el cruce se
+  // hace acá y no en el SELECT.
+  const mapa = await mapaAreaCosteoTipo().catch(() => new Map<string, string>());
+  const data = dataRes.recordset.map((o: Record<string, unknown>) => {
+    const explicito = String(o.tipoObra ?? '').trim().toUpperCase();
+    const porArea = mapa.get(String(o.areaCosteo ?? '').trim().toUpperCase()) ?? TIPO_POR_DEFECTO;
+    return {
+      ...o,
+      tipoObraEfectivo: explicito || porArea,
+      tipoObraOrigen: explicito ? 'obra' : 'area',
+    };
+  });
+
   return NextResponse.json({
-    data: dataRes.recordset, total, pagina,
+    data, total, pagina,
     paginas: Math.ceil(total / porPagina),
   });
 }
@@ -57,6 +72,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   if (!body.numeroObra) {
     return NextResponse.json({ error: 'El número de obra es requerido' }, { status: 400 });
+  }
+
+  // Tipo de obra (O/I/A/F/T): opcional, pero si viene tiene que existir en el
+  // catálogo (pro_obc.tipos_obra). Vacío = se deduce del área de costeo.
+  const tipoObra = String(body.tipoObra ?? '').trim().toUpperCase();
+  if (tipoObra) {
+    const t = await getTipoObra(tipoObra).catch(() => null);
+    if (!t) {
+      return NextResponse.json({ error: `Tipo de obra desconocido "${tipoObra}"` }, { status: 400 });
+    }
+    body.tipoObra = t.codigo;
+  } else {
+    body.tipoObra = null;
   }
   // Regla de dominio: el centro de costo (CC) de una obra nueva es su propio N°
   // (el AL lo crea automáticamente junto con almacén y proyecto).
@@ -109,13 +137,13 @@ export async function POST(req: NextRequest) {
       .input('creadoPor', sql.NVarChar, session.cedula ?? 'control-usuarios');
     const res = await r.query(`
       INSERT INTO dbo.Obra
-        (numeroObra, nombreMostrado, descripcion, centroCosto, areaCosteo, proyectoPadre, idProyecto,
+        (numeroObra, nombreMostrado, descripcion, centroCosto, areaCosteo, tipoObra, proyectoPadre, idProyecto,
          areaProrrateadaM2, gerenteProyecto, idEncargado, ubicacion, estado, fechaInicio, fechaFin,
          precioNormalMaquinaria, precioConcretoMaquinaria, origenPrincipal, esBC, esProcore,
          fechaCreacion, creadoPor)
       OUTPUT INSERTED.idObra
       VALUES
-        (@numeroObra, @nombreMostrado, @descripcion, @centroCosto, @areaCosteo, @proyectoPadre, @idProyecto,
+        (@numeroObra, @nombreMostrado, @descripcion, @centroCosto, @areaCosteo, @tipoObra, @proyectoPadre, @idProyecto,
          @areaProrrateadaM2, @gerenteProyecto, @idEncargado, @ubicacion, @estado, @fechaInicio, @fechaFin,
          @precioNormalMaquinaria, @precioConcretoMaquinaria, @origenPrincipal, @esBC, @esProcore,
          SYSUTCDATETIME(), @creadoPor)

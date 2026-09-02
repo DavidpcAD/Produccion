@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const conObras = new URL(req.url).searchParams.get('conObras') === '1';
 
   const db = await getAdelanteDb();
-  const [tipos, conteos] = await Promise.all([
+  const [tipos, conteos, areas] = await Promise.all([
     listarTiposObra(),
     db.request().query<{
       tipo_obra: string; grupos: number; partidas: number; subpartidas: number; obras: number;
@@ -37,6 +37,11 @@ export async function GET(req: NextRequest) {
       WHERE g.activo = 1
       GROUP BY g.tipo_obra
     `),
+    // Áreas de costeo de BC que caen en cada tipo: la pantalla de obras las usa
+    // para avisar si el área elegida no calza con el tipo que se marcó.
+    db.request().query<{ area_costeo: string; tipo_obra: string }>(
+      'SELECT area_costeo, tipo_obra FROM pro_obc.tipo_obra_area_costeo ORDER BY area_costeo',
+    ),
   ]);
 
   // Obras de BC por tipo (opcional): dbo.Obra vive en otra base que pro_obc, así
@@ -46,10 +51,13 @@ export async function GET(req: NextRequest) {
     try {
       const [app, mapa] = await Promise.all([getDb(), mapaAreaCosteoTipo()]);
       const r = await app.request().query<{
-        numeroObra: string; nombreMostrado: string | null; descripcion: string | null; areaCosteo: string | null;
-      }>('SELECT numeroObra, nombreMostrado, descripcion, areaCosteo FROM dbo.Obra ORDER BY numeroObra');
+        numeroObra: string; nombreMostrado: string | null; descripcion: string | null;
+        areaCosteo: string | null; tipoObra: string | null;
+      }>('SELECT numeroObra, nombreMostrado, descripcion, areaCosteo, tipoObra FROM dbo.Obra ORDER BY numeroObra');
       for (const o of r.recordset) {
-        const tipo = mapa.get(String(o.areaCosteo ?? '').trim().toUpperCase()) ?? TIPO_POR_DEFECTO;
+        // El tipo elegido en la obra manda; si no hay, se deduce del área de costeo.
+        const explicito = String(o.tipoObra ?? '').trim().toUpperCase();
+        const tipo = explicito || (mapa.get(String(o.areaCosteo ?? '').trim().toUpperCase()) ?? TIPO_POR_DEFECTO);
         if (!obrasPorTipo.has(tipo)) obrasPorTipo.set(tipo, []);
         obrasPorTipo.get(tipo)!.push({
           numeroObra: String(o.numeroObra).trim(),
@@ -71,6 +79,7 @@ export async function GET(req: NextRequest) {
         partidas: Number(c?.partidas) || 0,
         subpartidas: Number(c?.subpartidas) || 0,
         obras: Number(c?.obras) || 0,
+        areas: areas.recordset.filter((a) => a.tipo_obra === t.codigo).map((a) => a.area_costeo),
         obrasBC: conObras ? (obrasPorTipo.get(t.codigo) ?? []) : undefined,
       };
     }),
