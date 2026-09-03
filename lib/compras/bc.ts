@@ -1278,11 +1278,16 @@ export async function bcQuitarObraDeLineas(
   if (!conObra.length) return { limpiadas: [], pendientes: [] };
   const fallo = (motivo: string) => conObra.map(({ linea }) => ({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo }));
 
+  const est = await bcEstadoPedido(orderNo);
+  // YA LANZADO en BC: no hay nada que hacer acá y tampoco se puede — BC no deja tocar
+  // las líneas de un pedido liberado. Se sale sin pendientes para que quien llama siga
+  // su camino normal y termine contestando "ya estaba lanzado" en vez de un error. Pasa
+  // con el botón "Reintentar lanzar en BC" sobre una orden que alguien ya liberó.
+  if (est.lanzado) return { limpiadas: [], pendientes: [] };
   // Igual que al escribir la tarea del consumo directo: con el workflow de aprobación
   // de BC activo el pedido está "Pendiente de aprobación" y allá no se pueden tocar
   // líneas ("Status must be equal to 'Open'"). Reabrirlo cancela la solicitud viva; el
   // Release que viene enseguida la vuelve a mandar y a aprobar en el mismo paso.
-  const est = await bcEstadoPedido(orderNo);
   if (est.enAprobacion) {
     try { await bcReabrirPedido(orderNo); }
     catch (e) {
