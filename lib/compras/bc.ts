@@ -1010,6 +1010,9 @@ type AsignacionLineaBc = { lineNo: number; jobNo?: string; jobTaskNo?: string; j
    *  `bcQuitarObraDeLineas`). El codeunit no puede: solo escribe cuando el jobNo
    *  viene con valor. Lo hace la página publicada. */
   limpiarJob?: boolean;
+  /** CENTRO DE COSTO (Shortcut Dimension 1) a escribirle a la línea. Último recurso de
+   *  `bcQuitarObraDeLineas`, cuando revalidar el almacén no bastó. */
+  cc?: string;
   /** Reescribirle a la línea el almacén que YA tiene, para forzar a BC a revalidarlo.
    *  No cambia el almacén (va el mismo código): lo que se busca es que BC vuelva a
    *  derivar las DIMENSIONES de la línea desde la dimensión por defecto del almacén.
@@ -1144,6 +1147,9 @@ async function bcSetLineJobPagina(orderNo: string, asignaciones: AsignacionLinea
     // orden del JSON, así que cuando revalida el almacén ya no hay proyecto que le
     // gane al centro de costo por defecto del almacén.
     else if (a.revalidarAlmacen) body.Location_Code = a.revalidarAlmacen;
+    // Va de último: si además hay que forzar el centro de costo, se escribe DESPUÉS de
+    // que el almacén (y su dimensión por defecto) ya se aplicaron.
+    if (a.cc) body.Shortcut_Dimension_1_Code = a.cc;
     // N.º máquina del repuesto: la línea de BC lo lleva en GomEqp_Machine_No. Es la
     // única vía desde la app — ni la API estándar ni el codeunit exponen el campo.
     if (a.machineNo) body.GomEqp_Machine_No = a.machineNo;
@@ -1253,6 +1259,57 @@ function emparejarLineasBc<T extends { lineNo?: number; itemNo: string }>(
 //   c. Vuelve a LEER la línea y confirma que quedó sin obra y con un centro de costo que
 //      ya no es la obra. Si sigue mal, NO se lanza: es exactamente el pedido que Bodega
 //      no va a poder registrar después.
+// ─── Qué CENTRO DE COSTO exige cada almacén ─────────────────────────────────────
+// BC no publica las "Dimensiones predeterminadas" por ninguna API (ni la estándar, ni
+// la custom, ni como página), así que la app no puede PREGUNTAR qué centro de costo
+// exige un almacén. Pero BC lo contesta con los hechos: entre las líneas de pedido de
+// compra de ese almacén que NO llevan proyecto, el centro de costo es el que puso su
+// dimensión por defecto. Medido en Production: ALM-GRAL → INV en 302 de 302 líneas,
+// MAQ → MAQ, ALM-SSO → ALM-SSO, F-MADERAS → F-MADERAS…
+//
+// Solo se devuelve el valor cuando es ABRUMADOR (≥90% de al menos 5 líneas). Con menos
+// evidencia no se escribe nada: es preferible no lanzar el pedido a escribirle a
+// contabilidad un centro de costo adivinado.
+let ccPorAlmacenCache: { at: number; map: Map<string, string> } | null = null;
+export async function bcCentroCostoPorAlmacen(): Promise<Map<string, string>> {
+  if (ccPorAlmacenCache && Date.now() - ccPorAlmacenCache.at < 300_000) return ccPorAlmacenCache.map;
+  const map = new Map<string, string>();
+  try {
+    const cid = await getStdCompanyId();
+    const sel = "Line_No,No,Job_No,Location_Code,Shortcut_Dimension_1_Code";
+    let url: string | null = `${odataRoot()}/Purchase_Order_Line_Excel?company=${encodeURIComponent(cid)}&$select=${sel}`;
+    const conteo = new Map<string, Map<string, number>>();
+    let guard = 0;
+    while (url && guard++ < 60) {
+      const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
+      if (!res.ok) return map;
+      const data = (await res.json()) as { value?: { No?: string; Job_No?: string; Location_Code?: string; Shortcut_Dimension_1_Code?: string }[]; "@odata.nextLink"?: string };
+      for (const l of (data.value ?? [])) {
+        if (!String(l.No ?? "").trim()) continue;          // línea vacía / de texto
+        if (String(l.Job_No ?? "").trim()) continue;       // con proyecto manda el proyecto
+        const loc = String(l.Location_Code ?? "").trim();
+        if (!loc) continue;
+        const cc = String(l.Shortcut_Dimension_1_Code ?? "").trim();
+        if (!cc) continue;
+        if (!conteo.has(loc)) conteo.set(loc, new Map());
+        const m = conteo.get(loc)!;
+        m.set(cc, (m.get(cc) ?? 0) + 1);
+      }
+      url = data["@odata.nextLink"] ?? null;
+    }
+    for (const [loc, m] of conteo) {
+      const total = [...m.values()].reduce((a, b) => a + b, 0);
+      const [cc, n] = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (total >= 5 && n / total >= 0.9) map.set(loc.toUpperCase(), cc);
+    }
+    ccPorAlmacenCache = { at: Date.now(), map };
+    return map;
+  } catch (e) {
+    console.warn("BC: no se pudo deducir el centro de costo de cada almacén.", e);
+    return ccPorAlmacenCache?.map ?? map;
+  }
+}
+
 export type LineaAlmacenBc = { lineNo?: number; itemNo: string;
   /** Obra que el ingeniero puso en la solicitud (control interno). Se manda para poder
    *  reconocer el centro de costo malo aunque la línea ya no tenga proyecto. */
@@ -1306,16 +1363,43 @@ export async function bcQuitarObraDeLineas(
   const despues = await bcLineasJob(orderNo);
   if (!despues) return { limpiadas: [], pendientes: fallo("no se pudo verificar en BC que la línea quedara sin obra"), error: plan.errors || undefined };
 
+  // ¿Cómo quedó cada línea? Sigue MAL si conserva el proyecto, o si su centro de costo
+  // todavía es la obra — que es el caso de Proveeduría: escribe la DIMENSIÓN directo y
+  // sin proyecto (CP-005377), y ahí soltar el proyecto no cambia nada porque no hay.
+  const malProyecto = (d?: LineaJobBc) => !!(d && (d.jobNo || d.jobTaskNo));
+  const malCC = (d: LineaJobBc | undefined, obra?: string) => !!(d && obra && claveBc(d.cc) === claveBc(obra));
+
+  // ÚLTIMO RECURSO: a las que quedaron con el centro de costo de la obra se les escribe
+  // el que ese almacén exige, deducido de los propios pedidos de BC (ver
+  // `bcCentroCostoPorAlmacen`). Se hace solo acá, después de intentar lo limpio —soltar
+  // el proyecto y dejar que BC re-derive— y solo si BC responde algo contundente para
+  // ese almacén; si no, se prefiere no lanzar antes que inventar un centro de costo.
+  let ultima = despues;
+  const forzar = conObra
+    .map(({ linea, quiere }) => ({ quiere, d: despues.find((x) => x.lineNo === linea.lineNo) }))
+    .filter(({ d, quiere }) => !malProyecto(d) && malCC(d, quiere.obra));
+  if (forzar.length) {
+    const ccAlmacen = await bcCentroCostoPorAlmacen();
+    const asignaciones = forzar
+      .map(({ d }) => ({ lineNo: d!.lineNo, cc: ccAlmacen.get((d!.locationCode || "").toUpperCase()) }))
+      .filter((a): a is { lineNo: number; cc: string } => !!a.cc);
+    if (asignaciones.length) {
+      const plan2 = await bcSetLineJobPagina(orderNo, asignaciones);
+      if (plan2.errors) console.warn(`BC ${orderNo}: no se pudo forzar el centro de costo del almacén: ${plan2.errors}`);
+      ultima = (await bcLineasJob(orderNo)) ?? despues;
+    }
+  }
+
   const limpiadas: { lineNo: number; itemNo: string; jobNo: string; cc: string }[] = [];
   const pendientes: PendienteObraBc[] = [];
   for (const { linea, quiere } of conObra) {
-    const d = despues.find((x) => x.lineNo === linea.lineNo);
-    if (d && (d.jobNo || d.jobTaskNo)) {
-      pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `en BC sigue contra la obra ${d.jobNo || linea.jobNo}` });
-    } else if (d && quiere.obra && claveBc(d.cc) === claveBc(quiere.obra)) {
+    const d = ultima.find((x) => x.lineNo === linea.lineNo);
+    if (malProyecto(d)) {
+      pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `en BC sigue contra la obra ${d!.jobNo || linea.jobNo}` });
+    } else if (malCC(d, quiere.obra)) {
       // Lo grave: sin proyecto pero con el centro de costo de la obra. BC lo va a
       // rechazar cuando Bodega registre la factura, no ahora.
-      pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `su centro de costo sigue siendo la obra ${d.cc}${d.locationCode ? ` y el almacén es ${d.locationCode}` : ""}` });
+      pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `su centro de costo sigue siendo la obra ${d!.cc}${d!.locationCode ? ` y el almacén es ${d!.locationCode}` : ""}` });
     } else {
       limpiadas.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, jobNo: linea.jobNo, cc: d?.cc ?? "" });
     }
