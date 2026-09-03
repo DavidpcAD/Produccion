@@ -15,7 +15,10 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 // Las filas editables que salen de las líneas de artículo de una orden.
 function filasDe(orden?: Orden): Row[] {
   return (orden?.lineas ?? []).filter((l) => l.tipo === "articulo").map((l) => ({
-    key: l.id, articuloId: l.articuloId ?? "", descripcion: l.descripcion, unidad: l.unidad, obra: l.proyecto ?? l.almacen ?? "",
+    // `obra` es la columna de solo lectura y es la que se guarda como ALMACÉN de la
+    // línea: manda el almacén real y solo se cae al proyecto si la línea no lo trae
+    // (consumo directo, donde el almacén de la obra tiene su mismo código).
+    key: l.id, articuloId: l.articuloId ?? "", descripcion: l.descripcion, unidad: l.unidad, obra: l.almacen || l.proyecto || "",
     cantidad: String(l.cantidad), precio: String(l.precioUnitario), iva: String(l.ivaPct ?? 13), descuento: String(l.descuentoPct ?? 0),
     proyecto: l.proyecto, taskNo: l.taskNo, pedidoLineaId: l.pedidoLineaId, pedidoNumero: l.pedidoNumero,
   }));
@@ -123,7 +126,10 @@ export default function EditarOrdenPage() {
         tipo: "articulo", articuloId: r.articuloId, pedidoLineaId: r.pedidoLineaId, pedidoNumero: r.pedidoNumero,
         descripcion: r.descripcion, cantidad: Number(r.cantidad), unidad: r.unidad, almacen: r.obra,
         precioUnitario: Number(r.precio), ivaPct: Number(r.iva) || 0, descuentoPct: Number(r.descuento) || 0,
-        proyecto: r.proyecto || r.obra || undefined, taskNo: r.taskNo,
+        // El proyecto es el de la línea ORIGINAL y nada más: antes se caía a `r.obra`
+        // —que es el almacén— y una línea de material a inventario salía de acá con el
+        // almacén metido en el Job No. La obra solo viaja a BC en consumo directo.
+        proyecto: r.proyecto || undefined, taskNo: r.taskNo,
       }));
       if (fleteNum > 0) ls.push({ tipo: "cargo", descripcion: "FLETE / TRANSPORTE", cantidad: 1, unidad: "UND", almacen: rows[0]?.obra ?? "", precioUnitario: fleteNum, ivaPct: 13 });
       await updateOrden(orden!.id, { proveedorId, proveedorNo: provSel?.code, proveedorNombre: provSel?.nombre, currencyCode: currency, almacenRecepcion: almacen, lineas: ls });

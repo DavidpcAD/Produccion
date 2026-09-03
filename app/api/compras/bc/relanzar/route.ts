@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bcResyncPedidoLines, bcReleasePedido, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo, bcCompletarProyectoTarea, mensajeConsumoIncompleto, bcLineasProyectoSinTarea, mensajeProyectoSinTarea } from "@/lib/compras/bc";
+import { bcResyncPedidoLines, bcReleasePedido, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo, bcCompletarProyectoTarea, mensajeConsumoIncompleto, bcLineasProyectoSinTarea, mensajeProyectoSinTarea, bcQuitarObraDeLineas, mensajeObraNoQuitada } from "@/lib/compras/bc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
   let orderNo = "";
   try {
     const body = await req.json();
-    const { lineas, cargos, metodo, consumoDirecto } = body;
+    const { lineas, cargos, metodo, consumoDirecto, sinObra } = body;
     orderNo = body.orderNo ?? "";
     if (!orderNo) return NextResponse.json({ error: "Falta orderNo" }, { status: 400 });
     let jobError: string | undefined;
@@ -92,6 +92,28 @@ export async function POST(req: Request) {
         jobError,
       }, { status: 502 });
     }
+    // TAG ALM: quitarle a BC la obra que Proveeduría le copió a una línea que va a
+    // INVENTARIO, y dejarle el CENTRO DE COSTO que el almacén exige. Con el proyecto
+    // puesto BC le pisa el centro de costo con el de la obra, y eso BC lo valida SOLO
+    // AL REGISTRAR la factura: el pedido se lanza, el material llega y Bodega se topa
+    // con "el almacén ALM-GRAL obliga a que la dimensión CC sea INV, y la línea lleva
+    // VN-L.03" (CP-005375). La obra de "Obras y materiales" es control del ingeniero:
+    // solo viaja a BC en consumo directo.
+    // Va ANTES del consumo directo (son líneas distintas) y antes del pre-vuelo de
+    // "obra sin tarea", que es el que hoy tranca estos pedidos.
+    let obraQuitada = 0;
+    if (Array.isArray(sinObra) && sinObra.length) {
+      const q = await bcQuitarObraDeLineas(orderNo, sinObra).catch((e) => ({
+        limpiadas: [], pendientes: [], error: String((e as Error)?.message ?? e),
+      }));
+      obraQuitada = q.limpiadas.length;
+      if (q.pendientes.length) {
+        return NextResponse.json({ ok: false, error: mensajeObraNoQuitada(q.pendientes), obraPendiente: q.pendientes, obraError: q.error }, { status: 502 });
+      }
+      // Sin pendientes pero con error = no se pudo leer/verificar el pedido en BC. No
+      // se tranca el lanzamiento por eso (nada se escribió mal), pero queda el aviso.
+      if (q.error) console.warn(`BC ${orderNo}: no se pudo revisar la obra de las líneas de almacén: ${q.error}`);
+    }
     // CONSUMO DIRECTO: completarle a BC el proyecto+tarea que la app conoce por la
     // solicitud. Proveeduría crea el pedido sin la tarea y BC no lanza así; sin esto,
     // la salida a mano es borrarle el proyecto a la línea, y entonces el material
@@ -124,7 +146,7 @@ export async function POST(req: Request) {
     }
     try {
       const status = await bcReleasePedido(orderNo);
-      return NextResponse.json({ ok: true, status, cargoError, jobError });
+      return NextResponse.json({ ok: true, status, cargoError, jobError, obraQuitada });
     } catch (e) {
       return respuestaDelFallo(orderNo, e);
     }

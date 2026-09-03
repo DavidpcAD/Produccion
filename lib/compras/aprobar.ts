@@ -4,7 +4,7 @@
 // rechaza las líneas, la orden queda como estaba (pendiente) y se devuelve el
 // motivo real, para que el estado en SQL/UI nunca mienta respecto a BC.
 import type { Orden } from "./types";
-import { ALMACEN_GENERAL, numeroOrden } from "./helpers";
+import { ALMACEN_GENERAL, numeroOrden, ordenLineasSinObra } from "./helpers";
 
 // El retorno (`bcAviso`) existe para los estados que el PATCH sincroniza con BC
 // (enviar a aprobación / reabrir); acá no aplica — "lanzado" lo maneja este archivo
@@ -96,6 +96,13 @@ export async function aprobarYLanzar(
     .filter((l) => (l.jobNo && l.jobTaskNo) || l.machineNo)
     .map((l) => ({ lineNo: l.lineNo, itemNo: l.itemNo, jobNo: l.jobNo ?? "", jobTaskNo: l.jobTaskNo ?? "", machineNo: l.machineNo }));
 
+  // Al revés: las líneas que van a INVENTARIO (tag ALM) y por lo tanto NO deben
+  // llevar obra en BC. Proveeduría se la copia igual, y con el proyecto puesto BC le
+  // pisa el CENTRO DE COSTO de la línea con el de la obra. Eso BC lo valida solo al
+  // REGISTRAR la factura, así que el pedido se lanza, el material llega y Bodega es la
+  // que se topa con el "no" (CP-005375). Hay que arreglarlo ANTES de lanzar.
+  const sinObra = ordenLineasSinObra(orden);
+
   // Sin proveedor de BC o sin líneas: no hay nada que enviar a BC; se lanza local.
   if (!orden.proveedorNo || !lineasBc.length) {
     await setOrdenEstado(orden.id, "lanzado");
@@ -135,9 +142,12 @@ export async function aprobarYLanzar(
       // servidor le completa a BC la TAREA que Proveeduría no copia (sin tocar el
       // almacén). Sin esto BC rechaza el Release y la salida a mano —borrarle el
       // proyecto a la línea— manda el material a inventario en vez de a la obra.
+      // Y `sinObra` es el caso opuesto: a las líneas de almacén el servidor les BORRA
+      // la obra que Proveeduría les copió, para que el centro de costo lo pongan el
+      // almacén y el artículo (tampoco se le toca el almacén).
       res = await fetch("/api/compras/bc/relanzar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderNo: orden.bcNumber, consumoDirecto }),
+        body: JSON.stringify({ orderNo: orden.bcNumber, consumoDirecto, sinObra }),
       });
       d = await res.json().catch(() => ({}));
     } catch (e: any) {
@@ -154,6 +164,17 @@ export async function aprobarYLanzar(
       }
       return fallo(orden, setOrdenEstado, `No se lanzó ${orden.bcNumber} en BC: ${d.error || `HTTP ${res.status}`}. La orden queda pendiente.`);
     }
+    // Se le tocó una línea en BC: queda en el historial de la orden. Es una corrección
+    // del centro de costo, no un fallo, así que va con su propio tipo y NO cambia el
+    // estado (se manda el que ya tiene, igual que `fallo`).
+    if (d.obraQuitada) {
+      try {
+        await setOrdenEstado(orden.id, orden.estado, {
+          motivo: `se le quitó la obra a ${d.obraQuitada} línea(s) de material a almacén en ${orden.bcNumber} y su centro de costo volvió al del almacén: con la obra puesta, BC rechaza el registro de la factura porque el almacén exige su propio centro de costo`,
+          tipoMovimiento: "obra_quitada",
+        });
+      } catch (e) { console.warn("No se pudo registrar en el historial la obra quitada en BC:", e); }
+    }
     await setOrdenEstado(orden.id, "lanzado", { bcNumber: orden.bcNumber });
     // Ya estaba lanzada en BC (la liberaron a mano): la app se pone al día en vez de
     // dejarla pendiente para siempre.
@@ -161,7 +182,10 @@ export async function aprobarYLanzar(
     if (d.yaLanzado) return { ok: true, tone: "success", message: `${orden.bcNumber} ya estaba lanzada en Business Central; la orden queda como lanzada.` };
     const avisoCargoRe = d.cargoError ? ` · ⚠️ el cargo NO se agregó a BC: ${d.cargoError}` : "";
     const avisoJobRe = d.jobError ? ` · ⚠️ la actividad/almacén NO se aplicó en BC: ${d.jobError}` : "";
-    return { ok: !d.cargoError && !d.jobError, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${orden.bcNumber} aprobada y lanzada en BC${avisoCargoRe}${avisoJobRe}` };
+    // Que se le haya quitado la obra a una línea de almacén NO es un error, pero sí hay
+    // que decirlo: es la corrección del centro de costo y quien aprueba tiene que verla.
+    const avisoObra = d.obraQuitada ? ` · se le quitó la obra a ${d.obraQuitada} línea(s) de almacén y su centro de costo quedó en el del almacén` : "";
+    return { ok: !d.cargoError && !d.jobError, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${orden.bcNumber} aprobada y lanzada en BC${avisoObra}${avisoCargoRe}${avisoJobRe}` };
   }
 
   // Sin pedido en BC: o la orden es vieja (de antes de que Proveeduría lo creara al

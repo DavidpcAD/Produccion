@@ -8,7 +8,7 @@ import { IconChevronDown } from "@/components/compras/icons";
 import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { money, num, formatDate, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta } from "@/lib/compras/helpers";
+import { money, num, formatDate, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta, ordenLineasSinObra } from "@/lib/compras/helpers";
 import type { Orden, Pedido } from "@/lib/compras/types";
 
 // Vista de detalle de una orden, reutilizada por Proveeduría, Aprobación y Bodega.
@@ -45,22 +45,27 @@ export function OrdenDetalle({
     return () => { vivo = false; };
   }, [orden.bcNumber]);
 
-  // Reintenta el LANZAMIENTO en BC de un pedido ya creado (no duplica). Solo lanza:
-  // las líneas del pedido las escribe Proveeduría, que es la dueña del contenido, y
-  // reescribirlas desde acá le pisaba el almacén y la obra que acababa de poner.
+  // Reintenta el LANZAMIENTO en BC de un pedido ya creado (no duplica). No reescribe
+  // las líneas: las escribe Proveeduría, que es la dueña del contenido, y pisarlas
+  // desde acá le borraba el almacén que acababa de poner. La única corrección que sí
+  // se hace es quitarle la OBRA a las líneas que van a inventario (ver `sinObra`).
   async function reintentarLanzar() {
     if (!orden.bcNumber) return;
     setRelanzando(true);
     try {
       const r = await fetch("/api/compras/bc/relanzar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderNo: orden.bcNumber }),
+        // `sinObra` sí viaja: son las líneas que van a inventario, a las que hay que
+        // quitarles la obra que Proveeduría le copió al Job No. del pedido en BC (con
+        // el proyecto puesto, BC le carga el gasto al centro de costo de la obra).
+        body: JSON.stringify({ orderNo: orden.bcNumber, sinObra: ordenLineasSinObra(orden) }),
       });
       const d = await r.json().catch(() => ({}));
       // `r.ok` solo no alcanza: con la sesión vencida el proxy redirige a /login y el
       // fetch termina en un 200 de HTML sin JSON — y este botón decía "lanzado" sin
       // haber tocado BC (caso del 26/08/2026). El éxito lo declara el body (`d.ok`).
-      if (r.ok && d.ok) toast(`BC ${orden.bcNumber}: ${d.status ?? (d.yaLanzado ? "ya estaba lanzado" : "lanzado")}`, "success");
+      const avisoObra = d.obraQuitada ? ` · se le quitó la obra a ${d.obraQuitada} línea(s) de almacén` : "";
+      if (r.ok && d.ok) toast(`BC ${orden.bcNumber}: ${d.status ?? (d.yaLanzado ? "ya estaba lanzado" : "lanzado")}${avisoObra}`, "success");
       else if (r.ok && !("ok" in d)) toast("No se pudo lanzar en BC: la sesión parece vencida. Recargá la página y volvé a entrar.", "error");
       else toast(`No se pudo lanzar en BC: ${d.error ?? `HTTP ${r.status}`}`, "error");
     } catch (e: any) {

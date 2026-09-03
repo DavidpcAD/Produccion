@@ -742,6 +742,23 @@ export function ordenConsumoDirecto(o: Orden): { hay: boolean; parcial: boolean;
   return { hay: cd.length > 0, parcial: cd.length > 0 && cd.length < articulos.length, lineas: cd.length, destinos };
 }
 
+/** Líneas que NO van contra una obra: el material entra a INVENTARIO del almacén.
+ *
+ *  Con el tag ALM la obra que el ingeniero puso en "Obras y materiales" es control
+ *  suyo —para qué obra pidió el material—, no un consumo contra el proyecto: el
+ *  gasto lo paga el almacén, y en BC el centro de costo y el área de costo salen de
+ *  ahí. La obra viaja a BC SOLO en consumo directo. Se listan para que, antes de
+ *  lanzar, se le quite el proyecto a esas líneas en BC si alguien lo puso allá (ver
+ *  `bcQuitarObraDeLineas`): con el proyecto puesto BC le pisa el centro de costo con
+ *  el de la obra. */
+export function ordenLineasSinObra(o: Orden): { lineNo?: number; itemNo: string; obra?: string }[] {
+  return o.lineas
+    .filter((l) => l.tipo === "articulo" && !!l.articuloId && !ordenLineaEsConsumoDirecto(l))
+    // La obra viaja para poder reconocer el CENTRO DE COSTO malo en BC aunque la línea
+    // ya no tenga proyecto: es el mismo código (regla del sistema: CC de obra = su N.º).
+    .map((l) => ({ lineNo: l.lineNo, itemNo: l.articuloId!, obra: l.obra || l.proyecto || undefined }));
+}
+
 // ─── Almacén destino de una ORDEN ───────────────────────────────────────────────
 // El almacén al que entra lo que SÍ va a inventario (las líneas de consumo directo
 // no entran). Si todas comparten uno, va en el encabezado ("Almacén destino: X") y

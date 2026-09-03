@@ -35,6 +35,11 @@ const LABEL: Record<string, string> = {
   eliminado: "Eliminado",
   // Intento de lanzar a BC que falló: el motivo va en `detalle`.
   lanzamiento_fallido: "No se pudo lanzar a BC",
+  // Avisos de BC anotados sin mover la orden (el detalle dice qué pasó).
+  aviso_bc: "Aviso de Business Central",
+  // Se le quitó la obra en BC a una línea que va a inventario, para que el centro de
+  // costo lo ponga el almacén y no la obra.
+  obra_quitada: "Obra quitada en BC (material a almacén)",
 };
 
 // Etiqueta contextual: el mismo tipo de movimiento se lee distinto según

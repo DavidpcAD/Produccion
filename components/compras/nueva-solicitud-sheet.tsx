@@ -143,7 +143,11 @@ const DESTINOS: { v: DestinoMat; label: string }[] = [
 ];
 const ayudaDestino = (tipo: TipoSolicitud, d: DestinoMat) =>
   d === "almacen"
-    ? "ALM: entra a inventario del almacén elegido; se consume después."
+    // Con ALM el gasto lo paga el ALMACÉN: en BC el centro de costo y el área de costo
+    // salen de ahí, y la obra de cada tarjeta es control del ingeniero (para qué obra
+    // pidió), no un consumo contra el proyecto. Se dice acá porque es la confusión que
+    // hizo llegar compras de fábrica cargadas al centro de costo de una obra.
+    ? "ALM: entra a inventario del almacén elegido y se consume después. El centro de costo es el del almacén; la obra de cada tarjeta es solo tu control y no viaja a BC."
     : tipo === "repuesto"
       ? "CD (consumo directo): se lo lleva la máquina. En BC la línea va al almacén MAQ y se consume contra el proyecto MAQUINARIA (MAQ) · tarea PARQUE MAQUINARIA (CMAQ), con el N.º de máquina en la línea."
       : "CD (consumo directo): se consume de una vez contra el proyecto y la tarea de la obra.";
@@ -838,6 +842,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
 
   // Catálogo REAL de Business Central (respaldo al store si BC no responde).
   const [bcArt, setBcArt] = useState<Articulo[] | null>(null);
+  // Códigos BLOQUEADOS en BC (Blocked / Purchasing Blocked). No están en el catálogo —
+  // el endpoint ya los saca—, pero hay que conocerlos igual: una PLANTILLA o un pedido
+  // copiado traen códigos guardados, y `armarGruposFilas` sintetiza el material que no
+  // encuentra en el catálogo. Sin esta lista, el bloqueado volvía a entrar por ahí con
+  // la descripción vieja de la plantilla (M06-0116 al lado de su reemplazo M06-0805).
+  const [bcBloqueados, setBcBloqueados] = useState<Set<string>>(new Set());
   const [bcObras, setBcObras] = useState<Obra[] | null>(null);
   const [bcAlm, setBcAlm] = useState<Almacen[] | null>(null);
   useEffect(() => {
@@ -845,9 +855,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     (async () => {
       try {
         const ri = await fetch("/api/compras/bc/items");
+        const dataItems = ri.ok ? await ri.json() : {};
         // TODO el catálogo, tal cual viene de BC: inventario, servicio y no
         // inventariable. El tipo solo se guarda para etiquetarlo en el buscador.
-        const items: Articulo[] = ri.ok ? (((await ri.json()).items ?? []).map((i: any) => ({
+        const items: Articulo[] = ri.ok ? ((dataItems.items ?? []).map((i: any) => ({
           id: i.id, code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", unidadCompra: i.unidadCompra || undefined, almacenDefault: "", precioReferencia: 0,
           tipo: (i.tipo === "servicio" || i.tipo === "no-inventario" ? i.tipo : "inventario") as Articulo["tipo"],
         }))) : [];
@@ -856,6 +867,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         const almBc: Almacen[] = ra.ok ? ((await ra.json()).almacenes ?? []) : [];
         if (cancel) return;
         if (items.length) setBcArt(items);
+        if (Array.isArray(dataItems.bloqueados) && dataItems.bloqueados.length) {
+          setBcBloqueados(new Set(dataItems.bloqueados.map((c: unknown) => String(c).trim().toUpperCase())));
+        }
         if (obrasBc.length) setBcObras(obrasBc);
         if (almBc.length) setBcAlm(almBc);
       } catch { /* respaldo del store */ }
@@ -1293,13 +1307,29 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // (SOLO), sin obra. Los materiales que no estén en el catálogo cargado se sintetizan
   // con su código/descr/unidad para no perder la línea. Reutilizado por plantillas y
   // por "Copiar pedido".
-  function armarGruposFilas(lineasIn: PlantillaLinea[], bodega: boolean): { grupos: Grupo[]; rows: Row[]; extras: Articulo[] } {
+  //
+  // `descartarBloqueados` = sacar los materiales bloqueados en BC. Va en TRUE al armar
+  // algo nuevo (plantilla, copiar pedido) y en FALSE al EDITAR un pedido que ya existe:
+  // ahí la línea está guardada en la base y descartarla al abrir el drawer la borraría
+  // al guardar. Eso lo decide el ingeniero quitándola él, no la app por su cuenta.
+  function armarGruposFilas(lineasIn: PlantillaLinea[], bodega: boolean, descartarBloqueados = true): { grupos: Grupo[]; rows: Row[]; extras: Articulo[]; bloqueadas: string[] } {
     const extras: Articulo[] = [];
     const rows: Row[] = [];
     const nuevosGrupos: Grupo[] = [];
+    const bloqueadas: string[] = [];
     const porObra = new Map<string, string>(); // obraCodigo ("" = sin obra) -> grupoKey
     for (const pl2 of lineasIn) {
       if (!pl2.code) continue;
+      // BLOQUEADO en BC: la línea NO se agrega. Es el agujero por el que se colaba el
+      // material retirado: el catálogo ya no lo trae, así que caía en la síntesis de
+      // abajo y aparecía con la descripción que guardó la plantilla —el nombre viejo—
+      // justo al lado de su reemplazo. Quien llama avisa cuáles se dejaron fuera.
+      // Se prueba el código tal cual Y sin la variante pegada ("M11-0066 -VAR 01").
+      if (descartarBloqueados && bcBloqueados.size) {
+        const cod = pl2.code.trim().toUpperCase();
+        const base = separarVariantePegada(pl2.code).code.trim().toUpperCase();
+        if (bcBloqueados.has(cod) || bcBloqueados.has(base)) { bloqueadas.push(pl2.code); continue; }
+      }
       let a = catArticulos.find((x) => x.code === pl2.code) ?? extras.find((x) => x.code === pl2.code);
       // Código con la VARIANTE PEGADA ("M11-0066 -VAR 01"): así quedaron 12 líneas de las
       // plantillas de Bodega. Se separa y se busca el artículo REAL, así la línea nace con
@@ -1342,7 +1372,16 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       // guardaron vacía, y ahí manda la del artículo de BC.
       rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: vCode, variantNombre: vNombre, cantidad: pl2.cantidad || 1, unidad: (pl2.unidad ?? "").trim() || undefined, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
     }
-    return { grupos: nuevosGrupos, rows, extras };
+    return { grupos: nuevosGrupos, rows, extras, bloqueadas };
+  }
+
+  /** Aviso de los materiales que se dejaron fuera por estar bloqueados en BC. Se dice
+   *  SIEMPRE (no se descartan en silencio): el ingeniero tiene que saber que ese
+   *  material ya no se compra, para ir a buscar el que lo reemplaza. */
+  function avisarBloqueadas(bloqueadas: string[], origen: "la plantilla" | "el pedido copiado") {
+    if (!bloqueadas.length) return;
+    const lista = [...new Set(bloqueadas)];
+    toast(`${lista.length} material(es) de ${origen} están BLOQUEADOS en Business Central y no se agregaron: ${lista.join(", ")}. Buscá el material que los reemplaza.`, "info");
   }
 
   // Carga una plantilla: agrupa sus materiales por obra → una tarjeta por obra.
@@ -1352,8 +1391,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     // plantilla de bodega es material de obra que va al Almacén General, así que sus
     // líneas también van en una tarjeta de obra. Grupo único (sin obra) solo en repuesto.
     const bodega = esBodega(pl);
-    const { grupos: nuevosGrupos, rows, extras } = armarGruposFilas(pl.lineas, sinObra);
+    const { grupos: nuevosGrupos, rows, extras, bloqueadas } = armarGruposFilas(pl.lineas, sinObra);
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
+    avisarBloqueadas(bloqueadas, "la plantilla");
     // La plantilla puede traer el mismo material repetido en la misma obra: se
     // unifican (suma cantidades) para no cargar líneas duplicadas.
     const { rows: dedup, merged } = mergeDedup(rows);
@@ -1364,7 +1404,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       setGrupos(sinObra ? [] : nuevosGrupos);
       setLineas(finalRows);
       toast(`Plantilla "${pl.nombre}" cargada (${finalRows.length} materiales)${merged ? ` · ${merged} repetido${merged > 1 ? "s" : ""} unificado${merged > 1 ? "s" : ""}` : ""}`, "success");
-    } else toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
+    // Si la plantilla sí traía materiales pero TODOS estaban bloqueados, el aviso de
+    // arriba ya lo explicó: decir "no tiene materiales" mandaría a buscar el problema
+    // donde no está.
+    } else if (!bloqueadas.length) toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
   }
 
   // Copiar pedido: siembra el drawer con las líneas de un pedido existente. Mismo
@@ -1372,8 +1415,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   function aplicarSeed(s: NuevaSolicitudSeed) {
     // Repuesto y Stock: grupo único sin obra (el destino es la máquina / el almacén).
     const soloUno = s.tipo === "repuesto" || s.tipo === "stock";
-    const { grupos: gs, rows, extras } = armarGruposFilas(s.lineas, soloUno);
+    // Editando un pedido que ya existe: las líneas bloqueadas se conservan (ver
+    // `armarGruposFilas`). Copiando, se descartan: el pedido nuevo no debe nacer con un
+    // material que BC ya no deja comprar.
+    const { grupos: gs, rows, extras, bloqueadas } = armarGruposFilas(s.lineas, soloUno, !editandoId);
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
+    avisarBloqueadas(bloqueadas, "el pedido copiado");
     const { rows: dedup } = mergeDedup(rows);
     setTipo(s.tipo);
     setDestinoMat(s.consumo ? "consumo" : "almacen");

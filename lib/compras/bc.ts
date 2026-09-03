@@ -196,11 +196,57 @@ export async function bcItems(): Promise<BcItem[]> {
     // el fallback que este código ya preveía.
     const extra = await bcItemExtra();
     if (extra.size) items = items.map((i) => { const e = extra.get(i.code); return { ...i, lastDirectCost: e?.cost ?? i.lastDirectCost, categoria: e?.categoria ?? i.categoria, tipo: e?.tipo ?? i.tipo }; });
+    // Bloqueados SOLO para compras: el filtro de arriba no los ve (ver bcItemsBloqueados).
+    const bloqueados = await bcItemsBloqueados();
+    if (bloqueados?.size) items = items.filter((i) => !bloqueados.has(i.code));
     if (items.length) lastGoodItems = items; // guardamos el último catálogo bueno
     return items;
   } catch (e) {
     if (lastGoodItems) { console.warn("BC items falló; sirviendo último catálogo bueno cacheado."); return lastGoodItems; }
     throw e;
+  }
+}
+
+// ─── Artículos BLOQUEADOS en BC ─────────────────────────────────────────────────
+// En BC un artículo se retira de DOS formas y hay que respetar las dos:
+//   · `Blocked`            → bloqueado para todo. La API custom sí lo trae (y ya se
+//                            filtra al mapear el catálogo).
+//   · `Purchasing Blocked` → bloqueado SOLO para compras. Es el caso típico del
+//                            artículo reemplazado: se deja usar el inventario que
+//                            queda, pero no se le vuelve a comprar. NI la API custom
+//                            (page 50125) NI la estándar v2.0 lo exponen, así que sale
+//                            de la página publicada `Ficha_producto_Excel`.
+// Caso real (03/09/2026): M06-0116 "TORNILLO 1-1/4 P/F" está bloqueado en BC y el
+// buscador lo seguía ofreciendo al lado de su reemplazo M06-0805 ("TORNILLO P/GYP
+// 1-1/4 P FINA", con existencias) — el ingeniero pedía el que no era.
+//
+// Son DOS consultas porque el endpoint OData de páginas rechaza el OR entre campos
+// distintos: "The 'OR' operator is not supported on distinct fields on an OData
+// filter". Son pocas filas (18 bloqueados en Sandbox), así que sale barato.
+// `null` = no se pudo leer: quien llama NO debe concluir que no hay bloqueados (mejor
+// mostrar el catálogo completo que dejarlo vacío).
+let itemsBloqueadosCache: { at: number; set: Set<string> } | null = null;
+export async function bcItemsBloqueados(): Promise<Set<string> | null> {
+  if (itemsBloqueadosCache && Date.now() - itemsBloqueadosCache.at < 300_000) return itemsBloqueadosCache.set;
+  try {
+    const cid = await getStdCompanyId();
+    const out = new Set<string>();
+    for (const campo of ["Blocked", "Purchasing_Blocked"]) {
+      let url: string | null = `${odataRoot()}/Ficha_producto_Excel?company=${encodeURIComponent(cid)}&$select=No&$filter=${encodeURIComponent(`${campo} eq true`)}`;
+      let guard = 0;
+      while (url && guard++ < 20) {
+        const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
+        if (!res.ok) return null;
+        const data = (await res.json()) as { value?: { No?: string }[]; "@odata.nextLink"?: string };
+        for (const r of (data.value ?? [])) { const n = String(r.No ?? "").trim(); if (n) out.add(n); }
+        url = data["@odata.nextLink"] ?? null;
+      }
+    }
+    itemsBloqueadosCache = { at: Date.now(), set: out };
+    return out;
+  } catch (e) {
+    console.warn("BC: no se pudo leer qué artículos están bloqueados; el catálogo va sin ese filtro.", e);
+    return itemsBloqueadosCache?.set ?? null;
   }
 }
 
@@ -959,7 +1005,17 @@ type AsignacionLineaBc = { lineNo: number; jobNo?: string; jobTaskNo?: string; j
   /** N.º de MÁQUINA de la línea (GomEqp Machine No.): es el repuesto que se le compra
    *  a esa máquina. El codeunit AdelantePO_SetLineJob no conoce el campo, así que
    *  siempre lo termina escribiendo el plan B (la página publicada). */
-  machineNo?: string };
+  machineNo?: string;
+  /** BORRARLE el proyecto y la tarea a la línea (material que va a inventario, ver
+   *  `bcQuitarObraDeLineas`). El codeunit no puede: solo escribe cuando el jobNo
+   *  viene con valor. Lo hace la página publicada. */
+  limpiarJob?: boolean;
+  /** Reescribirle a la línea el almacén que YA tiene, para forzar a BC a revalidarlo.
+   *  No cambia el almacén (va el mismo código): lo que se busca es que BC vuelva a
+   *  derivar las DIMENSIONES de la línea desde la dimensión por defecto del almacén.
+   *  Así el centro de costo queda en el que ese almacén exige (ALM-GRAL → INV) sin que
+   *  la app tenga que adivinar el valor. Ver `bcQuitarObraDeLineas`. */
+  revalidarAlmacen?: string };
 export async function bcSetLineJobs(orderNo: string, asignaciones: AsignacionLineaBc[]): Promise<{ updated: number; errors: string }> {
   if (!orderNo || !asignaciones.length) return { updated: 0, errors: "" };
   const cid = await getStdCompanyId();
@@ -989,11 +1045,18 @@ export async function bcSetLineJobs(orderNo: string, asignaciones: AsignacionLin
 // Purchase_Order_Line_Excel (OData V4), que existe en los dos entornos y no depende
 // de la extensión. Verificado contra Sandbox: borrar y poner Job No./Job Task No. por
 // PATCH funciona (200) y queda.
-type LineaJobBc = { lineNo: number; itemNo: string; jobNo: string; jobTaskNo: string; locationCode: string; machineNo: string };
+type LineaJobBc = { lineNo: number; itemNo: string; jobNo: string; jobTaskNo: string; locationCode: string; machineNo: string;
+  /** CENTRO DE COSTO de la línea = Shortcut Dimension 1 (así lo llama BC en el tooltip:
+   *  "código de dimensión de acceso directo 1"). Es el campo que decide a quién se le
+   *  carga el gasto, y el que BC valida contra la dimensión por defecto del almacén
+   *  AL REGISTRAR (no al lanzar). Ver `bcQuitarObraDeLineas`. */
+  cc: string;
+  /** ÁREA DE COSTO = Shortcut Dimension 2. Se lee solo para poder decirlo en el aviso. */
+  ac: string };
 
 function paginaLineasUrl(cid: string, orderNo: string): string {
   const filtro = encodeURIComponent(`Document_No eq '${odataStr(orderNo)}'`);
-  return `${odataRoot()}/Purchase_Order_Line_Excel?company=${encodeURIComponent(cid)}&$filter=${filtro}&$select=Document_No,Line_No,No,Job_No,Job_Task_No,Location_Code,GomEqp_Machine_No`;
+  return `${odataRoot()}/Purchase_Order_Line_Excel?company=${encodeURIComponent(cid)}&$filter=${filtro}&$select=Document_No,Line_No,No,Job_No,Job_Task_No,Location_Code,GomEqp_Machine_No,Shortcut_Dimension_1_Code,Shortcut_Dimension_2_Code`;
 }
 
 /** Proyecto/tarea/almacén REALES de las líneas del pedido en BC. `null` = no se pudo leer. */
@@ -1002,7 +1065,7 @@ async function bcLineasJob(orderNo: string): Promise<LineaJobBc[] | null> {
     const cid = await getStdCompanyId();
     const res = await bcFetch(paginaLineasUrl(cid, orderNo), { cache: "no-store" });
     if (!res.ok) return null;
-    const data = (await res.json()) as { value?: { Line_No?: number; No?: string; Job_No?: string; Job_Task_No?: string; Location_Code?: string; GomEqp_Machine_No?: string }[] };
+    const data = (await res.json()) as { value?: { Line_No?: number; No?: string; Job_No?: string; Job_Task_No?: string; Location_Code?: string; GomEqp_Machine_No?: string; Shortcut_Dimension_1_Code?: string; Shortcut_Dimension_2_Code?: string }[] };
     return (data.value ?? []).map((l) => ({
       lineNo: Number(l.Line_No ?? 0),
       itemNo: String(l.No ?? "").trim(),
@@ -1010,6 +1073,8 @@ async function bcLineasJob(orderNo: string): Promise<LineaJobBc[] | null> {
       jobTaskNo: String(l.Job_Task_No ?? "").trim(),
       locationCode: String(l.Location_Code ?? "").trim(),
       machineNo: String(l.GomEqp_Machine_No ?? "").trim(),
+      cc: String(l.Shortcut_Dimension_1_Code ?? "").trim(),
+      ac: String(l.Shortcut_Dimension_2_Code ?? "").trim(),
     }));
   } catch { return null; }
 }
@@ -1070,8 +1135,15 @@ async function bcSetLineJobPagina(orderNo: string, asignaciones: AsignacionLinea
   for (const a of asignaciones) {
     const key = `Purchase_Order_Line_Excel(Document_Type='Order',Document_No='${odataStr(orderNo)}',Line_No=${a.lineNo})`;
     const body: Record<string, unknown> = {};
-    if (a.jobNo) { body.Job_No = a.jobNo; body.Job_Task_No = a.jobTaskNo ?? ""; }
+    // La TAREA va primero: BC aplica las propiedades en el orden del JSON y no
+    // acepta una tarea sin su proyecto, así que se vacía antes de soltar el proyecto.
+    if (a.limpiarJob) { body.Job_Task_No = ""; body.Job_No = ""; }
+    else if (a.jobNo) { body.Job_No = a.jobNo; body.Job_Task_No = a.jobTaskNo ?? ""; }
     if (a.locationCode) body.Location_Code = a.locationCode;
+    // Va DESPUÉS de soltar el proyecto, a propósito: BC aplica las propiedades en el
+    // orden del JSON, así que cuando revalida el almacén ya no hay proyecto que le
+    // gane al centro de costo por defecto del almacén.
+    else if (a.revalidarAlmacen) body.Location_Code = a.revalidarAlmacen;
     // N.º máquina del repuesto: la línea de BC lo lleva en GomEqp_Machine_No. Es la
     // única vía desde la app — ni la API estándar ni el codeunit exponen el campo.
     if (a.machineNo) body.GomEqp_Machine_No = a.machineNo;
@@ -1122,6 +1194,136 @@ async function bcAplicarAsignaciones(orderNo: string, asignaciones: AsignacionLi
   return `${detalle} (líneas sin proyecto/tarea: ${lineas})`;
 }
 
+// ─── Emparejar las líneas de la app con las del pedido en BC ────────────────────
+// Por N.º de línea (lo firme) y solo si el ARTÍCULO coincide; lo que no calce así se
+// empareja por artículo, en orden. Sin la doble pasada, un pedido con el mismo
+// artículo repetido (una línea a inventario y otra contra la obra) podía terminar
+// escribiéndole la obra a la línea equivocada.
+const claveBc = (n: string) => (n ?? "").trim().toUpperCase();
+
+function emparejarLineasBc<T extends { lineNo?: number; itemNo: string }>(
+  enBc: LineaJobBc[],
+  items: T[],
+): { linea: LineaJobBc; quiere: T }[] {
+  const lineas = [...enBc].sort((a, b) => a.lineNo - b.lineNo);
+  const usadas = new Set<number>();
+  const pares: { linea: LineaJobBc; quiere: T }[] = [];
+  const pendientesDeEmparejar: T[] = [];
+  for (const q of items) {
+    const l = q.lineNo ? lineas.find((x) => x.lineNo === q.lineNo && claveBc(x.itemNo) === claveBc(q.itemNo)) : undefined;
+    if (l && !usadas.has(l.lineNo)) { usadas.add(l.lineNo); pares.push({ linea: l, quiere: q }); }
+    else pendientesDeEmparejar.push(q);
+  }
+  for (const q of pendientesDeEmparejar) {
+    const l = lineas.find((x) => !usadas.has(x.lineNo) && claveBc(x.itemNo) === claveBc(q.itemNo));
+    if (l) { usadas.add(l.lineNo); pares.push({ linea: l, quiere: q }); }
+  }
+  return pares;
+}
+
+// ─── Tag ALM: la obra es control del ingeniero y NO viaja a BC ──────────────────
+//
+// POR QUÉ (03/09/2026, PED-000131 → CP-005293 y PED-000041 → CP-005375): con el tag ALM
+// el material entra a INVENTARIO del almacén elegido y el gasto lo paga ESE almacén. La
+// obra que el ingeniero puso en "Obras y materiales" es control suyo (para qué obra pidió
+// el material), no un consumo contra el proyecto: eso solo pasa con el tag CD.
+//
+// Lo que llega mal a BC es el CENTRO DE COSTO de la línea (Shortcut Dimension 1). Dos
+// caminos lo ensucian, y hay que cerrar los dos:
+//   1. Proveeduría copia la obra al `Job No.` de la línea. Con el proyecto puesto BC le
+//      PISA el centro de costo con el de la obra (regla del sistema: CC de una obra = su
+//      N.º). Encima BC no lanza una línea con proyecto y sin tarea, y la salida a mano
+//      —borrar el proyecto en BC— deja la DIMENSIÓN VIEJA pegada.
+//   2. Aunque la línea quede sin proyecto, si el centro de costo ya trae la obra, ahí se
+//      queda: nadie lo recalcula.
+//
+// Y el golpe llega tarde: BC valida la dimensión contra la que exige el almacén SOLO AL
+// REGISTRAR, no al lanzar. Por eso CP-005375 se creó y se lanzó sin chistar, y el "no"
+// apareció cuando Bodega fue a registrar la factura, con el material ya recibido:
+// «el almacén ALM-GRAL obliga a que la dimensión CC sea INV, y la línea lleva VN-L.03».
+//
+// Qué hace esta función, antes del Release y solo con las líneas que la app sabe que van
+// a inventario (la solicitud NO tiene tarea):
+//   a. Le borra `Job No.` + `Job Task No.`.
+//   b. Le reescribe el MISMO almacén que ya tiene. No es para cambiarle el almacén (ese
+//      es de Proveeduría): es para que BC revalide el campo y vuelva a derivar las
+//      dimensiones desde la dimensión por defecto de ese almacén. Así el centro de costo
+//      queda en el que BC exige (ALM-GRAL → INV) SIN que la app tenga que adivinarlo —
+//      no hay página publicada de "Dimensiones predeterminadas" para consultarlo.
+//   c. Vuelve a LEER la línea y confirma que quedó sin obra y con un centro de costo que
+//      ya no es la obra. Si sigue mal, NO se lanza: es exactamente el pedido que Bodega
+//      no va a poder registrar después.
+export type LineaAlmacenBc = { lineNo?: number; itemNo: string;
+  /** Obra que el ingeniero puso en la solicitud (control interno). Se manda para poder
+   *  reconocer el centro de costo malo aunque la línea ya no tenga proyecto. */
+  obra?: string };
+
+export type PendienteObraBc = { lineNo: number; itemNo: string; motivo: string };
+
+export async function bcQuitarObraDeLineas(
+  orderNo: string,
+  alm: LineaAlmacenBc[],
+): Promise<{ limpiadas: { lineNo: number; itemNo: string; jobNo: string; cc: string }[]; pendientes: PendienteObraBc[]; error?: string }> {
+  const items = (alm ?? []).filter((l) => l.itemNo);
+  if (!orderNo || !items.length) return { limpiadas: [], pendientes: [] };
+  const enBc = await bcLineasJob(orderNo);
+  // No se pudo LEER el pedido: no hay nada que afirmar. No se bloquea por esto (el
+  // pre-vuelo de "obra sin tarea" tampoco concluye si no puede leer), pero se avisa.
+  if (!enBc) return { limpiadas: [], pendientes: [], error: `no se pudieron leer las líneas de ${orderNo} en BC para quitarles la obra` };
+
+  // Línea sucia = tiene proyecto/tarea, o su centro de costo ES la obra de la solicitud.
+  const sucia = (linea: LineaJobBc, obra?: string) =>
+    !!(linea.jobNo || linea.jobTaskNo) || !!(obra && claveBc(linea.cc) === claveBc(obra));
+  const conObra = emparejarLineasBc(enBc, items).filter(({ linea, quiere }) => sucia(linea, quiere.obra));
+  if (!conObra.length) return { limpiadas: [], pendientes: [] };
+  const fallo = (motivo: string) => conObra.map(({ linea }) => ({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo }));
+
+  // Igual que al escribir la tarea del consumo directo: con el workflow de aprobación
+  // de BC activo el pedido está "Pendiente de aprobación" y allá no se pueden tocar
+  // líneas ("Status must be equal to 'Open'"). Reabrirlo cancela la solicitud viva; el
+  // Release que viene enseguida la vuelve a mandar y a aprobar en el mismo paso.
+  const est = await bcEstadoPedido(orderNo);
+  if (est.enAprobacion) {
+    try { await bcReabrirPedido(orderNo); }
+    catch (e) {
+      const detalle = String((e as Error)?.message ?? e);
+      return { limpiadas: [], pendientes: fallo(`el pedido está pendiente de aprobación en BC y no se pudo reabrir para quitarle la obra: ${detalle}`), error: detalle };
+    }
+  }
+
+  const plan = await bcSetLineJobPagina(orderNo, conObra.map(({ linea }) => ({
+    lineNo: linea.lineNo, limpiarJob: true,
+    // Sin almacén (servicio / no inventariable) no hay nada que revalidar.
+    revalidarAlmacen: linea.locationCode || undefined,
+  })));
+  // Se VERIFICA contra BC: no se le cree al 200 del PATCH (misma lección que dejó
+  // CP-005132 con el codeunit).
+  const despues = await bcLineasJob(orderNo);
+  if (!despues) return { limpiadas: [], pendientes: fallo("no se pudo verificar en BC que la línea quedara sin obra"), error: plan.errors || undefined };
+
+  const limpiadas: { lineNo: number; itemNo: string; jobNo: string; cc: string }[] = [];
+  const pendientes: PendienteObraBc[] = [];
+  for (const { linea, quiere } of conObra) {
+    const d = despues.find((x) => x.lineNo === linea.lineNo);
+    if (d && (d.jobNo || d.jobTaskNo)) {
+      pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `en BC sigue contra la obra ${d.jobNo || linea.jobNo}` });
+    } else if (d && quiere.obra && claveBc(d.cc) === claveBc(quiere.obra)) {
+      // Lo grave: sin proyecto pero con el centro de costo de la obra. BC lo va a
+      // rechazar cuando Bodega registre la factura, no ahora.
+      pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `su centro de costo sigue siendo la obra ${d.cc}${d.locationCode ? ` y el almacén es ${d.locationCode}` : ""}` });
+    } else {
+      limpiadas.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, jobNo: linea.jobNo, cc: d?.cc ?? "" });
+    }
+  }
+  return { limpiadas, pendientes, error: pendientes.length ? (plan.errors || undefined) : undefined };
+}
+
+/** Texto para el usuario de las líneas de almacén que siguen con la obra en BC. */
+export function mensajeObraNoQuitada(pendientes: PendienteObraBc[]): string {
+  const detalle = pendientes.map((p) => `línea ${p.lineNo || "?"}${p.itemNo ? ` (${p.itemNo})` : ""}: ${p.motivo}`).join(" · ");
+  return `${pendientes.length} línea(s) de material a ALMACÉN siguen con la obra en Business Central (${detalle}). NO se lanzó el pedido a propósito: BC valida el centro de costo contra el que exige el almacén SOLO al registrar la factura, así que si esto pasa, el pedido se lanza, el material llega y Bodega no puede registrar nada. Arreglalo en BC —quitale el N.º proyecto a la línea y ponele en Centro de Costo el que el almacén exige— y reintentá. Si la compra SÍ va contra la obra, la solicitud tiene que pedirse como consumo directo, con su actividad.`;
+}
+
 // ─── Consumo directo: completar el proyecto/tarea que la app SÍ conoce ──────────
 //
 // POR QUÉ (caso 25/08/2026): Proveeduría crea el pedido en BC copiando la obra al
@@ -1162,23 +1364,8 @@ export async function bcCompletarProyectoTarea(
   // lanzar a ciegas es justo lo que manda el material a inventario sin su obra.
   if (!enBc) return { aplicadas: 0, pendientes: [], error: `no se pudieron leer las líneas de ${orderNo} en BC para verificar el consumo directo` };
 
-  const clave = (n: string) => (n ?? "").trim().toUpperCase();
   const lineas = [...enBc].sort((a, b) => a.lineNo - b.lineNo);
-  const usadas = new Set<number>();
-  const pares: { linea: LineaJobBc; quiere: LineaConsumoBc }[] = [];
-
-  // 1) Por N.º de línea (lo firme), exigiendo que el artículo sea el mismo.
-  const pendientesDeEmparejar: LineaConsumoBc[] = [];
-  for (const q of items) {
-    const l = q.lineNo ? lineas.find((x) => x.lineNo === q.lineNo && clave(x.itemNo) === clave(q.itemNo)) : undefined;
-    if (l && !usadas.has(l.lineNo)) { usadas.add(l.lineNo); pares.push({ linea: l, quiere: q }); }
-    else pendientesDeEmparejar.push(q);
-  }
-  // 2) Las que quedaron (datos viejos sin N.º de línea): por artículo, en orden.
-  for (const q of pendientesDeEmparejar) {
-    const l = lineas.find((x) => !usadas.has(x.lineNo) && clave(x.itemNo) === clave(q.itemNo));
-    if (l) { usadas.add(l.lineNo); pares.push({ linea: l, quiere: q }); }
-  }
+  const pares = emparejarLineasBc(enBc, items);
 
   const asignaciones: AsignacionLineaBc[] = [];
   const pendientes: PendienteConsumoBc[] = [];
@@ -1187,7 +1374,7 @@ export async function bcCompletarProyectoTarea(
     // la MÁQUINA (repuesto), sí se escribe — es un campo aparte y no repunta costos.
     if (linea.jobTaskNo && (!quiere.machineNo || linea.machineNo === quiere.machineNo)) continue;
     if (linea.jobTaskNo) { asignaciones.push({ lineNo: linea.lineNo, machineNo: quiere.machineNo }); continue; }
-    if (quiere.jobNo && linea.jobNo && clave(linea.jobNo) !== clave(quiere.jobNo)) {
+    if (quiere.jobNo && linea.jobNo && claveBc(linea.jobNo) !== claveBc(quiere.jobNo)) {
       pendientes.push({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo: `en BC está contra la obra ${linea.jobNo} y la solicitud dice ${quiere.jobNo}: no se toca desde acá` });
       continue;
     }

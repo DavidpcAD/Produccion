@@ -12,7 +12,7 @@ import type { Articulo, OrdenLinea } from "@/lib/compras/types";
 // Orden DIRECTA: compra armada por Proveeduría sin partir de una solicitud de
 // Ingeniería (material que no vino en ningún pedido). Todas las líneas son
 // manuales (pedidoNumero "Manual"); en la lista/detalle se marca como "Directa".
-interface Row { key: string; articuloId: string; descripcion: string; unidad: string; obra: string; cantidad: string; precio: string; iva: string; descuento: string; }
+interface Row { key: string; articuloId: string; descripcion: string; unidad: string; cantidad: string; precio: string; iva: string; descuento: string; }
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 export default function OrdenDirectaPage() {
@@ -53,7 +53,7 @@ export default function OrdenDirectaPage() {
     // moneda no sirve como precio y es mejor dejar la línea en 0 que poner un número que
     // está bien en colones y mal en dólares (~456x).
     const respaldo = mismaMoneda(currency, "CRC") ? (it.precioUltimo || 0) : 0;
-    setRows((rs) => [...rs, { key: `m-${uid()}`, articuloId: it.code, descripcion: it.descripcion, unidad: it.unidad, obra: "", cantidad: String(Number(qaQty)), precio: String(Number(qaPrecio) || respaldo), iva: "13", descuento: "0" }]);
+    setRows((rs) => [...rs, { key: `m-${uid()}`, articuloId: it.code, descripcion: it.descripcion, unidad: it.unidad, cantidad: String(Number(qaQty)), precio: String(Number(qaPrecio) || respaldo), iva: "13", descuento: "0" }]);
     setQaCode(""); setQaQty(""); setQaPrecio("");
   }
 
@@ -83,7 +83,6 @@ export default function OrdenDirectaPage() {
         tipo: "articulo", articuloId: r.articuloId, pedidoNumero: "Manual",
         descripcion: r.descripcion, cantidad: Number(r.cantidad), unidad: r.unidad, almacen,
         precioUnitario: Number(r.precio), ivaPct: Number(r.iva) || 0, descuentoPct: Number(r.descuento) || 0,
-        proyecto: r.obra || undefined,
       }));
       if (fleteNum > 0) ls.push({ tipo: "cargo", descripcion: "FLETE / TRANSPORTE", cantidad: 1, unidad: "UND", almacen, precioUnitario: fleteNum, ivaPct: 13 });
       const orden = await createOrden({ proveedorId, proveedorNo: provSel?.code, proveedorNombre: provSel?.nombre, currencyCode: currency, almacenRecepcion: almacen, lineas: ls });
@@ -155,13 +154,12 @@ export default function OrdenDirectaPage() {
           </div>
           <div className="ds-table-wrap" style={{ boxShadow: "none" }}>
             <table className="ds-table">
-              <thead><tr><th>Artículo</th><th>Obra</th><th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Desc%</th><th className="ds-num">IVA%</th><th className="ds-num">Importe</th><th></th></tr></thead>
+              <thead><tr><th>Artículo</th><th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Desc%</th><th className="ds-num">IVA%</th><th className="ds-num">Importe</th><th></th></tr></thead>
               <tbody>
-                {rows.length === 0 && <tr><td colSpan={8}><div className="empty">Sin líneas. Buscá un artículo del catálogo y agregalo.</div></td></tr>}
+                {rows.length === 0 && <tr><td colSpan={7}><div className="empty">Sin líneas. Buscá un artículo del catálogo y agregalo.</div></td></tr>}
                 {rows.map((r) => (
                   <tr key={r.key}>
                     <td><div className="ds-truncate" title={r.descripcion} style={{ maxWidth: 220 }}>{r.descripcion}</div><div className="ds-body-sm ds-muted">{r.articuloId}</div></td>
-                    <td><input className="ds-cell-input" value={r.obra} placeholder="—" style={{ width: 92 }} onChange={(e) => setRow(r.key, { obra: e.target.value })} /></td>
                     <td className="ds-num"><input className="ds-cell-input" type="number" min={0} value={r.cantidad} style={{ width: 70 }} onChange={(e) => setRow(r.key, { cantidad: e.target.value })} /></td>
                     <td className="ds-num"><input className="ds-cell-input" type="number" min={0} value={r.precio} style={{ width: 92 }} onChange={(e) => setRow(r.key, { precio: e.target.value })} /></td>
                     <td className="ds-num"><input className="ds-cell-input" type="number" min={0} max={100} value={r.descuento} style={{ width: 60 }} onChange={(e) => setRow(r.key, { descuento: e.target.value })} /></td>
