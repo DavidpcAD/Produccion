@@ -459,12 +459,16 @@ export default function PartidasPage() {
   }
 
   const totalSubs = subpartidas.length;
+  // El tipo de obra ya se lee en el chip activo, así que no se repite acá.
   const subtitulo = [
-    `${plural(partidas.length, 'partida', 'partidas')} en ${plural(etapas.length, termGrupoLow, termGrupoPlural)}`,
-    plural(totalSubs, 'subpartida', 'subpartidas'),
-    tipo?.nombre.toLowerCase(),
+    plural(partidas.length, 'partida', 'partidas'),
+    plural(etapas.length, termGrupoLow, termGrupoPlural),
+    totalSubs > 0 ? plural(totalSubs, 'subpartida', 'subpartidas') : 'sin subpartidas',
     porObra && obraFiltro ? `obra ${obraFiltro}` : null,
   ].filter(Boolean).join(' · ');
+  // Un solo botón que alterna, en vez de "Expandir todo" + "Colapsar todo" siempre.
+  const todoColapsado = etapas.length > 0 && obrasAbiertas.size === 0
+    && partidasAbiertas.size === 0 && gruposCerrados.size >= etapas.length;
 
   return (
     <PageShell>
@@ -472,121 +476,124 @@ export default function PartidasPage() {
         title="Partidas y subpartidas"
         subtitle={subtitulo}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            {puede && (
-              <Button variant="outline" onClick={abrirBC} icon={<Icon name="traslado" size="sm" color="currentColor" />}>
+          puede ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Jerarquía: una sola acción principal; las otras dos, secundarias. */}
+              <Button variant="ghost" size="sm" onClick={abrirBC} icon={<Icon name="traslado" size="sm" color="currentColor" />}>
                 Traer de BC
               </Button>
-            )}
-            {puede && (
-              <Button variant="outline" onClick={abrirNuevaEtapa} icon={<Icon name="plus" size="sm" color="currentColor" />}>{nuevoGrupo}</Button>
-            )}
-            {puede && (
-              <Button variant="outline" onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>Nueva partida</Button>
-            )}
-          </div>
+              <Button variant="ghost" size="sm" onClick={abrirNuevaEtapa} icon={<Icon name="plus" size="sm" color="currentColor" />}>
+                {nuevoGrupo}
+              </Button>
+              <Button onClick={() => abrirNuevaPart()} icon={<Icon name="plus" size="sm" color="currentColor" />}>
+                Nueva partida
+              </Button>
+            </div>
+          ) : undefined
         }
       />
 
       <CatalogoTabs />
 
-      {/* Tipos de obra: O · I · A · F · T (pro_obc.tipos_obra) */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex flex-wrap rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">
-          {(tipos.length > 0 ? tipos : [{ codigo: 'VIVIENDA', letra: 'O', nombre: 'Obra Vivienda' } as TipoObra]).map(t => (
-            <button key={t.codigo} onClick={() => cambiarTipo(t.codigo)}
-              title={`${t.letra} = ${t.nombre}${t.grupos != null ? ` · ${plural(t.grupos, t.terminoGrupo?.toLowerCase() ?? 'grupo', t.terminoGrupoPlural?.toLowerCase() ?? 'grupos')}, ${plural(t.partidas ?? 0, 'partida', 'partidas')}, ${plural(t.subpartidas ?? 0, 'subpartida', 'subpartidas')}` : ''}`}
-              className={'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-ds text-sm font-semibold transition ' + (tipoCodigo === t.codigo ? 'bg-black text-white' : 'text-ds-gray-500 hover:text-ds-ink')}>
-              <span className={'inline-flex items-center justify-center h-4 w-4 rounded text-[10px] font-bold font-mono ' + (tipoCodigo === t.codigo ? 'bg-white/20 text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{t.letra}</span>
-              {t.nombre}
-              {t.partidas != null && <span className={'text-xs font-normal ' + (tipoCodigo === t.codigo ? 'text-white/70' : 'text-ds-gray-400')}>{t.partidas}</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-body-sm text-ds-gray-400">
-        {porObra
-          ? <>Las <span className="font-semibold text-ds-gray-500">{termGrupoPlural}</span> y <span className="font-semibold text-ds-gray-500">partidas</span> vienen de Business Central y cada obra tiene su propia estructura. Las <span className="font-semibold text-ds-gray-500">subpartidas</span> existen solo acá.</>
-          : <>Las <span className="font-semibold text-ds-gray-500">{termGrupoPlural}</span> y <span className="font-semibold text-ds-gray-500">partidas</span> son las de Business Central (capítulo y partida de la obra), compartidas por todas las obras del tipo. Las <span className="font-semibold text-ds-gray-500">subpartidas</span> existen solo acá.</>}
-      </p>
-
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[240px] flex-1">
-          <Input placeholder="Buscar etapa, partida o subpartida…" value={q} onChange={e => setQ(e.target.value)} />
-        </div>
-        {porObra && (
-          <div className="min-w-[240px]">
-            <Combobox
-              value={obraFiltro}
-              onChange={v => { setObraFiltro(v); setObrasAbiertas(new Set()); }}
-              placeholder="Todas las obras"
-              options={[
-                { value: '', label: 'Todas las obras' },
-                ...obrasDelTipo.map(o => ({
-                  value: o.numeroObra,
-                  label: o.nombre ? `${o.numeroObra} — ${o.nombre}` : o.numeroObra,
-                  parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombre, weight: 'light' as const }],
-                  search: `${o.numeroObra} ${o.nombre}`,
-                })),
-              ]}
-            />
+      {/* UN SOLO panel: el tipo de obra, los filtros y el catálogo viven juntos, en
+          vez de cuatro bloques sueltos y una tarjeta por obra. */}
+      <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+        <div className="px-4 pt-3 pb-3 border-b border-ds-gray-200 space-y-3">
+          {/* Tipos de obra: O · I · A · F · T (pro_obc.tipos_obra). Filtro, no una
+              segunda barra de pestañas: sin caja y sin número en los inactivos. */}
+          <div className="flex flex-wrap items-center gap-1">
+            {(tipos.length > 0 ? tipos : [{ codigo: 'VIVIENDA', letra: 'O', nombre: 'Obra Vivienda' } as TipoObra]).map(t => {
+              const activo = tipoCodigo === t.codigo;
+              return (
+                <button key={t.codigo} onClick={() => cambiarTipo(t.codigo)}
+                  aria-current={activo ? 'true' : undefined}
+                  title={`${t.letra} = ${t.nombre}${t.grupos != null ? ` · ${plural(t.grupos, t.terminoGrupo?.toLowerCase() ?? 'grupo', t.terminoGrupoPlural?.toLowerCase() ?? 'grupos')}, ${plural(t.partidas ?? 0, 'partida', 'partidas')}, ${plural(t.subpartidas ?? 0, 'subpartida', 'subpartidas')}` : ''}`}
+                  className={'inline-flex items-center gap-1.5 rounded-ds px-3 py-1.5 text-label font-semibold transition-colors ' + (activo ? 'bg-black text-white' : 'text-ds-gray-500 hover:bg-ds-gray-100 hover:text-ds-ink')}>
+                  <span className={'font-mono text-body-sm font-bold ' + (activo ? 'text-white/60' : 'text-ds-gray-300')}>{t.letra}</span>
+                  {t.nombre}
+                  {activo && t.partidas != null && <span className="text-body-sm font-normal text-white/70">{t.partidas}</span>}
+                </button>
+              );
+            })}
           </div>
-        )}
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="ghost" onClick={expandirTodo}>Expandir todo</Button>
-          <Button size="sm" variant="ghost" onClick={colapsarTodo}>Colapsar todo</Button>
-        </div>
-      </div>
 
-      {loading ? (
-        <div className="space-y-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
-      ) : etapas.length === 0 ? (
-        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center">
-          <p className="text-ds-gray-400">
-            El catálogo de <span className="font-semibold text-ds-ink">{tipo?.nombre.toLowerCase() ?? tipoCodigo.toLowerCase()}</span> está vacío.
-          </p>
-          {puede && (
-            <p className="text-body-sm text-ds-gray-400 mt-2">
-              Creá {elGrupo} con “{nuevoGrupo}”, o traé la estructura que ya está en Business Central con “Traer de BC”.
+          {/* Buscar · obra · expandir, todo en una línea */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-[220px] flex-1">
+              <Input placeholder="Buscar etapa, partida o subpartida…" value={q} onChange={e => setQ(e.target.value)} />
+            </div>
+            {porObra && (
+              <div className="w-full sm:w-[230px]">
+                <Combobox
+                  value={obraFiltro}
+                  onChange={v => { setObraFiltro(v); setObrasAbiertas(new Set()); }}
+                  placeholder="Todas las obras"
+                  options={[
+                    { value: '', label: 'Todas las obras' },
+                    ...obrasDelTipo.map(o => ({
+                      value: o.numeroObra,
+                      label: o.nombre ? `${o.numeroObra} — ${o.nombre}` : o.numeroObra,
+                      parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombre, weight: 'light' as const }],
+                      search: `${o.numeroObra} ${o.nombre}`,
+                    })),
+                  ]}
+                />
+              </div>
+            )}
+            <Button size="sm" variant="ghost" onClick={todoColapsado ? expandirTodo : colapsarTodo}
+              icon={<Icon name="chevrons-up-down" size="sm" color="currentColor" />}>
+              {todoColapsado ? 'Expandir' : 'Colapsar'}
+            </Button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="p-4 space-y-2">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        ) : etapas.length === 0 ? (
+          <div className="p-10 text-center">
+            <p className="text-ds-gray-400">
+              El catálogo de <span className="font-semibold text-ds-ink">{tipo?.nombre.toLowerCase() ?? tipoCodigo.toLowerCase()}</span> está vacío.
             </p>
-          )}
-        </div>
-      ) : arbol.length === 0 ? (
-        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400 text-sm">
-          Ningún resultado para “{q}”.
-        </div>
-      ) : (
-        // Con catálogo por obra (admin / fábrica) cada obra es su propia tarjeta;
-        // con catálogo compartido (vivienda / infra) es una sola.
-        <div className={porObra ? 'space-y-3' : ''}>
-          {arbol.map(sec => (
-            <div key={sec.obra ?? SIN_OBRA} className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
+            {puede && (
+              <p className="text-body-sm text-ds-gray-400 mt-2">
+                Creá {elGrupo} con “{nuevoGrupo}”, o traé la estructura que ya está en Business Central con “Traer de BC”.
+              </p>
+            )}
+          </div>
+        ) : arbol.length === 0 ? (
+          <div className="p-10 text-center text-ds-gray-400 text-label">
+            Ningún resultado para “{q}”.
+          </div>
+        ) : (
+        // Todas las obras en el MISMO panel, separadas por una línea: antes cada una
+        // era su propia tarjeta y seis tarjetas huecas llenaban la pantalla.
+        <div>
+          {arbol.map((sec, iSec) => (
+            <div key={sec.obra ?? SIN_OBRA} className={iSec > 0 ? 'border-t border-ds-gray-200' : ''}>
               {/* Nivel 0 (solo admin/fábrica): la obra de BC dueña de la estructura */}
               {sec.obra && (
                 <button
                   onClick={() => setObrasAbiertas(s => toggleSet(s, sec.obra!))}
                   title={obraAbierta(sec.obra) ? 'Colapsar la obra' : `Ver la estructura de ${sec.obra}`}
                   className={
-                    'w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors ' +
-                    // Abierta: sin borde propio — el primer grupo ya trae su border-y.
+                    'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ' +
                     (obraAbierta(sec.obra) ? '' : 'hover:bg-ds-gray-100/70')
                   }
                 >
-                  <span className={'text-ds-gray-400 transition-transform shrink-0 ' + (obraAbierta(sec.obra) ? 'rotate-90' : '')}>
+                  <span className={'text-ds-gray-300 transition-transform shrink-0 ' + (obraAbierta(sec.obra) ? 'rotate-90' : '')}>
                     <Icon name="chevron-right" size="sm" color="currentColor" />
                   </span>
-                  <span className="font-mono text-xs font-bold text-ds-ink bg-ds-gray-100 border border-ds-gray-200 rounded-ds px-2 py-0.5 shrink-0">
+                  <span className="font-mono text-body-sm font-semibold text-ds-gray-500 shrink-0 min-w-[84px] whitespace-nowrap">
                     {sec.obra}
                   </span>
-                  <span className="text-sm font-semibold text-ds-ink truncate flex-1 min-w-0">
+                  <span className="text-label font-semibold text-ds-ink truncate flex-1 min-w-0">
                     {obrasDelTipo.find(o => o.numeroObra === sec.obra)?.nombre ?? ''}
                   </span>
-                  <span className="text-[11px] text-ds-gray-400 shrink-0 hidden sm:block whitespace-nowrap">
+                  <span className="text-body-sm text-ds-gray-400 shrink-0 hidden sm:block whitespace-nowrap">
                     {plural(sec.grupos.length, termGrupoLow, termGrupoPlural)} · {plural(sec.totalPartidas, 'partida', 'partidas')}
                     {sec.totalSubs > 0 ? ` · ${plural(sec.totalSubs, 'subpartida', 'subpartidas')}` : ''}
                   </span>
-                  <span className="text-[11px] text-ds-gray-400 shrink-0 sm:hidden">{sec.totalPartidas}</span>
+                  <span className="text-body-sm text-ds-gray-400 shrink-0 sm:hidden">{sec.totalPartidas}</span>
                 </button>
               )}
 
@@ -646,7 +653,7 @@ export default function PartidasPage() {
                               <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{partida.codigo}</span>
                               <span className="text-sm text-ds-ink truncate">{partida.nombre}</span>
                             </button>
-                            <span className="text-xs text-ds-gray-400 shrink-0">{subs.length}</span>
+                            {subs.length > 0 && <span className="text-body-sm text-ds-gray-400 shrink-0">{subs.length}</span>}
                             {puede && (
                               <>
                                 <button onClick={() => abrirEditarPart(partida)} className="text-ds-gray-400 hover:text-ds-ink shrink-0" title="Editar partida">
@@ -715,7 +722,8 @@ export default function PartidasPage() {
             </div>
           ))}
         </div>
-      )}
+        )}
+      </div>
 
       {/* Modal: partida (crear/editar) */}
       <Modal
