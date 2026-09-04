@@ -40,6 +40,14 @@ const LABEL: Record<string, string> = {
   // Se le quitó la obra en BC a una línea que va a inventario, para que el centro de
   // costo lo ponga el almacén y no la obra.
   obra_quitada: "Obra quitada en BC (material a almacén)",
+  // La app le preguntó a BC y el estado de la orden se corrigió para seguir al del
+  // pedido allá (lanzado que no estaba lanzado, o pendiente que ya liberaron).
+  sincronizado_bc: "Estado corregido según Business Central",
+  // Los escribe la app de Proveeduría (misma bitácora) al cotejar la orden contra BC.
+  bc_creado: "Pedido creado en Business Central",
+  bc_renumerado: "N.º de Business Central corregido",
+  bc_desalineado: "⚠ La orden y Business Central NO coinciden",
+  bc_alineado: "La orden y Business Central coinciden",
 };
 
 // Etiqueta contextual: el mismo tipo de movimiento se lee distinto según
@@ -71,6 +79,10 @@ function colorPunto(m: Movimiento): string {
       case "rechazado": return "var(--ds-color-red-200)";    // rechazada · rojo
       case "lanzamiento_fallido": return "var(--ds-color-red-100)"; // no se pudo lanzar · rojo
       case "eliminado": return "var(--ds-color-red-100)";
+      case "sincronizado_bc": return "var(--ds-color-yellow)";   // BC dijo otra cosa · amarillo
+      case "bc_desalineado": return "var(--ds-color-red-200)";   // BC no tiene lo mismo · rojo
+      case "bc_alineado": return "var(--ds-color-green-200)";    // verificado y coincide
+      case "bc_renumerado": return "var(--ds-color-yellow)";
     }
   }
   // Pedido (ingeniería)
@@ -145,7 +157,12 @@ export function Timeline({
               })()}
             </div>
             <div className="timeline__meta">
-              {m.usuario} · {ROL_LABEL[m.rol]} · {formatDateTime(m.fecha)}{m.detalle ? ` · ${m.detalle}` : ""}
+              {/* La sincronización no la hace una persona: la dispara la pantalla que
+                  alguien tenía abierta. Se dice así, para no atribuirle el cambio. */}
+              {m.tipoMovimiento === "sincronizado_bc"
+                ? <>Sincronización con Business Central (desde la pantalla de {m.usuario}) · {formatDateTime(m.fecha)}</>
+                : <>{m.usuario} · {ROL_LABEL[m.rol]} · {formatDateTime(m.fecha)}</>}
+              {m.detalle ? ` · ${m.detalle}` : ""}
             </div>
           </div>
         );

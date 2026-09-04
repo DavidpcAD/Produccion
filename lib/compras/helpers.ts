@@ -1,4 +1,5 @@
 import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
+import type { EstadoBcOrden } from "./api";
 import { almacenesQueRecibe } from "../permissions";
 
 // Almacén de inventario por defecto (el General). El pedido puede elegir OTRO
@@ -813,6 +814,40 @@ export function nextNumero(prefix: string, existentes: string[]): string {
 // ALM-* y una compra directa no podía recibirse en F-MADERAS (caso MEXICHEM 26/08).
 export function almacenesFisicos<T extends { codigo: string }>(list: T[]): T[] {
   return list.filter((a) => esAlmacenDeBodega(a.codigo));
+}
+
+// La orden figuraba LANZADA y la sincronización con BC la devolvió a "pendiente de
+// aprobación" porque el pedido allá no estaba lanzado: el último movimiento que le
+// CAMBIÓ el estado fue `sincronizado_bc`. Para Aprobación eso es "volver a lanzar",
+// no "aprobar" (ya la aprobó); para los demás, el aviso de que en BC no está lanzada.
+// Se miran solo los movimientos que cambian el estado: un `lanzamiento_fallido`
+// posterior repite el mismo estado y no debe borrar el aviso.
+// Cómo se lee, junto al estado de la orden, el estado REAL del pedido en BC (lo que
+// contestó BC en la última sincronización). `contradice` = la app dice una cosa y BC
+// otra: se pinta en rojo. Es lo que hace que la respuesta de BC se vea SIEMPRE, no
+// solo en el toast del momento.
+export function bcEstadoBadge(estadoApp: string, bc: EstadoBcOrden): { label: string; tone: string; contradice: boolean } {
+  const contradice = (estadoApp === "lanzado" && (bc === "abierto" || bc === "pendiente_aprobacion"))
+    || (estadoApp === "pendiente_aprobacion" && bc === "lanzado");
+  const label = bc === "lanzado" ? "En BC: Lanzado ✓"
+    : bc === "abierto" ? "En BC: Abierto (sin lanzar)"
+    : bc === "pendiente_aprobacion" ? "En BC: Pendiente de aprobación"
+    : bc === "inexistente" ? "En BC: ya no está en Pedidos de compra"
+    : "BC: no se pudo leer";
+  const tone = contradice ? "red" : bc === "lanzado" ? "green" : (bc === "abierto" || bc === "pendiente_aprobacion") ? "yellow" : "gray";
+  return { label, tone, contradice };
+}
+
+export function ordenDevueltaPorBc(
+  o: { id: string; estado: string },
+  movimientos: { entidad: string; idEntidad: string; tipoMovimiento: string; estadoAnterior?: string; estadoNuevo?: string; fecha: string }[],
+): boolean {
+  if (o.estado !== "pendiente_aprobacion") return false;
+  const ult = movimientos
+    .filter((m) => m.entidad === "orden" && m.idEntidad === o.id && m.estadoNuevo && m.estadoAnterior !== m.estadoNuevo)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .at(-1);
+  return ult?.tipoMovimiento === "sincronizado_bc" && ult.estadoNuevo === "pendiente_aprobacion";
 }
 
 // N.º con el que se conoce una orden. Desde que Proveeduría crea el Pedido de compra

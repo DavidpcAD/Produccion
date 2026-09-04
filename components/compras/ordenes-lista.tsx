@@ -7,7 +7,7 @@ import { Badge, ProgressBar } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { IconChevronDown } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
-import { money, formatDate, ordenBadge, ordenConsumoDirecto, ordenRecibidoPct, ordenSubtotal, ordenPedidos, ordenEsDirecta, ordenLineaImporte, num, numeroOrden } from "@/lib/compras/helpers";
+import { bcEstadoBadge, money, formatDate, ordenBadge, ordenConsumoDirecto, ordenRecibidoPct, ordenSubtotal, ordenPedidos, ordenEsDirecta, ordenLineaImporte, num, numeroOrden } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Lista de órdenes reutilizable (Proveeduría / Aprobación / Bodega), sobre DataTable
@@ -26,7 +26,7 @@ export function OrdenesLista({
   // Memoizalo en la página (useCallback): entra en las deps de las columnas.
   acciones?: (o: Orden) => ReactNode;
 }) {
-  const { proveedores } = useStore();
+  const { proveedores, bcEstados } = useStore();
   const router = useRouter();
   const prov = (id: string) => proveedores.find((p) => p.id === id);
   const nombreProv = (o: Orden) => o.proveedorNombre ?? prov(o.proveedorId)?.nombre ?? "—";
@@ -68,6 +68,9 @@ export function OrdenesLista({
         return (
           <span className="row gap-2 wrap">
             <Badge tone={b.tone}>{b.label}</Badge>
+            {/* Lo que BC contestó del pedido en la última sincronización: en rojo si
+                contradice al estado de acá. */}
+            {bcEstados[o.id] && (() => { const bb = bcEstadoBadge(o.estado, bcEstados[o.id]); return <Badge tone={bb.tone} title="Estado real del pedido en Business Central (última sincronización)">{bb.label}</Badge>; })()}
             {cd.hay && <Badge tone="ink" title={`Se consume contra ${cd.destinos.join(" · ")}. No entra a inventario.`}>CD{cd.parcial ? " parcial" : ""}</Badge>}
           </span>
         );
@@ -87,7 +90,7 @@ export function OrdenesLista({
       enableSorting: false, enableColumnFilter: false,
       cell: (c: any) => <span className="row" onClick={(e) => e.stopPropagation()}>{acciones(c.row.original)}</span>,
     } as ColumnDef<Orden, any>] : []),
-  ], [proveedores, acciones]); // eslint-disable-line react-hooks/exhaustive-deps
+  ], [proveedores, acciones, bcEstados]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderLineas = (o: Orden) => (
     <table className="ds-table" style={{ boxShadow: "none", background: "transparent" }}>

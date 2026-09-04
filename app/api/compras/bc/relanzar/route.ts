@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bcResyncPedidoLines, bcReleasePedido, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo, bcCompletarProyectoTarea, mensajeConsumoIncompleto, bcLineasProyectoSinTarea, mensajeProyectoSinTarea, bcQuitarObraDeLineas, mensajeObraNoQuitada } from "@/lib/compras/bc";
+import { bcResyncPedidoLines, bcReleasePedidoVerificado, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo, bcCompletarProyectoTarea, mensajeConsumoIncompleto, bcLineasProyectoSinTarea, mensajeProyectoSinTarea, bcQuitarObraDeLineas, mensajeObraNoQuitada } from "@/lib/compras/bc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -145,8 +145,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: mensajeProyectoSinTarea(sinTarea), jobSinTarea: sinTarea }, { status: 502 });
     }
     try {
-      const status = await bcReleasePedido(orderNo);
-      return NextResponse.json({ ok: true, status, cargoError, jobError, obraQuitada });
+      const rel = await bcReleasePedidoVerificado(orderNo);
+      // BC contestó 200 pero el pedido NO quedó lanzado (siguió Abierto, o el workflow lo
+      // dejó pendiente de aprobación). Esto se devolvía como éxito y la orden quedaba
+      // "Lanzado" acá con el pedido Abierto en BC (CP-005143, CP-005180, CP-005350):
+      // Bodega se topaba con el "must be approved and released" sin saber por qué.
+      if (!rel.lanzado) {
+        return NextResponse.json({
+          ok: false, status: rel.status, error: rel.motivo,
+          bcEnAprobacion: rel.estado === "pendiente_aprobacion" || undefined,
+        }, { status: 502 });
+      }
+      return NextResponse.json({ ok: true, status: rel.status, cargoError, jobError, obraQuitada });
     } catch (e) {
       return respuestaDelFallo(orderNo, e);
     }

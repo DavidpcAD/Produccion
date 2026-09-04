@@ -8,8 +8,9 @@ import { IconChevronDown } from "@/components/compras/icons";
 import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { money, num, formatDate, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta, ordenLineasSinObra } from "@/lib/compras/helpers";
+import { bcEstadoBadge, money, num, formatDate, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenDevueltaPorBc, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta, ordenLineasSinObra } from "@/lib/compras/helpers";
 import type { Orden, Pedido } from "@/lib/compras/types";
+import type { EstadoBcOrden } from "@/lib/compras/api";
 
 // Vista de detalle de una orden, reutilizada por Proveeduría, Aprobación y Bodega.
 // `acciones` son los botones específicos de cada rol (aprobar, recibir, etc.).
@@ -28,7 +29,7 @@ export function OrdenDetalle({
   // compartida; Proveeduría la manda a la suya, donde además puede ordenarla.
   pedidoHref?: (p: Pedido) => string;
 }) {
-  const { proveedores, recepciones, pedidos, movimientos } = useStore();
+  const { proveedores, recepciones, pedidos, movimientos, bcEstados, sincronizarBc, setOrdenEstado } = useStore();
   const router = useRouter();
   const toast = useToast();
   const [verFactura, setVerFactura] = useState<string | null>(null);
@@ -44,6 +45,31 @@ export function OrdenDetalle({
       .catch(() => { /* sin BC: se muestran los totales locales */ });
     return () => { vivo = false; };
   }, [orden.bcNumber]);
+
+  // Le pregunta a BC cómo está el pedido al abrir la orden (y cada vez que cambia su
+  // estado). Si el estado de acá no calza con el de allá, el servidor lo corrige (ver
+  // /api/compras/ordenes/sincronizar-bc) y el store se recarga; acá solo se muestra lo
+  // que BC dijo y se avisa del cambio, para que nadie se quede mirando un "Lanzado"
+  // que en BC no existe.
+  const [bcEstadoLeido, setBcEstado] = useState<EstadoBcOrden | null>(null);
+  // Mientras llega la lectura fresca se muestra lo que el store ya sabe de la última
+  // sincronización. Sin pedido en BC no hay estado que mostrar (se deriva, no se
+  // resetea el state dentro del efecto).
+  const bcEstado = orden.bcNumber ? (bcEstadoLeido ?? bcEstados[orden.id] ?? null) : null;
+  useEffect(() => {
+    if (!orden.bcNumber) return;
+    let vivo = true;
+    sincronizarBc([orden.id]).then((r) => {
+      if (!vivo || !r) return;
+      setBcEstado(r.estados[orden.id] ?? (r.desconocido ? "desconocido" : null));
+      const c = r.corregidas.find((x) => x.id === orden.id);
+      if (!c) return;
+      toast(c.a === "lanzado"
+        ? `${orden.bcNumber} ya estaba lanzado en Business Central: la orden pasó a Lanzado.`
+        : `${orden.bcNumber} NO está lanzado en Business Central (está ${c.bcEstado === "abierto" ? "Abierto" : "Pendiente de aprobación"}): la orden volvió a Pendiente de aprobación para volver a lanzarla.`, "info");
+    }).catch(() => { /* sin BC no se afirma nada */ });
+    return () => { vivo = false; };
+  }, [orden.id, orden.bcNumber, orden.estado]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reintenta el LANZAMIENTO en BC de un pedido ya creado (no duplica). No reescribe
   // las líneas: las escribe Proveeduría, que es la dueña del contenido, y pisarlas
@@ -65,7 +91,20 @@ export function OrdenDetalle({
       // fetch termina en un 200 de HTML sin JSON — y este botón decía "lanzado" sin
       // haber tocado BC (caso del 26/08/2026). El éxito lo declara el body (`d.ok`).
       const avisoObra = d.obraQuitada ? ` · se le quitó la obra a ${d.obraQuitada} línea(s) de almacén` : "";
-      if (r.ok && d.ok) toast(`BC ${orden.bcNumber}: ${d.status ?? (d.yaLanzado ? "ya estaba lanzado" : "lanzado")}${avisoObra}`, "success");
+      if (r.ok && d.ok) {
+        toast(`BC ${orden.bcNumber}: ${d.status ?? (d.yaLanzado ? "ya estaba lanzado" : "lanzado")}${avisoObra}`, "success");
+        if (orden.estado !== "lanzado") {
+          // BC lo dejó lanzado: la orden pasa a "lanzado" acá también. Antes quedaba
+          // pendiente con el pedido lanzado en BC hasta que la sincronización la alcanzara.
+          try { await setOrdenEstado(orden.id, "lanzado", { bcNumber: orden.bcNumber }); }
+          catch (e: any) { toast(`Se lanzó en BC, pero no se pudo marcar acá: ${String(e?.message ?? e)}`, "error"); }
+        } else {
+          // Ya figuraba lanzada acá (era BC el que no la tenía lanzada): solo se relee
+          // BC para que el aviso rojo y el badge se pongan al día.
+          const s = await sincronizarBc([orden.id]);
+          if (s) setBcEstado(s.estados[orden.id] ?? null);
+        }
+      }
       else if (r.ok && !("ok" in d)) toast("No se pudo lanzar en BC: la sesión parece vencida. Recargá la página y volvé a entrar.", "error");
       else toast(`No se pudo lanzar en BC: ${d.error ?? `HTTP ${r.status}`}`, "error");
     } catch (e: any) {
@@ -103,6 +142,15 @@ export function OrdenDetalle({
     const fallo = movs.filter((m) => m.tipoMovimiento === "lanzamiento_fallido").sort((a, b) => a.fecha.localeCompare(b.fecha)).at(-1);
     return !!fallo && !movs.some((m) => m.fecha > fallo.fecha);
   })();
+  // Ya se había aprobado y BC la devolvió a pendiente porque el pedido allá no quedó
+  // lanzado: se dice arriba, en rojo, porque cambia lo que hay que hacer con ella.
+  const devueltaPorBc = ordenDevueltaPorBc(orden, movimientos);
+  // La app dice "lanzado" y BC, leído al abrir, dice que el pedido está Abierto o
+  // Pendiente de aprobación. El servidor ya está devolviendo la orden a pendiente,
+  // pero la opción de lanzar tiene que estar ACÁ, en el momento en que se ve la
+  // contradicción, sin depender de que esa corrección alcance a escribirse.
+  const lanzadaSinLanzarEnBc = !!orden.bcNumber && orden.estado === "lanzado" && (bcEstado === "abierto" || bcEstado === "pendiente_aprobacion");
+  const sinLanzarEnBc = devueltaPorBc || lanzadaSinLanzarEnBc;
   const subtotal = orden.lineas.filter((l) => l.tipo === "articulo").reduce((s, l) => s + ordenLineaImporte(l), 0);
   const iva = orden.lineas.filter((l) => l.tipo === "articulo").reduce((s, l) => s + ordenLineaImporte(l) * ((l.ivaPct || 0) / 100), 0);
   const flete = orden.lineas.filter((l) => l.tipo === "cargo").reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
@@ -112,9 +160,15 @@ export function OrdenDetalle({
       <div className="back-link" onClick={() => router.push(volverHref)}>{volverLabel}</div>
       <div className="page__head">
         <div className="page__title">
-          <div className="row gap-3">
-            <h1 className="ds-heading">{numeroOrden(orden)}</h1>
+          {/* Con tres badges (estado, BC, CD) en tablet el número se partía letra por
+              letra: el número no se encoge y los badges bajan de línea. */}
+          <div className="row gap-3 wrap">
+            <h1 className="ds-heading" style={{ whiteSpace: "nowrap" }}>{numeroOrden(orden)}</h1>
             <Badge tone={b.tone}>{b.label}</Badge>
+            {bcEstado && (() => {
+              const bb = bcEstadoBadge(orden.estado, bcEstado);
+              return <Badge tone={bb.tone} title="Estado real del pedido en Business Central, leído al abrir la orden.">{bb.label}</Badge>;
+            })()}
             {esDirecta && <Badge tone="yellow">Directa</Badge>}
             {cd.hay && (
               <Badge tone="ink" title={`Se consume contra ${cd.destinos.join(" · ")}. El material NO entra a inventario: el costo va a la obra.`}>
@@ -123,6 +177,14 @@ export function OrdenDetalle({
             )}
           </div>
           <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · emitida {formatDate(orden.fecha)} · recibido {ordenRecibidoPct(orden)}%</p>
+          {sinLanzarEnBc && (
+            <div className="ds-body-sm mt-2" style={{ padding: "8px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-red-100) 8%, var(--ds-tint-base))", border: "1.5px solid color-mix(in srgb, var(--ds-color-red-100) 30%, var(--ds-tint-base))", color: "var(--ds-color-red-200)" }}>
+              <span className="ds-strong">Sin lanzar en Business Central.</span>{" "}
+              {lanzadaSinLanzarEnBc
+                ? <>La orden figura lanzada acá, pero el pedido {orden.bcNumber} está {bcEstado === "abierto" ? "Abierto" : "Pendiente de aprobación"} en BC y Bodega no puede recibir contra él. Dale «Volver a lanzar en BC».</>
+                : <>La orden ya se había aprobado, pero el pedido {orden.bcNumber} quedó sin lanzar en BC y Bodega no puede recibir contra él. Aprobación tiene que darle «Volver a lanzar en BC».</>}
+            </div>
+          )}
           {cd.hay && (
             <p className="ds-body-sm" style={{ color: "var(--ds-color-green-200)" }}>
               {cd.parcial ? `${cd.lineas} de sus líneas se consumen` : "Se consume"} contra <span className="ds-strong">{cd.destinos.join(" · ")}</span> · no entra a inventario
@@ -160,9 +222,19 @@ export function OrdenDetalle({
             <button className="link-btn" title="Abrir el Pedido en Business Central (editar · vista previa de registro · registrar)"
               onClick={() => window.open(orden.bcDeepLink!, "_blank")}>↗ Abrir en BC</button>
           )}
-          {falloAlLanzar && (
+          {/* Con la orden "sin lanzar en BC" el camino es el botón «Volver a lanzar en BC»
+              (el de Aprobación, o el de abajo): este link repetía la misma acción al lado. */}
+          {falloAlLanzar && !sinLanzarEnBc && (
             <button className="link-btn" disabled={relanzando} title={`El último intento de lanzar ${orden.bcNumber} en BC falló. Reintentar el Release del pedido ya creado.`}
               onClick={reintentarLanzar}>{relanzando ? "Lanzando…" : "↻ Reintentar lanzar en BC"}</button>
+          )}
+          {/* "Lanzado" acá y sin lanzar en BC: la opción de lanzar va como botón, no
+              como link, porque es LO que hay que hacer con esta orden. Lanza el pedido
+              que ya existe en BC (no crea otro). */}
+          {lanzadaSinLanzarEnBc && (
+            <Button size="sm" disabled={relanzando}
+              title={`La orden figura lanzada acá, pero el pedido ${orden.bcNumber} está sin lanzar en Business Central. Lanzar el pedido que ya existe (no se crea otro).`}
+              onClick={reintentarLanzar}>{relanzando ? "Lanzando…" : "↻ Volver a lanzar en BC"}</Button>
           )}
           {acciones}
         </div>

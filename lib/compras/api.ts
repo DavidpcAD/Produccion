@@ -18,6 +18,18 @@ export interface Bootstrap {
   movimientos: Movimiento[];
 }
 
+// Resultado de poner el estado de las órdenes al día con BC (ver
+// /api/compras/ordenes/sincronizar-bc). `estados` es lo que BC dijo de cada orden
+// consultada; `corregidas`, las que cambiaron de estado acá por eso.
+export type EstadoBcOrden = "lanzado" | "abierto" | "pendiente_aprobacion" | "inexistente" | "desconocido";
+export interface SincronizacionBc {
+  ok: boolean;
+  desconocido?: boolean;   // no se pudo leer BC: no se afirmó nada
+  revisadas: number;
+  corregidas: { id: string; numero: string; bcNumber: string; de: string; a: string; bcEstado: EstadoBcOrden }[];
+  estados: Record<string, EstadoBcOrden>;
+}
+
 export const api = {
   bootstrap: (): Promise<Bootstrap> => fetch("/api/compras/bootstrap").then(jsonOrThrow),
 
@@ -38,6 +50,10 @@ export const api = {
   getOrden: (id: string): Promise<Orden> => fetch(`/api/compras/ordenes/${id}`).then(jsonOrThrow),
   patchOrdenEstado: (id: string, body: unknown) =>
     fetch(`/api/compras/ordenes/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+  // El estado de la orden sigue al del pedido en BC. Sin `ids` revisa todas las que
+  // puedan estar desalineadas (una sola lectura de BC).
+  sincronizarBc: (body: { ids?: string[]; usuario: string; rol: string }): Promise<SincronizacionBc> =>
+    fetch("/api/compras/ordenes/sincronizar-bc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
 
   createRecepcion: (body: unknown): Promise<{ idRecepcionCompra: number }> =>
     fetch("/api/compras/recepciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),

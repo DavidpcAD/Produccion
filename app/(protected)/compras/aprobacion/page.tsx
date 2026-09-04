@@ -7,7 +7,7 @@ import { Badge, Button, Card, Modal, Textarea, Tile, useToast } from "@/componen
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
 import { AprobarControl } from "@/components/compras/aprobar-control";
-import { money, formatDate, num, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas, ordenTotalConIva } from "@/lib/compras/helpers";
+import { bcEstadoBadge, money, formatDate, num, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenDevueltaPorBc, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas, ordenTotalConIva } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Los KPI de arriba son el filtro de la lista: cada uno muestra las órdenes de ese
@@ -21,7 +21,7 @@ const TILES: { f: Filtro; label: string; accent: string; vacio: string }[] = [
 ];
 
 export default function AprobacionPage() {
-  const { ordenes, proveedores, pedidos, setOrdenEstado, devolverOrden } = useStore();
+  const { ordenes, proveedores, pedidos, movimientos, bcEstados, setOrdenEstado, devolverOrden } = useStore();
   const toast = useToast();
   const prov = (id: string) => proveedores.find((p) => p.id === id);
   const [rechObj, setRechObj] = useState<{ id: string; numero: string } | null>(null);
@@ -158,6 +158,12 @@ export default function AprobacionPage() {
             // Un solo almacén destino → va en el encabezado y la tabla muestra la
             // OBRA por línea (compacto, se lee en teléfono). Mezcla → columna Almacén.
             const alm = ordenAlmacenDestino(o);
+            // Ya estaba aprobada y BC la devolvió: el pedido allá no quedó lanzado. Se
+            // dice en la tarjeta y el botón pasa a "Volver a lanzar en BC".
+            const sinLanzarBc = ordenDevueltaPorBc(o, movimientos);
+            // Lo que BC contestó del pedido (última sincronización). Si la tarjeta ya dice
+            // "Sin lanzar en BC", el mismo dato en amarillo sería repetirlo.
+            const enBc = bcEstados[o.id] && !(sinLanzarBc && bcEstados[o.id] !== "lanzado") ? bcEstadoBadge(o.estado, bcEstados[o.id]) : null;
             return (
               <Card key={o.id}>
                 <div className="row wrap gap-3" style={{ alignItems: "flex-start" }}>
@@ -182,6 +188,12 @@ export default function AprobacionPage() {
                       <span className="row gap-3 wrap" style={{ alignItems: "center" }}>
                         <span className="ds-subtitle oc-open-row__num">{numeroOrden(o)}</span>
                         <Badge tone={b.tone}>{b.label}</Badge>
+                        {sinLanzarBc && (
+                          <Badge tone="red" title={`Ya la aprobaste, pero el pedido ${o.bcNumber} quedó sin lanzar en Business Central. Hay que volver a lanzarla.`}>
+                            Sin lanzar en BC
+                          </Badge>
+                        )}
+                        {enBc && <Badge tone={enBc.tone} title="Estado real del pedido en Business Central (última sincronización)">{enBc.label}</Badge>}
                         {cd.hay && (
                           <Badge tone="ink" title={`Se consume contra ${cd.destinos.join(" · ")}. El material NO entra a inventario: el costo va a la obra.`}>
                             CD · consumo directo{cd.parcial ? " (parcial)" : ""}
@@ -244,7 +256,7 @@ export default function AprobacionPage() {
                   <div className="mt-4">
                     <AprobarControl
                       busy={lote || aprobandoId === o.id}
-                      approveLabel="Aprobar y lanzar"
+                      approveLabel={sinLanzarBc ? "↻ Volver a lanzar en BC" : "Aprobar y lanzar"}
                       title={`${numeroOrden(o)} · ${money(total, o.currencyCode)}`}
                       onApprove={() => aprobar(o)}
                       onReject={() => { setMotivo(""); setRechObj({ id: o.id, numero: numeroOrden(o) }); }}

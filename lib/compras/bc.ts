@@ -1820,6 +1820,33 @@ export async function bcEstadoPedido(orderNo: string): Promise<BcEstadoPedido> {
   } catch { return { ...nada, desconocido: true }; }
 }
 
+// El estado de TODOS los pedidos de compra vivos en BC en una sola lectura (~200
+// filas, <1 s contra Production el 3/9/2026). Es lo que usa la sincronización de
+// estado de las órdenes: una llamada por orden serían 100+ viajes cada vez.
+// Mismo mapeo que `bcEstadoPedido`. `null` = no se pudo leer (BC caído / sin
+// permiso): NO concluir nada. Un pedido que no está en el mapa ya no está en Pedidos
+// de compra (lo registraron o lo eliminaron).
+export async function bcEstadosPedidos(): Promise<Map<string, BcEstadoPedido> | null> {
+  try {
+    const cid = await getStdCompanyId();
+    let url: string | null = `${stdRoot()}/companies(${cid})/purchaseOrders?$select=number,status`;
+    const out = new Map<string, BcEstadoPedido>();
+    let guard = 0;
+    while (url && guard++ < 20) {
+      const res = await bcFetch(url, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      for (const row of data.value ?? []) {
+        const status = String(row.status ?? "");
+        const n = status.replace(/_x0020_/g, " ").toLowerCase();
+        out.set(String(row.number ?? ""), { existe: true, status, lanzado: n === "open" || n === "released", enAprobacion: n.includes("review") || n.includes("approval") });
+      }
+      url = data["@odata.nextLink"] ?? null;
+    }
+    return out;
+  } catch { return null; }
+}
+
 // ¿El pedido tiene RECEPCIONES registradas en BC? Es lo que distingue las dos
 // razones por las que un pedido desaparece de Pedidos de compra:
 //   · con recepción  → se REGISTRÓ (recibido/facturado): el pedido cumplió su ciclo.
@@ -1896,6 +1923,49 @@ export async function bcReleasePedido(orderNo: string): Promise<string> {
   if (!res.ok) throw new Error(mensajeBcLegible((await res.text()).slice(0, 600)));
   const d: any = await res.json().catch(() => ({}));
   return d?.value ?? "Released";
+}
+
+// El `Format(PurchHeader.Status)` que devuelven los procedures del codeunit
+// (ReleaseOrder / SendForApproval / ReopenOrder / GetOrderLines) es el enum del
+// ENCABEZADO y viaja en el idioma de la sesión del web service: "Open"/"Abierto",
+// "Released"/"Lanzado", "Pending Approval"/"Pendiente de aprobación". OJO: acá "Open"
+// SÍ es Abierto — al revés de la API v2.0 (`bcEstadoPedido`), donde "Open" es lanzado.
+export type EstadoPedidoBc = "abierto" | "lanzado" | "pendiente_aprobacion" | "desconocido";
+export function estadoDesdeStatusCodeunit(status?: string): EstadoPedidoBc {
+  const s = (status ?? "").trim().toLowerCase();
+  if (!s) return "desconocido";
+  if (s.startsWith("released") || s.startsWith("lanzado")) return "lanzado";
+  if (s.startsWith("open") || s.startsWith("abierto")) return "abierto";
+  if (s.includes("approval") || s.includes("aprobaci")) return "pendiente_aprobacion";
+  return "desconocido";
+}
+
+// Lanza y VERIFICA. `AdelantePO_ReleaseOrder` contesta 200 con el estado en que quedó
+// el pedido, y ese estado no siempre es "Released": si el workflow de aprobación lo
+// tomó y no se pudo aprobar, queda "Pending Approval"; si el Release no entró, sigue
+// "Open". La app daba por lanzado cualquier 200, y así CP-005143, CP-005180 y
+// CP-005350 quedaron "Lanzado" acá con el pedido Abierto en BC (visto el 3/9/2026):
+// Bodega no podía recibir y nadie sabía por qué. Si el texto no se reconoce (otro
+// idioma), se le pregunta a la API v2.0 antes de afirmar nada.
+export async function bcReleasePedidoVerificado(orderNo: string): Promise<{ lanzado: boolean; status: string; estado: EstadoPedidoBc; motivo?: string }> {
+  const status = await bcReleasePedido(orderNo);
+  // No se le cree ni al texto del codeunit: se RELEE el pedido por la API v2.0 y lo
+  // que manda es lo que BC tiene GUARDADO. El texto solo decide si BC no se pudo
+  // releer (o el pedido ya no aparece en Pedidos de compra, p. ej. lo registraron en
+  // el acto). Un 200 sin body devolvía "Released" por defecto: eso solo ya no alcanza
+  // para declarar lanzado.
+  const dicho = estadoDesdeStatusCodeunit(status);
+  const est = await bcEstadoPedido(orderNo);
+  const estado: EstadoPedidoBc = (!est.desconocido && est.existe)
+    ? (est.lanzado ? "lanzado" : est.enAprobacion ? "pendiente_aprobacion" : "abierto")
+    : dicho;
+  if (estado === "lanzado") return { lanzado: true, status, estado };
+  const motivo = estado === "pendiente_aprobacion"
+    ? `BC contestó sin error, pero el pedido ${orderNo} quedó PENDIENTE DE APROBACIÓN allá (el workflow lo tomó y no se pudo aprobar ni lanzar). Revisá la solicitud de aprobación en BC y reintentá.`
+    : estado === "abierto"
+      ? `BC contestó sin error ("${status}"), pero el pedido ${orderNo} sigue ABIERTO allá: el lanzamiento no entró. Reintentá; si persiste, revisá el pedido en BC.`
+      : `BC contestó "${status}" y no se pudo confirmar que el pedido ${orderNo} quedara lanzado. Revisalo en BC antes de reintentar.`;
+  return { lanzado: false, status, estado, motivo };
 }
 
 // Re-sincroniza PRECIO + VARIANTE de las líneas de un pedido YA creado en BC, para
@@ -2052,7 +2122,7 @@ export async function bcFacturarRecibido(orderNo: string, vendorInvoiceNo: strin
 // Si el create funciona pero el release falla (p.ej. AdelantePO no publicado aún),
 // devuelve el pedido creado con released=false para que la UI avise sin romperse.
 export async function bcCrearYLanzarPedido(input: { vendorNo: string; currencyCode?: string; locationCode?: string; lineas: NuevaLineaBc[]; cargos?: CargoBc[]; metodo?: string; flete?: { monto: number; descripcion?: string } }):
-  Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados?: number; jobError?: string; released: boolean; releaseError?: string }> {
+  Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados?: number; jobError?: string; released: boolean; releaseError?: string; releaseStatus?: string }> {
   const { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError } = await bcCrearPedido(input);
   // Si NINGUNA línea entró a BC, no tiene sentido intentar lanzar (BC responde
   // "nothing to release"). Devolvemos released=false con el motivo real de la línea.
@@ -2094,8 +2164,11 @@ export async function bcCrearYLanzarPedido(input: { vendorNo: string; currencyCo
     };
   }
   try {
-    await bcReleasePedido(number);
-    return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError, released: true };
+    // `released` solo si BC de verdad lo dejó "Released": un 200 con el pedido todavía
+    // Abierto o Pendiente de aprobación NO es lanzamiento (ver bcReleasePedidoVerificado).
+    const rel = await bcReleasePedidoVerificado(number);
+    if (!rel.lanzado) return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError, released: false, releaseError: rel.motivo, releaseStatus: rel.status };
+    return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError, released: true, releaseStatus: rel.status };
   } catch (e: any) {
     return { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, jobError, released: false, releaseError: String(e?.message ?? e) };
   }

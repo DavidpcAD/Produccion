@@ -162,7 +162,9 @@ export async function aprobarYLanzar(
         // Se desliga el bcNumber Y se deja el motivo, en una sola escritura.
         return fallo(orden, setOrdenEstado, `${d.error} Ya desligamos ${orden.bcNumber} de esta orden: dale "Aprobar y lanzar" otra vez y se crea de nuevo en BC.`, { bcNumber: "" });
       }
-      return fallo(orden, setOrdenEstado, `No se lanzó ${orden.bcNumber} en BC: ${d.error || `HTTP ${res.status}`}. La orden queda pendiente.`);
+      // Siempre con la respuesta de BC: el "por qué" es lo único que le sirve a quien
+      // aprueba para saber qué hacer (y queda en el historial vía `fallo`).
+      return fallo(orden, setOrdenEstado, `No se lanzó ${orden.bcNumber} en BC. Respuesta de BC: ${d.error || `HTTP ${res.status}`}${d.status ? ` (estado del pedido en BC: ${d.status})` : ""}. La orden queda pendiente.`);
     }
     // Se le tocó una línea en BC: queda en el historial de la orden. Es una corrección
     // del centro de costo, no un fallo, así que va con su propio tipo y NO cambia el
@@ -185,7 +187,9 @@ export async function aprobarYLanzar(
     // Que se le haya quitado la obra a una línea de almacén NO es un error, pero sí hay
     // que decirlo: es la corrección del centro de costo y quien aprueba tiene que verla.
     const avisoObra = d.obraQuitada ? ` · se le quitó la obra a ${d.obraQuitada} línea(s) de almacén y su centro de costo quedó en el del almacén` : "";
-    return { ok: !d.cargoError && !d.jobError, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${orden.bcNumber} aprobada y lanzada en BC${avisoObra}${avisoCargoRe}${avisoJobRe}` };
+    // `d.status` es el texto con que BC contestó (Format(Status) del pedido, ya verificado
+    // como lanzado): se muestra siempre, para que el éxito también venga con la respuesta.
+    return { ok: !d.cargoError && !d.jobError, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${orden.bcNumber} aprobada y lanzada · BC respondió: ${d.status ?? "Released"}${avisoObra}${avisoCargoRe}${avisoJobRe}` };
   }
 
   // Sin pedido en BC: o la orden es vieja (de antes de que Proveeduría lo creara al
@@ -217,13 +221,13 @@ export async function aprobarYLanzar(
       const avisoCargo = d.cargoError ? ` · ⚠️ el cargo NO se agregó a BC: ${d.cargoError}` : "";
       const avisoJob = d.jobError ? ` · ⚠️ la actividad/almacén NO se aplicó en BC: ${d.jobError}` : "";
       await setOrdenEstado(orden.id, "lanzado", { bcNumber: d.number, bcDeepLink: d.deepLink || undefined });
-      return { ok: true, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${d.number} aprobada y lanzada en BC${avisoLineas}${avisoCargo}${avisoJob}` };
+      return { ok: true, tone: (d.cargoError || d.jobError) ? "error" : "success", message: `${d.number} creada y lanzada · BC respondió: ${d.releaseStatus ?? "Released"}${avisoLineas}${avisoCargo}${avisoJob}` };
     }
     // Creado pero no lanzado: se persiste el bcNumber y el motivo, sin cambiar el estado.
-    return fallo(orden, setOrdenEstado, `${d.number} se creó en BC pero no se lanzó: ${d.releaseError || "sin detalle"}. Reintentá "Aprobar y lanzar" (no se creará otro).`, { bcNumber: d.number, bcDeepLink: d.deepLink || undefined });
+    return fallo(orden, setOrdenEstado, `${d.number} se creó en BC pero NO se lanzó. Respuesta de BC: ${d.releaseError || "sin detalle"}. Reintentá "Aprobar y lanzar" (no se creará otro).`, { bcNumber: d.number, bcDeepLink: d.deepLink || undefined });
   }
 
   // Ni siquiera se creó el pedido en BC.
   const motivo = d.lineError || d.error || `HTTP ${res.status}`;
-  return fallo(orden, setOrdenEstado, `No se creó en BC: ${motivo}. La orden queda pendiente.`);
+  return fallo(orden, setOrdenEstado, `No se creó en BC. Respuesta de BC: ${motivo}. La orden queda pendiente.`);
 }

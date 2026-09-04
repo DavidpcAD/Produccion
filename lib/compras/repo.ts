@@ -585,6 +585,41 @@ export async function setOrdenEstado(id: number, estado: string, usuario: string
   await tx.commit();
 }
 
+// Las órdenes que tienen pedido en BC, livianas (sin líneas): lo que necesita la
+// sincronización de estado contra BC, que corre seguido y no debe cargar todo.
+export async function listOrdenesConBc(): Promise<{ id: number; numero: string; bcNumber: string; estado: string }[]> {
+  await ensureEstados();
+  const pool = await getPool();
+  const r = await pool.request().query("SELECT idOrdenCompra, ordenNo, bcNo, idEstado FROM dbo.OrdenCompra WHERE esEliminada=0 AND bcNo IS NOT NULL AND bcNo <> ''");
+  return r.recordset.map((o) => ({ id: Number(o.idOrdenCompra), numero: o.ordenNo ?? "", bcNumber: String(o.bcNo), estado: codigoDeId(o.idEstado) ?? "abierto" }));
+}
+
+// Pone la orden en el estado que BC dice que tiene el pedido y lo deja en la bitácora
+// como `sincronizado_bc`, con el porqué. Es aparte de setOrdenEstado porque no lo
+// escribe una persona: no toca bcNo, el detalle va limpio (no es un "Motivo:") y el
+// UPDATE exige que la orden SIGA en el estado que se leyó (`esperadoActual`): la
+// sincronización corre desde cada pantalla abierta, y si otra ya la corrigió no hay
+// que escribir dos veces ni duplicar el movimiento. Devuelve si escribió.
+export async function corregirEstadoPorBc(id: number, esperadoActual: string, estado: string, detalle: string, usuario: string, rol: Role): Promise<boolean> {
+  await ensureEstados();
+  const pool = await getPool();
+  const idNuevo = await idDeEstado(estado);
+  if (idNuevo == null) return false;
+  const prev = await pool.request().input("id", sql.Int, id).query("SELECT ordenNo FROM dbo.OrdenCompra WHERE idOrdenCompra=@id");
+  if (!prev.recordset.length) return false;
+  // El estado previo se compara por NOMBRE, no por id: dbo.Estado tiene el mismo
+  // nombre repetido con dos ids (SBX al 3/9/2026), y una orden puede llevar cualquiera.
+  const upd = await pool.request().input("id", sql.Int, id).input("e", sql.Int, idNuevo)
+    .input("prevNombre", sql.NVarChar(50), NOMBRE_POR_CODIGO[esperadoActual] ?? esperadoActual).input("u", sql.NVarChar(100), usuario)
+    .query(`UPDATE dbo.OrdenCompra SET idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u
+            WHERE idOrdenCompra=@id AND idEstado IN (SELECT idEstado FROM dbo.Estado WHERE modulo='Compras' AND estado=@prevNombre)`);
+  if (!(upd.rowsAffected?.[0] > 0)) return false;
+  const tx = new sql.Transaction(pool); await tx.begin();
+  await logMov(tx, { entidad: "orden", idEntidad: id, documentoNo: prev.recordset[0]?.ordenNo ?? "", tipoMovimiento: "sincronizado_bc", estadoAnterior: esperadoActual, estadoNuevo: estado, detalle, usuario, rol });
+  await tx.commit();
+  return true;
+}
+
 // ----------------------------------------------------------------- RECEPCIONES
 export interface NewRecepcionDB {
   idOrdenCompra: number; numeroFactura: string; fechaFactura: string; fechaRecepcion: string; fechaRegistro: string;

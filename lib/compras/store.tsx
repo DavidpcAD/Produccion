@@ -10,6 +10,7 @@ import type {
 import * as seed from "./seed";
 import { nextNumero, nowISO, numeroOrden, ordenEstaCompleta, PERSONA_POR_ROL, todayISO } from "./helpers";
 import { api, USE_API as USE_API_BUILD } from "./api";
+import type { EstadoBcOrden, SincronizacionBc } from "./api";
 
 export interface NewPedidoInput {
   tipoSolicitud: TipoSolicitud;
@@ -88,6 +89,13 @@ interface StoreShape {
   // Devuelve `bcAviso` cuando el estado SÍ cambió en la app pero BC no se pudo poner al
   // día (mandar a aprobación / reabrir): la pantalla lo muestra en vez de cantar éxito.
   setOrdenEstado: (id: string, estado: Orden["estado"], extra?: { bcNumber?: string; bcDeepLink?: string; motivo?: string; tipoMovimiento?: string }) => Promise<AvisoBc>;
+  // El estado de la orden SIGUE al del pedido en BC: le pregunta a BC (solo esas `ids`,
+  // o todas las que puedan estar desalineadas) y, si el servidor corrigió alguna,
+  // recarga. Devuelve lo que BC dijo de cada una; null si no hay API o BC no contestó.
+  sincronizarBc: (ids?: string[]) => Promise<SincronizacionBc | null>;
+  // Lo último que BC contestó sobre el pedido de cada orden (por id de orden), para
+  // mostrarlo junto al estado en listas, tarjetas y detalle. Se llena con cada sincronización.
+  bcEstados: Record<string, EstadoBcOrden>;
 
   registrarRecepcion: (input: RegistrarRecepcionInput) => Promise<Recepcion>;
   // MODO 2: registrar la factura de una recepción que quedó EN REVISIÓN (Kattya).
@@ -184,6 +192,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   const [planContexto, setPlanContexto] = useState<StoreShape["planContexto"]>(null);
   const [hydrated, setHydrated] = useState(false);
   const [cargando, setCargando] = useState(USE_API);
+  const [bcEstados, setBcEstados] = useState<Record<string, EstadoBcOrden>>({});
   // Motivo real por el que no hay datos, para poder DECIRLO en pantalla en vez de mostrar
   // una lista vacía (o, peor, la semilla) como si fuera la verdad.
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -261,6 +270,31 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       window.removeEventListener("focus", onVisible);
     };
   }, [USE_API, hydrated]);
+
+  // Sincronización con BC (solo modo SQL): al cargar y cada 5 min con la pestaña
+  // visible. Es UNA lectura de BC (todos los pedidos vivos) contra las órdenes que
+  // dicen "lanzado" o "pendiente de aprobación"; si el estado de acá no calza con el
+  // de allá, el servidor lo corrige y se recarga (ver /api/compras/ordenes/sincronizar-bc).
+  // Sin esto una orden podía figurar lanzada meses con el pedido Abierto en BC.
+  useEffect(() => {
+    if (!USE_API || !hydrated || cargando) return;
+    let cancel = false;
+    let busy = false;
+    const tick = async () => {
+      if (busy || typeof document === "undefined" || document.visibilityState !== "visible") return;
+      busy = true;
+      try {
+        const r = await api.sincronizarBc({ usuario: usuario ?? "sistema", rol: role ?? "aprobacion" });
+        if (cancel) return;
+        if (r.estados) setBcEstados((p) => ({ ...p, ...r.estados }));
+        if (r.corregidas?.length) await refreshFromApi();
+      } catch { /* BC intermitente: al próximo tick */ }
+      finally { busy = false; }
+    };
+    tick();
+    const id = setInterval(tick, 5 * 60_000);
+    return () => { cancel = true; clearInterval(id); };
+  }, [USE_API, hydrated, cargando, usuario, role]);
 
   // Refresco inmediato al cambiar de menú dentro de compras (el store persiste
   // entre navegaciones, así que sin esto los datos quedaban "viejos" hasta el
@@ -471,6 +505,18 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
         const mov = mkMov({ entidad: "orden", idEntidad: id, documentoNo: prevo?.numero ?? "", tipoMovimiento: tipo, estadoAnterior: prevo?.estado, estadoNuevo: estado, detalle });
         return { ...d, ordenes: d.ordenes.map((o) => (o.id === id ? { ...o, estado, bcNumber: extra?.bcNumber ?? o.bcNumber, bcDeepLink: extra?.bcDeepLink ?? o.bcDeepLink } : o)), movimientos: [mov, ...d.movimientos] };
       });
+    };
+
+    // El estado de la orden sigue al del pedido en BC (ver la ruta sincronizar-bc):
+    // se le pregunta a BC por esas órdenes y, si el servidor corrigió alguna, se recarga.
+    const sincronizarBc: StoreShape["sincronizarBc"] = async (ids) => {
+      if (!USE_API) return null;
+      try {
+        const r = await api.sincronizarBc({ ids, usuario: persona, rol: rolActual });
+        if (r.estados) setBcEstados((p) => ({ ...p, ...r.estados }));
+        if (r.corregidas?.length) await refreshFromApi();
+        return r;
+      } catch { return null; }
     };
 
     // ---------------- REGISTRAR RECEPCION ----------------
@@ -684,7 +730,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       maquinas: seed.maquinas, almacenes: seed.almacenes,
       pedidos: data.pedidos, ordenes: data.ordenes, recepciones: data.recepciones, movimientos: data.movimientos,
       addPedido, editPedido, updatePedido, setPedidoEstado, deletePedido,
-      createOrden, updateOrden, setOrdenEstado, registrarRecepcion, facturarRecepcion, devolverPedido, devolverLineasPedido, devolverOrden, reset,
+      createOrden, updateOrden, setOrdenEstado, sincronizarBc, bcEstados, registrarRecepcion, facturarRecepcion, devolverPedido, devolverLineasPedido, devolverOrden, reset,
       notasCredito, marcarNotasCredito, cargarNotasCredito,
       notificaciones: data.notificaciones, marcarNotifsLeidas, marcarNotifLeida,
       planCategorias: data.planCategorias, planFilas: data.planFilas,
@@ -692,7 +738,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       planContexto, setPlanContexto,
       borrador, setBorrador,
     };
-  }, [role, usuario, data, borrador, planContexto, cargando, errorCarga]);
+  }, [role, usuario, data, borrador, planContexto, cargando, errorCarga, bcEstados]);
 
   return <StoreCtx.Provider value={api2}>{children}</StoreCtx.Provider>;
 }

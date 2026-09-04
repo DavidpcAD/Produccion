@@ -7,13 +7,13 @@ import { Button, Modal, Textarea, useToast } from "@/components/compras/ui";
 import { OrdenDetalle } from "@/components/compras/orden-detalle";
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
-import { numeroOrden } from "@/lib/compras/helpers";
+import { numeroOrden, ordenDevueltaPorBc } from "@/lib/compras/helpers";
 
 export default function AprobacionOrdenDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes, setOrdenEstado, devolverOrden, cargando } = useStore();
+  const { ordenes, movimientos, setOrdenEstado, devolverOrden, cargando } = useStore();
   const [rechazarOpen, setRechazarOpen] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [aprobando, setAprobando] = useState(false);
@@ -53,10 +53,16 @@ export default function AprobacionOrdenDetallePage() {
     router.push(volverHref);
   }
 
+  // Ya estaba aprobada y BC la devolvió (el pedido allá no quedó lanzado): el mismo
+  // botón, pero dice lo que va a hacer — volver a lanzar el pedido que ya existe.
+  const relanzar = ordenDevueltaPorBc(orden, movimientos);
   const acciones = orden.estado === "pendiente_aprobacion" ? (
     <>
       <Button variant="red" onClick={() => setRechazarOpen(true)} disabled={aprobando}>Rechazar</Button>
-      <Button onClick={aprobar} disabled={aprobando}>{aprobando ? "Lanzando…" : "Aprobar y lanzar"}</Button>
+      <Button onClick={aprobar} disabled={aprobando}
+        title={relanzar ? `${orden.bcNumber} está sin lanzar en Business Central: se vuelve a lanzar el pedido que ya existe.` : undefined}>
+        {aprobando ? "Lanzando…" : relanzar ? "↻ Volver a lanzar en BC" : "Aprobar y lanzar"}
+      </Button>
     </>
   ) : null;
 
