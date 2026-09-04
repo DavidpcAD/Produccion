@@ -1270,9 +1270,32 @@ function emparejarLineasBc<T extends { lineNo?: number; itemNo: string }>(
 // Solo se devuelve el valor cuando es ABRUMADOR (≥90% de al menos 5 líneas). Con menos
 // evidencia no se escribe nada: es preferible no lanzar el pedido a escribirle a
 // contabilidad un centro de costo adivinado.
+//
+// Antes que deducir, se lee la CONFIGURACIÓN: `BC_CC_POR_ALMACEN`, con el mismo
+// nombre y formato que ya usa la app de Proveeduría (repo OrdenesCompra,
+// `ccForzadoDelAlmacen`), para que una sola env sirva para las dos apps:
+//
+//   BC_CC_POR_ALMACEN="ALM-GRAL=INV,ALM-BAR=INV,F-MUEBLES=F-MUEBLES,…"
+//   BC_CC_POR_ALMACEN="F-MUEBLES"        ← atajo: el CC es el mismo código del almacén
+//
+// Hace falta porque hay almacenes con muy poco historial en BC (ALM-BAR y F-MUEBLES
+// tienen UNA línea cada uno) y ahí la deducción no alcanza el umbral: sin la env, la
+// app no escribe nada y no lanza el pedido. Con la env, sí. Ojo con ALM-BAR: su CC es
+// INV, NO su propio código — por eso el atajo no sirve para todos.
+export function ccPorAlmacenDeEnv(): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const par of (process.env.BC_CC_POR_ALMACEN ?? "").split(/[,;]/)) {
+    const [alm, cc] = par.split("=");
+    const almacen = (alm ?? "").trim().toUpperCase();
+    if (almacen) map.set(almacen, (cc ?? "").trim() || almacen);
+  }
+  return map;
+}
+
 let ccPorAlmacenCache: { at: number; map: Map<string, string> } | null = null;
 export async function bcCentroCostoPorAlmacen(): Promise<Map<string, string>> {
-  if (ccPorAlmacenCache && Date.now() - ccPorAlmacenCache.at < 300_000) return ccPorAlmacenCache.map;
+  const deEnv = ccPorAlmacenDeEnv();
+  if (ccPorAlmacenCache && Date.now() - ccPorAlmacenCache.at < 300_000) return new Map([...ccPorAlmacenCache.map, ...deEnv]);
   const map = new Map<string, string>();
   try {
     const cid = await getStdCompanyId();
@@ -1282,7 +1305,7 @@ export async function bcCentroCostoPorAlmacen(): Promise<Map<string, string>> {
     let guard = 0;
     while (url && guard++ < 60) {
       const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
-      if (!res.ok) return map;
+      if (!res.ok) return new Map([...map, ...deEnv]);
       const data = (await res.json()) as { value?: { No?: string; Job_No?: string; Location_Code?: string; Shortcut_Dimension_1_Code?: string }[]; "@odata.nextLink"?: string };
       for (const l of (data.value ?? [])) {
         if (!String(l.No ?? "").trim()) continue;          // línea vacía / de texto
@@ -1303,10 +1326,11 @@ export async function bcCentroCostoPorAlmacen(): Promise<Map<string, string>> {
       if (total >= 5 && n / total >= 0.9) map.set(loc.toUpperCase(), cc);
     }
     ccPorAlmacenCache = { at: Date.now(), map };
-    return map;
+    // La env va DESPUÉS: lo configurado a mano le gana a lo deducido.
+    return new Map([...map, ...deEnv]);
   } catch (e) {
     console.warn("BC: no se pudo deducir el centro de costo de cada almacén.", e);
-    return ccPorAlmacenCache?.map ?? map;
+    return new Map([...(ccPorAlmacenCache?.map ?? map), ...deEnv]);
   }
 }
 
