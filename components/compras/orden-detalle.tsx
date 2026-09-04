@@ -218,9 +218,11 @@ export function OrdenDetalle({
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}><path d="M6 9V3h12v6" /><path d="M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="7" rx="1" /></svg>
             Imprimir
           </Button>
+          {/* Toda orden con pedido en BC lo trae (el link lo arma el servidor del N.º):
+              va como botón, al lado de Imprimir, para que se encuentre. */}
           {orden.bcDeepLink && (
-            <button className="link-btn" title="Abrir el Pedido en Business Central (editar · vista previa de registro · registrar)"
-              onClick={() => window.open(orden.bcDeepLink!, "_blank")}>↗ Abrir en BC</button>
+            <Button variant="outline" size="sm" title={`Abrir el pedido ${orden.bcNumber} en Business Central (editar · vista previa de registro · registrar)`}
+              onClick={() => window.open(orden.bcDeepLink!, "_blank")}>↗ Abrir en BC</Button>
           )}
           {/* Con la orden "sin lanzar en BC" el camino es el botón «Volver a lanzar en BC»
               (el de Aprobación, o el de abajo): este link repetía la misma acción al lado. */}

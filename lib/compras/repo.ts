@@ -1,5 +1,6 @@
 import { getPool, sql } from "./db";
 import { etiquetaInterna } from "./helpers";
+import { bcDeepLinkPedido } from "./bc";
 import type { Orden, OrdenLinea, Pedido, PedidoLinea, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
 
 /* ============================================================================
@@ -452,6 +453,10 @@ function mapOrden(o: any, lineas: any[]): Orden {
     estado: (codigoDeId(o.idEstado) ?? "abierto") as Orden["estado"],
     versionesArchivadas: Number(o.versionesArchivadas ?? 0),
     bcNumber: o.bcNo || undefined,           // Nº del Pedido en BC (para relanzar/recibir/facturar)
+    // Link al Pedido en BC. Se arma acá, del N.º, para TODA orden que tenga pedido: la
+    // base no lo guarda y el que crea el pedido (Proveeduría o esta app al lanzar) no
+    // siempre lo dejó, así que «Abrir en BC» no aparecía en producción (CP-005143).
+    bcDeepLink: o.bcNo ? bcDeepLinkPedido(String(o.bcNo)) : undefined,
     lineas: lineas.map((l): OrdenLinea => ({
       id: String(l.idOrdenCompraDet), lineNo: Number(l.lineNum ?? 0) || undefined,
       tipo: (l.tipoLinea === "cargo" ? "cargo" : "articulo"),

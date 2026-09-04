@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/compras/shell";
-import { Badge, Button, Card, Modal, Textarea, Tile, useToast } from "@/components/compras/ui";
+import { Badge, Button, Card, Input, Modal, Textarea, Tile, useToast } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
 import { AprobarControl } from "@/components/compras/aprobar-control";
 import { bcEstadoBadge, money, formatDate, num, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenDevueltaPorBc, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas, ordenTotalConIva } from "@/lib/compras/helpers";
+import { coincideBusqueda } from "@/lib/utilidades/buscar";
 import type { Orden } from "@/lib/compras/types";
 
 // Los KPI de arriba son el filtro de la lista: cada uno muestra las órdenes de ese
@@ -32,10 +33,23 @@ export default function AprobacionPage() {
   const [abierto, setAbierto] = useState<Set<string>>(new Set());
   const [ordenMonto, setOrdenMonto] = useState<"desc" | "asc">("desc");
   const [filtro, setFiltro] = useState<Filtro>("pendiente_aprobacion");
+  const [busca, setBusca] = useState("");
 
   const totalDe = (o: Orden) => ordenTotalConIva(o);
   const cuenta = (f: Filtro) => ordenes.filter((o) => o.estado === f).length;
-  const lista = [...ordenes.filter((o) => o.estado === filtro)]
+  // Con 15 pendientes y 100+ lanzadas, sin buscador había que ir tarjeta por tarjeta.
+  // Se busca por lo que uno tiene a mano: N.º de orden (el de BC o el interno),
+  // proveedor (código o nombre), solicitud de origen, obra/almacén de las líneas y
+  // descripción de los artículos. Por palabras, sin tildes (mismo criterio que la
+  // tabla de "Todas las órdenes").
+  const textoBusqueda = (o: Orden) => [
+    numeroOrden(o), o.numero, o.bcNumber,
+    o.proveedorNo ?? prov(o.proveedorId)?.code, o.proveedorNombre ?? prov(o.proveedorId)?.nombre,
+    ...o.lineas.flatMap((l) => [l.pedidoNumero, l.obra, l.proyecto, l.almacen, l.descripcion]),
+  ].filter(Boolean).join(" ");
+  const enFiltro = ordenes.filter((o) => o.estado === filtro);
+  const lista = enFiltro
+    .filter((o) => !busca.trim() || coincideBusqueda(textoBusqueda(o), busca))
     .sort((a, b) => (ordenMonto === "desc" ? totalDe(b) - totalDe(a) : totalDe(a) - totalDe(b)));
   // Aprobar/rechazar (y el lote) solo aplican a las pendientes; en los demás filtros
   // la lista es de consulta y cada tarjeta abre el detalle.
@@ -100,9 +114,11 @@ export default function AprobacionPage() {
           ))}
         </div>
 
-        {lista.length > 0 && (
+        {enFiltro.length > 0 && (
           <div className="row row--between wrap gap-3 mt-6" style={{ alignItems: "center", padding: "10px 14px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 8%, var(--ds-tint-base))", border: "1.5px solid var(--ds-color-gray-100)" }}>
-            <div className="row gap-4 wrap" style={{ alignItems: "center" }}>
+            <div className="row gap-4 wrap" style={{ alignItems: "center", flex: "1 1 auto" }}>
+              <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por N.º de orden, proveedor o solicitud…"
+                aria-label="Buscar órdenes" style={{ flex: "1 1 260px", minWidth: 200, maxWidth: 420 }} />
               {esPendientes ? (
                 <label className="row gap-2" style={{ alignItems: "center", cursor: "pointer" }}>
                   <input type="checkbox" className="ds-cbx" checked={seleccionadas.length > 0 && seleccionadas.length === lista.length}
@@ -145,7 +161,14 @@ export default function AprobacionPage() {
         )}
 
         <div className="col gap-4 mt-4">
-          {lista.length === 0 && <Card><div className="empty" style={{ lineHeight: 1.6 }}>{tile.vacio}<br /><span className="ds-muted ds-body-sm">Tocá otro panel de arriba para ver las de otro estado, o abrí la pestaña <strong>“Todas las órdenes”</strong> para buscarlas todas juntas.</span></div></Card>}
+          {lista.length === 0 && enFiltro.length > 0 && (
+            <Card><div className="empty" style={{ lineHeight: 1.6 }}>
+              Ninguna orden de «{tile.label}» coincide con <strong>“{busca.trim()}”</strong>.<br />
+              <span className="ds-muted ds-body-sm">Probá con el N.º de BC (CP-…), el nombre del proveedor o la solicitud (PED-…); si está en otro estado, tocá otro panel de arriba. </span>
+              <button type="button" className="link-btn" onClick={() => setBusca("")}>Limpiar búsqueda</button>
+            </div></Card>
+          )}
+          {enFiltro.length === 0 && <Card><div className="empty" style={{ lineHeight: 1.6 }}>{tile.vacio}<br /><span className="ds-muted ds-body-sm">Tocá otro panel de arriba para ver las de otro estado, o abrí la pestaña <strong>“Todas las órdenes”</strong> para buscarlas todas juntas.</span></div></Card>}
           {lista.map((o) => {
             const articulos = o.lineas.filter((l) => l.tipo === "articulo");
             const maquinas = ordenMaquinas(o, pedidos);
