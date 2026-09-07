@@ -145,13 +145,21 @@ export async function aprobarYLanzar(
       // Y `sinObra` es el caso opuesto: a las líneas de almacén el servidor les BORRA
       // la obra que Proveeduría les copió, para que el centro de costo lo pongan el
       // almacén y el artículo (tampoco se le toca el almacén).
+      // `ordenId` va para que el SERVIDOR lea de la base el proveedor que debe tener
+      // el pedido y se niegue a lanzarlo si en BC es de otro. Sin esto el freno no
+      // aplica, a propósito: no confía en lo que mande el navegador.
       res = await fetch("/api/compras/bc/relanzar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderNo: orden.bcNumber, consumoDirecto, sinObra }),
+        body: JSON.stringify({ orderNo: orden.bcNumber, ordenId: orden.id, consumoDirecto, sinObra }),
       });
       d = await res.json().catch(() => ({}));
     } catch (e: any) {
       return fallo(orden, setOrdenEstado, `No se pudo contactar BC: ${String(e?.message ?? e)}. La orden queda pendiente.`);
+    }
+    // El pedido de BC es de otro proveedor. El mensaje del freno ya dice qué hacer y
+    // no hay que adornarlo: agregarle "queda pendiente" sería repetir lo que explica.
+    if (res.status === 409 && d?.frenoProveedor) {
+      return fallo(orden, setOrdenEstado, String(d.error));
     }
     if (!(res.ok && d.ok)) {
       // El pedido ya no existe en BC (lo registraron, lo eliminaron o lo archivaron):

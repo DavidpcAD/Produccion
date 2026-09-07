@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bcResyncPedidoLines, bcReleasePedidoVerificado, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo, bcCompletarProyectoTarea, mensajeConsumoIncompleto, bcLineasProyectoSinTarea, mensajeProyectoSinTarea, bcQuitarObraDeLineas, mensajeObraNoQuitada } from "@/lib/compras/bc";
+import { frenarLanzamiento } from "@/lib/compras/freno-lanzamiento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,9 +55,14 @@ export async function POST(req: Request) {
   let orderNo = "";
   try {
     const body = await req.json();
-    const { lineas, cargos, metodo, consumoDirecto, sinObra } = body;
+    const { lineas, cargos, metodo, consumoDirecto, sinObra, ordenId } = body;
     orderNo = body.orderNo ?? "";
     if (!orderNo) return NextResponse.json({ error: "Falta orderNo" }, { status: 400 });
+    // ¿El pedido de allá sigue siendo del proveedor de esta orden? Va PRIMERO, antes
+    // de tocarle nada: si es de otro, todo lo que sigue (líneas, cargos, obra, tarea)
+    // se le estaría escribiendo a un pedido ajeno. Ver lib/compras/freno-lanzamiento.ts.
+    const frenoProv = await frenarLanzamiento(orderNo, ordenId);
+    if (frenoProv) return NextResponse.json(frenoProv, { status: 409 });
     let jobError: string | undefined;
     if (Array.isArray(lineas) && lineas.length) {
       const rs = await bcResyncPedidoLines(orderNo, lineas);

@@ -1803,20 +1803,26 @@ export function mensajeBcLegible(raw: string): string {
 // o lo archivaron (BC archiva una copia al eliminar/registrar; un pedido de compra
 // archivado NO se puede restaurar, hay que crearlo de nuevo).
 // `desconocido:true` = no se pudo preguntar (BC caído / sin permiso): NO concluir nada.
-export type BcEstadoPedido = { existe: boolean; status?: string; lanzado: boolean; enAprobacion: boolean; desconocido?: boolean };
+// `vendorNo` = de quién es el pedido EN BC. Viene en la misma lectura y es lo que
+// necesita el freno de lanzamiento: la app le manda el proveedor a BC una sola vez
+// (al crear el pedido) y después nadie vuelve a mirarlo. Ver freno-lanzamiento.ts.
+export type BcEstadoPedido = { existe: boolean; status?: string; vendorNo?: string; lanzado: boolean; enAprobacion: boolean; desconocido?: boolean };
 export async function bcEstadoPedido(orderNo: string): Promise<BcEstadoPedido> {
   const nada: BcEstadoPedido = { existe: false, lanzado: false, enAprobacion: false };
   if (!orderNo) return { ...nada, desconocido: true };
   try {
     const cid = await getStdCompanyId();
-    const filtro = `$filter=${encodeURIComponent(`number eq '${odataStr(orderNo)}'`)}&$select=number,status`;
+    const filtro = `$filter=${encodeURIComponent(`number eq '${odataStr(orderNo)}'`)}&$select=number,status,vendorNumber`;
     const res = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders?${filtro}`, { cache: "no-store" });
     if (!res.ok) return { ...nada, desconocido: true };
     const row = ((await res.json())?.value ?? [])[0];
     if (!row) return nada; // no está en Pedidos de compra
     const status = String(row.status ?? "");
     const n = status.replace(/_x0020_/g, " ").toLowerCase();
-    return { existe: true, status, lanzado: n === "open" || n === "released", enAprobacion: n.includes("review") || n.includes("approval") };
+    return {
+      existe: true, status, vendorNo: String(row.vendorNumber ?? "").trim() || undefined,
+      lanzado: n === "open" || n === "released", enAprobacion: n.includes("review") || n.includes("approval"),
+    };
   } catch { return { ...nada, desconocido: true }; }
 }
 

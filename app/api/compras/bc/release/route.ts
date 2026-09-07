@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bcReleasePedidoVerificado } from "@/lib/compras/bc";
+import { frenarLanzamiento } from "@/lib/compras/freno-lanzamiento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +12,12 @@ export const dynamic = "force-dynamic";
 // Pendiente de aprobación se devuelve como fallo, con el motivo.
 export async function POST(req: Request) {
   try {
-    const { orderNo } = await req.json();
+    const { orderNo, ordenId } = await req.json();
     if (!orderNo) return NextResponse.json({ error: "Falta orderNo" }, { status: 400 });
+    // Misma puerta que en `relanzar`: no se lanza un pedido que en BC es de otro
+    // proveedor que la orden. Ver lib/compras/freno-lanzamiento.ts.
+    const frenoProv = await frenarLanzamiento(orderNo, ordenId);
+    if (frenoProv) return NextResponse.json(frenoProv, { status: 409 });
     const rel = await bcReleasePedidoVerificado(orderNo);
     if (!rel.lanzado) return NextResponse.json({ ok: false, status: rel.status, error: rel.motivo }, { status: 502 });
     return NextResponse.json({ ok: true, status: rel.status });

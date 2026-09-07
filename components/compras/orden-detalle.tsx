@@ -84,7 +84,9 @@ export function OrdenDetalle({
         // `sinObra` sí viaja: son las líneas que van a inventario, a las que hay que
         // quitarles la obra que Proveeduría le copió al Job No. del pedido en BC (con
         // el proyecto puesto, BC le carga el gasto al centro de costo de la obra).
-        body: JSON.stringify({ orderNo: orden.bcNumber, sinObra: ordenLineasSinObra(orden) }),
+        // `ordenId`: el servidor lee de la base el proveedor que debe tener el pedido
+        // y se niega a lanzarlo si en BC es de otro (lib/compras/freno-lanzamiento.ts).
+        body: JSON.stringify({ orderNo: orden.bcNumber, ordenId: orden.id, sinObra: ordenLineasSinObra(orden) }),
       });
       const d = await r.json().catch(() => ({}));
       // `r.ok` solo no alcanza: con la sesión vencida el proxy redirige a /login y el
@@ -106,6 +108,8 @@ export function OrdenDetalle({
         }
       }
       else if (r.ok && !("ok" in d)) toast("No se pudo lanzar en BC: la sesión parece vencida. Recargá la página y volvé a entrar.", "error");
+      // El pedido es de otro proveedor: el mensaje del freno ya explica qué hacer.
+      else if (r.status === 409 && d?.frenoProveedor) toast(String(d.error), "error");
       else toast(`No se pudo lanzar en BC: ${d.error ?? `HTTP ${r.status}`}`, "error");
     } catch (e: any) {
       toast(`No se pudo lanzar en BC: ${String(e?.message ?? e)}`, "error");
