@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { PresupuestoHorasCard } from '@/components/presupuesto/horas-card';
+import { calcularTasas, CODIGO_POSTVENTA, type TasasObra } from '@/lib/presupuesto-tasas';
 
 interface Obra { idObra: number; numeroObra: string; nombreMostrado: string; areaProrrateadaM2?: number | null }
 // Resumen del presupuesto ya cargado en BC para la obra elegida (misma forma que
@@ -66,6 +67,9 @@ interface ResultadoBC {
   obraCampos?: Record<string, number>; // todos los importes numéricos del registro de BC
   resultadoBC?: string;
   resultadoDescompuestoBC?: string;
+  tasas?: TasasObra;                                  // % tasa y % tasa postventa calculadas
+  tasasBC?: 'ok' | 'pendiente' | 'error' | 'fuera-de-rango'; // si quedaron escritas en la obra de BC
+  tasasError?: string;
 }
 
 // 2 decimales EXACTOS como BC (no redondear a colones enteros).
@@ -73,6 +77,78 @@ const crc = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC',
 const TIPO_LABEL: Record<string, string> = { Sales: 'Venta', Cost: 'Costo directo', 'Indirect Cost': 'Indirectos', Production: 'Producción' };
 // Solo estos 3 se suben a BC (Producción es base de avance, va aparte — no se muestra).
 const TIPO_SUBIBLES = ['Sales', 'Cost', 'Indirect Cost'];
+
+// Porcentaje con 2 decimales, como lo muestra BC ("31,10 %").
+const pctFmt = new Intl.NumberFormat('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (v: number | null) => (v == null ? '—' : `${pctFmt.format(v)} %`);
+
+/**
+ * Las 2 tasas que van a la ficha de la obra en BC, con la división a la vista para
+ * que el presupuestista pueda verificarlas antes de enviar:
+ *
+ *   % tasa           = coste indirecto / venta × 100   → Tax Pcnt. (231)
+ *   % tasa postventa = postventa (CI.PV) / venta × 100 → After-sales Tax Pcnt. (233)
+ */
+function TasasCard({ t, estado, error }: { t: TasasObra; estado?: ResultadoBC['tasasBC']; error?: string }) {
+  const fila = (etiqueta: string, valor: number | null, numerador: number, nota: string) => (
+    <div className="rounded-ds-lg border border-ds-gray-200 p-3">
+      <p className="text-ds-gray-400 text-xs">{etiqueta}</p>
+      <p className="text-ds-ink font-bold text-sub-sm mt-0.5">{pct(valor)}</p>
+      <p className="text-ds-gray-400 text-xs mt-1 tabular-nums">
+        {crc.format(numerador)} ÷ {crc.format(t.venta)}
+      </p>
+      <p className="text-ds-gray-400 text-xs">{nota}</p>
+    </div>
+  );
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {fila('% tasa', t.taxPcnt, t.indirecto, 'coste indirecto ÷ venta · BC: Tax Pcnt.')}
+        {fila('% tasa postventa', t.afterSalesTaxPcnt, t.postventa, `línea ${CODIGO_POSTVENTA} ÷ venta · BC: After-sales Tax Pcnt.`)}
+      </div>
+      {t.fueraDeRango && (
+        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red">
+          Alguna de las dos tasas queda fuera de 0–100 %, así que el Excel está mal (lo típico: los indirectos
+          suman más que la venta). Esto NO se manda a BC — Business Central aceptaría el número igual y la obra
+          quedaría con una tasa imposible. Revisá las hojas VentaAD e IND.
+        </div>
+      )}
+      {t.venta <= 0 && (
+        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red">
+          El Excel no trae importe de venta, así que las dos tasas no se pueden calcular (habría que dividir entre cero).
+          Revisá la hoja VentaAD antes de subir.
+        </div>
+      )}
+      {t.faltaPostventa && (
+        <div className="rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow/10 px-3 py-2 text-xs text-ds-yellow-ink">
+          No encontré la línea de postventa ({CODIGO_POSTVENTA}) entre los indirectos, así que el % tasa postventa
+          queda en 0. Si la obra sí lleva postventa, revisá la hoja IND del Excel.
+        </div>
+      )}
+      {estado === 'pendiente' && (
+        <div className="rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow/10 px-3 py-2 text-xs text-ds-yellow-ink">
+          Las tasas quedaron calculadas pero NO se escribieron en la obra: la API de Business Central todavía no
+          publica los campos Tax Pcnt. / After-sales Tax Pcnt. Hay que ponerlos a mano en la ficha de la obra
+          (pestaña Adicionales) hasta que se publiquen en la extensión.
+        </div>
+      )}
+      {estado === 'fuera-de-rango' && (
+        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red">
+          Las tasas NO se escribieron en la obra porque caen fuera de 0–100 %. El presupuesto sí quedó cargado:
+          corregí el Excel y volvé a subir, o poné las tasas a mano en la ficha de la obra.
+        </div>
+      )}
+      {estado === 'error' && (
+        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red break-words">
+          No se pudieron escribir las tasas en BC: {error ?? 'error desconocido'}
+        </div>
+      )}
+      {estado === 'ok' && (
+        <p className="text-xs text-ds-green-ink">Escritas en la obra de BC (Adicionales: % tasa y % tasa postventa).</p>
+      )}
+    </div>
+  );
+}
 
 // Tarjeta de un total de la obra (venta / costo / indirecto / resultado).
 function MetricBC({ label, value, accent }: { label: string; value: string; accent?: 'pos' | 'neg' }) {
@@ -130,6 +206,12 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
             <MetricBC label="Importe coste" value={crc.format(t.costLineAmount ?? 0)} />
             <MetricBC label="Coste indirecto" value={crc.format(t.indirectCostLineAmount ?? 0)} />
             <MetricBC label="Resultado" value={crc.format(resultadoVal)} accent={resultadoVal >= 0 ? 'pos' : 'neg'} />
+          </div>
+        )}
+        {r.tasas && (
+          <div className="space-y-2">
+            <p className="text-ds-gray-500 text-body-sm">Tasas de la obra</p>
+            <TasasCard t={r.tasas} estado={r.tasasBC} error={r.tasasError} />
           </div>
         )}
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ds-gray-500">
@@ -436,6 +518,9 @@ export default function PresupuestoPage() {
 
   const tipos = plantilla ? Object.keys(plantilla.porTipo).filter(t => (plantilla.porTipo[t] ?? []).length > 0) : [];
   const hayDatos = tipos.length > 0 || (descompuesto?.lineas.length ?? 0) > 0;
+  // Las 2 tasas que van a la obra en BC. Se calculan del Excel cargado (y se
+  // recalculan si se editan líneas en el paso 2), para revisarlas antes de enviar.
+  const tasas = plantilla ? calcularTasas(plantilla.porTipo) : null;
 
   return (
     <PageShell width="narrow">
@@ -579,6 +664,14 @@ export default function PresupuestoPage() {
                   </button>
                 ))}
               </div>
+              {tasas && (
+                <div className="space-y-2">
+                  <p className="text-ds-gray-500 text-body-sm">
+                    Tasas de la obra <span className="text-ds-gray-400 text-xs">— calculadas del Excel; se envían con el General a BC.</span>
+                  </p>
+                  <TasasCard t={tasas} />
+                </div>
+              )}
               {(() => {
                 const activa = (TIPO_SUBIBLES.includes(tipoVista) && plantilla.porTipo[tipoVista]) ? tipoVista : TIPO_SUBIBLES.find(t => plantilla.porTipo[t]) ?? '';
                 const lineas = plantilla.porTipo[activa] ?? [];
@@ -841,6 +934,12 @@ export default function PresupuestoPage() {
                     </div>
                   ))}
                 </div>
+                {tasas && (
+                  <div className="space-y-2">
+                    <p className="text-ds-gray-500 text-body-sm">Tasas que se escriben en la obra</p>
+                    <TasasCard t={tasas} />
+                  </div>
+                )}
                 {catalogo && catalogo.detalle.some(d => !d.enCatalogo) && (
                   <div className="rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow/10 px-3 py-2 text-xs text-ds-yellow-ink">
                     Ojo: {catalogo.detalle.filter(d => !d.enCatalogo).length} línea(s) del Excel todavía no están en el

@@ -1,5 +1,6 @@
 import 'server-only';
 import { getBCToken } from './bc-client';
+import { TASA_MAX, TASA_MIN } from './presupuesto-tasas';
 
 // Cliente del API custom de Business Central "adelante/construction/v1.0" — el mismo que
 // usa la app de Power Apps para subir presupuestos. Replica el flujo:
@@ -213,6 +214,78 @@ export async function setAreaProrrateadaWork(worksNo: string, areaProrrateada: n
     method: 'PATCH',
     headers: { 'If-Match': w['@odata.etag'] ?? '*' },
     body: JSON.stringify({ areaProrrateada }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tasas de la obra: «% tasa» (Tax Pcnt., campo 231) y «% tasa postventa»
+// (After-sales Tax Pcnt., 233). Los calcula el app sobre el presupuesto —ver
+// lib/presupuesto-tasas.ts— y hay que escribirlos en la obra al subir.
+//
+// Los 4 campos (230 Use Custom Tax, 231 Tax Pcnt., 232 Use Custom After-sales Tax,
+// 233 After-sales Tax Pcnt.) son de la extensión "Goom Job Global Localization" y
+// los publica la página API `work` desde AdelanteAPI 1.2.7.0 (Sandbox y Production).
+// Se sigue PROBANDO antes de escribir, porque un entorno con una versión anterior de
+// la extensión no los tiene y el PATCH fallaría entero.
+//
+// Probado contra Sandbox (obra ZZC-02):
+//   · Los 4 campos en UN solo PATCH pegan; un GET inmediato los devuelve igual. No
+//     hay OnValidate que pise el porcentaje, así que no hay que partirlo en dos.
+//   · Mandar el porcentaje solo YA enciende su booleano; se mandan igual los cuatro
+//     porque el de postventa no siempre se enciende solo.
+//   · BC NO valida el rango por la API: 150 y -5 entran con HTTP 200. El MinValue 0 /
+//     MaxValue 100 de la tabla solo aplica a la captura a mano. De ahí el guard de acá.
+// ---------------------------------------------------------------------------
+export interface TasasWork { taxPcnt: number; afterSalesTaxPcnt: number }
+
+// El "sí" se cachea para siempre (una extensión no deja de publicar campos sin
+// redeploy del app). El "no" se cachea solo unos minutos A PROPÓSITO: si se cacheara
+// igual, un proceso que arrancó antes de publicar la extensión seguiría diciendo
+// "las tasas quedaron sin escribir" hasta reiniciarlo. Con el TTL se recupera solo.
+const TTL_NEGATIVO_MS = 5 * 60 * 1000;
+let tasasSoportadasCache: { valor: Promise<boolean>; expira: number } | null = null;
+
+/** ¿La API custom expone los campos de tasa de la obra en ESTE entorno? */
+export async function tasasSoportadas(): Promise<boolean> {
+  if (tasasSoportadasCache && Date.now() < tasasSoportadasCache.expira) {
+    return tasasSoportadasCache.valor;
+  }
+  const valor = (async () => {
+    await req(`works?$top=1&$select=no,taxPcnt,afterSalesTaxPcnt`, { method: 'GET' });
+    return true;
+  })().catch(() => false);
+  // Hasta saber el resultado se cachea corto; si dio true se vuelve permanente.
+  tasasSoportadasCache = { valor, expira: Date.now() + TTL_NEGATIVO_MS };
+  valor.then((ok) => {
+    if (ok) tasasSoportadasCache = { valor, expira: Number.POSITIVE_INFINITY };
+  });
+  return valor;
+}
+
+/**
+ * Escribe las 2 tasas en la OBRA (GomJob Works) de BC, junto con los dos booleanos
+ * "usar tasa personalizada". La clave OData es el SystemId (`id`), no el N° de obra.
+ * Lanza si la API no publica los campos (llamalo detrás de tasasSoportadas()) o si
+ * un porcentaje sale de 0–100 — BC no lo validaría y guardaría el disparate.
+ */
+export async function setTasasWork(worksNo: string, tasas: TasasWork): Promise<void> {
+  for (const [campo, valor] of Object.entries(tasas)) {
+    if (!Number.isFinite(valor) || valor < TASA_MIN || valor > TASA_MAX) {
+      throw new Error(`${campo} = ${valor} está fuera de ${TASA_MIN}–${TASA_MAX}: no se escribe en BC (BC lo aceptaría igual).`);
+    }
+  }
+  const g = await req(`works?$filter=${encodeURIComponent(`no eq '${worksNo}'`)}&$top=1`, { method: 'GET' });
+  const w = ((g?.value ?? []) as Array<{ id?: string; '@odata.etag'?: string }>)[0];
+  if (!w?.id) throw new Error(`La obra ${worksNo} no existe en BC (works)`);
+  await req(`works(${w.id})`, {
+    method: 'PATCH',
+    headers: { 'If-Match': w['@odata.etag'] ?? '*' },
+    body: JSON.stringify({
+      useCustomTax: true,
+      taxPcnt: tasas.taxPcnt,
+      useCustomAfterSalesTax: true,
+      afterSalesTaxPcnt: tasas.afterSalesTaxPcnt,
+    }),
   });
 }
 

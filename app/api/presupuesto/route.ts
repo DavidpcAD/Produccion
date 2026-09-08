@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { getDb, sql } from '@/lib/db';
-import { bcConstructionConfigured, subirVersionPresupuesto, subirDescompuesto, getWork, setAreaProrrateadaWork, type BulkLine, type DecompLine } from '@/lib/bc-construction';
+import { bcConstructionConfigured, subirVersionPresupuesto, subirDescompuesto, getWork, setAreaProrrateadaWork, setTasasWork, tasasSoportadas, type BulkLine, type DecompLine } from '@/lib/bc-construction';
+import { calcularTasas } from '@/lib/presupuesto-tasas';
 import { actualizarTareasProyecto, setAreaProrrateadaJob } from '@/lib/bc-client';
 
 export const runtime = 'nodejs';
@@ -52,6 +53,33 @@ export async function POST(req: NextRequest) {
       resultado.enviadas = r.enviadas;
       resultado.totales = r.totals;
       resultado.resultadoBC = r.resultado;
+    }
+    // «% tasa» y «% tasa postventa» de la obra. Se RECALCULAN acá sobre las mismas
+    // líneas que llegaron (no se confía en un número mandado por el cliente) y se
+    // devuelven siempre, para que el panel muestre exactamente lo que se revisó
+    // antes de enviar. La escritura en BC depende de que la extensión publique los
+    // campos (ver tasasSoportadas) y no es fatal: el presupuesto ya quedó cargado.
+    if (lineasVersion.length > 0) {
+      const tasas = calcularTasas(plantilla?.porTipo ?? {});
+      resultado.tasas = tasas;
+      if (tasas.fueraDeRango) {
+        // Indirectos > venta (o negativos): el Excel está mal. BC aceptaría el número
+        // igual, así que acá se corta y se avisa en vez de guardar un disparate.
+        resultado.tasasBC = 'fuera-de-rango';
+      } else if (tasas.taxPcnt != null && tasas.afterSalesTaxPcnt != null) {
+        if (await tasasSoportadas()) {
+          try {
+            await setTasasWork(worksNo, { taxPcnt: tasas.taxPcnt, afterSalesTaxPcnt: tasas.afterSalesTaxPcnt });
+            resultado.tasasBC = 'ok';
+          } catch (e) {
+            resultado.tasasBC = 'error';
+            resultado.tasasError = e instanceof Error ? e.message : String(e);
+          }
+        } else {
+          // La API de BC todavía no publica Tax Pcnt. / After-sales Tax Pcnt.
+          resultado.tasasBC = 'pendiente';
+        }
+      }
     }
     if (materiales.length > 0) {
       const d = await subirDescompuesto(worksNo, materiales);
@@ -104,7 +132,7 @@ export async function POST(req: NextRequest) {
       } catch { /* no fatal: BC ya quedó con el área */ }
     }
 
-    await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length, areaProrrateada, tareasProyecto: resultado.tareasProyecto ?? resultado.tareasProyectoError }, ip });
+    await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length, areaProrrateada, tasas: resultado.tasas, tasasBC: resultado.tasasBC ?? resultado.tasasError, tareasProyecto: resultado.tareasProyecto ?? resultado.tareasProyectoError }, ip });
     return NextResponse.json({ ok: true, ...resultado });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
