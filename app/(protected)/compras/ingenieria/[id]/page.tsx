@@ -7,7 +7,7 @@ import { Badge, Button, Card, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
-import { ALMACEN_GENERAL, destinoLabel, esConsumoInmediato, esSubcontrato, formatDate, money, montoDeLineaSubcontrato, num, numeroOrden, obraDeLinea, ordenesDePedido, pedidoBadge, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, destinoLabel, esConsumoInmediato, esSubcontrato, formatDate, money, montoDeLineaSubcontrato, num, numeroOrden, obraDeLinea, ordenesDePedido, pedidoBadge, pedidoLineaDadaDeBaja, pedidoLineaPorRecibir, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
 export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -223,13 +223,18 @@ export default function PedidoDetallePage() {
               <tbody>
                 {pedido.lineas.map((l) => {
                   const recibido = recibidoDeLineaPedido(ordenes, l.id);
-                  const porRecibir = Math.max(0, l.cantidad - recibido);
+                  // En una solicitud ARCHIVADA solo falta por llegar lo que ya está en una
+                  // orden: lo que nunca se ordenó se dio de baja y no va a llegar nunca
+                  // (antes se quedaba en rojo para siempre). Lo solicitado no se toca.
+                  const porRecibir = pedidoLineaPorRecibir(l, pedido, recibido);
+                  const baja = pedidoLineaDadaDeBaja(l, pedido);
                   return (
                     <tr key={l.id}>
                       <td>
                         <div className="row gap-2" style={{ alignItems: "center" }}>
                           <div className="ds-truncate" style={{ maxWidth: 220 }}>{l.descripcion}</div>
                           {l.devuelta && <Badge tone="red">Devuelta</Badge>}
+                          {baja > 0 && <Badge tone="gray" title={`Se archivó la solicitud: ${num.format(baja)} ${l.unidad} nunca se ordenaron y ya no se van a comprar.`}>Ya no se compra</Badge>}
                         </div>
                       </td>
                       {pedido.tipoSolicitud === "material" && <td className="ds-muted">{obraDeLinea(l, pedido) || "—"}</td>}
@@ -242,7 +247,7 @@ export default function PedidoDetallePage() {
                       <td className="ds-num">{num.format(l.cantidadOrdenada)}</td>
                       <td className="ds-num ds-strong">{num.format(recibido)}</td>
                       <td className="ds-num">
-                        {porRecibir > 0 ? <span className="ds-pending-text">{num.format(porRecibir)}</span> : <span className="ds-muted">0</span>}
+                        {porRecibir > 0 ? <span className="ds-pending-text">{num.format(porRecibir)}</span> : <span className="ds-muted">{baja > 0 ? "—" : "0"}</span>}
                       </td>
                     </tr>
                   );

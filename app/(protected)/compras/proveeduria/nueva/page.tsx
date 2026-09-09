@@ -175,8 +175,8 @@ export default function ArmarOrdenPage() {
   const lineasDisponibles = pedidos
     .filter((p) => p.estado === "aprobado" || p.estado === "en_orden")
     .flatMap((p) => p.lineas
-      .filter((l) => pedidoLineaPendiente(l) > 0 && !yaEnOrden.has(l.id))
-      .map((l) => ({ p, l, pend: pedidoLineaPendiente(l) })));
+      .filter((l) => pedidoLineaPendiente(l, p) > 0 && !yaEnOrden.has(l.id))
+      .map((l) => ({ p, l, pend: pedidoLineaPendiente(l, p) })));
   const inc = (v: string, q: string) => !q || coincideBusqueda(v, q);
   const lineasDispFiltradas = lineasDisponibles.filter(({ p, l }) =>
     inc(p.numero, addF.pedido) && inc(l.descripcion, addF.articulo) && inc(destinoDeLinea(l, p), addF.destino));

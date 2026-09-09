@@ -85,7 +85,15 @@ export default function MatrizPage() {
   // vista venga desfasada o cacheada.
   const mapa = useMemo(() => {
     const RANK: Record<string, number> = { ENTREGADO: 4, COMPRADO: 3, PEDIDO: 2, BORRADOR: 1 };
-    const EST_DE_CODIGO: Record<string, string> = { cerrado: "ENTREGADO", en_orden: "COMPRADO", aprobado: "PEDIDO", borrador: "BORRADOR" };
+    // "cerrado" NO está en el mapa a propósito, igual que "devuelto": esa solicitud se
+    // ARCHIVÓ porque lo que faltaba ya no se va a comprar, así que no hay nada en curso
+    // que pintar. Antes valía "ENTREGADO" —el rango MÁXIMO—, o sea que una solicitud
+    // dada de baja le decía al ingeniero "material entregado" Y le tapaba el estado real
+    // de los otros pedidos de la misma celda obra × clasificación. Sin estado, si en la
+    // celda hay pedidos vivos manda el de ellos, y si la archivada era la única la celda
+    // queda vacía (que es lo correcto). La otra mitad del arreglo es la vista SQL
+    // dbo.vw_MatrizObraClasificacion, que trae el mismo CASE ('Cerrado' → ENTREGADO).
+    const EST_DE_CODIGO: Record<string, string> = { en_orden: "COMPRADO", aprobado: "PEDIDO", borrador: "BORRADOR" };
     const m = new Map<string, string>();
     const put = (idObra: number, idClas: number, est?: string) => {
       if (!est) return;

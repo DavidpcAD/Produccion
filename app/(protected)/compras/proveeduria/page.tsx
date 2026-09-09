@@ -41,7 +41,7 @@ export default function ProveeduriaMaterialesPage() {
   // Los SUBCONTRATOS no pasan por acá: el ingeniero ya eligió al subcontratista y
   // puso los montos, y su orden nace pendiente de aprobación (ver esSubcontrato).
   const pedidosConSaldo = useMemo(
-    () => pedidos.filter((p) => !esSubcontrato(p) && (p.estado === "aprobado" || p.estado === "en_orden") && p.lineas.some((l) => pedidoLineaPendiente(l) > 0)),
+    () => pedidos.filter((p) => !esSubcontrato(p) && (p.estado === "aprobado" || p.estado === "en_orden") && p.lineas.some((l) => pedidoLineaPendiente(l, p) > 0)),
     [pedidos]
   );
 
@@ -49,7 +49,7 @@ export default function ProveeduriaMaterialesPage() {
     const rows: Row[] = [];
     pedidosConSaldo.forEach((p) => {
       p.lineas.forEach((l) => {
-        const pend = pedidoLineaPendiente(l);
+        const pend = pedidoLineaPendiente(l, p);
         if (pend <= 0) return;
         rows.push({
           pedidoId: p.id, pedidoNumero: p.numero, destino: destinoLabel(p), tipo: p.tipoSolicitud,
@@ -103,8 +103,8 @@ export default function ProveeduriaMaterialesPage() {
   // Convertir TODO un pedido (sus líneas pendientes) en una orden de compra.
   function convertirPedido(p: typeof pedidos[number]) {
     const lineas = p.lineas
-      .filter((l) => pedidoLineaPendiente(l) > 0)
-      .map((l) => ({ pedidoLineaId: l.id, cantidad: pedidoLineaPendiente(l), precio: 0, iva: 13 }));
+      .filter((l) => pedidoLineaPendiente(l, p) > 0)
+      .map((l) => ({ pedidoLineaId: l.id, cantidad: pedidoLineaPendiente(l, p), precio: 0, iva: 13 }));
     if (!lineas.length) { toast("Este pedido no tiene líneas pendientes por ordenar.", "error"); return; }
     setBorrador(lineas);
     router.push("/compras/proveeduria/nueva");
@@ -177,7 +177,7 @@ export default function ProveeduriaMaterialesPage() {
             {pedidosConSaldo
               .filter((p) => { const q = pedFiltro.trim(); if (!q) return true; const r = solicitudResumen(p); return coincideBusqueda([p.numero, destinoCodigo(p), r.principal, r.secundaria ?? "", p.notas ?? ""].join(" "), q); })
               .map((p) => {
-              const n = p.lineas.filter((l) => pedidoLineaPendiente(l) > 0).length;
+              const n = p.lineas.filter((l) => pedidoLineaPendiente(l, p) > 0).length;
               const sel = seleccionPorPedido(p.id);
               return (
                 <div key={p.id} className={`md-item ${filtro === p.id ? "is-active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFiltro(p.id)}>
@@ -248,7 +248,7 @@ export default function ProveeduriaMaterialesPage() {
                     <td><div className="ds-truncate" title={l.descripcion}>{l.descripcion}</div></td>
                     <td className="ds-muted ds-body-sm">{destinoDeLinea(l, preview) || "—"}</td>
                     <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
-                    <td className="ds-num">{pedidoLineaPendiente(l) > 0 ? <span className="ds-pending-text">{num.format(pedidoLineaPendiente(l))}</span> : "0"}</td>
+                    <td className="ds-num">{pedidoLineaPendiente(l, preview) > 0 ? <span className="ds-pending-text">{num.format(pedidoLineaPendiente(l, preview))}</span> : "0"}</td>
                   </tr>
                 ))}
               </tbody>

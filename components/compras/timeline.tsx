@@ -62,6 +62,9 @@ function etiqueta(m: Movimiento): string {
     if (m.tipoMovimiento === "recepcion_parcial") return "Recibido en bodega (parcial)";
     if (m.tipoMovimiento === "recepcion_total") return "Recibido en bodega (total)";
   }
+  // El "cerrado" de un PEDIDO es el archivado de Proveeduría: lo que faltaba por
+  // ordenar ya no se compra. El detalle del movimiento trae las líneas y el motivo.
+  if (m.entidad === "pedido" && m.tipoMovimiento === "cerrado") return "Solicitud archivada · el resto ya no se compra";
   if (m.entidad === "recepcion" && m.tipoMovimiento === "creado") return "Factura registrada";
   return LABEL[m.tipoMovimiento] ?? m.tipoMovimiento;
 }
@@ -89,6 +92,7 @@ function colorPunto(m: Movimiento): string {
   switch (m.tipoMovimiento) {
     case "creado": return "var(--ds-color-gray-300)";     // creado · gris
     case "aprobado": return "var(--ds-color-green-100)";  // aprobado · verde lima
+    case "cerrado": return "var(--ds-color-gray-400)";    // archivada · gris apagado (ni bien ni mal)
     case "reabierto": return "var(--ds-color-gray-400)";
     case "eliminado":
     case "rechazado": return "var(--ds-color-red-100)";

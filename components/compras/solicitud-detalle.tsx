@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Badge, Card, QtyRing } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
-import { destinoCodigo, destinoDeLinea, destinoLabel, formatDate, num, pedidoBadge, pedidoLineaPendiente, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { destinoCodigo, destinoDeLinea, destinoLabel, formatDate, num, pedidoBadge, pedidoLineaDadaDeBaja, pedidoLineaPendiente, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 import type { Pedido } from "@/lib/compras/types";
 
 // Vista de una solicitud (pedido), reutilizada por Proveeduría —que trabaja sobre
@@ -58,20 +58,27 @@ export function SolicitudDetalle({
           <table className="ds-table">
             <thead><tr><th>Artículo</th><th>Obra</th><th className="ds-num">Solicitado</th><th className="ds-num">Ordenado</th><th className="ds-num">Pendiente</th></tr></thead>
             <tbody>
-              {pedido.lineas.map((l) => (
+              {pedido.lineas.map((l) => {
+                // Solicitud archivada: lo que nunca entró en una orden se dio de baja.
+                // No queda "pendiente" (nadie lo va a comprar), se marca.
+                const baja = pedidoLineaDadaDeBaja(l, pedido);
+                const pend = pedidoLineaPendiente(l, pedido);
+                return (
                 <tr key={l.id}>
                   <td>
                     <div className="row gap-2" style={{ alignItems: "center" }}>
                       <div className="ds-truncate" title={l.descripcion} style={{ maxWidth: 260 }}>{l.descripcion}</div>
                       {l.devuelta && <Badge tone="red">Devuelta</Badge>}
+                      {baja > 0 && <Badge tone="gray" title={`Se archivó la solicitud: ${num.format(baja)} ${l.unidad} nunca se ordenaron y ya no se van a comprar.`}>Ya no se compra</Badge>}
                     </div>
                   </td>
                   <td className="ds-muted ds-body-sm">{destinoDeLinea(l, pedido) || "—"}</td>
                   <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                   <td className="ds-num">{num.format(l.cantidadOrdenada)}</td>
-                  <td className="ds-num">{pedidoLineaPendiente(l) > 0 ? <span className="ds-pending-text">{num.format(pedidoLineaPendiente(l))}</span> : "0"}</td>
+                  <td className="ds-num">{pend > 0 ? <span className="ds-pending-text">{num.format(pend)}</span> : "0"}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

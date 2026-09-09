@@ -6,12 +6,14 @@ import type { DevolucionInfo, PedidoProgreso, PedidoProgresoPaso } from "@/lib/c
 // Mini-stepper de 5 pasos (Pedido → Proveeduría → Orden → Aprobado → Facturado)
 // para la columna Estado de "Mis solicitudes". Puntos con conectores punteados:
 // completado = verde con ✓, actual = punto sólido, futuro = vacío. Si la solicitud
-// fue devuelta a Ingeniería, el paso actual se pinta rojo. Al pasar el mouse sobre
-// un punto cumplido (✓) o el actual se abre una tarjetita tipo "gota de agua" con el
-// detalle del paso; los pasos futuros no reaccionan.
+// fue devuelta a Ingeniería, el paso actual se pinta rojo; si Proveeduría la ARCHIVÓ
+// (lo que faltaba ya no se compra), gris. Al pasar el mouse sobre un punto cumplido
+// (✓) o el actual se abre una tarjetita tipo "gota de agua" con el detalle del paso;
+// los pasos futuros no reaccionan.
 export function SolicitudProgreso({ prog, devolucion }: { prog: PedidoProgreso; devolucion?: DevolucionInfo }) {
+  const variante = prog.devuelto ? " sol-steps--devuelto" : prog.archivado ? " sol-steps--archivado" : "";
   return (
-    <span className={`sol-steps${prog.devuelto ? " sol-steps--devuelto" : ""}`} role="img" aria-label={`Paso ${prog.nivel} de ${prog.total}: ${prog.actualLabel}`}>
+    <span className={`sol-steps${variante}`} role="img" aria-label={prog.archivado ? `Archivada en el paso ${prog.nivel} de ${prog.total}` : `Paso ${prog.nivel} de ${prog.total}: ${prog.actualLabel}`}>
       {prog.pasos.map((paso, i) => {
         // TODOS los puntos reaccionan al mouse y abren su tarjetita (incluso los
         // futuros/pendientes), para poder ver de qué etapa se trata cada uno.
@@ -39,8 +41,19 @@ export function SolicitudProgreso({ prog, devolucion }: { prog: PedidoProgreso; 
 }
 
 // Contenido de la tarjetita de un punto. En una solicitud devuelta, el punto actual
-// (rojo) muestra de dónde volvió, quién la devolvió y el motivo.
+// (rojo) muestra de dónde volvió, quién la devolvió y el motivo; en una archivada, el
+// punto actual dice hasta dónde llegó y por qué se dio de baja el resto.
 function DotDetalle({ paso, n, prog, devolucion }: { paso: PedidoProgresoPaso; n: number; prog: PedidoProgreso; devolucion?: DevolucionInfo }) {
+  if (prog.archivado && paso.current) {
+    return (
+      <div className="hc-step">
+        <div className="hc-step__title">⛔ Solicitud archivada</div>
+        <div className="hc-step__sub">Quedó en “{paso.label}”. Lo que faltaba por ordenar ya no se compra.</div>
+        <div className="hc-step__state hc-step__state--archivado">Archivada</div>
+        {prog.motivo && <div className="hc-step__motivo">Motivo: {prog.motivo}</div>}
+      </div>
+    );
+  }
   if (prog.devuelto && paso.current) {
     const quien = devolucion?.por
       ? `${devolucion.por}${devolucion.rolLabel ? ` · ${devolucion.rolLabel}` : ""}`

@@ -481,8 +481,40 @@ export const ROL_LABEL: Record<string, string> = {
   facturacion: "Bodega",
 };
 
+// ---- solicitud ARCHIVADA (cerrada por Proveeduría) ----
+// Proveeduría "cierra" una solicitud cuando lo que le falta ya NO se va a comprar.
+// En la base compartida eso son tres cosas y solo tres: idEstado "Cerrado", el motivo
+// al frente de notaCreador ("⛔ Cerrada: …") y un Movimiento tipoMovimiento "cerrado".
+// En dbo.PedidoCompraDet NO se marca nada a propósito: el updatePedido de este repo
+// borra y reinserta justo las líneas con 0 ordenado, así que una marca por línea se
+// borraría sola. Por eso la baja se DERIVA de lo que sí sobrevive: el pedido está
+// cerrado y a la línea le quedaba saldo sin ordenar.
+export function pedidoArchivado(p: Pedido): boolean {
+  return p.estado === "cerrado";
+}
+
+// Motivo del archivado, del comentario del pedido: la app de Proveeduría antepone un
+// tramo "⛔ Cerrada: <motivo>" a notaCreador (los tramos van separados por " · ").
+// Análogo a motivoDevolucion.
+export function motivoArchivado(p: Pedido): string | undefined {
+  const m = /⛔?\s*cerrada:\s*([^·]+)/i.exec(p.notas ?? "");
+  return m ? m[1].trim() : undefined;
+}
+
+/** Cuánto de esta línea se DIO DE BAJA: lo que nunca llegó a una orden en una
+ *  solicitud archivada. Ese material ya no se compra ni va a llegar. */
+export function pedidoLineaDadaDeBaja(l: PedidoLinea, p: Pedido): number {
+  if (!pedidoArchivado(p)) return 0;
+  return Math.max(0, l.cantidad - l.cantidadOrdenada);
+}
+
 // ---- líneas de pedido ----
-export function pedidoLineaPendiente(l: PedidoLinea): number {
+// Saldo por ORDENAR de una línea. En una solicitud archivada es 0: el saldo que no
+// alcanzó a entrar en una orden se dio de baja (ver pedidoLineaDadaDeBaja), así que
+// Proveeduría ya no lo compra. El pedido va como parámetro porque el cierre vive en
+// él, no en la línea.
+export function pedidoLineaPendiente(l: PedidoLinea, p: Pedido): number {
+  if (pedidoArchivado(p)) return 0;
   return Math.max(0, l.cantidad - l.cantidadOrdenada);
 }
 
@@ -505,6 +537,17 @@ export function recibidoDeLineaPedido(ordenes: Orden[], pedidoLineaId: string): 
     }
   }
   return total;
+}
+
+/** Cuánto falta por LLEGAR de una línea de solicitud, contra lo que ya se recibió.
+ *  Normalmente es todo lo que se pidió y todavía no llegó. En una solicitud archivada
+ *  el tope es lo ORDENADO, no lo solicitado: cerrar la solicitud no cancela las
+ *  órdenes que ya salieron (si le ordenaron 10 y recibió 4, esas 6 sí vienen), pero
+ *  lo que nunca se ordenó está dado de baja y no es "por recibir" — antes se quedaba
+ *  en rojo para siempre. Lo solicitado NO se toca: es lo que el ingeniero pidió. */
+export function pedidoLineaPorRecibir(l: PedidoLinea, p: Pedido, recibido: number): number {
+  const enCamino = pedidoArchivado(p) ? l.cantidadOrdenada : l.cantidad;
+  return Math.max(0, enCamino - recibido);
 }
 
 // ---- líneas de orden ----
@@ -620,7 +663,10 @@ export function pedidoBadge(estado: Pedido["estado"]): { label: string; tone: st
     case "borrador": return { label: "Borrador", tone: "gray" };
     case "aprobado": return { label: "En proveeduría", tone: "green" };
     case "en_orden": return { label: "En orden", tone: "yellow" };
-    case "cerrado": return { label: "Cerrado", tone: "gray" };
+    // "cerrado" en SQL = la solicitud se ARCHIVÓ: lo que faltaba por ordenar ya no se
+    // compra. Se rotula igual que en OrdenesCompra (femenino: la solicitud) para que
+    // las dos apps le digan lo mismo al usuario.
+    case "cerrado": return { label: "Archivada", tone: "gray" };
     case "devuelto": return { label: "Devuelto", tone: "red" };
   }
   // Mismo default que ordenBadge, por la misma razón: sin él, un estado fuera del union
@@ -649,8 +695,11 @@ export interface PedidoProgreso {
   nivel: number;        // paso alcanzado (1..5)
   total: number;        // 5
   devuelto: boolean;    // volvió a Ingeniería (estado devuelto)
+  // Proveeduría la archivó: lo que faltaba por ordenar ya no se compra. Es un TERCER
+  // desenlace, ni "completada" ni "devuelta": el flujo no siguió, se dio de baja.
+  archivado: boolean;
   completado: boolean;  // terminó TODO el flujo (los 5 pasos con ✓)
-  motivo?: string;      // motivo de la devolución (si devuelto)
+  motivo?: string;      // motivo de la devolución o del archivado
   actualLabel: string;  // nombre del paso actual
   pasos: PedidoProgresoPaso[];
 }
@@ -700,9 +749,13 @@ export function pedidoProgreso(p: Pedido, ordenes: Orden[]): PedidoProgreso {
   const enProveeduria = p.estado !== "borrador";               // ya fue enviada
   const hayOrden = ligadas.length > 0 || pedidoOrdenadoPct(p) > 0;
   const ordenAprobada = ligadas.some((o) => o.estado === "lanzado" || o.estado === "completado");
-  // COMPLETADA = todo el flujo terminó (recibida y facturada / cerrada). Solo así
+  // COMPLETADA = todo el flujo terminó (lo que se pidió se ordenó y llegó). Solo así
   // el paso 5 lleva ✓; mientras se recibe, el paso 5 queda "en curso".
-  const completado = p.estado === "cerrado" || (hayOrden && recibidoTotal);
+  // OJO: el estado "cerrado" NO cuenta acá. Es el archivado de Proveeduría —"lo que
+  // falta ya no se compra"—, lo contrario de terminar bien: daba los 5 pasos en ✓ y
+  // "Completada" en una solicitud a la que le dieron de baja la mitad del material.
+  const completado = hayOrden && recibidoTotal;
+  const archivado = pedidoArchivado(p);
 
   let nivel = 1;
   if (enProveeduria) nivel = 2;
@@ -718,9 +771,10 @@ export function pedidoProgreso(p: Pedido, ordenes: Orden[]): PedidoProgreso {
   }));
   const devuelto = p.estado === "devuelto";
   return {
-    nivel, total: PASOS_SOLICITUD.length, devuelto, completado,
-    motivo: devuelto ? motivoDevolucion(p) : undefined,
-    actualLabel: completado ? "Completada" : PASOS_SOLICITUD[nivel - 1].label,
+    nivel, total: PASOS_SOLICITUD.length, devuelto, archivado, completado,
+    motivo: devuelto ? motivoDevolucion(p) : archivado ? motivoArchivado(p) : undefined,
+    // El archivado manda sobre el resto: es el desenlace que quedó registrado.
+    actualLabel: archivado ? "Archivada" : completado ? "Completada" : PASOS_SOLICITUD[nivel - 1].label,
     pasos,
   };
 }

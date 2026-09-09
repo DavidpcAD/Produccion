@@ -21,7 +21,9 @@ export default function ProveeduriaPedidoDetallePage() {
   if (!pedido) {
     return <AppShell role="proveeduria"><main className="page"><div className="empty">{cargando ? "Cargando solicitud…" : "Solicitud no encontrada."}</div></main></AppShell>;
   }
-  const hayPendiente = pedido.lineas.some((l) => pedidoLineaPendiente(l) > 0);
+  // Una solicitud ARCHIVADA no tiene saldo por ordenar: lo que faltaba se dio de baja,
+  // así que "Crear orden de compra" queda deshabilitado (ver pedidoLineaPendiente).
+  const hayPendiente = pedido.lineas.some((l) => pedidoLineaPendiente(l, pedido) > 0);
   // Solo se puede devolver una línea que Proveeduría todavía NO ordenó: si ya tiene
   // orden de compra, queda bloqueada y no aparece para elegir. El criterio es el
   // mismo del servidor (`enOrden` = la FK a una orden viva); con solo mirar
@@ -30,8 +32,8 @@ export default function ProveeduriaPedidoDetallePage() {
 
   function crearOC() {
     const lineas = pedido!.lineas
-      .filter((l) => pedidoLineaPendiente(l) > 0)
-      .map((l) => ({ pedidoLineaId: l.id, cantidad: pedidoLineaPendiente(l), precio: 0, iva: 13 }));
+      .filter((l) => pedidoLineaPendiente(l, pedido!) > 0)
+      .map((l) => ({ pedidoLineaId: l.id, cantidad: pedidoLineaPendiente(l, pedido!), precio: 0, iva: 13 }));
     if (!lineas.length) { toast("Este pedido no tiene líneas pendientes por ordenar.", "error"); return; }
     setBorrador(lineas);
     router.push("/compras/proveeduria/nueva");

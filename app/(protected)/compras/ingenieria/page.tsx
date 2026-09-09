@@ -75,6 +75,9 @@ export default function IngenieriaPage() {
     // Estado: barrita de progreso (5 pasos). El filtro sigue por el estado del pedido.
     { id: "estado", header: "Estado", accessorFn: (p) => pedidoBadge(p.estado).label, meta: { label: "Estado" }, cell: (c) => <SolicitudProgreso prog={pedidoProgreso(c.row.original, ordenesFinal)} devolucion={devolPara(c.row.original)} /> },
     // Comentario: truncado; al pasar el mouse se despliega hacia abajo con el texto completo.
+    // Se muestra CRUDO a propósito: cuando Proveeduría archiva una solicitud le antepone
+    // "⛔ Cerrada: <motivo>" a la nota, y esta columna es el único lugar donde el ingeniero
+    // ve el porqué sin abrir el detalle. No lo limpies.
     { id: "comentario", header: "Comentario", accessorFn: (p) => p.notas ?? "", meta: { label: "Comentario" }, cell: (c) => { const txt = c.getValue() as string; if (!txt) return <span className="ds-body-sm ds-muted">—</span>; return <HoverCard placement="bottom" align="start" variant="panel" maxWidth={340} skipIfFits content={<span className="hc-comentario">{txt}</span>}><span className="ds-body-sm ds-muted ds-truncate" data-fit style={{ maxWidth: 240, display: "inline-block", verticalAlign: "middle" }}>{txt}</span></HoverCard>; } },
     // Usuario: iniciales que se expanden a nombre completo en la misma línea (sin tooltip).
     { id: "usuario", header: "Usuario", accessorFn: (p) => p.solicitante, meta: { label: "Usuario" }, cell: (c) => <UsuarioChip nombre={c.row.original.solicitante} /> },
