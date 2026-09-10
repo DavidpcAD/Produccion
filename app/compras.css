@@ -1653,3 +1653,14 @@
   .oc-scope .recv-prog__seg { transition: none; }
   .oc-scope .kebab-menu { animation: none; }
 }
+
+/* Cantidad ya recibida (solo lectura): misma pastilla que `qty-input`, sin campo.
+   La usa el detalle de una factura, donde la cantidad es un hecho, no un dato
+   que se teclee. */
+.oc-scope .qty-pill {
+  display: inline-flex; align-items: baseline; gap: 4px; flex-shrink: 0;
+  min-width: 76px; height: 48px; padding: 0 var(--ds-space-3); justify-content: center;
+  border-radius: 999px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-tint-base);
+  color: var(--ds-text); font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold);
+}
+.oc-scope .qty-pill__unit { font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-regular); color: var(--ds-color-gray-400); }

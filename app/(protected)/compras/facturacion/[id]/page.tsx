@@ -8,7 +8,7 @@ import { Badge, Button, Card, Field, Input, Modal, Select, Textarea, useToast } 
 import { IconWarning } from "@/components/compras/icons";
 import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
-import { money, cantidadEntreUnidades, codigoDeItem, distribuirCargo, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, todayISO, type UnidadItem } from "@/lib/compras/helpers";
+import { money, cantidadEntreUnidades, codigoDeItem, distribuirCargo, formatDate, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, todayISO, type UnidadItem } from "@/lib/compras/helpers";
 import type { MotivoNC, Orden } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
@@ -42,7 +42,7 @@ export default function RegistrarFacturaPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { ordenes, pedidos, proveedores, registrarRecepcion, marcarNotasCredito, cargando } = useStore();
+  const { ordenes, pedidos, proveedores, recepciones, registrarRecepcion, marcarNotasCredito, cargando } = useStore();
   // Sin recorte por rol: quien tiene el módulo de recepción registra la factura de
   // cualquier orden. Maderas y Bryan pidieron ver TODAS justamente porque les llegan
   // facturas de material que no digitaron ellos (01/09/2026); el selector de la lista
@@ -168,6 +168,12 @@ export default function RegistrarFacturaPage() {
     [articulo]
   );
   const fleteAplicado = nadaRecibidoAun && cargo ? cargo.precioUnitario : 0;
+  // Facturas YA registradas de esta orden (las entregas anteriores), más viejas primero.
+  const yaFacturada = useMemo(
+    () => [...recepciones.filter((r) => r.ordenId === id)]
+      .sort((a, b) => (a.fechaRecepcion || "").localeCompare(b.fechaRecepcion || "")),
+    [recepciones, id],
+  );
   // Cargo de transporte de ESTA factura/viaje (lo agrega Bodega). Se suma a la
   // factura y se reparte en BC entre lo recibido según el método elegido.
   const cargoNuevoMonto = cargoOn ? (Number(cargoMonto) || 0) : 0;
@@ -404,6 +410,24 @@ export default function RegistrarFacturaPage() {
             </div>
             <p className="ds-muted">{orden.proveedorNo ?? prov?.code} · {orden.proveedorNombre ?? prov?.nombre} · recibido {ordenRecibidoPct(orden)}%{orden.currencyCode ? ` · ${orden.currencyCode}` : ""}</p>
             {orden.almacenRecepcion && <p className="ds-body-sm ds-muted">Recepción en almacén <span className="ds-strong">{orden.almacenRecepcion}</span></p>}
+            {/* Entregas anteriores: esta orden ya se recibió a medias antes, así que
+                hay facturas previas. Sin esto, para saber qué trajo el primer viaje
+                había que salirse de la recepción y buscarla en otra pestaña. */}
+            {yaFacturada.length > 0 && (
+              <p className="ds-body-sm ds-muted">
+                Esta orden ya tiene {yaFacturada.length} factura(s) registrada(s):{" "}
+                {yaFacturada.map((r, i) => (
+                  <span key={r.id}>
+                    {i > 0 && " · "}
+                    <button type="button" className="link-btn"
+                      title={`Ver qué líneas trajo esta factura (${formatDate(r.fechaRecepcion)})`}
+                      onClick={() => router.push(`/compras/facturacion/recepcion/${r.id}`)}>
+                      {r.numeroFactura || "sin factura (en revisión)"}
+                    </button>
+                  </span>
+                ))}
+              </p>
+            )}
             <div className="row gap-2 wrap mt-2">
               <span className="ds-muted ds-body-sm">Solicitudes origen:</span>
               {[...new Set(orden.lineas.filter((l) => l.pedidoNumero).map((l) => l.pedidoNumero!))].map((n) => {
