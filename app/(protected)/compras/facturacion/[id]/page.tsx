@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
-import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
+import { Badge, Button, Card, Field, Input, Modal, Select, Textarea, useToast } from "@/components/compras/ui";
 import { IconWarning } from "@/components/compras/icons";
 import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
-import { money, cantidadEntreUnidades, distribuirCargo, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, todayISO, type UnidadItem } from "@/lib/compras/helpers";
+import { money, cantidadEntreUnidades, codigoDeItem, distribuirCargo, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, todayISO, type UnidadItem } from "@/lib/compras/helpers";
 import type { MotivoNC, Orden } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
@@ -51,6 +51,14 @@ export default function RegistrarFacturaPage() {
 
   const articulo = (orden?.lineas ?? []).filter((l) => l.tipo === "articulo");
   const cargo = (orden?.lineas ?? []).find((l) => l.tipo === "cargo");
+  // Para MOSTRAR: solo las líneas que todavía tienen pendiente (lo ya recibido
+  // completo no se vuelve a recibir) y SIEMPRE en orden alfabético, que es como
+  // Bodega va leyendo la factura del proveedor. Los cálculos usan `articulo`.
+  const articuloVisible = useMemo(
+    () => articulo.filter((l) => ordenLineaPendiente(l) > 1e-9)
+      .sort((a, b) => a.descripcion.localeCompare(b.descripcion, "es")),
+    [articulo],
+  );
 
   const [recibir, setRecibir] = useState<Record<string, string>>(() => pendientesDe(orden));
 
@@ -95,12 +103,38 @@ export default function RegistrarFacturaPage() {
     mueveInventario: boolean;
   }[]>(null);
   // Líneas marcadas para NOTA DE CRÉDITO (dañado / menos cantidad / precio distinto).
-  const [marcadas, setMarcadas] = useState<Record<string, { motivo: MotivoNC; cantidad: string; precio: string }>>({});
-  const marcarLinea = (l: { id: string; cantidad: number; precioUnitario: number }) =>
-    setMarcadas((m) => ({ ...m, [l.id]: { motivo: "precio_distinto", cantidad: String(recibir[l.id] || l.cantidad), precio: String(l.precioUnitario ?? "") } }));
+  const [marcadas, setMarcadas] = useState<Record<string, { motivo: MotivoNC; cantidad: string; precio: string; nota: string }>>({});
   const quitarMarca = (id: string) => setMarcadas((m) => { const n = { ...m }; delete n[id]; return n; });
-  const setMarca = (id: string, patch: Partial<{ motivo: MotivoNC; cantidad: string; precio: string }>) =>
-    setMarcadas((m) => ({ ...m, [id]: { ...m[id], ...patch } }));
+  // Menú kebab (⋮) abierto por línea (id de la línea, o null).
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+  // Popup de nota de crédito (borrador): la línea marcada NO se expande —eso
+  // partía la tarjeta en el celular—; se edita acá y se confirma con "Guardar".
+  const [ncModal, setNcModal] = useState<null | { lineId: string; descripcion: string; motivo: MotivoNC; cantidad: string; precio: string; nota: string }>(null);
+  const abrirNc = (l: { id: string; descripcion: string; cantidad?: number; precioUnitario?: number }) => {
+    const ex = marcadas[l.id];
+    setNcModal({
+      lineId: l.id, descripcion: l.descripcion,
+      motivo: ex?.motivo ?? "precio_distinto",
+      cantidad: ex?.cantidad ?? String(recibir[l.id] || l.cantidad || ""),
+      precio: ex?.precio ?? (l.precioUnitario != null ? String(Math.round(l.precioUnitario * 100) / 100) : ""),
+      nota: ex?.nota ?? "",
+    });
+    setMenuOpen(null);
+  };
+  const guardarNc = () => {
+    if (!ncModal) return;
+    setMarcadas((m) => ({ ...m, [ncModal.lineId]: { motivo: ncModal.motivo, cantidad: ncModal.cantidad, precio: ncModal.precio, nota: ncModal.nota } }));
+    setNcModal(null);
+  };
+  // Fechas de recepción y registro: por defecto siguen a la fecha de la factura
+  // (es lo que hace Bodega el 99% de las veces). Se despliegan para corregirlas.
+  const [fechasAparte, setFechasAparte] = useState(false);
 
   // ¿esta recepción completa toda la orden?
   const completaOrden = useMemo(() => {
@@ -118,6 +152,13 @@ export default function RegistrarFacturaPage() {
     () => articulo.reduce((s, l) => s + importeRecibir(l), 0),
     [articulo, recibir]
   );
+
+  // Setear "a recibir" acotado a [0, pendiente]: el campo de la tarjeta nunca
+  // deja teclear más de lo que la orden tiene pendiente.
+  const setQty = (l: { id: string }, n: number, pend: number) =>
+    setRecibir((r) => ({ ...r, [l.id]: String(Math.max(0, Math.min(n, pend))) }));
+  const recibirTodoPend = () => setRecibir(Object.fromEntries(articulo.map((l) => [l.id, String(ordenLineaPendiente(l))])));
+  const limpiarCant = () => setRecibir(Object.fromEntries(articulo.map((l) => [l.id, "0"])));
   // El flete ORIGINAL de la orden (el que puso proveeduría) va en la PRIMERA
   // factura, repartido entre los materiales que se reciben en esa entrega — no
   // espera a completar. En entregas siguientes ya está facturado: no se re-cobra
@@ -246,7 +287,7 @@ export default function RegistrarFacturaPage() {
         fechaFactura, fechaRecepcion, fechaRegistro, total: totalFactura, lineas,
       });
       // Líneas marcadas → notas de crédito (no bloquea el registro).
-      const nc = articulo.filter((l) => marcadas[l.id]).map((l) => ({ ordenLineaId: l.id, articuloNo: l.articuloId, descripcion: l.descripcion, motivo: marcadas[l.id].motivo, cantidad: Number(marcadas[l.id].cantidad) || 0, precioUnitario: Number(marcadas[l.id].precio) || 0 }));
+      const nc = articulo.filter((l) => marcadas[l.id]).map((l) => ({ ordenLineaId: l.id, articuloNo: l.articuloId, descripcion: l.descripcion, motivo: marcadas[l.id].motivo, cantidad: Number(marcadas[l.id].cantidad) || 0, precioUnitario: Number(marcadas[l.id].precio) || 0, nota: marcadas[l.id].nota || undefined }));
       if (nc.length) { try { await marcarNotasCredito(orden!.id, numeroOrden(orden!), orden!.proveedorNombre ?? prov?.nombre, nc); } catch { /* no bloquear */ } }
       const falloBc = aviso.includes("NO se pudo") || aviso.includes("no disponible");
       toast(`Factura ${numeroFactura} registrada${completaOrden ? " — orden completada" : " (parcial)"}${aviso}`, falloBc ? "info" : "success");
@@ -340,7 +381,7 @@ export default function RegistrarFacturaPage() {
         ordenId: orden!.id, numeroFactura: "", fechaFactura, fechaRecepcion, fechaRegistro,
         total: subtotalRecibido, lineas, facturaEnRevision: true,
       });
-      const nc = articulo.filter((l) => marcadas[l.id]).map((l) => ({ ordenLineaId: l.id, articuloNo: l.articuloId, descripcion: l.descripcion, motivo: marcadas[l.id].motivo, cantidad: Number(marcadas[l.id].cantidad) || 0, precioUnitario: Number(marcadas[l.id].precio) || 0 }));
+      const nc = articulo.filter((l) => marcadas[l.id]).map((l) => ({ ordenLineaId: l.id, articuloNo: l.articuloId, descripcion: l.descripcion, motivo: marcadas[l.id].motivo, cantidad: Number(marcadas[l.id].cantidad) || 0, precioUnitario: Number(marcadas[l.id].precio) || 0, nota: marcadas[l.id].nota || undefined }));
       if (nc.length) { try { await marcarNotasCredito(orden!.id, numeroOrden(orden!), orden!.proveedorNombre ?? prov?.nombre, nc); } catch { /* no bloquear */ } }
       const falloBc = aviso.includes("NO se pudo") || aviso.includes("no disponible");
       toast(`Material recibido — factura EN REVISIÓN${aviso}`, falloBc ? "info" : "success");
@@ -384,97 +425,161 @@ export default function RegistrarFacturaPage() {
             <Field label="N.º de factura del proveedor">
               <Input value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} placeholder="Ej. F-0099281" />
             </Field>
-            <Field label="Fecha de recepción en bodega">
-              <DateField value={fechaRecepcion} onChange={setFechaRecepcion} />
-            </Field>
             <Field label="Fecha de la factura">
-              <DateField value={fechaFactura} onChange={(v) => { setFechaFactura(v); setFechaRegistro(v); }} />
+              <DateField value={fechaFactura} onChange={(v) => { setFechaFactura(v); setFechaRegistro(v); setFechaRecepcion(v); }} />
             </Field>
-            <Field label="Fecha de registro (contable)"
-              warning={!fechasCoinciden}
-              help={fechasCoinciden ? "Coincide con la fecha de factura ✓" : "Debe coincidir con la fecha de factura para que cuadre con el estado de cuenta del proveedor."}>
-              <DateField value={fechaRegistro} onChange={setFechaRegistro} />
-            </Field>
+            {/* Una sola fecha: recepción y registro contable van iguales a la de la
+                factura, que es lo que corresponde el 99% de las veces (y es lo que
+                tiene que cuadrar con el estado de cuenta del proveedor). Las otras
+                dos se despliegan solo cuando de verdad hay que separarlas. */}
+            {!fechasAparte ? (
+              <div className="ds-body-sm ds-muted" style={{ gridColumn: "1 / -1", marginTop: -6 }}>
+                Se usa también como fecha de recepción en bodega y de registro contable.{" "}
+                <button type="button" className="link-btn" onClick={() => setFechasAparte(true)}>Poner otra fecha</button>
+              </div>
+            ) : <>
+              <Field label="Fecha de recepción en bodega">
+                <DateField value={fechaRecepcion} onChange={setFechaRecepcion} />
+              </Field>
+              <Field label="Fecha de registro (contable)"
+                warning={!fechasCoinciden}
+                help={fechasCoinciden ? "Coincide con la fecha de factura ✓" : "Debe coincidir con la fecha de factura para que cuadre con el estado de cuenta del proveedor."}>
+                <DateField value={fechaRegistro} onChange={setFechaRegistro} />
+              </Field>
+            </>}
           </div>
         </Card>
 
-        <Card className="mt-4" style={{ padding: 0, overflow: "hidden" }}>
-          <div className="row row--between" style={{ padding: "12px 16px", borderBottom: "1.5px solid var(--ds-color-gray-100)" }}>
-            <span className="ds-label ds-muted">{articulo.length} línea(s) de artículo</span>
-            <div className="row gap-3">
-              <button className="link-btn" title="Poner en 'a recibir' toda la cantidad pendiente de cada línea" onClick={() => setRecibir(Object.fromEntries(articulo.map((l) => [l.id, String(ordenLineaPendiente(l))])))}>Recibir todo lo pendiente</button>
-              <button className="link-btn" title="Dejar en 0 las cantidades a recibir" onClick={() => setRecibir(Object.fromEntries(articulo.map((l) => [l.id, "0"])))}>Limpiar cantidades</button>
-            </div>
+        {/* Lista de recepción: cada línea es una TARJETA con su campo de cantidad.
+            Bodega recibe en tablet/celular con la factura del proveedor en la mano;
+            la tabla de nueve columnas que había acá no se podía leer ahí. */}
+        <Card className="mt-4">
+          <div className="recv-head">
+            <span className="ds-label ds-muted">{articuloVisible.length} artículo(s) a recibir</span>
           </div>
-          <div className="ds-table-wrap" style={{ boxShadow: "none" }}>
-            <table className="ds-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 32 }}></th><th>Artículo</th><th className="hide-mobile">Almacén</th>
-                  <th className="ds-num hide-mobile">Ordenado</th><th className="ds-num hide-mobile">Ya recib.</th>
-                  <th className="ds-num">Pend.</th><th className="ds-num">A recibir</th>
-                  <th className="ds-num hide-mobile">Precio</th>
-                  <th className="ds-num hide-mobile">A facturar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {articulo.map((l) => {
-                  const pend = ordenLineaPendiente(l);
-                  const val = Number(recibir[l.id] || 0);
-                  const importe = importeRecibir(l);
-                  return (
-                    <tr key={l.id} className={pend > 0 && val < pend ? "row-pending" : ""}>
-                      <td className="ds-num"><input type="checkbox" className="ds-cbx" checked={pend > 0 && val >= pend} disabled={pend <= 0} title="Marcar recibido completo" onChange={(e) => setRecibir((r) => ({ ...r, [l.id]: e.target.checked ? String(pend) : "0" }))} /></td>
-                      <td>
-                        {l.descripcion}
-                        <div className="ds-body-sm ds-muted">
-                          {[l.pedidoNumero, l.proyecto && `Proy. ${l.proyecto}`, l.taskNo && `Tarea ${l.taskNo}`, l.descuentoPct ? `−${l.descuentoPct}%` : null].filter(Boolean).join(" · ")}
+          {articuloVisible.length > 0 && (
+            <div className="recv-head__actions">
+              <Button variant="green" size="sm" onClick={recibirTodoPend}>Recibir todo</Button>
+              <Button variant="outline" size="sm" onClick={limpiarCant}>Limpiar</Button>
+            </div>
+          )}
+          <div className="recv-list">
+            {articuloVisible.length === 0 && (
+              <div className="ds-body-sm ds-muted" style={{ padding: "6px 2px" }}>
+                Ya recibiste todos los artículos de esta orden.
+              </div>
+            )}
+            {articuloVisible.map((l) => {
+              const pend = ordenLineaPendiente(l);
+              const val = Number(recibir[l.id] || 0);
+              const full = pend > 0 && val >= pend;
+              const zero = pend > 0 && val <= 0;
+              const marcada = !!marcadas[l.id];
+              // Progreso de la línea (entregas parciales): lo ya recibido antes,
+              // lo que se recibe ahora y lo que quedaría pendiente.
+              const total = l.cantidad;
+              const recibidoAntes = l.cantidadRecibida ?? 0;
+              const pctDone = total > 0 ? (recibidoAntes / total) * 100 : 0;
+              const pctNow = total > 0 ? (Math.min(val, pend) / total) * 100 : 0;
+              const faltanDespues = Math.max(0, pend - val);
+              // Lo mismo que traía la segunda línea de la tabla: de qué solicitud
+              // viene, a qué obra/tarea va, el descuento y el almacén de entrada.
+              const meta = [l.pedidoNumero, l.almacen, l.proyecto && `Proy. ${l.proyecto}`,
+                l.taskNo && `Tarea ${l.taskNo}`, l.descuentoPct ? `−${l.descuentoPct}%` : null]
+                .filter(Boolean).join(" · ");
+              return (
+                <div key={l.id} className={`recv-card ${marcada ? "is-nc" : full ? "is-full" : zero ? "is-zero" : ""}`}>
+                  <div className="recv-card__row">
+                    <div className="recv-card__name">
+                      {l.descripcion}
+                      {/* El código del material, debajo del nombre: es con lo que
+                          Bodega confirma contra la factura que llegó justo ese
+                          material. Va pelado (lo guardado trae la variante pegada). */}
+                      {codigoDeItem(l.articuloId) && <div className="recv-card__code">{codigoDeItem(l.articuloId)}</div>}
+                      {meta && <div className="recv-card__code">{meta}</div>}
+                    </div>
+                    <button type="button" className={`kebab ${marcada ? "is-marked" : ""}`}
+                      aria-label="Más opciones" aria-haspopup="menu" aria-expanded={menuOpen === l.id}
+                      onClick={() => setMenuOpen(menuOpen === l.id ? null : l.id)}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden><circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" /></svg>
+                    </button>
+                    {menuOpen === l.id && (
+                      <>
+                        <div className="kebab__overlay" onClick={() => setMenuOpen(null)} />
+                        <div className="kebab-menu" role="menu">
+                          {pend > 0 && val < pend && (
+                            <button type="button" className="kebab-menu__item" role="menuitem" onClick={() => { setQty(l, pend, pend); setMenuOpen(null); }}>
+                              Recibir todo ({num.format(pend)})
+                            </button>
+                          )}
+                          {!marcada
+                            ? <button type="button" className="kebab-menu__item kebab-menu__item--nc" role="menuitem" onClick={() => abrirNc(l)}>Marcar nota de crédito</button>
+                            : <>
+                                <button type="button" className="kebab-menu__item" role="menuitem" onClick={() => abrirNc(l)}>Editar nota de crédito</button>
+                                <button type="button" className="kebab-menu__item kebab-menu__item--nc" role="menuitem" onClick={() => { quitarMarca(l.id); setMenuOpen(null); }}>Quitar nota de crédito</button>
+                              </>}
                         </div>
-                        {marcadas[l.id] ? (
-                          <div className="col gap-2" style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "color-mix(in srgb, var(--ds-color-red-100) 8%, var(--ds-tint-base))", border: "1.5px solid color-mix(in srgb, var(--ds-color-red-100) 30%, var(--ds-tint-base))" }}>
-                            <div className="row gap-2 wrap" style={{ alignItems: "center" }}>
-                              <span className="ds-body-sm ds-strong" style={{ color: "var(--ds-color-red-200)" }}>Nota de crédito:</span>
-                              <select className="ds-cell-input" value={marcadas[l.id].motivo} onChange={(e) => setMarca(l.id, { motivo: e.target.value as MotivoNC })} style={{ minWidth: 130 }}>
-                                {MOTIVO_NC.map((mo) => <option key={mo.v} value={mo.v}>{mo.label}</option>)}
-                              </select>
-                              <input className="ds-cell-input" type="number" min={0} style={{ width: 70 }} title="Cantidad afectada" value={marcadas[l.id].cantidad} onChange={(e) => setMarca(l.id, { cantidad: e.target.value })} placeholder="Cant." />
-                              <input className="ds-cell-input" type="number" min={0} style={{ width: 90 }} title="Precio unitario" value={marcadas[l.id].precio} onChange={(e) => setMarca(l.id, { precio: e.target.value })} placeholder="Precio unit." />
-                              <button type="button" className="link-btn" onClick={() => quitarMarca(l.id)}>Quitar</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button type="button" className="link-btn" style={{ marginTop: 4, color: "var(--ds-color-red-200)" }} onClick={() => marcarLinea(l)}>⚠ Marcar para nota de crédito</button>
-                        )}
-                      </td>
-                      <td className="ds-muted hide-mobile">{l.almacen}</td>
-                      <td className="ds-num hide-mobile">{num.format(l.cantidad)} {l.unidad}</td>
-                      <td className="ds-num hide-mobile">{num.format(l.cantidadRecibida)}</td>
-                      <td className="ds-num">{pend > 0 ? <span className="ds-pending-text">{num.format(pend)}</span> : "0"}</td>
-                      <td className="ds-num">
-                        <input className="ds-cell-input" type="number" min={0} max={pend} value={recibir[l.id] ?? ""} disabled={pend <= 0}
-                          title={pend <= 0 ? "Esta línea ya se recibió completa" : undefined}
-                          onChange={(e) => { const v = e.target.value; if (v === "") return setRecibir((r) => ({ ...r, [l.id]: "" })); const n = Math.max(0, Math.min(Number(v) || 0, pend)); setRecibir((r) => ({ ...r, [l.id]: String(n) })); }} />
-                      </td>
-                      <td className="ds-num ds-muted hide-mobile">{money(l.precioUnitario, orden.currencyCode)}</td>
-                      <td className="ds-num ds-strong hide-mobile">{money(importe || 0, orden.currencyCode)}</td>
-                    </tr>
-                  );
-                })}
-                {cargo && (
-                  <tr style={{ opacity: completaOrden ? 1 : 0.5 }}>
-                    <td></td>
-                    <td><Badge tone="yellow">Cargo</Badge> {cargo.descripcion}</td>
-                    <td className="ds-muted hide-mobile">{cargo.almacen}</td>
-                    <td className="ds-num hide-mobile">{num.format(cargo.cantidad)}</td>
-                    <td className="ds-num hide-mobile">{num.format(cargo.cantidadRecibida)}</td>
-                    <td className="ds-num">—</td>
-                    <td className="ds-num">{nadaRecibidoAun ? num.format(cargo.cantidad) : "—"}</td>
-                    <td className="ds-num ds-muted hide-mobile">{money(cargo.precioUnitario, orden.currencyCode)}</td>
-                    <td className="ds-num ds-strong hide-mobile">{money(fleteAplicado, orden.currencyCode)}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      </>
+                    )}
+                  </div>
+                  {marcada && (
+                    <button type="button" className="recv-nc-chip" onClick={() => abrirNc(l)} title="Editar nota de crédito">
+                      Nota de crédito · {MOTIVO_NC.find((mo) => mo.v === marcadas[l.id].motivo)?.label}
+                    </button>
+                  )}
+                  <div className="recv-card__row2">
+                    {/* El importe de la línea se recalcula con la cantidad que
+                        escribe Bodega (cantidad × precio − descuento): la misma
+                        cuenta que arma el subtotal de abajo. Antes solo se veía el
+                        precio unitario y había que multiplicar a mano contra la
+                        factura del proveedor. */}
+                    <div className="recv-card__money">
+                      <span className={`recv-card__linetot ${val > 0 ? "" : "is-zero"}`} title="Cantidad a recibir × precio (sin IVA)">
+                        {money(importeRecibir(l), orden.currencyCode)}
+                      </span>
+                      <span className="recv-card__price">
+                        {num.format(val)}{l.unidad ? ` ${l.unidad}` : ""} × <b>{money(l.precioUnitario, orden.currencyCode)}</b> c/u
+                        {l.descuentoPct ? ` · −${l.descuentoPct}%` : ""}
+                      </span>
+                    </div>
+                    <div className="qty-field">
+                      <input className={`qty-input ${val > 0 && pend > 0 ? "is-active" : ""}`} type="number" inputMode="numeric" min={0} max={pend}
+                        value={recibir[l.id] ?? ""} disabled={pend <= 0}
+                        aria-label={`Cantidad a recibir de ${l.descripcion}`}
+                        onChange={(e) => { const v = e.target.value; if (v === "") return setRecibir((r) => ({ ...r, [l.id]: "" })); setQty(l, Number(v) || 0, pend); }}
+                        onBlur={(e) => { if (e.target.value === "") setRecibir((r) => ({ ...r, [l.id]: "0" })); }} />
+                      {l.unidad && <span className="qty-field__unit">{l.unidad}</span>}
+                    </div>
+                  </div>
+                  <div className="recv-prog">
+                    <div className="recv-prog__bar" role="img"
+                      aria-label={`Recibido ${num.format(recibidoAntes)} de ${num.format(total)}${l.unidad ? " " + l.unidad : ""}`}>
+                      <span className="recv-prog__seg recv-prog__seg--done" style={{ width: `${pctDone}%` }} />
+                      <span className="recv-prog__seg recv-prog__seg--now" style={{ width: `${pctNow}%` }} />
+                    </div>
+                    <span className="recv-prog__lbl">
+                      {recibidoAntes > 0
+                        ? `Ya recibiste ${num.format(recibidoAntes)} de ${num.format(total)} ${l.unidad ?? ""}`.trim()
+                        : `Pedido ${num.format(total)} ${l.unidad ?? ""}`.trim()} ·{" "}
+                      {faltanDespues > 0
+                        ? <span className="recv-prog__falta">faltan {num.format(faltanDespues)} por recibir</span>
+                        : <span className="recv-prog__done">se completa ✓</span>}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            {cargo && (
+              <div className="recv-cargo" style={{ opacity: nadaRecibidoAun ? 1 : 0.6 }}>
+                <Badge tone="yellow">Cargo</Badge>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="ds-strong">{cargo.descripcion}</div>
+                  <div className="ds-body-sm ds-muted">
+                    {nadaRecibidoAun ? `Se factura en esta entrega · ${money(fleteAplicado, orden.currencyCode)}` : "Ya se facturó en la primera entrega"}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -556,6 +661,42 @@ export default function RegistrarFacturaPage() {
             <Button variant="red" onClick={registrar} disabled={!algoRecibido || !numeroFactura.trim() || guardando}>{guardando ? "Registrando…" : "Registrar factura"}</Button>
           </div>
         </div>
+
+        {ncModal && (
+          <Modal
+            title="Nota de crédito"
+            onClose={() => setNcModal(null)}
+            footer={<>
+              {marcadas[ncModal.lineId] && <Button variant="ghost" onClick={() => { quitarMarca(ncModal.lineId); setNcModal(null); }}>Quitar</Button>}
+              <Button variant="outline" onClick={() => setNcModal(null)}>Cancelar</Button>
+              <Button variant="green" onClick={guardarNc}>Guardar</Button>
+            </>}
+          >
+            <p className="ds-label ds-muted" style={{ margin: "0 0 4px" }}>Material</p>
+            <p className="ds-strong" style={{ margin: "0 0 16px" }}>{ncModal.descripcion}</p>
+            <Field label="Tipo de nota de crédito">
+              <Select value={ncModal.motivo} onChange={(e) => setNcModal((m) => m && { ...m, motivo: e.target.value as MotivoNC })}>
+                {MOTIVO_NC.map((mo) => <option key={mo.v} value={mo.v}>{mo.label}</option>)}
+              </Select>
+            </Field>
+            {ncModal.motivo === "precio_distinto" && (
+              <Field label="Precio con el que viene la factura (por unidad)">
+                <Input type="number" inputMode="decimal" min={0} value={ncModal.precio} placeholder="0"
+                  onChange={(e) => setNcModal((m) => m && { ...m, precio: e.target.value })} />
+              </Field>
+            )}
+            {ncModal.motivo !== "precio_distinto" && (
+              <Field label={ncModal.motivo === "menos_cantidad" ? "Cantidad que realmente llegó" : "Cantidad dañada"}>
+                <Input type="number" inputMode="numeric" min={0} value={ncModal.cantidad} placeholder="0"
+                  onChange={(e) => setNcModal((m) => m && { ...m, cantidad: e.target.value })} />
+              </Field>
+            )}
+            <Field label="Comentario (opcional)">
+              <Textarea rows={3} value={ncModal.nota} placeholder="Qué pasó con esta línea…"
+                onChange={(e) => setNcModal((m) => m && { ...m, nota: e.target.value })} />
+            </Field>
+          </Modal>
+        )}
 
         {preview && (
           <Modal

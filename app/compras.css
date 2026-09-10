@@ -1529,3 +1529,127 @@
   .oc-scope .ds-skeleton { animation: none; }
   .oc-scope .ds-reveal { animation: none; opacity: 1; transform: none; }
 }
+
+/* ============================================================
+   Recepción en bodega (tarjetas) — Adelante DS
+   Portado de la app de Proveeduría: Bodega recibe en tablet/celular, así que
+   la línea a recibir es una TARJETA con su campo de cantidad, no una fila de
+   tabla con nueve columnas.
+   ============================================================ */
+
+/* Estado vacío del DS: ícono en círculo + qué pasó + qué hacer. */
+.oc-scope .ds-empty { display: flex; flex-direction: column; align-items: center; gap: var(--ds-space-2); text-align: center; padding: var(--ds-space-10) var(--ds-space-5); color: var(--ds-color-gray-500); }
+.oc-scope .ds-empty__icon { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 50%; background: var(--ds-color-gray-100); color: var(--ds-color-gray-400); margin-bottom: var(--ds-space-1); }
+.oc-scope .ds-empty__title { font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-gray-500); }
+.oc-scope .ds-empty__hint { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); max-width: 48ch; line-height: 1.5; }
+
+/* Cabecera de la lista de recepción (contador + "recibir todo"/"limpiar"). */
+.oc-scope .recv-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-3); flex-wrap: wrap; margin-bottom: var(--ds-space-2); }
+.oc-scope .recv-head__actions { display: flex; gap: var(--ds-space-2); margin-bottom: var(--ds-space-4); }
+.oc-scope .recv-head__actions > .ds-btn { flex: 1; }
+
+.oc-scope .recv-list { display: flex; flex-direction: column; gap: var(--ds-space-2); }
+
+/* Tarjeta COMPACTA de línea: nombre + importe + selector de cantidad. Barra de
+   color a la izquierda con el estado (verde = se recibe todo · ámbar = en 0). */
+.oc-scope .recv-card {
+  position: relative;
+  border: 1.5px solid var(--ds-color-gray-200); border-left-width: 4px; border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface); padding: var(--ds-space-3) var(--ds-space-4);
+  display: flex; flex-direction: column; gap: var(--ds-space-2);
+  transition: border-color .14s ease;
+}
+.oc-scope .recv-card:not(.is-full):not(.is-zero):not(.is-nc) { border-left-color: var(--ds-color-gray-300); }
+.oc-scope .recv-card.is-full { border-left-color: var(--ds-color-green-100); }
+.oc-scope .recv-card.is-zero { border-left-color: var(--ds-color-yellow); }
+
+.oc-scope .recv-card__row { display: flex; align-items: flex-start; gap: var(--ds-space-2); }
+.oc-scope .recv-card__name { flex: 1; min-width: 0; font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-body-md); line-height: 1.25; }
+.oc-scope .recv-card__code { margin-top: 2px; font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-regular); color: var(--ds-color-gray-400); }
+.oc-scope .recv-card__row2 { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-3); }
+.oc-scope .recv-card__price { min-width: 0; font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
+.oc-scope .recv-card__price b { color: var(--ds-text); font-weight: var(--ds-font-weight-semibold); }
+/* El importe de la línea manda y el "15 UND × ₡3 659,86 c/u" queda de apoyo. */
+.oc-scope .recv-card__money { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.oc-scope .recv-card__linetot { font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold); color: var(--ds-text); line-height: 1.2; }
+.oc-scope .recv-card__linetot.is-zero { color: var(--ds-color-gray-400); }
+
+/* Campo de cantidad (pastilla): trae lo pendiente y nunca deja poner más. */
+.oc-scope .qty-field { display: inline-flex; align-items: center; gap: var(--ds-space-2); flex-shrink: 0; }
+.oc-scope .qty-field__unit { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
+.oc-scope .qty-input {
+  width: 76px; height: 48px; text-align: center; border-radius: 999px;
+  border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-surface); color: var(--ds-text);
+  font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold);
+  -moz-appearance: textfield; font-family: inherit;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.oc-scope .qty-input.is-active { border-color: var(--ds-color-green-100); }
+.oc-scope .qty-input:focus { outline: none; border-color: var(--ds-color-green-100); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-color-green-100) 22%, transparent); }
+.oc-scope .qty-input:disabled { opacity: .5; }
+.oc-scope .qty-input::-webkit-outer-spin-button, .oc-scope .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Nota de crédito: la línea marcada NO se expande (eso rompía la tarjeta en el
+   celular). Se edita en un POPUP y la tarjeta queda con acento rojo + un chip. */
+.oc-scope .recv-card.is-nc { border-left-color: var(--ds-color-red-200); }
+.oc-scope .recv-nc-chip {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 7px;
+  margin: -2px 0 2px; padding: 5px 10px; border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-color-red-100) 12%, var(--ds-tint-base));
+  color: var(--ds-color-red-200); font: inherit; font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold);
+  cursor: pointer; transition: background .12s ease;
+}
+.oc-scope .recv-nc-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ds-color-red-200); }
+.oc-scope .recv-nc-chip:hover { background: color-mix(in srgb, var(--ds-color-red-100) 20%, var(--ds-tint-base)); }
+
+/* Progreso por línea (entregas parciales): barra apilada (verde = ya recibido
+   antes · ámbar = lo que se recibe ahora) + "Pedido X · faltan Z". */
+.oc-scope .recv-prog { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; padding-top: 10px; border-top: 1px solid var(--ds-color-gray-100); }
+.oc-scope .recv-prog__bar { display: flex; height: 8px; border-radius: 999px; background: var(--ds-color-gray-100); overflow: hidden; }
+.oc-scope .recv-prog__seg { height: 100%; transition: width .18s ease; }
+.oc-scope .recv-prog__seg--done { background: var(--ds-color-green-100); }
+.oc-scope .recv-prog__seg--now { background: var(--ds-color-yellow); }
+.oc-scope .recv-prog__lbl { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
+.oc-scope .recv-prog__falta { color: var(--ds-color-red-200); font-weight: var(--ds-font-weight-semibold); }
+.oc-scope .recv-prog__done { color: var(--ds-color-green-200); font-weight: var(--ds-font-weight-semibold); }
+
+/* Kebab (⋮): acciones de la línea (recibir todo, nota de crédito). */
+.oc-scope .kebab {
+  flex-shrink: 0; width: 34px; height: 30px; margin: -4px -6px -4px 0;
+  border: 0; background: transparent; color: var(--ds-color-gray-400);
+  border-radius: var(--ds-radius-md); cursor: pointer; display: grid; place-items: center;
+  transition: background .12s ease, color .12s ease;
+}
+.oc-scope .kebab:hover { background: var(--ds-color-gray-100); color: var(--ds-text); }
+.oc-scope .kebab.is-marked { color: var(--ds-color-red-200); }
+.oc-scope .kebab__overlay { position: fixed; inset: 0; z-index: 40; }
+.oc-scope .kebab-menu {
+  position: absolute; top: 40px; right: var(--ds-space-3); z-index: 41; min-width: 210px;
+  background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-03-big); padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  animation: fade .12s ease;
+}
+.oc-scope .kebab-menu__item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 11px 12px; border: 0; background: transparent; border-radius: var(--ds-radius-md);
+  font: inherit; font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-text); cursor: pointer; transition: background .12s ease;
+}
+.oc-scope .kebab-menu__item:hover { background: var(--ds-color-gray-100); }
+.oc-scope .kebab-menu__item--nc { color: var(--ds-color-red-200); }
+.oc-scope .kebab-menu__item--nc:hover { background: color-mix(in srgb, var(--ds-color-red-100) 12%, transparent); }
+
+/* Flete/cargo de la orden, como tarjeta informativa dentro de la lista. */
+.oc-scope .recv-cargo { display: flex; align-items: center; gap: var(--ds-space-3); padding: var(--ds-space-3) var(--ds-space-4); border-radius: var(--ds-radius-lg); border: 1.5px dashed var(--ds-color-gray-200); }
+
+/* Móvil: objetivos táctiles grandes y botonera a ancho completo. */
+@media (max-width: 760px) {
+  .oc-scope .kebab { width: 44px; height: 44px; }
+  .oc-scope .recv-actions { width: 100%; }
+  .oc-scope .recv-actions > .ds-btn { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-scope .recv-prog__seg { transition: none; }
+  .oc-scope .kebab-menu { animation: none; }
+}

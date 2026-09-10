@@ -607,6 +607,22 @@ export function ordenRecibidoPct(o: Orden): number {
   return Math.round((rec / total) * 100);
 }
 
+// Cantidades para los anillos/barras de progreso (mismo criterio que el %: los
+// cargos —flete— no se reciben, así que no cuentan).
+export function ordenAvance(o: Orden): { recibida: number; total: number } {
+  const arts = o.lineas.filter((l) => l.tipo === "articulo");
+  return {
+    recibida: arts.reduce((s, l) => s + l.cantidadRecibida, 0),
+    total: arts.reduce((s, l) => s + l.cantidad, 0),
+  };
+}
+
+// Código del artículo PELADO: lo guardado puede traer la variante pegada
+// ("M14-0018 NEGRO") y lo que Bodega compara contra la factura es el código.
+export function codigoDeItem(itemNo: string | undefined): string {
+  return (itemNo ?? "").trim().split(/\s+/)[0] ?? "";
+}
+
 export function ordenEstaCompleta(o: Orden): boolean {
   return o.lineas.length > 0 && o.lineas.every(ordenLineaCompleta);
 }

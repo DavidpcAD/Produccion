@@ -215,6 +215,21 @@ export function ProgressBar({
   );
 }
 
+// ---------------------------------------------------------------- EmptyState
+// Estado vacío del DS: ícono en círculo + qué pasa + qué hacer. Reemplaza al
+// `<div className="empty">` pelado, que era un párrafo gris centrado.
+export function EmptyState({ icon, title, hint }: {
+  icon?: React.ReactNode; title: React.ReactNode; hint?: React.ReactNode;
+}) {
+  return (
+    <div className="ds-empty">
+      {icon && <span className="ds-empty__icon">{icon}</span>}
+      <p className="ds-empty__title">{title}</p>
+      {hint && <p className="ds-empty__hint">{hint}</p>}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Modal
 export function Modal({ title, onClose, children, footer, wide, full }: {
   title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; full?: boolean;
