@@ -43,7 +43,10 @@ type Row = { key: string; grupoKey: string; articuloId: string; variantCode?: st
 type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; variantCode?: string; variantNombre?: string; descripcion?: string; unidad?: string;
   // Tarea de la obra (consumo directo). Viaja al copiar/editar un pedido para no
   // perder la actividad; en las plantillas guardadas no existe.
-  taskNo?: string; taskDescr?: string };
+  taskNo?: string; taskDescr?: string;
+  // SUBCONTRATO: alcance (texto libre de la línea) y monto unitario. Solo llegan al
+  // copiar/editar un subcontrato; las plantillas guardadas no los tienen.
+  detalle?: string; monto?: number };
 type Plantilla = { id: number; nombre: string; tipo?: "general" | "bodega"; idClasificacion?: number | null; lineas: PlantillaLinea[]; creadoPor?: string };
 // Semilla para "Copiar pedido": abre el drawer ya cargado con las líneas de un
 // pedido existente. Las líneas usan el MISMO shape que una plantilla (code/obra/
@@ -59,6 +62,9 @@ export type NuevaSolicitudSeed = {
   consumo?: boolean;
   /** clasificación WBS del pedido (celda de la Matriz), para no perder el amarre. */
   idClasificacion?: number | null;
+  /** SUBCONTRATO: subcontratista y moneda, que viven en la ORDEN y no en el pedido. */
+  proveedorId?: string;
+  currency?: string;
   lineas: PlantillaLinea[];
 };
 
@@ -837,7 +843,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   /** Aviso al crear/enviar/guardar (la Matriz marca la celda con esto). */
   onGuardado?: (info: { numero: string; enviado: boolean }) => void;
 }) {
-  const { articulos, obras, almacenes, proveedores, usuario, addPedido, editPedido, setPedidoEstado, createOrden, setOrdenEstado } = useStore();
+  const { articulos, obras, almacenes, proveedores, usuario, addPedido, editPedido, editSubcontrato, setPedidoEstado, createOrden, setOrdenEstado } = useStore();
   const toast = useToast();
 
   // Catálogo REAL de Business Central (respaldo al store si BC no responde).
@@ -1206,7 +1212,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   );
   const itemsBuscador = esSub ? servicioItems : esActivoTipo ? activoItems : articuloItems;
   const provItems: Item[] = useMemo(() => catProv.map((p) => ({ id: p.id, title: p.nombre, sub: p.code })), [catProv]);
-  const provSel = catProv.find((p) => p.id === proveedorId);
+  // La ORDEN guarda el CÓDIGO del subcontratista (el `number` de BC) y el selector
+  // trabaja con el id (el GUID): al editar un subcontrato llega el código, así que se
+  // busca por las dos cosas. `provIdSel` es lo que el selector entiende como elegido.
+  const provSel = catProv.find((p) => p.id === proveedorId) ?? catProv.find((p) => p.code === proveedorId);
+  const provIdSel = provSel?.id ?? proveedorId;
   const destinoNombre = destinoItems.find((d) => d.id === destino)?.title ?? "";
   const obraNombreDe = (code: string) => catObras.find((o) => o.codigo === code)?.nombre ?? code;
 
@@ -1370,7 +1380,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       const vNombre = pl2.variantNombre || (variantePegada ? pl2.descripcion : undefined);
       // La unidad de la plantilla solo se respeta si trae algo: las de Bodega la
       // guardaron vacía, y ahí manda la del artículo de BC.
-      rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: vCode, variantNombre: vNombre, cantidad: pl2.cantidad || 1, unidad: (pl2.unidad ?? "").trim() || undefined, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined });
+      rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: vCode, variantNombre: vNombre, cantidad: pl2.cantidad || 1, unidad: (pl2.unidad ?? "").trim() || undefined, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined,
+        // Subcontrato: sin esto, editarlo perdía el alcance escrito y los montos.
+        detalle: pl2.detalle, monto: pl2.monto });
     }
     return { grupos: nuevosGrupos, rows, extras, bloqueadas };
   }
@@ -1432,6 +1444,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       if (t?.taskNo) { setTareaMaq(t.taskNo); setTareaMaqNombre(t.taskDescr ?? ""); }
     }
     if (s.almacen) setAlmacenSel(s.almacen);
+    // Subcontrato: el subcontratista y la moneda son de la orden, no del pedido.
+    if (s.tipo === "subcontrato") { cargarProveedores(); setProveedorId(s.proveedorId ?? ""); setCurrency(s.currency ?? ""); }
     if (s.tipo === "stock") setFTipoPl("bodega");
     if (s.prioridad) setPrioridad(s.prioridad);
     if (s.notas) setNotas(s.notas);
@@ -1782,13 +1796,26 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       close();
     } catch { toast("No se pudo guardar el borrador.", "error"); setSaving(false); }
   }
-  // Editar: mismo formulario, pero reemplaza las líneas del pedido existente. El
-  // repo lo rechaza si proveeduría ya ordenó algo (por eso Editar solo aparece en
-  // borrador/devuelto), así que el error se muestra tal cual viene.
+  // Editar: mismo formulario, pero reemplaza las líneas del pedido existente. Vale
+  // también con el pedido ya enviado a Proveeduría: el repo preserva las líneas que ya
+  // están en una orden de compra y solo reemplaza las libres (que son justamente las
+  // únicas que la pantalla manda en la semilla). El estado del pedido no se toca.
   async function guardarEdicion() {
     if (!editandoId || !canContinue || saving) return;
     setSaving(true);
     try {
+      // Subcontrato: el pedido y su ORDEN se corrigen juntos (los montos y el
+      // subcontratista viven en la orden) y vuelve a quedar pendiente de aprobación.
+      if (esSub) {
+        await editSubcontrato(editandoId, buildInput(), {
+          proveedorNo: provSel?.code ?? proveedorId, proveedorNombre: provSel?.nombre,
+          currencyCode: currency, montos: validLines.map((l) => l.monto ?? 0),
+        });
+        toast(`Subcontrato ${editar?.numero ?? ""} corregido · vuelve a aprobación`.trim(), "success");
+        onGuardado?.({ numero: editar?.numero ?? "", enviado: false });
+        close();
+        return;
+      }
       await editPedido(editandoId, buildInput());
       toast(`Pedido ${editar?.numero ?? ""} actualizado`.trim(), "success");
       onGuardado?.({ numero: editar?.numero ?? "", enviado: false });
@@ -1885,7 +1912,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                     <span className="ds-form-field__label">Subcontratista</span>
                     <div className="row gap-3 wrap">
                       <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-                        <Dropdown placeholder="Buscar proveedor…" items={provItems} value={proveedorId} onPick={elegirProveedor} />
+                        <Dropdown placeholder="Buscar proveedor…" items={provItems} value={provIdSel} onPick={elegirProveedor} />
                       </div>
                       <Segmented size="sm" value={currency || "CRC"} options={[{ v: "CRC", label: "CRC" }, { v: "USD", label: "USD" }]}
                         onChange={(v: string) => setCurrency(v === "CRC" ? "" : v)} />

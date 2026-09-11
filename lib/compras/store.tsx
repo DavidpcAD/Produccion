@@ -78,6 +78,10 @@ interface StoreShape {
 
   addPedido: (input: NewPedidoInput) => Promise<Pedido>;
   editPedido: (id: string, input: NewPedidoInput) => Promise<void>;
+  /** SUBCONTRATO: el pedido y su orden se corrigen juntos — el proveedor, la moneda y
+   *  los MONTOS viven en la orden, no en la tabla del pedido. Vuelve a quedar pendiente
+   *  de aprobación. Solo mientras la orden no se haya lanzado a BC. */
+  editSubcontrato: (id: string, input: NewPedidoInput, orden: { proveedorNo: string; proveedorNombre?: string; currencyCode: string; montos: number[] }) => Promise<void>;
   updatePedido: (p: Pedido) => void;
   setPedidoEstado: (id: string, estado: Pedido["estado"]) => Promise<void>;
   deletePedido: (id: string) => Promise<void>;
@@ -376,6 +380,48 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
               ...input.lineas.map((l) => ({ ...l, id: uid(), cantidadOrdenada: 0 })),
             ],
           } : x)),
+          movimientos: [mov, ...d.movimientos],
+        };
+      });
+    };
+
+    // Subcontrato: pedido + orden en una sola llamada (el servidor los rehace en una
+    // transacción). `montos[i]` es el monto de `input.lineas[i]`.
+    const editSubcontrato: StoreShape["editSubcontrato"] = async (id, input, orden) => {
+      if (USE_API) {
+        await api.putSubcontrato(id, {
+          obra: input.obraCodigo, obraNombre: input.obraNombre, prioridad: input.prioridad,
+          notas: input.notas, usuario: persona, rol: rolActual,
+          proveedorNo: orden.proveedorNo, proveedorNombre: orden.proveedorNombre, currencyCode: orden.currencyCode,
+          lineas: input.lineas.map((l, i) => ({
+            itemNo: l.articuloId, descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad,
+            obra: l.obraCodigo, taskNo: l.taskNo, taskDescr: l.taskDescr, monto: orden.montos[i] ?? 0,
+          })),
+        });
+        await refreshFromApi();
+        return;
+      }
+      setData((d) => {
+        const prev = d.pedidos.find((x) => x.id === id);
+        const lineas = input.lineas.map((l) => ({ ...l, id: uid(), cantidadOrdenada: l.cantidad, enOrden: true }));
+        const oc = d.ordenes.find((o) => o.lineas.some((ol) => prev?.lineas.some((pl) => pl.id === ol.pedidoLineaId)));
+        const mov = mkMov({ entidad: "pedido", idEntidad: id, documentoNo: prev?.numero ?? "", tipoMovimiento: "editado", detalle: `${lineas.length} servicio(s) · ${orden.proveedorNombre ?? orden.proveedorNo}` });
+        return {
+          ...d,
+          pedidos: d.pedidos.map((x) => (x.id === id ? {
+            ...x, obraCodigo: input.obraCodigo, obraNombre: input.obraNombre,
+            prioridad: input.prioridad, notas: input.notas, estado: "en_orden" as Pedido["estado"], lineas,
+          } : x)),
+          ordenes: oc ? d.ordenes.map((o) => (o.id === oc.id ? {
+            ...o, proveedorNo: orden.proveedorNo, proveedorNombre: orden.proveedorNombre,
+            currencyCode: orden.currencyCode, estado: "pendiente_aprobacion" as Orden["estado"],
+            lineas: lineas.map((l, i) => ({
+              id: uid(), tipo: "articulo" as const, articuloId: l.articuloId, pedidoLineaId: l.id, pedidoNumero: prev?.numero,
+              descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad, almacen: "",
+              precioUnitario: orden.montos[i] ?? 0, ivaPct: 13, proyecto: l.obraCodigo, taskNo: l.taskNo,
+              cantidadRecibida: 0, cantidadFacturada: 0,
+            })),
+          } : o)) : d.ordenes,
           movimientos: [mov, ...d.movimientos],
         };
       });
@@ -729,7 +775,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       proveedores: seed.proveedores, articulos: seed.articulos, obras: seed.obras,
       maquinas: seed.maquinas, almacenes: seed.almacenes,
       pedidos: data.pedidos, ordenes: data.ordenes, recepciones: data.recepciones, movimientos: data.movimientos,
-      addPedido, editPedido, updatePedido, setPedidoEstado, deletePedido,
+      addPedido, editPedido, editSubcontrato, updatePedido, setPedidoEstado, deletePedido,
       createOrden, updateOrden, setOrdenEstado, sincronizarBc, bcEstados, registrarRecepcion, facturarRecepcion, devolverPedido, devolverLineasPedido, devolverOrden, reset,
       notasCredito, marcarNotasCredito, cargarNotasCredito,
       notificaciones: data.notificaciones, marcarNotifsLeidas, marcarNotifLeida,

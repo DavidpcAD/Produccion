@@ -44,6 +44,9 @@ export const api = {
     fetch(`/api/compras/pedidos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
   deletePedido: (id: string, body: unknown) =>
     fetch(`/api/compras/pedidos/${id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+  /** Subcontrato: pedido + orden se corrigen juntos (los montos viven en la orden). */
+  putSubcontrato: (id: string, body: unknown) =>
+    fetch(`/api/compras/pedidos/${id}/subcontrato`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
 
   createOrden: (body: unknown): Promise<{ idOrdenCompra: number }> =>
     fetch("/api/compras/ordenes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),

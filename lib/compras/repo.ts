@@ -287,6 +287,139 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
   }
 }
 
+/** Editar un SUBCONTRATO: pedido + su orden de compra a la vez.
+ *
+ *  Un subcontrato no se puede editar como los demás pedidos porque nace con su orden
+ *  pegada: las líneas del pedido están referenciadas por OrdenCompraDet (ahí viven el
+ *  proveedor y los MONTOS, que la tabla del pedido no tiene). Corregirlo es rehacer las
+ *  dos cosas juntas, y por eso va en una sola transacción.
+ *
+ *  Solo mientras la orden NO se haya lanzado a Business Central: en cuanto existe allá
+ *  —o alguien recibió/facturó— lo que manda es BC y esto rebotaría en silencio.
+ */
+export interface EditSubcontratoDB {
+  id: number;
+  obra?: string; obraNombre?: string; prioridad: string; notas?: string;
+  usuario: string; rol: Role;
+  proveedorNo: string; proveedorNombre?: string; currencyCode: string;
+  lineas: {
+    itemNo: string; descripcion: string; cantidad: number; unidad: string;
+    obra?: string; taskNo?: string; taskDescr?: string;
+    /** monto global del servicio: viaja como precio unitario de la línea de la orden. */
+    monto: number;
+  }[];
+}
+
+export async function updateSubcontrato(input: EditSubcontratoDB): Promise<void> {
+  await ensureEstados();
+  const pool = await getPool();
+  const idPendiente = await idDeEstado("pendiente_aprobacion");
+  const idEnOrden = await idDeEstado("en_orden");
+
+  // La orden del subcontrato: la que referencia sus líneas y sigue viva.
+  const oq = await pool.request().input("id", sql.Int, input.id).query(
+    `SELECT TOP 1 oc.idOrdenCompra, oc.ordenNo, oc.bcNo, oc.idEstado,
+            (SELECT ISNULL(SUM(od2.quantityRecibida + od2.quantityFacturada), 0)
+               FROM dbo.OrdenCompraDet od2 WHERE od2.idOrdenCompra = oc.idOrdenCompra) AS movido
+       FROM dbo.OrdenCompra oc
+       JOIN dbo.OrdenCompraDet od ON od.idOrdenCompra = oc.idOrdenCompra
+       JOIN dbo.PedidoCompraDet d ON d.idPedidoCompraDet = od.idPedidoCompraDet
+      WHERE d.idPedidoCompra = @id AND oc.esEliminada = 0`);
+  const orden = oq.recordset[0];
+  if (!orden) throw new Error("El subcontrato no tiene orden de compra: no hay nada que editar acá.");
+  if (orden.bcNo) throw new Error(`La orden ${orden.ordenNo} ya existe en Business Central (${orden.bcNo}): corregila allá.`);
+  const estadoOrden = codigoDeId(orden.idEstado);
+  if (estadoOrden === "lanzado" || estadoOrden === "completado") throw new Error(`La orden ${orden.ordenNo} ya está ${estadoOrden}: no se puede editar.`);
+  if (Number(orden.movido ?? 0) > 0) throw new Error(`La orden ${orden.ordenNo} ya tiene recepción o factura: no se puede editar.`);
+
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    const chk = await new sql.Request(tx).input("id", sql.Int, input.id).query(
+      "SELECT pedidoNo FROM dbo.PedidoCompra WHERE idPedidoCompra=@id AND esEliminada=0");
+    const pedidoNo = chk.recordset[0]?.pedidoNo as string | undefined;
+    if (!pedidoNo) throw new Error("Pedido no encontrado");
+
+    await new sql.Request(tx)
+      .input("id", sql.Int, input.id)
+      .input("obra", sql.NVarChar(50), input.obra ?? null)
+      .input("proyecto", sql.NVarChar(150), input.obraNombre ?? null)
+      .input("prioridad", sql.NVarChar(20), input.prioridad)
+      .input("notaCreador", sql.NVarChar(500), input.notas ?? null)
+      .input("modificadoPor", sql.NVarChar(100), input.usuario)
+      .query(`UPDATE dbo.PedidoCompra SET obra=@obra, proyecto=@proyecto, prioridad=@prioridad,
+              notaCreador=@notaCreador, fechaModificacion=getdate(), modificadoPor=@modificadoPor
+              WHERE idPedidoCompra=@id`);
+
+    // Primero las líneas de la ORDEN (son las que sujetan a las del pedido con su FK),
+    // después las del pedido. Recién ahí se pueden reinsertar las dos tandas.
+    await new sql.Request(tx).input("o", sql.Int, orden.idOrdenCompra)
+      .query("DELETE FROM dbo.OrdenCompraDet WHERE idOrdenCompra=@o");
+    await new sql.Request(tx).input("id", sql.Int, input.id)
+      .query("DELETE FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@id");
+
+    await new sql.Request(tx)
+      .input("o", sql.Int, orden.idOrdenCompra)
+      .input("proveedorNo", sql.NVarChar(20), input.proveedorNo)
+      .input("proveedorNombre", sql.NVarChar(150), input.proveedorNombre ?? null)
+      .input("currencyCode", sql.NVarChar(10), input.currencyCode || null)
+      .input("e", sql.Int, idPendiente)
+      .input("u", sql.NVarChar(100), input.usuario)
+      .query(`UPDATE dbo.OrdenCompra SET proveedorNo=@proveedorNo, proveedorNombre=@proveedorNombre,
+              currencyCode=@currencyCode, idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u
+              WHERE idOrdenCompra=@o`);
+
+    let line = 10000;
+    for (const l of input.lineas) {
+      const det = await new sql.Request(tx)
+        .input("idPedidoCompra", sql.Int, input.id)
+        .input("lineNum", sql.Int, line)
+        .input("descripcion", sql.NVarChar(250), l.descripcion)
+        .input("itemNo", sql.NVarChar(50), l.itemNo)
+        // El servicio no entra a inventario: el "almacén" de la línea del subcontrato es
+        // la obra, igual que cuando se crea (ver crearOrdenSubcontrato en el panel).
+        .input("locationCode", sql.NVarChar(20), l.obra ?? "")
+        .input("unitOfMeasureCode", sql.NVarChar(20), l.unidad)
+        .input("obra", sql.NVarChar(50), l.obra ?? null)
+        .input("quantitySolicitado", sql.Decimal(18, 4), l.cantidad)
+        .input("taskNo", sql.NVarChar(15), l.taskNo ?? null)
+        .input("taskDescr", sql.NVarChar(150), l.taskDescr ?? null)
+        .input("creadoPor", sql.NVarChar(100), input.usuario)
+        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,unitOfMeasureCode,locationCode,obra,quantitySolicitado,quantityOrdenado,taskNo,taskDescr,fechaCreacion,creadoPor)
+                OUTPUT INSERTED.idPedidoCompraDet
+                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@unitOfMeasureCode,@locationCode,@obra,@quantitySolicitado,@quantitySolicitado,@taskNo,@taskDescr,getdate(),@creadoPor)`);
+      const idDet = det.recordset[0].idPedidoCompraDet as number;
+      await new sql.Request(tx)
+        .input("idOrdenCompra", sql.Int, orden.idOrdenCompra)
+        .input("idPedidoCompraDet", sql.Int, idDet)
+        .input("lineNum", sql.Int, line)
+        .input("descripcion", sql.NVarChar(250), l.descripcion)
+        .input("itemNo", sql.NVarChar(50), l.itemNo)
+        .input("unitOfMeasureCode", sql.NVarChar(20), l.unidad)
+        .input("quantity", sql.Decimal(18, 4), l.cantidad)
+        .input("directUnitCost", sql.Decimal(18, 4), l.monto)
+        .input("jobNo", sql.NVarChar(20), l.obra ?? null)
+        .input("taskNo", sql.NVarChar(15), l.taskNo ?? null)
+        .input("creadoPor", sql.NVarChar(100), input.usuario)
+        .query(`INSERT dbo.OrdenCompraDet (idOrdenCompra,idPedidoCompraDet,lineNum,tipoLinea,descripcion,itemNo,unitOfMeasureCode,locationCode,quantity,quantityRecibida,quantityFacturada,directUnitCost,vatPct,lineDiscountPct,jobNo,taskNo,fechaCreacion,creadoPor)
+                VALUES (@idOrdenCompra,@idPedidoCompraDet,@lineNum,'articulo',@descripcion,@itemNo,@unitOfMeasureCode,'',@quantity,0,0,@directUnitCost,13,0,@jobNo,@taskNo,getdate(),@creadoPor)`);
+      line += 10000;
+    }
+
+    // El subcontrato queda como nació: todo ordenado y esperando aprobación.
+    await new sql.Request(tx).input("id", sql.Int, input.id).input("e", sql.Int, idEnOrden)
+      .query("UPDATE dbo.PedidoCompra SET idEstado=@e, fechaModificacion=getdate() WHERE idPedidoCompra=@id");
+
+    const detalle = `${input.lineas.length} servicio(s) · ${input.proveedorNombre ?? input.proveedorNo}`;
+    await logMov(tx, { entidad: "pedido", idEntidad: input.id, documentoNo: pedidoNo, tipoMovimiento: "editado", detalle, usuario: input.usuario, rol: input.rol });
+    await logMov(tx, { entidad: "orden", idEntidad: Number(orden.idOrdenCompra), documentoNo: orden.ordenNo ?? "", tipoMovimiento: "editado", estadoAnterior: estadoOrden, estadoNuevo: "pendiente_aprobacion", detalle: `Subcontrato ${pedidoNo} corregido · ${detalle}`, usuario: input.usuario, rol: input.rol });
+    await tx.commit();
+  } catch (e) {
+    await tx.rollback();
+    throw e;
+  }
+}
+
 export async function devolverLineasPedido(id: number, lineaIds: number[], motivo: string, usuario: string, rol: Role): Promise<void> {
   await ensureEstados();
   const pool = await getPool();

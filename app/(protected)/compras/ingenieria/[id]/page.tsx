@@ -37,6 +37,13 @@ export default function PedidoDetallePage() {
   // SUBCONTRATO: el proveedor y los montos viven en la orden que se creó junto con la
   // solicitud (la tabla del pedido no tiene precio).
   const esSub = esSubcontrato(pedido);
+  // Líneas que TODAVÍA se pueden tocar: sin nada ordenado y sin orden de compra viva.
+  // Mientras quede alguna, el pedido se puede corregir aunque ya esté en Proveeduría
+  // (el repo preserva las que sí tienen orden y solo reemplaza estas). Antes había que
+  // devolverlo a borrador para editarlo, y si Proveeduría ya había ordenado una línea
+  // no había forma de arreglar el resto.
+  const lineasEditables = pedido.lineas.filter((l) => l.cantidadOrdenada === 0 && !l.enOrden);
+  const esBorrador = pedido.estado === "borrador" || pedido.estado === "devuelto";
   // Consumo directo: el material no entra al inventario, se consume contra la obra Y su
   // ACTIVIDAD (Job Task) en BC. La tarea la eligió el ingeniero al crear el pedido, así
   // que la tabla la muestra: sin ella no se ve contra qué se va a consumir. Si el pedido
@@ -45,16 +52,35 @@ export default function PedidoDetallePage() {
   const ordenSub = esSub ? ordenesDePedido(ordenes, pedido)[0] : undefined;
   const monedaSub = ordenSub?.currencyCode ?? "";
   const totalSub = esSub ? pedido.lineas.reduce((t, l) => t + montoDeLineaSubcontrato(ordenes, l.id), 0) : 0;
+  // Precio UNITARIO de la línea en la orden (lo que se teclea en el panel). Ojo:
+  // `montoDeLineaSubcontrato` devuelve el total de la línea (cantidad × precio).
+  const precioSub = (pedidoLineaId: string) => ordenSub?.lineas.find((ol) => ol.pedidoLineaId === pedidoLineaId)?.precioUnitario ?? 0;
+  // Un SUBCONTRATO se edita mientras su orden siga siendo de esta app: sin pedido en
+  // Business Central, sin lanzar y sin que nadie haya recibido o facturado. Después
+  // manda BC y tocarlo acá no cambiaría nada allá.
+  const subEditable = !!ordenSub && !ordenSub.bcNumber
+    && ordenSub.estado !== "lanzado" && ordenSub.estado !== "completado"
+    && ordenSub.lineas.every((l) => !l.cantidadRecibida && !l.cantidadFacturada);
+  // Material / stock / repuesto / activo: se edita mientras quede alguna línea libre.
+  const editable = pedido.estado !== "cerrado" && (esSub ? subEditable : lineasEditables.length > 0);
+  // Ya salió de Ingeniería (está en la cola de Proveeduría / de Aprobación) pero
+  // todavía se puede tocar.
+  const editableEnviado = editable && !esBorrador;
 
   // Semilla del pedido: la usa "Copiar" (crea uno nuevo con las mismas líneas) y
   // "Editar" (el MISMO drawer, guardando sobre este pedido). La pantalla completa
   // vieja ya no existe.
   const lineaASeed = (l: (typeof pedido.lineas)[number]) => ({
     code: l.articuloId, cantidad: l.cantidad,
-    obraCodigo: pedido.tipoSolicitud === "material" ? (obraDeLinea(l, pedido) || undefined) : undefined,
+    obraCodigo: (pedido.tipoSolicitud === "material" || esSub) ? (obraDeLinea(l, pedido) || undefined) : undefined,
     variantCode: l.variantCode, descripcion: l.descripcion, unidad: l.unidad,
     // La actividad (tarea) del consumo directo viaja con la línea.
     taskNo: l.taskNo, taskDescr: l.taskDescr,
+    // SUBCONTRATO: el alcance escrito (que es la descripción de la línea) y el monto
+    // unitario, que vive en la orden. Sin esto el panel abría el subcontrato vacío de
+    // plata y el ingeniero tenía que volver a teclear todo.
+    detalle: esSub ? l.descripcion : undefined,
+    monto: esSub ? precioSub(l.id) : undefined,
   });
   const seedBase = {
     tipo: pedido.tipoSolicitud,
@@ -66,6 +92,9 @@ export default function PedidoDetallePage() {
     // Almacén elegido (tag ALM / pedido de Stock): se copia tal cual.
     almacen: pedido.lineas.find((l) => !!l.almacen && !l.taskNo)?.almacen || undefined,
     idClasificacion: pedido.idClasificacion ?? null,
+    // Subcontrato: subcontratista y moneda son de la orden.
+    proveedorId: ordenSub?.proveedorNo ?? ordenSub?.proveedorId,
+    currency: ordenSub?.currencyCode,
   };
   // "Copiar" arranca un pedido nuevo: lleva TODAS las líneas, incluidas las que ya
   // tienen orden de compra (son solo la semilla de un pedido distinto).
@@ -73,7 +102,11 @@ export default function PedidoDetallePage() {
   // "Editar" sigue siendo ESTE pedido: las líneas con orden de compra quedan
   // bloqueadas (el repo las preserva tal cual) y no se ofrecen para editar; solo
   // entran las que faltan por ordenar (pendientes o devueltas por Proveeduría).
-  const seedEdicion: NuevaSolicitudSeed = { ...seedBase, lineas: pedido.lineas.filter((l) => l.cantidadOrdenada === 0 && !l.enOrden).map(lineaASeed) };
+  // El SUBCONTRATO es la excepción: todas sus líneas están en la orden desde que nace,
+  // así que se editan todas juntas (pedido + orden se rehacen a la vez).
+  const seedEdicion: NuevaSolicitudSeed = esSub
+    ? { ...seedBase, lineas: pedido.lineas.map(lineaASeed) }
+    : { ...seedBase, lineas: pedido.lineas.filter((l) => l.cantidadOrdenada === 0 && !l.enOrden).map(lineaASeed) };
 
   return (
     <AppShell role="ingenieria">
@@ -119,31 +152,39 @@ export default function PedidoDetallePage() {
                 </Button>
               </>
             )}
-            {!esSub && (pedido.estado === "borrador" || pedido.estado === "devuelto") && (
-              <>
-                <Button variant="outline" onClick={async () => { await deletePedido(pedido.id); toast("Pedido eliminado"); router.push("/compras/ingenieria"); }}>
-                  Eliminar
-                </Button>
-                <Button variant="outline" onClick={() => setEditarOpen(true)}>
-                  Editar
-                </Button>
-                <Button onClick={async () => { await setPedidoEstado(pedido.id, "aprobado"); toast(`${pedido.numero} enviado a proveeduría`, "success"); }}>
-                  Enviar a proveeduría
-                </Button>
-              </>
+            {!esSub && esBorrador && (
+              <Button variant="outline" onClick={async () => { await deletePedido(pedido.id); toast("Pedido eliminado"); router.push("/compras/ingenieria"); }}>
+                Eliminar
+              </Button>
             )}
+            {/* Volver a borrador = sacarlo de la cola de Proveeduría. Solo tiene sentido
+                mientras nadie lo haya tocado: con algo ordenado o devuelto, el camino es
+                editar las líneas que siguen libres. */}
             {pedido.estado === "aprobado" && !ordenado && !hayLineasDevueltas && (
               <Button variant="outline" onClick={async () => { await setPedidoEstado(pedido.id, "borrador"); toast("Pedido reabierto como borrador"); }}>
                 Volver a borrador
               </Button>
             )}
-            {!esSub && pedido.estado === "aprobado" && hayLineasDevueltas && (
+            {/* Editar vale también con el pedido YA enviado: el editor solo ofrece las
+                líneas que Proveeduría todavía no ordenó. */}
+            {editable && (
               <Button variant="outline" onClick={() => setEditarOpen(true)}>
-                Corregir línea(s) devuelta(s)
+                {hayLineasDevueltas ? "Corregir línea(s) devuelta(s)" : "Editar"}
               </Button>
             )}
-            {pedido.estado === "aprobado" && ordenado && !hayLineasDevueltas && (
-              <span className="ds-muted ds-label" style={{ alignSelf: "center" }}>Proveeduría ya generó orden de compra · no editable</span>
+            {!esSub && esBorrador && (
+              <Button onClick={async () => { await setPedidoEstado(pedido.id, "aprobado"); toast(`${pedido.numero} enviado a proveeduría`, "success"); }}>
+                Enviar a proveeduría
+              </Button>
+            )}
+            {!esBorrador && !editable && (
+              <span className="ds-muted ds-label" style={{ alignSelf: "center" }}>
+                {esSub
+                  ? (ordenSub?.bcNumber
+                      ? `La orden ya existe en Business Central (${ordenSub.bcNumber}) · se corrige allá`
+                      : "La orden ya se lanzó o se recibió · no editable")
+                  : "Proveeduría ya generó orden de compra · no editable"}
+              </span>
             )}
           </div>
         </div>
@@ -261,6 +302,16 @@ export default function PedidoDetallePage() {
         {!esSub && pedido.estado === "aprobado" && !ordenado && (
           <p className="ds-muted ds-label mt-4">Este pedido está aprobado. Proveeduría puede convertirlo en una orden de compra.</p>
         )}
+        {/* Ya enviado pero todavía corregible: hay que decir qué se puede tocar, porque
+            el editor abre solo con las líneas libres y si no se entiende parece que
+            "se perdieron" las que ya están en una orden. */}
+        {!esSub && editableEnviado && !hayLineasDevueltas && (
+          <p className="ds-muted ds-label mt-2">
+            {ordenado
+              ? <>Proveeduría ya ordenó parte del pedido: esas líneas quedan fijas. Con «Editar» podés corregir {lineasEditables.length === 1 ? "la línea que falta" : `las ${lineasEditables.length} líneas que faltan`}.</>
+              : <>Mientras Proveeduría no lo ordene podés corregirlo con «Editar» — sigue en su cola, no hay que volver a enviarlo.</>}
+          </p>
+        )}
         {esSub && ordenSub && (
           <p className="ds-muted ds-label mt-4">
             {ordenSub.estado === "pendiente_aprobacion"
@@ -268,6 +319,11 @@ export default function PedidoDetallePage() {
               : ordenSub.estado === "rechazado"
                 ? <>Orden <strong>{numeroOrden(ordenSub)}</strong> rechazada{ordenSub.motivoRechazo ? `: ${ordenSub.motivoRechazo}` : ""}.</>
                 : <>Orden <strong>{numeroOrden(ordenSub)}</strong>. Falta recibir la factura del servicio.</>}
+          </p>
+        )}
+        {esSub && editableEnviado && (
+          <p className="ds-muted ds-label mt-2">
+            Podés corregirlo con «Editar» (alcance, montos o subcontratista) mientras no se apruebe: al guardar vuelve a quedar pendiente de aprobación.
           </p>
         )}
 
