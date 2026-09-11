@@ -1352,9 +1352,23 @@ export async function bcQuitarObraDeLineas(
   // pre-vuelo de "obra sin tarea" tampoco concluye si no puede leer), pero se avisa.
   if (!enBc) return { limpiadas: [], pendientes: [], error: `no se pudieron leer las líneas de ${orderNo} en BC para quitarles la obra` };
 
-  // Línea sucia = tiene proyecto/tarea, o su centro de costo ES la obra de la solicitud.
+  // El centro de costo que ese almacén EXIGE. Si la línea ya lo tiene, está bien y no
+  // hay nada que corregir — aunque ese texto coincida con la "obra" de la solicitud.
+  // Pasa de verdad: casi todos los almacenes tienen CC = su propio código (ALM-SSO →
+  // ALM-SSO, MAQ → MAQ…, solo ALM-GRAL/ALM-BAR van a INV), así que una solicitud de
+  // material que eligió el ALMACÉN como obra caía en el "el CC es la obra" con el CC
+  // correcto puesto. Y el último recurso de abajo le escribía ese mismo valor, o sea
+  // que la orden no se podía lanzar ni arreglándola a mano en BC (CP-005480).
+  const ccExigido = ccPorAlmacenDeEnv();
+  const ccEsElDelAlmacen = (linea: LineaJobBc) => {
+    const exige = ccExigido.get(claveBc(linea.locationCode || ""));
+    return !!exige && claveBc(linea.cc) === claveBc(exige);
+  };
+  // Línea sucia = tiene proyecto/tarea, o su centro de costo ES la obra de la solicitud
+  // (y no es, a la vez, el que el almacén exige).
   const sucia = (linea: LineaJobBc, obra?: string) =>
-    !!(linea.jobNo || linea.jobTaskNo) || !!(obra && claveBc(linea.cc) === claveBc(obra));
+    !!(linea.jobNo || linea.jobTaskNo)
+    || (!ccEsElDelAlmacen(linea) && !!(obra && claveBc(linea.cc) === claveBc(obra)));
   const conObra = emparejarLineasBc(enBc, items).filter(({ linea, quiere }) => sucia(linea, quiere.obra));
   if (!conObra.length) return { limpiadas: [], pendientes: [] };
   const fallo = (motivo: string) => conObra.map(({ linea }) => ({ lineNo: linea.lineNo, itemNo: linea.itemNo, motivo }));
@@ -1391,7 +1405,8 @@ export async function bcQuitarObraDeLineas(
   // todavía es la obra — que es el caso de Proveeduría: escribe la DIMENSIÓN directo y
   // sin proyecto (CP-005377), y ahí soltar el proyecto no cambia nada porque no hay.
   const malProyecto = (d?: LineaJobBc) => !!(d && (d.jobNo || d.jobTaskNo));
-  const malCC = (d: LineaJobBc | undefined, obra?: string) => !!(d && obra && claveBc(d.cc) === claveBc(obra));
+  const malCC = (d: LineaJobBc | undefined, obra?: string) =>
+    !!(d && obra && !ccEsElDelAlmacen(d) && claveBc(d.cc) === claveBc(obra));
 
   // ÚLTIMO RECURSO: a las que quedaron con el centro de costo de la obra se les escribe
   // el que ese almacén exige, deducido de los propios pedidos de BC (ver
