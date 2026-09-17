@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { cookies } from 'next/headers';
-import { getRolesDeUsuario } from './users';
+import { cargarSesion } from './sesiones';
 import { computeNivelAdmin, computeAllowedModules, rolLabelDeUsuario } from './permissions';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
@@ -31,10 +32,20 @@ export interface JWTPayload {
    *  Producción → el front cae al filtro por nivel. Calculado en getSession. */
   modules?: string[];
   nivelAdmin: number;
+  /** Id de ESTA sesión. Lo pone `signToken`; es lo que permite revocarla sin
+   *  esperar a que venza el token (ver lib/sesiones.ts). Los tokens emitidos
+   *  antes de esto no lo traen: siguen valiendo hasta vencer, pero solo se les
+   *  puede cortar con una revocación total del usuario. */
+  jti?: string;
+  /** Emisión del token (segundos epoch UTC). Lo agrega `jwt.sign` solo. */
+  iat?: number;
 }
 
 export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+  // `jti` nuevo en cada firma: identifica esta sesión y nada más. Si el payload
+  // viniera con uno viejo se descarta, para no reusar el id de otra sesión.
+  const { jti: _viejo, iat: _iat, ...limpio } = payload;
+  return jwt.sign(limpio, JWT_SECRET, { expiresIn: '8h', jwtid: randomUUID() });
 }
 
 export function verifyToken(token: string): JWTPayload | null {
@@ -56,9 +67,12 @@ export async function getSession(): Promise<JWTPayload | null> {
   // base en cada lectura de sesión, así los cambios de rol se reflejan sin
   // necesidad de re-loguear (el token solo identifica a la persona). Los
   // usuarios de prueba (idUsuario 0) conservan lo que trae el token.
+  // En la MISMA consulta se mira si la sesión fue revocada (logout), así la
+  // revocación no cuesta un viaje extra a la base.
   if (payload.idUsuario && payload.idUsuario > 0) {
     try {
-      const roles = await getRolesDeUsuario(payload.idUsuario);
+      const { roles, revocada } = await cargarSesion(payload.idUsuario, payload.jti, payload.iat);
+      if (revocada) return null; // cerró sesión: el token ya no vale
       return {
         ...payload,
         roles: roles.map(r => r.idRol),
@@ -67,8 +81,14 @@ export async function getSession(): Promise<JWTPayload | null> {
         modules: computeAllowedModules(roles) ?? undefined,
         nivelAdmin: computeNivelAdmin(roles),
       };
-    } catch {
-      return payload; // si la DB falla, se usa lo del token
+    } catch (err) {
+      // Si la base no responde se sigue con lo que trae el token, igual que
+      // antes. Es deliberado: cerrar el paso dejaría la app inutilizable ante
+      // cualquier hipo de la base, y el token ya está firmado y sin vencer. El
+      // costo es que mientras la base esté caída una sesión revocada podría
+      // pasar, hasta que venza el token.
+      console.error('getSession: no se pudo verificar la sesión contra la base:', err);
+      return payload;
     }
   }
   return payload;

@@ -8,6 +8,13 @@ export async function logAudit(params: {
   detallePrevio?: unknown;
   detalleNuevo?: unknown;
   ip?: string;
+  /**
+   * Registrar aunque no haya colaborador. Solo para eventos que valen la pena
+   * guardar sin actor conocido — un login fallido contra una cédula que no
+   * existe es justo lo que hay que ver en un ataque de fuerza bruta. Por
+   * defecto sigue descartándose, para no ensuciar la bitácora de acciones.
+   */
+  permitirSinActor?: boolean;
 }) {
   try {
     const db = await getDb();
@@ -18,7 +25,7 @@ export async function logAudit(params: {
         .input('id', sql.Int, params.idColAccion)
         .query('SELECT 1 AS found FROM dbo.Colaborador WHERE idColaborador = @id');
       if (check.recordset.length === 0) return; // No registrar si el usuario no existe
-    } else {
+    } else if (!params.permitirSinActor) {
       return; // Sin usuario válido, no registrar
     }
 

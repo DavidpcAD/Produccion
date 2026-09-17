@@ -4,7 +4,7 @@ import { buildSessionPayload } from '@/lib/users';
 
 // Login de desarrollo: emite sesión para un Usuario real de AdelanteSBX
 // SIN validar contraseña. Solo habilitado fuera de producción. El login real
-// con contraseña+OTP vive en /api/auth/login y /api/auth/verify-otp.
+// con contraseña vive en /api/auth/login.
 function devEnabled() {
   return process.env.NODE_ENV !== 'production';
 }

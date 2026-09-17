@@ -31,12 +31,29 @@ export default function LoginPage() {
   const [devUserId, setDevUserId] = useState('');
   const [devLoading, setDevLoading] = useState(false);
 
+  // A dónde volver después de entrar. Lo manda useSession cuando el servidor
+  // rechaza la sesión (venció o se revocó), junto con el aviso.
+  const [volverA, setVolverA] = useState('/');
+
   useEffect(() => {
     fetch('/api/auth/dev-users')
       .then(r => (r.ok ? r.json() : null))
       .then(d => { if (d?.data?.length) setDevUsers(d.data); })
       .catch(() => {});
   }, []);
+
+  // Se lee de window y no con useSearchParams para no obligar a envolver la
+  // página en un Suspense (esta se prerenderiza).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('sesion') === 'vencida') {
+      toast('Tu sesión terminó. Entrá de nuevo.', 'warning');
+    }
+    // Solo rutas internas: un destino como "//evil.com" o "https://evil.com"
+    // convertiría este login en un trampolín hacia otro sitio.
+    const volver = params.get('volver') ?? '';
+    if (volver.startsWith('/') && !volver.startsWith('//')) setVolverA(volver);
+  }, [toast]);
 
   async function handleDevLogin() {
     if (!devUserId) { toast('Elegí un usuario', 'warning'); return; }
@@ -50,7 +67,7 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) { toast(data.error || 'No se pudo entrar', 'error'); return; }
       toast(`Sesión dev: ${data.usuario?.nombre ?? ''}`, 'success');
-      router.push('/');
+      router.push(volverA);
     } finally {
       setDevLoading(false);
     }
@@ -68,7 +85,7 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) { toast(data.error || 'Credenciales inválidas', 'error'); return; }
       toast('¡Bienvenido!', 'success');
-      router.push('/');
+      router.push(volverA);
     } finally {
       setLoading(false);
     }
