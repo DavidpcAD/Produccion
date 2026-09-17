@@ -52,6 +52,11 @@ const EMPTY_ETAPA = { codigo: '', nombre: '', bcWorksNo: '', bcTaskNo: '' };
 const SIN_OBRA = '—compartido—';
 const porCodigo = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
 const plural = (n: number, sing: string, plu: string) => `${n} ${n === 1 ? sing : plu}`;
+// En fábrica el mismo nombre se repite en los tres niveles a propósito (la máquina
+// es el proceso, la partida y la subpartida). Escribirlo tres veces hace que el
+// árbol se lea como tres cosas distintas; por eso el hijo que repite al padre se
+// marca en vez de repetirse.
+const mismoNombre = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export default function PartidasPage() {
   const session = useSession();
@@ -75,10 +80,10 @@ export default function PartidasPage() {
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState('');
 
-  // Estado del árbol. Los grupos arrancan ABIERTOS (se guarda lo cerrado) y las
-  // partidas CERRADAS (se guarda lo abierto): abrir una partida es justamente el
-  // gesto de "ver sus subpartidas".
-  const [gruposCerrados, setGruposCerrados] = useState<Set<number>>(new Set());
+  // Estado del árbol: todo arranca CERRADO y se guarda lo que el usuario abre.
+  // Con 18 máquinas (o 200 obras) desplegadas de una, la pantalla es un muro y
+  // deja de leerse de qué cuelga qué; abrir es el gesto de "ver qué hay adentro".
+  const [gruposAbiertos, setGruposAbiertos] = useState<Set<number>>(new Set());
   const [partidasAbiertas, setPartidasAbiertas] = useState<Set<number>>(new Set());
   const [obrasAbiertas, setObrasAbiertas] = useState<Set<string>>(new Set());
 
@@ -129,7 +134,7 @@ export default function PartidasPage() {
     if (t === tipoCodigo) return;
     setQ('');
     setObraFiltro('');
-    setGruposCerrados(new Set());
+    setGruposAbiertos(new Set());
     setPartidasAbiertas(new Set());
     setObrasAbiertas(new Set());
     setTipoCodigo(t);
@@ -239,7 +244,7 @@ export default function PartidasPage() {
   // Con una sola obra (o buscando) no tiene sentido tenerla cerrada.
   const obraAbierta = (obra: string | null) =>
     obra === null || buscando || arbol.length === 1 || obrasAbiertas.has(obra);
-  const grupoAbierto = (id: number) => buscando || !gruposCerrados.has(id);
+  const grupoAbierto = (id: number) => buscando || gruposAbiertos.has(id);
   const partidaAbierta = (id: number, forzar: boolean) => forzar || partidasAbiertas.has(id);
 
   const toggleSet = <T,>(set: Set<T>, v: T) => {
@@ -248,12 +253,12 @@ export default function PartidasPage() {
     return n;
   };
   function expandirTodo() {
-    setGruposCerrados(new Set());
+    setGruposAbiertos(new Set(etapas.map(e => e.idEtapa)));
     setPartidasAbiertas(new Set(partidas.map(p => p.idPartida)));
     setObrasAbiertas(new Set(etapas.map(e => e.bcWorksNo).filter((o): o is string => !!o)));
   }
   function colapsarTodo() {
-    setGruposCerrados(new Set(etapas.map(e => e.idEtapa)));
+    setGruposAbiertos(new Set());
     setPartidasAbiertas(new Set());
     setObrasAbiertas(new Set());
   }
@@ -360,7 +365,7 @@ export default function PartidasPage() {
       toast(editing ? 'Partida actualizada' : 'Partida creada', 'success');
       setPartOpen(false);
       // Al crear, dejar la rama abierta para agregarle subpartidas ahí mismo.
-      setGruposCerrados(s => { const n = new Set(s); n.delete(Number(partForm.idEtapa)); return n; });
+      setGruposAbiertos(s => new Set(s).add(Number(partForm.idEtapa)));
       if (!editing && data?.idPartida) setPartidasAbiertas(s => new Set(s).add(Number(data.idPartida)));
       await Promise.all([load(), cargarTipos()]);
     } finally { setSaving(false); }
@@ -468,7 +473,7 @@ export default function PartidasPage() {
   ].filter(Boolean).join(' · ');
   // Un solo botón que alterna, en vez de "Expandir todo" + "Colapsar todo" siempre.
   const todoColapsado = etapas.length > 0 && obrasAbiertas.size === 0
-    && partidasAbiertas.size === 0 && gruposCerrados.size >= etapas.length;
+    && partidasAbiertas.size === 0 && gruposAbiertos.size === 0;
 
   return (
     <PageShell>
@@ -545,6 +550,19 @@ export default function PartidasPage() {
               {todoColapsado ? 'Expandir' : 'Colapsar'}
             </Button>
           </div>
+
+          {/* Cómo se lee el árbol. Cada nivel tiene su forma de código y acá está
+              la equivalencia, que era justo lo que no se entendía de un vistazo. */}
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-ds-gray-400">
+            <span className="inline-flex items-center justify-center h-4 px-1 rounded-ds bg-black text-white text-[9px] font-bold font-mono">AB</span>
+            <span>{termGrupo}</span>
+            <Icon name="chevron-right" size="sm" color="currentColor" />
+            <span className="font-mono rounded border border-ds-gray-200 bg-ds-surface px-1 text-[10px] font-semibold text-ds-gray-500">AB-01</span>
+            <span>partida</span>
+            <Icon name="chevron-right" size="sm" color="currentColor" />
+            <span className="font-mono text-[10px] text-ds-gray-400">AB-01.1</span>
+            <span>subpartida</span>
+          </div>
         </div>
 
         {loading ? (
@@ -575,10 +593,7 @@ export default function PartidasPage() {
                 <button
                   onClick={() => setObrasAbiertas(s => toggleSet(s, sec.obra!))}
                   title={obraAbierta(sec.obra) ? 'Colapsar la obra' : `Ver la estructura de ${sec.obra}`}
-                  className={
-                    'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ' +
-                    (obraAbierta(sec.obra) ? '' : 'hover:bg-ds-gray-100/70')
-                  }
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left border-b border-ds-gray-200 bg-ds-gray-100/60 hover:bg-ds-gray-100 transition-colors" 
                 >
                   <span className={'text-ds-gray-300 transition-transform shrink-0 ' + (obraAbierta(sec.obra) ? 'rotate-90' : '')}>
                     <Icon name="chevron-right" size="sm" color="currentColor" />
@@ -597,34 +612,47 @@ export default function PartidasPage() {
                 </button>
               )}
 
-              {obraAbierta(sec.obra) && sec.grupos.map(({ etapa, partidas: parts, totalPartidas, totalSubs: subsGrupo }) => {
+              {/* Cuando hay obra (admin / fábrica) todo lo suyo entra un escalón: si los
+                  procesos arrancan pegados al borde no se lee que cuelgan de la obra. */}
+              {obraAbierta(sec.obra) && (
+              <div className={sec.obra ? 'pl-8' : ''}>
+              {sec.grupos.map(({ etapa, partidas: parts, totalPartidas, totalSubs: subsGrupo }, iGrupo) => {
                 const abierto = grupoAbierto(etapa.idEtapa);
+                const ultimoGrupo = iGrupo === sec.grupos.length - 1;
                 return (
-                  <div key={etapa.idEtapa}>
+                  <div key={etapa.idEtapa} className="relative">
+                    {/* Riel de la obra hacia sus procesos (solo admin / fábrica). */}
+                    {sec.obra && (
+                      <span aria-hidden className={'pointer-events-none absolute left-[-9px] top-0 w-px bg-ds-gray-200 ' + (ultimoGrupo ? 'h-[18px]' : 'bottom-0')} />
+                    )}
                     {/* Nivel 1 — grupo (etapa / sistema / área / proceso / torre) */}
-                    <div className="flex items-center gap-2 px-3 py-2 bg-ds-gray-100 border-y border-ds-gray-200">
+                    <div className={
+                      'group/proc relative flex items-center gap-2 px-3 py-2 border-b border-ds-gray-100 transition-colors '
+                      + (abierto ? 'bg-ds-gray-100/60' : 'hover:bg-ds-gray-100/40')
+                    }>
+                      {sec.obra && <span aria-hidden className="pointer-events-none absolute left-[-9px] top-[18px] h-px w-[9px] bg-ds-gray-200" />}
                       <button
-                        onClick={() => setGruposCerrados(s => toggleSet(s, etapa.idEtapa))}
+                        onClick={() => setGruposAbiertos(s => toggleSet(s, etapa.idEtapa))}
                         className="flex items-center gap-2 flex-1 min-w-0 text-left"
                         title={abierto ? 'Colapsar' : `Ver las partidas de ${etapa.nombre}`}
                       >
-                        <span className={'transition-transform shrink-0 ' + (abierto ? 'rotate-90' : '')}>
+                        <span className={'text-ds-gray-300 transition-transform shrink-0 ' + (abierto ? 'rotate-90' : '')}>
                           <Icon name="chevron-right" size="sm" color="currentColor" />
                         </span>
-                        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-ds bg-black text-white text-[11px] font-bold font-mono shrink-0">{etapa.codigo}</span>
-                        <span className="font-bold text-ds-ink text-xs uppercase tracking-wide truncate">{etapa.nombre}</span>
+                        <span className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 rounded-ds bg-ds-ink text-ds-surface text-[10px] font-bold font-mono shrink-0">{etapa.codigo}</span>
+                        <span className="text-sm font-semibold text-ds-ink truncate">{etapa.nombre}</span>
                         {etapa.bcTaskNo && (
-                          <span className="rounded bg-ds-surface border border-ds-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-ds-gray-400 shrink-0" title={`Capítulo ${etapa.bcTaskNo} de la obra en Business Central`}>
+                          <span className="rounded border border-ds-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-300 shrink-0 hidden sm:inline" title={`Capítulo ${etapa.bcTaskNo} de la obra en Business Central`}>
                             BC {etapa.bcTaskNo}
                           </span>
                         )}
                       </button>
-                      <span className="text-[11px] text-ds-gray-400 shrink-0 whitespace-nowrap">
+                      <span className="text-[11px] text-ds-gray-300 shrink-0 whitespace-nowrap">
                         {plural(totalPartidas, 'partida', 'partidas')}
                         {subsGrupo > 0 ? ` · ${plural(subsGrupo, 'subpartida', 'subpartidas')}` : ''}
                       </span>
                       {puede && (
-                        <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-400 hover:text-brand shrink-0" title={`Nueva partida en ${etapa.nombre}`}>
+                        <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-300 hover:text-brand shrink-0 transition-opacity sm:opacity-0 sm:group-hover/proc:opacity-100 sm:focus-visible:opacity-100" title={`Nueva partida en ${etapa.nombre}`}>
                           <Icon name="plus" size="sm" color="currentColor" />
                         </button>
                       )}
@@ -636,30 +664,48 @@ export default function PartidasPage() {
                       </div>
                     )}
 
-                    {abierto && parts.map(({ partida, subs, subsVisibles, forzarAbierta }) => {
+                    {abierto && parts.map(({ partida, subs, subsVisibles, forzarAbierta }, iPart) => {
                       const subAbierta = partidaAbierta(partida.idPartida, forzarAbierta);
+                      const ultimaPart = iPart === parts.length - 1;
                       return (
-                        <div key={partida.idPartida} className="border-b border-ds-gray-100 last:border-b-0">
+                        <div key={partida.idPartida} className="relative border-b border-ds-gray-100 last:border-b-0">
+                          {/* Riel del nivel 2: la línea que baja desde el proceso y
+                              entra a cada partida. Va por bloque de partida, así que
+                              los tramos se pegan y se leen como una sola guía; en la
+                              última se corta en el codo, como cualquier árbol. */}
+                          <span aria-hidden className={'pointer-events-none absolute left-[21px] top-0 w-px bg-ds-gray-200 ' + (ultimaPart ? 'h-[22px]' : 'bottom-0')} />
                           {/* Nivel 2 — partida (existe en BC) */}
-                          <div className="flex items-center gap-2 pl-8 pr-3 py-2.5 hover:bg-ds-gray-100/60 transition-colors">
+                          <div className="group/part relative flex items-center gap-2 pl-8 pr-3 py-2 hover:bg-ds-gray-100/40 transition-colors">
+                            <span aria-hidden className="pointer-events-none absolute left-[21px] top-1/2 h-px w-2.5 bg-ds-gray-200" />
                             <button
                               onClick={() => setPartidasAbiertas(s => toggleSet(s, partida.idPartida))}
                               className="flex items-center gap-2 flex-1 min-w-0 text-left"
                               title={subAbierta ? 'Colapsar subpartidas' : 'Ver subpartidas'}
                             >
-                              <span className={'transition-transform shrink-0 ' + (subAbierta ? 'rotate-90' : '') + (subs.length === 0 ? ' opacity-30' : '')}>
+                              <span className={'text-ds-gray-300 transition-transform shrink-0 ' + (subAbierta ? 'rotate-90' : '') + (subs.length === 0 ? ' opacity-30' : '')}>
                                 <Icon name="chevron-right" size="sm" color="currentColor" />
                               </span>
-                              <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{partida.codigo}</span>
-                              <span className="text-sm text-ds-ink truncate">{partida.nombre}</span>
+                              <span className="font-mono text-[10px] font-semibold text-ds-gray-400 shrink-0 rounded border border-ds-gray-200 px-1.5 py-0.5">{partida.codigo}</span>
+                              {!buscando && mismoNombre(partida.nombre, etapa.nombre) ? (
+                                <span className="text-sm italic text-ds-gray-300 truncate" title={partida.nombre}>
+                                  igual que {elGrupo}
+                                </span>
+                              ) : (
+                                <span className="text-sm text-ds-ink truncate">{partida.nombre}</span>
+                              )}
                             </button>
-                            {subs.length > 0 && <span className="text-body-sm text-ds-gray-400 shrink-0">{subs.length}</span>}
+                            {subs.length > 0 && (
+                              <span className="text-[11px] text-ds-gray-300 shrink-0 whitespace-nowrap">
+                                <span className="hidden sm:inline">{plural(subs.length, 'subpartida', 'subpartidas')}</span>
+                                <span className="sm:hidden">{subs.length}</span>
+                              </span>
+                            )}
                             {puede && (
                               <>
-                                <button onClick={() => abrirEditarPart(partida)} className="text-ds-gray-400 hover:text-ds-ink shrink-0" title="Editar partida">
+                                <button onClick={() => abrirEditarPart(partida)} className="text-ds-gray-300 hover:text-ds-ink shrink-0 transition-opacity sm:opacity-0 sm:group-hover/part:opacity-100 sm:focus-visible:opacity-100" title="Editar partida">
                                   <Icon name="edit" size="sm" color="currentColor" />
                                 </button>
-                                <button onClick={() => abrirNuevaSub(partida.idPartida)} className="text-ds-gray-400 hover:text-brand shrink-0" title="Agregar subpartida">
+                                <button onClick={() => abrirNuevaSub(partida.idPartida)} className="text-ds-gray-300 hover:text-brand shrink-0 transition-opacity sm:opacity-0 sm:group-hover/part:opacity-100 sm:focus-visible:opacity-100" title="Agregar subpartida">
                                   <Icon name="plus" size="sm" color="currentColor" />
                                 </button>
                               </>
@@ -674,17 +720,24 @@ export default function PartidasPage() {
                               </div>
                             ) : (
                               <ul className="bg-ds-gray-100/40">
-                                {subsVisibles.map(s => (
+                                {subsVisibles.map((s, iSub) => (
                                   <li
                                     key={s.idSubPartida}
                                     onClick={puede ? () => abrirEditarSub(s) : undefined}
                                     title={puede ? 'Editar subpartida' : undefined}
-                                    className={'pl-16 pr-3 py-2.5 flex items-start gap-3 border-t border-ds-gray-100 ' + (puede ? 'cursor-pointer hover:bg-ds-gray-100 transition-colors' : '')}
+                                    className={'group/sub relative pl-16 pr-3 py-2 flex items-start gap-3 border-t border-ds-gray-100 ' + (puede ? 'cursor-pointer hover:bg-ds-gray-100/70 transition-colors' : '')}
                                   >
-                                    <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0 pt-0.5">{s.codigo}</span>
+                                    {/* Riel del nivel 3, un escalón más adentro que el de partidas. */}
+                                    <span aria-hidden className={'pointer-events-none absolute left-[45px] top-0 w-px bg-ds-gray-200 ' + (iSub === subsVisibles.length - 1 ? 'h-[22px]' : 'bottom-0')} />
+                                    <span aria-hidden className="pointer-events-none absolute left-[45px] top-[22px] h-px w-3 bg-ds-gray-200" />
+                                    <span className="font-mono text-[10px] text-ds-gray-300 shrink-0 pt-1">{s.codigo}</span>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={'text-sm truncate ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
+                                        {!buscando && s.activo && mismoNombre(s.nombre, partida.nombre) ? (
+                                          <span className="text-[13px] italic text-ds-gray-300 truncate" title={s.nombre}>igual que la partida</span>
+                                        ) : (
+                                          <span className={'text-[13px] truncate ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
+                                        )}
                                         {s.esCritica && <Badge variant="red">Crítica</Badge>}
                                         {!s.activo && <Badge variant="gray">Inactiva</Badge>}
                                       </div>
@@ -704,7 +757,7 @@ export default function PartidasPage() {
                                       </span>
                                     )}
                                     {puede && (
-                                      <span className="text-ds-gray-400 p-1 shrink-0" aria-hidden>
+                                      <span className="text-ds-gray-300 p-1 shrink-0 transition-opacity sm:opacity-0 sm:group-hover/sub:opacity-100" aria-hidden>
                                         <Icon name="edit" size="sm" color="currentColor" />
                                       </span>
                                     )}
@@ -719,6 +772,8 @@ export default function PartidasPage() {
                   </div>
                 );
               })}
+              </div>
+              )}
             </div>
           ))}
         </div>
