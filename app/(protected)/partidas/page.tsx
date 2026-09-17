@@ -52,11 +52,10 @@ const EMPTY_ETAPA = { codigo: '', nombre: '', bcWorksNo: '', bcTaskNo: '' };
 const SIN_OBRA = '—compartido—';
 const porCodigo = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
 const plural = (n: number, sing: string, plu: string) => `${n} ${n === 1 ? sing : plu}`;
-// En fábrica el mismo nombre se repite en los tres niveles a propósito (la máquina
-// es el proceso, la partida y la subpartida). Escribirlo tres veces hace que el
-// árbol se lea como tres cosas distintas; por eso el hijo que repite al padre se
-// marca en vez de repetirse.
-const mismoNombre = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+// Rótulo de nivel: en fábrica el mismo nombre se repite en los tres niveles a
+// propósito (la máquina es el proceso, la partida y la subpartida), así que el
+// nombre solo no dice en qué nivel estás parado. Cada fila lo dice.
+const NIVEL = 'text-[9px] font-semibold uppercase tracking-[0.08em] text-ds-gray-400 shrink-0';
 
 export default function PartidasPage() {
   const session = useSession();
@@ -647,7 +646,8 @@ export default function PartidasPage() {
                           </span>
                         )}
                       </button>
-                      <span className="text-[11px] text-ds-gray-300 shrink-0 whitespace-nowrap">
+                      <span className={NIVEL}>{termGrupo}</span>
+                      <span className="text-[11px] text-ds-gray-300 shrink-0 whitespace-nowrap hidden sm:inline">
                         {plural(totalPartidas, 'partida', 'partidas')}
                         {subsGrupo > 0 ? ` · ${plural(subsGrupo, 'subpartida', 'subpartidas')}` : ''}
                       </span>
@@ -686,18 +686,12 @@ export default function PartidasPage() {
                                 <Icon name="chevron-right" size="sm" color="currentColor" />
                               </span>
                               <span className="font-mono text-[10px] font-semibold text-ds-gray-400 shrink-0 rounded border border-ds-gray-200 px-1.5 py-0.5">{partida.codigo}</span>
-                              {!buscando && mismoNombre(partida.nombre, etapa.nombre) ? (
-                                <span className="text-sm italic text-ds-gray-300 truncate" title={partida.nombre}>
-                                  igual que {elGrupo}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-ds-ink truncate">{partida.nombre}</span>
-                              )}
+                              <span className="text-sm text-ds-ink truncate">{partida.nombre}</span>
                             </button>
+                            <span className={NIVEL}>Partida</span>
                             {subs.length > 0 && (
-                              <span className="text-[11px] text-ds-gray-300 shrink-0 whitespace-nowrap">
-                                <span className="hidden sm:inline">{plural(subs.length, 'subpartida', 'subpartidas')}</span>
-                                <span className="sm:hidden">{subs.length}</span>
+                              <span className="text-[11px] text-ds-gray-300 shrink-0 whitespace-nowrap hidden sm:inline">
+                                {plural(subs.length, 'subpartida', 'subpartidas')}
                               </span>
                             )}
                             {puede && (
@@ -733,11 +727,7 @@ export default function PartidasPage() {
                                     <span className="font-mono text-[10px] text-ds-gray-300 shrink-0 pt-1">{s.codigo}</span>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        {!buscando && s.activo && mismoNombre(s.nombre, partida.nombre) ? (
-                                          <span className="text-[13px] italic text-ds-gray-300 truncate" title={s.nombre}>igual que la partida</span>
-                                        ) : (
-                                          <span className={'text-[13px] truncate ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
-                                        )}
+                                        <span className={'text-[13px] truncate ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
                                         {s.esCritica && <Badge variant="red">Crítica</Badge>}
                                         {!s.activo && <Badge variant="gray">Inactiva</Badge>}
                                       </div>
@@ -751,6 +741,7 @@ export default function PartidasPage() {
                                         </div>
                                       )}
                                     </div>
+                                    <span className={NIVEL + ' pt-1'}>Subpartida</span>
                                     {s.numSprint != null && (
                                       <span className="rounded-full bg-ds-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ds-gray-500 shrink-0 whitespace-nowrap" title={`Sprint ${s.numSprint}`}>
                                         Sprint {s.numSprint}
