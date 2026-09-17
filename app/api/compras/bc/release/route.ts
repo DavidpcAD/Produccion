@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { bcReleasePedidoVerificado } from "@/lib/compras/bc";
 import { frenarLanzamiento } from "@/lib/compras/freno-lanzamiento";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ export const dynamic = "force-dynamic";
 // `ok` solo si BC de verdad lo dejó "Released": un 200 con el pedido Abierto o
 // Pendiente de aprobación se devuelve como fallo, con el motivo.
 export async function POST(req: Request) {
+  const g = await guardCompras({ soloAdmin: true });
+  if (esRechazo(g)) return g;
+
   try {
     const { orderNo, ordenId } = await req.json();
     if (!orderNo) return NextResponse.json({ error: "Falta orderNo" }, { status: 400 });

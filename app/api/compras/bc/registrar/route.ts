@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bcRegistrarFactura } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 // body: { orderNo, vendorInvoiceNo, lineas: [{itemNo, qty}], postingDate?,
 //         cargo?: { itemChargeNo, descripcion?, monto, metodo? } }  ← flete del viaje
 export async function POST(req: Request) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const { orderNo, vendorInvoiceNo, lineas, postingDate, cargo } = await req.json();
     const cargoValido = cargo && cargo.itemChargeNo && Number(cargo.monto) > 0

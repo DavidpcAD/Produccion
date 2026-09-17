@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { listMovimientosAll, listOrdenes, listPedidos, listRecepciones } from "@/lib/compras/repo";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Carga inicial de toda la data para el front-end (modo API).
 export async function GET() {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const [pedidos, ordenes, recepciones, movimientos] = await Promise.all([
       listPedidos(), listOrdenes(), listRecepciones(), listMovimientosAll(),

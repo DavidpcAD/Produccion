@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { listWbs, createClasificacion } from "@/lib/compras/repo";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Árbol del maestro: etapa -> partida -> sub_partida + clasificaciones del ingeniero.
 export async function GET() {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     return NextResponse.json(await listWbs());
   } catch (e: any) {
@@ -15,6 +19,9 @@ export async function GET() {
 
 // Crear una clasificación (control del ingeniero) colgando de una partida O sub_partida.
 export async function POST(req: Request) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const body = await req.json();
     const nombre = String(body?.nombre ?? "").trim();

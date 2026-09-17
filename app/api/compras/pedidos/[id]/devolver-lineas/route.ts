@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { devolverLineasPedido } from "@/lib/compras/repo";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,10 +9,13 @@ export const dynamic = "force-dynamic";
 // compró): el resto sigue su curso. Si se devuelven todas, el pedido completo
 // pasa a "devuelto" (mismo efecto que el PATCH de estado de siempre).
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
-    const { lineaIds, motivo, usuario, rol } = await req.json();
+    const { lineaIds, motivo } = await req.json();
     const ids = Array.isArray(lineaIds) ? lineaIds.map(Number) : [];
-    await devolverLineasPedido(Number((await params).id), ids, motivo ?? "", usuario, rol);
+    await devolverLineasPedido(Number((await params).id), ids, motivo ?? "", g.usuario, g.rol);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });

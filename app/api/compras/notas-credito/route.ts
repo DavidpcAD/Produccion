@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createNotasCredito, listNotasCredito } from "@/lib/compras/repo";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +10,9 @@ export const dynamic = "force-dynamic";
 // Aislado del bootstrap: si la tabla dbo.NotaCreditoDet no existe, GET devuelve []
 // y no rompe el resto de la app.
 export async function GET() {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     return NextResponse.json({ notas: await listNotasCredito() });
   } catch (e: any) {
@@ -17,9 +21,14 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const body = await req.json();
-    const n = await createNotasCredito(body);
+    // La identidad del actor sale de la SESIÓN, nunca del body: antes el cliente
+    // decidía a nombre de quién quedaba el registro (y qué rol figuraba).
+    const n = await createNotasCredito({ ...body, usuario: g.usuario, rol: g.rol });
     return NextResponse.json({ ok: true, creadas: n });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });

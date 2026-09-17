@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bcOrdenTotales } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 // Totales del pedido calculados por BC (subtotal excl. IVA, IVA, total con IVA).
 // Nunca 500: si BC no responde o el pedido no existe, devuelve { totales: null }.
 export async function GET(req: NextRequest) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   const orderNo = req.nextUrl.searchParams.get("orderNo") ?? "";
   try {
     return NextResponse.json({ totales: await bcOrdenTotales(orderNo) });

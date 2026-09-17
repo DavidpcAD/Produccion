@@ -8,6 +8,7 @@ import { IconChevronDown } from "@/components/compras/icons";
 import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
+import { useSession } from "@/hooks/useSession";
 import { bcEstadoBadge, money, num, formatDate, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenDevueltaPorBc, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta, ordenLineasSinObra } from "@/lib/compras/helpers";
 import type { Orden, Pedido } from "@/lib/compras/types";
 import type { EstadoBcOrden } from "@/lib/compras/api";
@@ -34,6 +35,12 @@ export function OrdenDetalle({
   const toast = useToast();
   const [verFactura, setVerFactura] = useState<string | null>(null);
   const [relanzando, setRelanzando] = useState(false);
+  // Lanzar a BC es de Aprobación: la API lo exige (guardCompras soloAdmin) desde
+  // que las rutas dejaron de confiar en el proxy. Esta pantalla la abren también
+  // Proveeduría y Facturación, así que el botón se esconde para ellos — verlo y
+  // recibir un 403 al apretarlo es peor que no verlo.
+  const sesion = useSession();
+  const puedeLanzar = sesion?.modules ? sesion.modules.includes("admin") : (sesion?.nivelAdmin ?? 0) >= 4;
   // Totales calculados por BC (fuente de verdad). Se leen si la orden ya está en BC.
   const [bcTot, setBcTot] = useState<{ subtotal: number; iva: number; total: number; currencyCode: string } | null>(null);
   useEffect(() => {
@@ -185,7 +192,7 @@ export function OrdenDetalle({
             <div className="ds-body-sm mt-2" style={{ padding: "8px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-red-100) 8%, var(--ds-tint-base))", border: "1.5px solid color-mix(in srgb, var(--ds-color-red-100) 30%, var(--ds-tint-base))", color: "var(--ds-color-red-200)" }}>
               <span className="ds-strong">Sin lanzar en Business Central.</span>{" "}
               {lanzadaSinLanzarEnBc
-                ? <>La orden figura lanzada acá, pero el pedido {orden.bcNumber} está {bcEstado === "abierto" ? "Abierto" : "Pendiente de aprobación"} en BC y Bodega no puede recibir contra él. Dale «Volver a lanzar en BC».</>
+                ? <>La orden figura lanzada acá, pero el pedido {orden.bcNumber} está {bcEstado === "abierto" ? "Abierto" : "Pendiente de aprobación"} en BC y Bodega no puede recibir contra él. {puedeLanzar ? "Dale «Volver a lanzar en BC»." : "Aprobación tiene que darle «Volver a lanzar en BC»."}</>
                 : <>La orden ya se había aprobado, pero el pedido {orden.bcNumber} quedó sin lanzar en BC y Bodega no puede recibir contra él. Aprobación tiene que darle «Volver a lanzar en BC».</>}
             </div>
           )}
@@ -230,14 +237,14 @@ export function OrdenDetalle({
           )}
           {/* Con la orden "sin lanzar en BC" el camino es el botón «Volver a lanzar en BC»
               (el de Aprobación, o el de abajo): este link repetía la misma acción al lado. */}
-          {falloAlLanzar && !sinLanzarEnBc && (
+          {falloAlLanzar && !sinLanzarEnBc && puedeLanzar && (
             <button className="link-btn" disabled={relanzando} title={`El último intento de lanzar ${orden.bcNumber} en BC falló. Reintentar el Release del pedido ya creado.`}
               onClick={reintentarLanzar}>{relanzando ? "Lanzando…" : "↻ Reintentar lanzar en BC"}</button>
           )}
           {/* "Lanzado" acá y sin lanzar en BC: la opción de lanzar va como botón, no
               como link, porque es LO que hay que hacer con esta orden. Lanza el pedido
               que ya existe en BC (no crea otro). */}
-          {lanzadaSinLanzarEnBc && (
+          {lanzadaSinLanzarEnBc && puedeLanzar && (
             <Button size="sm" disabled={relanzando}
               title={`La orden figura lanzada acá, pero el pedido ${orden.bcNumber} está sin lanzar en Business Central. Lanzar el pedido que ya existe (no se crea otro).`}
               onClick={reintentarLanzar}>{relanzando ? "Lanzando…" : "↻ Volver a lanzar en BC"}</Button>

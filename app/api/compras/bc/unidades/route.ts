@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bcUnidadesDeItem, bcUnidadesDeItems, bcItemFichas } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 // HRS, garantizar la base) lo decide quien la muestra — ver `unidadesOfrecidas`
 // en lib/compras/helpers.ts.
 export async function GET(req: Request) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   const sp = new URL(req.url).searchParams;
   const item = sp.get("item") ?? "";
   // `items=A,B,C` devuelve el mapa de varios artículos de una vez (Proveeduría arma la

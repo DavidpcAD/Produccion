@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { updateClasificacion } from "@/lib/compras/repo";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Editar una clasificación existente (nombre y/o partida). Mismo XOR que crear.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const id = Number((await params).id);
     if (!id) return NextResponse.json({ error: "Id inválido" }, { status: 400 });

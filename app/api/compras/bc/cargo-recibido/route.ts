@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bcPostChargeOnReceipts } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 // cargo, lo asigna a las líneas de recepción elegidas con el método indicado, fija
 // el N.º de factura del proveedor y registra. Body: ver bcPostChargeOnReceipts.
 export async function POST(req: NextRequest) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const body = await req.json();
     const resultado = await bcPostChargeOnReceipts(body);

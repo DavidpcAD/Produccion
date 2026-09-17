@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bcCrearPedido, bcDeepLinkPedido } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,6 +8,9 @@ export const dynamic = "force-dynamic";
 // Crea un Pedido de compra (Purchase Order) en Business Central a partir del
 // proveedor y las líneas de material seleccionadas en Proveeduría.
 export async function POST(req: Request) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const body = await req.json();
     const { number, id, omitidas } = await bcCrearPedido(body);

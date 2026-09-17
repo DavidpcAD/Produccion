@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { getOrden, setOrdenEstado } from "@/lib/compras/repo";
 import { bcEnviarAAprobacion, bcReabrirPedido } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const o = await getOrden(Number((await params).id));
     if (!o) return NextResponse.json({ error: "no encontrada" }, { status: 404 });
@@ -35,8 +39,14 @@ function accionBcDelEstado(estado: string): "enviar" | "reabrir" | null {
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
-    const { estado, usuario, rol, motivo, bcNumber, tipoMovimiento } = await req.json();
+    const { estado, motivo, bcNumber, tipoMovimiento } = await req.json();
+    // La identidad del actor sale de la SESIÓN, nunca del body: antes el cliente
+    // decidía a nombre de quién quedaba el registro (y qué rol figuraba).
+    const { usuario, rol } = g;
     const id = Number((await params).id);
     await setOrdenEstado(id, estado, usuario, rol, motivo, bcNumber, tipoMovimiento);
 

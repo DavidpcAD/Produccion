@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { bcItems, bcItemsBloqueados } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     // `bloqueados` viaja junto al catálogo porque NO alcanza con no ofrecerlos en el
     // buscador: una PLANTILLA (o un pedido copiado) trae códigos guardados, y el que no

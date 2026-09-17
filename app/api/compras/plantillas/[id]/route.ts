@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { deletePlantilla, updatePlantilla } from "@/lib/compras/repo";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const body = await req.json();
     if (!body?.nombre) return NextResponse.json({ error: "Falta nombre" }, { status: 400 });
@@ -13,7 +17,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       tipo: body.tipo === "bodega" ? "bodega" : "general",
       idClasificacion: body.idClasificacion != null ? Number(body.idClasificacion) : null,
       lineas: Array.isArray(body.lineas) ? body.lineas : [],
-      usuario: String(body.usuario ?? ""),
+      // El dueño/actor sale de la SESIÓN, no del query ni del body.
+    usuario: g.usuario,
     });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
@@ -22,9 +27,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
-    const usuario = new URL(req.url).searchParams.get("usuario") ?? "";
-    await deletePlantilla(Number((await params).id), usuario);
+    // El dueño/actor sale de la SESIÓN, no del query ni del body.
+    await deletePlantilla(Number((await params).id), g.usuario);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });

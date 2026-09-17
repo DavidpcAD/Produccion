@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { corregirEstadoPorBc, listOrdenesConBc } from "@/lib/compras/repo";
 import { bcEstadoPedido, bcEstadosPedidos, type BcEstadoPedido } from "@/lib/compras/bc";
-import type { Role } from "@/lib/compras/types";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,11 +40,15 @@ function estadoDe(e: BcEstadoPedido | undefined): EstadoBcOrden {
 }
 
 export async function POST(req: Request) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const body = await req.json().catch(() => ({}));
     const ids: string[] | null = Array.isArray(body?.ids) ? body.ids.map(String) : null;
-    const usuario = String(body?.usuario || "sistema");
-    const rol = (body?.rol || "aprobacion") as Role;
+    // La identidad del actor sale de la SESIÓN, nunca del body: antes el cliente
+    // decidía a nombre de quién quedaba el registro (y qué rol figuraba).
+    const { usuario, rol } = g;
 
     const todas = await listOrdenesConBc();
     // Con `ids`, se contesta el estado de BC de cada una (sea cual sea su estado acá);

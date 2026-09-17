@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listOrdenes, listPedidos } from "@/lib/compras/repo";
 import { pedidoTieneDevolucion } from "@/lib/compras/helpers";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 //  • pedidosDevueltos  = solicitudes que Proveeduría devolvió, enteras o por línea
 //  • ordenesRechazadas = órdenes que Aprobación rechazó (orden.estado "rechazado")
 export async function GET() {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     const [pedidos, ordenes] = await Promise.all([listPedidos(), listOrdenes()]);
     const pedidosDevueltos = pedidos.filter((p) => pedidoTieneDevolucion(p)).length;

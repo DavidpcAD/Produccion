@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bcUltimaCompra, bcItemLastCost, bcItemFichas } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,9 @@ export const dynamic = "force-dynamic";
 // La fuente vieja "proveedor" (líneas de factura de compra) se quitó: su $select daba
 // 400 desde siempre y su `unitCost` no es el precio de compra — ver bcUltimoPrecioFacturado.
 export async function GET(req: Request) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   const u = new URL(req.url);
   const item = (u.searchParams.get("item") ?? "").trim();
   const vendor = (u.searchParams.get("vendor") ?? "").trim();

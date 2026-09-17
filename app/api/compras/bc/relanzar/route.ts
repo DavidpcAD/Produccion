@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { bcResyncPedidoLines, bcReleasePedidoVerificado, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo, bcCompletarProyectoTarea, mensajeConsumoIncompleto, bcLineasProyectoSinTarea, mensajeProyectoSinTarea, bcQuitarObraDeLineas, mensajeObraNoQuitada } from "@/lib/compras/bc";
 import { frenarLanzamiento } from "@/lib/compras/freno-lanzamiento";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,9 @@ async function respuestaDelFallo(orderNo: string, e: unknown) {
 // lanzar. `lineas`/`cargos` siguen soportados para el camino en que ESTA app creó el
 // pedido (sin bcNo previo), donde sí le toca aplicar obra/tarea/almacén.
 export async function POST(req: Request) {
+  const g = await guardCompras({ soloAdmin: true });
+  if (esRechazo(g)) return g;
+
   let orderNo = "";
   try {
     const body = await req.json();

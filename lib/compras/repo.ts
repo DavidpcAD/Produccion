@@ -672,7 +672,9 @@ export async function createOrden(input: NewOrdenDB): Promise<number> {
     // Avanzar el estado del PEDIDO origen a "en_orden" cuando TODAS sus líneas ya
     // quedaron ordenadas (mismo criterio que el modo demo). Antes el estado del
     // pedido no se tocaba en SQL → "mis solicitudes" y la matriz quedaban viejas.
-    const detIds = input.lineas.map((l) => l.idPedidoCompraDet).filter((x): x is number => !!x);
+    // Estos ids se interpolan en el IN (…) de abajo, así que el filtro tiene que
+    // garantizar enteros de verdad: !!x dejaba pasar cualquier cosa truthy.
+    const detIds = input.lineas.map((l) => l.idPedidoCompraDet).filter((x): x is number => Number.isInteger(x));
     if (detIds.length) {
       const idEnOrden = await idDeEstado("en_orden");
       const peds = await new sql.Request(tx).query(

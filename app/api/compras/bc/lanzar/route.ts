@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bcCrearYLanzarPedido, bcDeepLinkPedido } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 // y lo LANZA (Release) en el mismo paso, para que en BC aparezca directo como
 // "Lanzado". Lo usa Aprobación cuando Luis Roberto aprueba la orden.
 export async function POST(req: Request) {
+  const g = await guardCompras({ soloAdmin: true });
+  if (esRechazo(g)) return g;
+
   try {
     const body = await req.json();
     const { number, id, omitidas, creadas, lineError, cargoError, cargosCreados, released, releaseError, releaseStatus } = await bcCrearYLanzarPedido(body);

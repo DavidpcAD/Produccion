@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bcExistencias } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,6 +8,9 @@ export const dynamic = "force-dynamic";
 // GET /api/compras/bc/existencias?itemNo=M01-0001  ó  ?locationCode=OR-4321 (al menos uno).
 // Devuelve el stock neto físico por ubicación/variante desde BC (inventoryByLocation).
 export async function GET(req: NextRequest) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   const { searchParams } = new URL(req.url);
   const itemNo = searchParams.get("itemNo") ?? undefined;
   const locationCode = searchParams.get("locationCode") ?? undefined;

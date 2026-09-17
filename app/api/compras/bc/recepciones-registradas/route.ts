@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bcPostedReceiptLines } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 // artículo, N.º de recepción. Nunca 500: si la API custom aún no está publicada,
 // devuelve { lineas: [], error } para que la UI avise sin romperse.
 export async function GET(req: NextRequest) {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   const sp = req.nextUrl.searchParams;
   try {
     const lineas = await bcPostedReceiptLines({

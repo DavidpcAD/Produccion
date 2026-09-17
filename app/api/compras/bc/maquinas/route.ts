@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bcMaquinas } from "@/lib/compras/bc";
+import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 // Es la tabla del parque de maquinaria (GomEqp Machine), leída por la página
 // publicada `Maquinaria`; ver `bcMaquinas`.
 export async function GET() {
+  const g = await guardCompras();
+  if (esRechazo(g)) return g;
+
   try {
     return NextResponse.json({ maquinas: await bcMaquinas() });
   } catch (e: any) {
