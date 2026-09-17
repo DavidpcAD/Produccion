@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getBCToken, bcConfigured } from '@/lib/bc-client';
+import { odataStr } from '@/lib/odata';
 
 // Diagnóstico de la integración Business Central. SOLO ADMIN (nivelAdmin >= 4).
 //   GET /api/concreto/diagnostico-bc?test=config     → env presentes
@@ -20,7 +21,7 @@ function bcRoot(): string {
 function urlEmpresaBC(): string | null {
   const company = process.env.BC_COMPANY;
   if (!company) return null;
-  return `${bcRoot()}/ODataV4/Company('${encodeURIComponent(company)}')`;
+  return `${bcRoot()}/ODataV4/Company('${encodeURIComponent(odataStr(company))}')`;
 }
 
 async function fetchBC(url: string): Promise<Record<string, unknown>> {

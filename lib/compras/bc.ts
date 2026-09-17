@@ -5,6 +5,8 @@
 // La compañía sale de BC_COMPANY_ID (GUID). El tenant/environment se deducen
 // de BC_BASE_URL (o de BC_TENANT_ID/BC_ENVIRONMENT).
 
+import { odataStr } from "@/lib/odata";
+
 type TokenCache = { token: string; exp: number };
 let tokenCache: TokenCache | null = null;
 
@@ -330,7 +332,7 @@ export async function bcItemLastCost(itemNo: string): Promise<number | null> {
     const cid = await getStdCompanyId();
     // Sin `lastDirectCost`: no existe en la entidad `item` de la API v2.0 de este
     // entorno y el $select inválido hacía que esto devolviera siempre null.
-    const url = `${stdRoot()}/companies(${cid})/items?$filter=${encodeURIComponent(`number eq '${itemNo}'`)}&$select=number,unitCost&$top=1`;
+    const url = `${stdRoot()}/companies(${cid})/items?$filter=${encodeURIComponent(`number eq '${odataStr(itemNo)}'`)}&$select=number,unitCost&$top=1`;
     const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
     if (!res.ok) return null;
     const it = ((await res.json())?.value ?? [])[0];
@@ -450,9 +452,7 @@ async function listCustom(group: string, path: string, opts: RequestInit = { cac
 }
 
 // Escapa una comilla simple para un literal OData ('' = comilla dentro del string).
-function odataStr(v: string): string {
-  return v.replace(/'/g, "''");
-}
+
 
 // ─── UNIDADES DE MEDIDA DE UN ARTÍCULO ──────────────────────────────────────────
 // Un material se CONSUME en una unidad y se COMPRA en otra: el adhesivo M06-0009 se
@@ -842,7 +842,7 @@ export async function bcUltimoPrecioFacturado(itemNo: string, vendorNo: string):
   if (!itemNo || !vendorNo) return null;
   try {
     const cid = await getStdCompanyId();
-    const filtro = `$filter=${encodeURIComponent(`vendorNumber eq '${vendorNo}'`)}`;
+    const filtro = `$filter=${encodeURIComponent(`vendorNumber eq '${odataStr(vendorNo)}'`)}`;
     const url =
       `${stdRoot()}/companies(${cid})/purchaseInvoices?${filtro}` +
       `&$orderby=invoiceDate desc&$top=20` +
@@ -914,7 +914,7 @@ function mapVariantes(rows: any[]): BcVariante[] {
 const lastGoodVariants = new Map<string, BcVariantsResult>();
 export async function bcVariantsEx(itemNo: string): Promise<BcVariantsResult> {
   if (!itemNo) return { variantes: [], disponible: true };
-  const filtro = `$filter=itemNumber eq '${encodeURIComponent(itemNo)}'`;
+  const filtro = `$filter=${encodeURIComponent(`itemNumber eq '${odataStr(itemNo)}'`)}`;
 
   // 1) API custom de Adelante.
   try {
@@ -947,7 +947,7 @@ async function getStdVariantId(itemNo: string, code: string): Promise<string | n
   if (key in stdVariantIdCache) return stdVariantIdCache[key];
   try {
     const cid = await getStdCompanyId();
-    const filtro = `$filter=${encodeURIComponent(`itemNumber eq '${itemNo}' and code eq '${code}'`)}&$select=id,code`;
+    const filtro = `$filter=${encodeURIComponent(`itemNumber eq '${odataStr(itemNo)}' and code eq '${odataStr(code)}'`)}&$select=id,code`;
     const res = await bcFetch(`${stdRoot()}/companies(${cid})/itemVariants?${filtro}`, { cache: "no-store" });
     if (res.ok) {
       const id = ((await res.json()).value ?? [])[0]?.id ?? null;
@@ -979,7 +979,7 @@ async function getStdLocationId(cid: string, code: string): Promise<string | nul
   if (!code) return null;
   if (code in stdLocationIdCache) return stdLocationIdCache[code];
   try {
-    const filtro = `$filter=${encodeURIComponent(`code eq '${code}'`)}&$select=id,code`;
+    const filtro = `$filter=${encodeURIComponent(`code eq '${odataStr(code)}'`)}&$select=id,code`;
     const res = await bcFetch(`${stdRoot()}/companies(${cid})/locations?${filtro}`, { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
@@ -2002,7 +2002,7 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
   const cid = await getStdCompanyId();
   const jsonHeaders = { "Content-Type": "application/json" };
   // 1) Pedido por número -> id.
-  const filtro = `$filter=${encodeURIComponent(`number eq '${orderNo}'`)}&$select=id,number`;
+  const filtro = `$filter=${encodeURIComponent(`number eq '${odataStr(orderNo)}'`)}&$select=id,number`;
   const resPo = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders?${filtro}`, { cache: "no-store" });
   if (!resPo.ok) throw new Error(`BC ${resPo.status} al buscar el pedido ${orderNo}.`);
   const poId = ((await resPo.json()).value ?? [])[0]?.id;

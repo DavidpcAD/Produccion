@@ -1,3 +1,5 @@
+import { odataStr } from './odata';
+
 let bcToken: { access_token: string; expires_at: number } | null = null;
 
 export async function getBCToken(): Promise<string> {
@@ -67,7 +69,7 @@ export async function getPostventaObras(): Promise<PostventaObra[]> {
 
 export async function getJobTasks(jobNo: string) {
   const token = await getBCToken();
-  const filter = encodeURIComponent(`jobNo eq '${jobNo}' and jobTaskType eq 'Posting'`);
+  const filter = encodeURIComponent(`jobNo eq '${odataStr(jobNo)}' and jobTaskType eq 'Posting'`);
   const res = await fetch(`${BASE}/jobTasks?$filter=${filter}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
@@ -278,7 +280,7 @@ export async function actualizarTareasProyecto(obraNo: string): Promise<void> {
  */
 export async function setAreaProrrateadaJob(obraNo: string, areaProrrateada: number): Promise<void> {
   const token = await getBCToken();
-  const g = await fetch(`${BASE}/jobs?$filter=${encodeURIComponent(`no eq '${obraNo}'`)}&$top=1`, {
+  const g = await fetch(`${BASE}/jobs?$filter=${encodeURIComponent(`no eq '${odataStr(obraNo)}'`)}&$top=1`, {
     headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
   });
   const gd = (await g.json().catch(() => ({}))) as { value?: Array<{ id?: string; '@odata.etag'?: string }> };

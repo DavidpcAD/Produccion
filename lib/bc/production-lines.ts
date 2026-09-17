@@ -1,4 +1,5 @@
 import 'server-only';
+import { odataStr } from '../odata';
 import { getBCToken } from '@/lib/bc-client';
 
 /**
@@ -46,7 +47,7 @@ export function registrarDisponible(): boolean {
 // Raíz de la entidad, con o sin segmento Company('…').
 function entityRoot(): string {
   return COMPANY_NAME
-    ? `${BC_ROOT}/ODataV4/Company('${COMPANY_NAME}')/${ENTITY}`
+    ? `${BC_ROOT}/ODataV4/Company('${odataStr(COMPANY_NAME!)}')/${ENTITY}`
     : `${BC_ROOT}/ODataV4/${ENTITY}`;
 }
 
@@ -60,16 +61,16 @@ function entityUrl(query: string): string {
 
 // URL de un registro por clave (para PATCH), con company= si aplica.
 function keyUrl(obra: string, taskNo: string): string {
-  const key = `(Works_No='${obra}',Task_No='${taskNo}')`;
+  const key = `(Works_No='${odataStr(obra)}',Task_No='${odataStr(taskNo)}')`;
   return COMPANY_NAME
-    ? `${BC_ROOT}/ODataV4/Company('${COMPANY_NAME}')/${ENTITY}${key}`
+    ? `${BC_ROOT}/ODataV4/Company('${odataStr(COMPANY_NAME!)}')/${ENTITY}${key}`
     : `${BC_ROOT}/ODataV4/${ENTITY}${key}?company=${COMPANY_ID}`;
 }
 
 // URL de la acción no enlazada de "Registrar".
 function actionUrl(): string {
   return COMPANY_NAME
-    ? `${BC_ROOT}/ODataV4/Company('${COMPANY_NAME}')/${REGISTRAR_ACTION}`
+    ? `${BC_ROOT}/ODataV4/Company('${odataStr(COMPANY_NAME!)}')/${REGISTRAR_ACTION}`
     : `${BC_ROOT}/ODataV4/${REGISTRAR_ACTION}?company=${COMPANY_ID}`;
 }
 
@@ -90,7 +91,7 @@ export interface LineaBC {
 /** Lee todas las líneas de producción de una obra. */
 export async function leerLineasObra(obra: string): Promise<LineaBC[]> {
   const tok = await getBCToken();
-  const url = entityUrl(`$filter=Works_No eq '${obra}'&$top=200`);
+  const url = entityUrl(`$filter=${encodeURIComponent(`Works_No eq '${odataStr(obra)}'`)}&$top=200`);
   const r = await fetch(url, {
     headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' },
     cache: 'no-store',
@@ -103,7 +104,7 @@ export async function leerLineasObra(obra: string): Promise<LineaBC[]> {
 export async function leerLineasObras(obras: string[]): Promise<LineaBC[]> {
   if (obras.length === 0) return [];
   const tok = await getBCToken();
-  const filtro = obras.map((o) => `Works_No eq '${o}'`).join(' or ');
+  const filtro = obras.map((o) => `Works_No eq '${odataStr(o)}'`).join(' or ');
   let url: string | null = entityUrl(`$filter=${encodeURIComponent(filtro)}&$top=5000`);
   const acc: LineaBC[] = [];
   while (url) {

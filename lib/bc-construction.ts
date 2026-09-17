@@ -1,4 +1,5 @@
 import 'server-only';
+import { odataStr } from './odata';
 import { getBCToken } from './bc-client';
 import { TASA_MAX, TASA_MIN } from './presupuesto-tasas';
 
@@ -123,7 +124,7 @@ export function nextVersion(verBase?: string | null): string {
 // (evita el error "Work Version already exists"). Toma el mayor REESTUDIO n y suma 1.
 export async function nextVersionDisponible(worksNo: string): Promise<string> {
   try {
-    const body = await req(`workVersions?$filter=${encodeURIComponent(`worksNo eq '${worksNo}'`)}&$top=1000`, { method: 'GET' });
+    const body = await req(`workVersions?$filter=${encodeURIComponent(`worksNo eq '${odataStr(worksNo)}'`)}&$top=1000`, { method: 'GET' });
     const codes: string[] = (body?.value ?? []).map((v: { versionCode?: string }) => String(v.versionCode ?? ''));
     let max = 0;
     for (const c of codes) {
@@ -162,7 +163,7 @@ export async function getWorkLines(worksNo: string, company?: string): Promise<W
   const out: WorkLineBC[] = [];
   for (let skip = 0; skip < 40000; skip += PAGINA) {
     const body = await req(
-      `workLines?$filter=${encodeURIComponent(`worksNo eq '${worksNo}'`)}&$top=${PAGINA}&$skip=${skip}`,
+      `workLines?$filter=${encodeURIComponent(`worksNo eq '${odataStr(worksNo)}'`)}&$top=${PAGINA}&$skip=${skip}`,
       { method: 'GET' }, company);
     const page = (body?.value ?? []) as Array<Record<string, unknown>>;
     for (const l of page) {
@@ -186,7 +187,7 @@ export async function getWorkLines(worksNo: string, company?: string): Promise<W
 export interface WorkTotals { salesLineAmount?: number; costLineAmount?: number; indirectCostLineAmount?: number; result?: number }
 
 export async function getWork(worksNo: string, company?: string): Promise<(WorkTotals & { no: string; filterVersionCode?: string }) | null> {
-  const body = await req(`works?$filter=${encodeURIComponent(`no eq '${worksNo}'`)}&$top=1`, { method: 'GET' }, company);
+  const body = await req(`works?$filter=${encodeURIComponent(`no eq '${odataStr(worksNo)}'`)}&$top=1`, { method: 'GET' }, company);
   return body?.value?.[0] ?? null;
 }
 
@@ -207,7 +208,7 @@ export async function getObrasConVersion(): Promise<Set<string>> {
 // setAreaProrrateadaJob (que lo pone en el Job): así el área queda en Obra + Proyecto.
 // Busca el work por N° y hace PATCH con If-Match.
 export async function setAreaProrrateadaWork(worksNo: string, areaProrrateada: number): Promise<void> {
-  const g = await req(`works?$filter=${encodeURIComponent(`no eq '${worksNo}'`)}&$top=1`, { method: 'GET' });
+  const g = await req(`works?$filter=${encodeURIComponent(`no eq '${odataStr(worksNo)}'`)}&$top=1`, { method: 'GET' });
   const w = ((g?.value ?? []) as Array<{ id?: string; '@odata.etag'?: string }>)[0];
   if (!w?.id) throw new Error(`La obra ${worksNo} no existe en BC (works)`);
   await req(`works(${w.id})`, {
@@ -274,7 +275,7 @@ export async function setTasasWork(worksNo: string, tasas: TasasWork): Promise<v
       throw new Error(`${campo} = ${valor} está fuera de ${TASA_MIN}–${TASA_MAX}: no se escribe en BC (BC lo aceptaría igual).`);
     }
   }
-  const g = await req(`works?$filter=${encodeURIComponent(`no eq '${worksNo}'`)}&$top=1`, { method: 'GET' });
+  const g = await req(`works?$filter=${encodeURIComponent(`no eq '${odataStr(worksNo)}'`)}&$top=1`, { method: 'GET' });
   const w = ((g?.value ?? []) as Array<{ id?: string; '@odata.etag'?: string }>)[0];
   if (!w?.id) throw new Error(`La obra ${worksNo} no existe en BC (works)`);
   await req(`works(${w.id})`, {

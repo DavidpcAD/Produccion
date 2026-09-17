@@ -1,4 +1,5 @@
 import { ROLES_APP, type RolApp, type UsuarioConRoles } from './tipos-deps';
+import { odataStr } from '@/lib/odata';
 
 /**
  * Gestión de roles de usuarios en la App Registration del API (Entra ID).
@@ -157,7 +158,7 @@ async function resolverSpYRoles(): Promise<CacheSp> {
     );
   }
 
-  const filtro = encodeURIComponent(`appId eq '${appId}'`);
+  const filtro = encodeURIComponent(`appId eq '${odataStr(appId)}'`);
   const sps = await graphFetch<{
     value: Array<{ id: string; appRoles: Array<{ id: string; value: string }> }>;
   }>(`/servicePrincipals?$filter=${filtro}&$select=id,appRoles`);
@@ -244,7 +245,7 @@ export async function buscarUsuarios(q: string, limite: number): Promise<Usuario
   const rolesById = new Map<string, RolApp>();
   for (const [value, id] of rolesByValue) rolesById.set(id, value as RolApp);
 
-  const qSafe = q.replace(/'/g, "''");
+  const qSafe = odataStr(q);
   const filtro = encodeURIComponent(
     `startswith(displayName,'${qSafe}') or startswith(mail,'${qSafe}') or startswith(userPrincipalName,'${qSafe}')`,
   );

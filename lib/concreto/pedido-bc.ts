@@ -1,3 +1,4 @@
+import { odataStr } from '../odata';
 import type sqlModule from 'mssql';
 import { sql } from '@/lib/db-adelantedb';
 import { getBCToken, bcConfigured } from '@/lib/bc-client';
@@ -73,7 +74,7 @@ function urlEmpresaBC(): string {
       'Falta BC_COMPANY (nombre de la empresa en BC) para el pedido de ensamblado.',
     );
   }
-  return `${bcRoot()}/ODataV4/Company('${encodeURIComponent(company)}')`;
+  return `${bcRoot()}/ODataV4/Company('${encodeURIComponent(odataStr(company))}')`;
 }
 
 interface OpcionesFetchBC {
@@ -476,7 +477,7 @@ interface FilaLineaAssemblyBC {
  * NO se aborta (el pedido ya existe en BC).
  */
 async function ajustarAlmacenLineasComponente(numeroPedido: string): Promise<void> {
-  const urlLineas = `${urlEmpresaBC()}/AssemblyOrderLine?$filter=Document_No eq '${encodeURIComponent(numeroPedido)}'`;
+  const urlLineas = `${urlEmpresaBC()}/AssemblyOrderLine?$filter=${encodeURIComponent(`Document_No eq '${odataStr(numeroPedido)}'`)}`;
   const resp = await llamarBC<{ value?: FilaLineaAssemblyBC[] }>(urlLineas);
   const lineas = resp.value ?? [];
 
@@ -488,8 +489,8 @@ async function ajustarAlmacenLineasComponente(numeroPedido: string): Promise<voi
   for (const linea of lineasItem) {
     const urlLinea =
       `${urlEmpresaBC()}/AssemblyOrderLine(` +
-      `Document_Type='${encodeURIComponent(linea.Document_Type)}',` +
-      `Document_No='${encodeURIComponent(linea.Document_No)}',` +
+      `Document_Type='${encodeURIComponent(odataStr(linea.Document_Type))}',` +
+      `Document_No='${encodeURIComponent(odataStr(linea.Document_No))}',` +
       `Line_No=${linea.Line_No})`;
     try {
       await llamarBC(urlLinea, {
