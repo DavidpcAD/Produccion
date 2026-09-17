@@ -1,7 +1,10 @@
+// Solo LECTURA. El alta/edición/baja de colaboradores se administra en
+// Recursos Humanos (rh.adelante.cr); Producción únicamente consulta el padrón
+// para poblar los selectores de Cuadrillas y Proyectos. Los métodos de
+// escritura se eliminaron el 2026-09-14 (ver auditoría de seguridad).
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, sql } from '@/lib/db';
-import { getSession, hashPassword } from '@/lib/auth';
-import { enrolarEnZona, H4Error } from '@/lib/h4';
+import { getSession } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -91,134 +94,4 @@ export async function GET(req: NextRequest) {
     paginas: Math.ceil(total / porPagina),
     pagina,
   });
-}
-
-export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session || session.nivelAdmin < 2) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-  }
-
-  const body = await req.json();
-  const str = (v: unknown) => (v != null && String(v).trim() !== '' ? String(v).trim() : null);
-
-  // Colaborador = todos. Requeridos: cédula, nombre, primer apellido, teléfono, puesto.
-  const cedula = str(body.cedula);
-  const nombre = str(body.nombre);
-  const primerApellido = str(body.primerApellido);
-  const telefono = str(body.telefono);
-  const idPuesto = body.idPuesto ? Number(body.idPuesto) : null;
-  if (!cedula || !nombre || !primerApellido || !telefono || !idPuesto) {
-    return NextResponse.json(
-      { error: 'Cédula, nombre, primer apellido, teléfono y puesto son requeridos.' },
-      { status: 400 },
-    );
-  }
-
-  // Usuario (login) = solo si se le asignan roles. Ahí sí requiere username + contraseña.
-  const roles: number[] = Array.isArray(body.roles) ? body.roles.map(Number).filter(Boolean) : [];
-  const tiposMap: Record<string, string> = body.tipos && typeof body.tipos === 'object' ? body.tipos : {};
-  const crearUsuario = roles.length > 0;
-  const username = str(body.username);
-  const password = typeof body.password === 'string' ? body.password : '';
-  if (crearUsuario) {
-    if (!username) return NextResponse.json({ error: 'El usuario (username) es requerido cuando se asignan roles.' }, { status: 400 });
-    if (password.length < 8) return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres.' }, { status: 400 });
-  }
-
-  const db = await getDb();
-  const tx = new sql.Transaction(db);
-  try {
-    await tx.begin();
-
-    // 1) Colaborador (idPais = único país; calcNombreCompleto/iniciales son computados; fechaCreacion tiene default)
-    const colRes = await new sql.Request(tx)
-      .input('idPuesto', sql.Int, idPuesto)
-      .input('cedula', sql.NVarChar, cedula)
-      .input('nombre', sql.NVarChar, nombre)
-      .input('primerApellido', sql.NVarChar, primerApellido)
-      .input('segundoApellido', sql.NVarChar, str(body.segundoApellido))
-      .input('correo', sql.NVarChar, str(body.correo))
-      .input('telefono', sql.NVarChar, telefono)
-      .input('genero', sql.NVarChar, str(body.sexo))
-      .input('fechaIngreso', sql.Date, body.fechaIngreso ? new Date(body.fechaIngreso) : null)
-      .input('direccion', sql.NVarChar, str(body.direccion))
-      .input('codigoDistrito', sql.Char, str(body.codigoDistrito))
-      .input('salarioMensual', sql.Decimal(18, 2), body.salarioMensual != null && String(body.salarioMensual).trim() !== '' ? Number(body.salarioMensual) : null)
-      .input('horaEntrada', sql.NVarChar, str(body.horaEntrada))
-      .input('horaSalida', sql.NVarChar, str(body.horaSalida))
-      .input('creadoPor', sql.NVarChar, session.cedula ?? 'control-usuarios')
-      .query(`
-        INSERT INTO dbo.Colaborador
-          (idPais, idPuesto, cedula, nombre, primerApellido, segundoApellido, correo,
-           telefono, genero, fechaIngreso, direccion, codigoDistrito,
-           salarioMensual, horaEntrada, horaSalida, esActivo, creadoPor)
-        OUTPUT INSERTED.idColaborador
-        VALUES
-          ((SELECT MIN(idPais) FROM dbo.Pais), @idPuesto, @cedula, @nombre, @primerApellido,
-           @segundoApellido, @correo, @telefono, @genero, @fechaIngreso, @direccion,
-           @codigoDistrito, @salarioMensual, @horaEntrada, @horaSalida, 1, @creadoPor)
-      `);
-    const idColaborador = Number(colRes.recordset[0].idColaborador);
-
-    // 2) Usuario + roles (solo si tiene acceso a apps)
-    if (crearUsuario) {
-      const passwordHash = await hashPassword(password);
-      const uRes = await new sql.Request(tx)
-        .input('idCol', sql.Int, idColaborador)
-        .input('username', sql.NVarChar, username)
-        .input('hash', sql.NVarChar, passwordHash)
-        .input('telefono', sql.NVarChar, telefono)
-        .input('creadoPor', sql.NVarChar, session.cedula ?? 'control-usuarios')
-        .query(`
-          INSERT INTO dbo.Usuario
-            (idColaborador, username, passwordHash, fechaUltimoCambioContrasena, fechaCreacion, creadoPor, telefono)
-          OUTPUT INSERTED.idUsuario
-          VALUES (@idCol, @username, @hash, SYSUTCDATETIME(), SYSUTCDATETIME(), @creadoPor, @telefono)
-        `);
-      const idUsuario = Number(uRes.recordset[0].idUsuario);
-      for (const idRol of roles) {
-        const esTipo = (tiposMap[String(idRol)] || '').trim() || 'Indefinido';
-        await new sql.Request(tx)
-          .input('u', sql.Int, idUsuario)
-          .input('r', sql.Int, idRol)
-          .input('esTipo', sql.NVarChar, esTipo)
-          .input('creadoPor', sql.NVarChar, session.cedula ?? 'control-usuarios')
-          .query(`INSERT INTO dbo.UsuarioRol (idUsuario, idRol, esTipo, creadoPor)
-                  VALUES (@u, @r, @esTipo, @creadoPor)`);
-      }
-    }
-
-    await tx.commit();
-
-    // Enrolamiento en zona de marca (H4) — DESPUÉS de crear el colaborador, porque
-    // la API de H4 lo busca por idColaborador. Se hace fuera de la transacción: si
-    // falla, el colaborador ya quedó creado y se puede reintentar el enrolamiento.
-    const idZonaMarcaje = body.idZonaMarcaje != null && String(body.idZonaMarcaje).trim() !== ''
-      ? Number(body.idZonaMarcaje) : null;
-    let enrolamiento: { pin: string; equipos: number; conFoto: boolean } | null = null;
-    let enrolamientoError: string | null = null;
-    if (idZonaMarcaje) {
-      try {
-        enrolamiento = await enrolarEnZona(idZonaMarcaje, idColaborador, session.cedula ?? null);
-      } catch (e) {
-        enrolamientoError = e instanceof H4Error ? e.message : (e instanceof Error ? e.message : String(e));
-        console.error('/api/usuarios enrolamiento H4 error:', e);
-      }
-    }
-
-    return NextResponse.json(
-      { idCol: idColaborador, usuarioCreado: crearUsuario, enrolamiento, enrolamientoError },
-      { status: 201 },
-    );
-  } catch (err: unknown) {
-    try { await tx.rollback(); } catch { /* ignorar */ }
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('/api/usuarios POST error:', err);
-    if (/duplicate|UNIQUE|PRIMARY KEY/i.test(msg)) {
-      if (/username/i.test(msg)) return NextResponse.json({ error: 'Ya existe un usuario con ese username.' }, { status: 409 });
-      return NextResponse.json({ error: 'Ya existe un colaborador con esa cédula.' }, { status: 409 });
-    }
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
 }
