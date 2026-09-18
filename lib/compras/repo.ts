@@ -148,7 +148,7 @@ export interface NewPedidoDB {
    *  poder filtrar "mis solicitudes". Si no viene, cae al nombre (`usuario`). El
    *  movimiento sí conserva el nombre legible (`usuario`). */
   creadoPorId?: string;
-  lineas: { itemNo: string; descripcion: string; cantidad: number; unidad: string; almacen: string; obra?: string; variantCode?: string; taskNo?: string; taskDescr?: string }[];
+  lineas: { itemNo: string; descripcion: string; cantidad: number; unidad: string; almacen: string; obra?: string; variantCode?: string; notas?: string; taskNo?: string; taskDescr?: string }[];
 }
 
 export async function createPedido(input: NewPedidoDB): Promise<number> {
@@ -191,11 +191,16 @@ export async function createPedido(input: NewPedidoDB): Promise<number> {
         .input("locationCode", sql.NVarChar(20), l.almacen)
         .input("obra", sql.NVarChar(50), l.obra ?? null)
         .input("quantitySolicitado", sql.Decimal(18, 4), l.cantidad)
+        // Comentario que el solicitante le escribió A ESTA LÍNEA ("sin filo", "color
+        // café"…). Se escribía en el panel y se perdía acá: la columna se leía pero
+        // nunca se insertaba, así que ni el solicitante ni proveeduría lo volvían a ver.
+        // La columna es nvarchar(255): se recorta para no romper el guardado entero.
+        .input("notaCreador", sql.NVarChar(255), l.notas?.slice(0, 255) || null)
         .input("taskNo", sql.NVarChar(15), l.taskNo ?? null)
         .input("taskDescr", sql.NVarChar(150), l.taskDescr ?? null)
         .input("creadoPor", sql.NVarChar(100), input.usuario)
-        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,obra,quantitySolicitado,quantityOrdenado,taskNo,taskDescr,fechaCreacion,creadoPor)
-                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@obra,@quantitySolicitado,0,@taskNo,@taskDescr,getdate(),@creadoPor)`);
+        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,obra,quantitySolicitado,quantityOrdenado,notaCreador,taskNo,taskDescr,fechaCreacion,creadoPor)
+                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@obra,@quantitySolicitado,0,@notaCreador,@taskNo,@taskDescr,getdate(),@creadoPor)`);
       line += 10000;
     }
     await logMov(tx, { entidad: "pedido", idEntidad: idPedido, documentoNo: numero, tipoMovimiento: "creado", estadoNuevo: "borrador", usuario: input.usuario, rol: input.rol });
@@ -272,11 +277,16 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
         .input("locationCode", sql.NVarChar(20), l.almacen)
         .input("obra", sql.NVarChar(50), l.obra ?? null)
         .input("quantitySolicitado", sql.Decimal(18, 4), l.cantidad)
+        // Comentario que el solicitante le escribió A ESTA LÍNEA ("sin filo", "color
+        // café"…). Se escribía en el panel y se perdía acá: la columna se leía pero
+        // nunca se insertaba, así que ni el solicitante ni proveeduría lo volvían a ver.
+        // La columna es nvarchar(255): se recorta para no romper el guardado entero.
+        .input("notaCreador", sql.NVarChar(255), l.notas?.slice(0, 255) || null)
         .input("taskNo", sql.NVarChar(15), l.taskNo ?? null)
         .input("taskDescr", sql.NVarChar(150), l.taskDescr ?? null)
         .input("creadoPor", sql.NVarChar(100), input.usuario)
-        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,obra,quantitySolicitado,quantityOrdenado,taskNo,taskDescr,fechaCreacion,creadoPor)
-                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@obra,@quantitySolicitado,0,@taskNo,@taskDescr,getdate(),@creadoPor)`);
+        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,variantCode,unitOfMeasureCode,locationCode,obra,quantitySolicitado,quantityOrdenado,notaCreador,taskNo,taskDescr,fechaCreacion,creadoPor)
+                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@variantCode,@unitOfMeasureCode,@locationCode,@obra,@quantitySolicitado,0,@notaCreador,@taskNo,@taskDescr,getdate(),@creadoPor)`);
       line += 10000;
     }
     await logMov(tx, { entidad: "pedido", idEntidad: input.id, documentoNo: row.pedidoNo, tipoMovimiento: "editado", usuario: input.usuario, rol: input.rol });
@@ -304,7 +314,7 @@ export interface EditSubcontratoDB {
   proveedorNo: string; proveedorNombre?: string; currencyCode: string;
   lineas: {
     itemNo: string; descripcion: string; cantidad: number; unidad: string;
-    obra?: string; taskNo?: string; taskDescr?: string;
+    obra?: string; notas?: string; taskNo?: string; taskDescr?: string;
     /** monto global del servicio: viaja como precio unitario de la línea de la orden. */
     monto: number;
   }[];
@@ -382,12 +392,13 @@ export async function updateSubcontrato(input: EditSubcontratoDB): Promise<void>
         .input("unitOfMeasureCode", sql.NVarChar(20), l.unidad)
         .input("obra", sql.NVarChar(50), l.obra ?? null)
         .input("quantitySolicitado", sql.Decimal(18, 4), l.cantidad)
+        .input("notaCreador", sql.NVarChar(255), l.notas?.slice(0, 255) || null)
         .input("taskNo", sql.NVarChar(15), l.taskNo ?? null)
         .input("taskDescr", sql.NVarChar(150), l.taskDescr ?? null)
         .input("creadoPor", sql.NVarChar(100), input.usuario)
-        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,unitOfMeasureCode,locationCode,obra,quantitySolicitado,quantityOrdenado,taskNo,taskDescr,fechaCreacion,creadoPor)
+        .query(`INSERT dbo.PedidoCompraDet (idPedidoCompra,lineNum,descripcion,itemNo,unitOfMeasureCode,locationCode,obra,quantitySolicitado,quantityOrdenado,notaCreador,taskNo,taskDescr,fechaCreacion,creadoPor)
                 OUTPUT INSERTED.idPedidoCompraDet
-                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@unitOfMeasureCode,@locationCode,@obra,@quantitySolicitado,@quantitySolicitado,@taskNo,@taskDescr,getdate(),@creadoPor)`);
+                VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@unitOfMeasureCode,@locationCode,@obra,@quantitySolicitado,@quantitySolicitado,@notaCreador,@taskNo,@taskDescr,getdate(),@creadoPor)`);
       const idDet = det.recordset[0].idPedidoCompraDet as number;
       await new sql.Request(tx)
         .input("idOrdenCompra", sql.Int, orden.idOrdenCompra)
@@ -517,6 +528,10 @@ export async function listOrdenes(): Promise<Orden[]> {
              -- El PED-… que originó la línea. Sin esto la app pintaba TODA orden como
              -- "Compra directa · sin solicitud de origen" aunque naciera de un pedido.
              pc.pedidoNo AS pedidoNoOrigen,
+             -- El COMENTARIO que el solicitante le escribió a la línea ("marca X",
+             -- "sin filo"). La orden no lo copia: se hereda del pedido origen para que
+             -- se siga leyendo después de armada la orden, que es cuando se compra.
+             pd.notaCreador AS notaPedidoOrigen,
              -- La OBRA de la línea, heredada del pedido origen. Mismo compat que
              -- mapPedido: en líneas viejas de material la obra viajaba en locationCode
              -- (la columna obra existía sin usarse) y de último cae a la del pedido.
@@ -555,6 +570,10 @@ export async function getOrden(id: number): Promise<Orden | null> {
              -- El PED-… que originó la línea. Sin esto la app pintaba TODA orden como
              -- "Compra directa · sin solicitud de origen" aunque naciera de un pedido.
              pc.pedidoNo AS pedidoNoOrigen,
+             -- El COMENTARIO que el solicitante le escribió a la línea ("marca X",
+             -- "sin filo"). La orden no lo copia: se hereda del pedido origen para que
+             -- se siga leyendo después de armada la orden, que es cuando se compra.
+             pd.notaCreador AS notaPedidoOrigen,
              -- La OBRA de la línea, heredada del pedido origen. Mismo compat que
              -- mapPedido: en líneas viejas de material la obra viajaba en locationCode
              -- (la columna obra existía sin usarse) y de último cae a la del pedido.
@@ -597,6 +616,7 @@ function mapOrden(o: any, lineas: any[]): Orden {
       // query): sin ella BC rechaza el lanzamiento.
       articuloId: l.itemNo ?? undefined, variantCode: (l.variantCodeEfectivo ?? l.variantCode) ?? undefined, pedidoLineaId: l.idPedidoCompraDet ? String(l.idPedidoCompraDet) : undefined,
       pedidoNumero: l.pedidoNoOrigen ?? undefined, obra: l.obraOrigen ?? undefined,
+      notaPedido: l.notaPedidoOrigen ?? undefined,
       maquinaNo: l.maquinaOrigen ?? undefined,
       esActivo: l.tipoSolicitudOrigen === "activo" || undefined,
       descripcion: l.descripcion ?? "", cantidad: Number(l.quantity ?? 0),

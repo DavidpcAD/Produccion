@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { AppShell } from "@/components/compras/shell";
-import { Badge, Button, Card, Modal, useToast } from "@/components/compras/ui";
+import { Badge, Button, Card, LineaPedidaInfo, Modal, useToast } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { VistaToggle } from "@/components/compras/vista-toggle";
 import { IconEye, IconReceipt, IconList } from "@/components/compras/icons";
@@ -21,6 +21,9 @@ interface Row {
   pedidoLineaId: string;
   articuloId: string;
   descripcion: string;
+  /** Variante y comentario que escribió quien pidió: se leen antes de comprar. */
+  variantCode?: string;
+  notas?: string;
   unidad: string;
   almacen: string;
   pendiente: number;
@@ -54,6 +57,7 @@ export default function ProveeduriaMaterialesPage() {
         rows.push({
           pedidoId: p.id, pedidoNumero: p.numero, destino: destinoLabel(p), tipo: p.tipoSolicitud,
           pedidoLineaId: l.id, articuloId: l.articuloId, descripcion: l.descripcion,
+          variantCode: l.variantCode, notas: l.notas,
           unidad: l.unidad, almacen: destinoDeLinea(l, p), pendiente: pend,
           incluir: false, cantidad: String(pend), precio: "0", iva: "13",
         });
@@ -131,8 +135,13 @@ export default function ProveeduriaMaterialesPage() {
     },
     { id: "pedido", header: "Pedido", accessorFn: (r) => r.pedidoNumero, meta: { label: "Pedido" },
       cell: (c) => { const r = c.row.original; return <span className="row gap-2" style={{ alignItems: "center" }}>{dot(r.tipo === "repuesto" ? "yellow" : "green")}<span className="ds-body-sm ds-strong">{r.pedidoNumero}</span></span>; } },
-    { id: "articulo", header: "Artículo", accessorFn: (r) => `${r.articuloId} ${r.descripcion}`, meta: { label: "Artículo" },
-      cell: (c) => { const r = c.row.original; return <div className="ds-truncate" title={`${r.articuloId} — ${r.descripcion}`} style={{ maxWidth: 320 }}><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>; } },
+    { id: "articulo", header: "Artículo", accessorFn: (r) => `${r.articuloId} ${r.descripcion} ${r.variantCode ?? ""} ${r.notas ?? ""}`, meta: { label: "Artículo" },
+      cell: (c) => { const r = c.row.original; return (
+        <div style={{ maxWidth: 320 }}>
+          <div className="ds-truncate" title={`${r.articuloId} — ${r.descripcion}`}><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>
+          <LineaPedidaInfo variante={r.variantCode} nota={r.notas} />
+        </div>
+      ); } },
     { id: "obra", header: "Obra", accessorFn: (r) => r.almacen || "—", meta: { label: "Obra" },
       cell: (c) => <span className="ds-muted ds-body-sm">{c.getValue()}</span> },
     { id: "pend", header: "Pend.", accessorFn: (r) => r.pendiente, meta: { label: "Pend.", num: true }, enableColumnFilter: false,
@@ -245,7 +254,10 @@ export default function ProveeduriaMaterialesPage() {
               <tbody>
                 {preview.lineas.map((l) => (
                   <tr key={l.id}>
-                    <td><div className="ds-truncate" title={l.descripcion}>{l.descripcion}</div></td>
+                    <td>
+                      <div className="ds-truncate" title={l.descripcion}>{l.descripcion}</div>
+                      <LineaPedidaInfo code={l.articuloId} variante={l.variantCode} nota={l.notas} />
+                    </td>
                     <td className="ds-muted ds-body-sm">{destinoDeLinea(l, preview) || "—"}</td>
                     <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                     <td className="ds-num">{pedidoLineaPendiente(l, preview) > 0 ? <span className="ds-pending-text">{num.format(pedidoLineaPendiente(l, preview))}</span> : "0"}</td>

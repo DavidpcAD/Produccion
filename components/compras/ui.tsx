@@ -112,6 +112,32 @@ export function Badge({ tone = "gray", title, children }: { tone?: string; title
   return <span className={`ds-badge ds-badge--${tone}`} title={title}>{children}</span>;
 }
 
+// ------------------------------------------------- Detalle de una línea pedida
+// Lo que el solicitante dejó dicho en UNA línea y que hasta ahora se quedaba en el
+// panel de creación: el CÓDIGO del artículo, la VARIANTE que eligió y el COMENTARIO
+// que le escribió. Se pinta igual en la solicitud enviada, en el armado de la orden
+// y en la orden, que es donde hay que leerlo antes de comprar.
+export function LineaPedidaInfo({ code, variante, nota, extra }: {
+  code?: string; variante?: string; nota?: string; extra?: React.ReactNode;
+}) {
+  const meta = [code, variante && `Variante ${variante}`].filter(Boolean).join(" · ");
+  const txt = nota?.trim();
+  if (!meta && !txt && !extra) return null;
+  return (
+    <>
+      {(meta || extra) && (
+        <div className="ds-body-sm ds-muted">{meta}{meta && extra ? " · " : ""}{extra}</div>
+      )}
+      {txt && (
+        <div className="oc-nota-linea" title={txt}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+          <span>{txt}</span>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ---------------------------------------------------------------- Card
 export function Card({
   className = "", interactive, flat, children, ...rest

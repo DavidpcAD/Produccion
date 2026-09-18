@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Badge, Card, QtyRing } from "@/components/compras/ui";
+import { Badge, Card, LineaPedidaInfo, QtyRing } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
 import { destinoCodigo, destinoDeLinea, destinoLabel, formatDate, num, pedidoBadge, pedidoLineaDadaDeBaja, pedidoLineaPendiente, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
@@ -71,6 +71,9 @@ export function SolicitudDetalle({
                       {l.devuelta && <Badge tone="red">Devuelta</Badge>}
                       {baja > 0 && <Badge tone="gray" title={`Se archivó la solicitud: ${num.format(baja)} ${l.unidad} nunca se ordenaron y ya no se van a comprar.`}>Ya no se compra</Badge>}
                     </div>
+                    {/* Variante y comentario que escribió quien pidió: es lo que hay que
+                        leer antes de comprar (marca, color, "sin filo"…). */}
+                    <LineaPedidaInfo code={l.articuloId} variante={l.variantCode} nota={l.notas} />
                   </td>
                   <td className="ds-muted ds-body-sm">{destinoDeLinea(l, pedido) || "—"}</td>
                   <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>

@@ -188,6 +188,10 @@ export interface OrdenLinea {
   /** REPUESTO: máquina del pedido origen (MAQ00012). Igual que `obra`, se hereda en el
    *  join; a BC va en el N.º máquina de la línea (GomEqp Machine No.). */
   maquinaNo?: string;
+  /** Comentario que el solicitante le escribió a la línea de pedido origen ("marca X",
+   *  "sin filo"). La orden no lo persiste: se hereda en el join, igual que `obra`, para
+   *  que se pueda leer al comprar y al recibir. */
+  notaPedido?: string;
   descripcion: string;
   cantidad: number;
   unidad: string;

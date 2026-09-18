@@ -46,7 +46,10 @@ type PlantillaLinea = { code: string; cantidad: number; obraCodigo?: string; var
   taskNo?: string; taskDescr?: string;
   // SUBCONTRATO: alcance (texto libre de la línea) y monto unitario. Solo llegan al
   // copiar/editar un subcontrato; las plantillas guardadas no los tienen.
-  detalle?: string; monto?: number };
+  detalle?: string; monto?: number;
+  // Comentario de la línea. Viaja al copiar/editar un pedido para no borrarlo al
+  // guardar; una plantilla es un molde y no lo lleva.
+  notas?: string };
 type Plantilla = { id: number; nombre: string; tipo?: "general" | "bodega"; idClasificacion?: number | null; lineas: PlantillaLinea[]; creadoPor?: string };
 // Semilla para "Copiar pedido": abre el drawer ya cargado con las líneas de un
 // pedido existente. Las líneas usan el MISMO shape que una plantilla (code/obra/
@@ -785,7 +788,7 @@ function LineaComentarioBtn({ value, onChange }: { value: string; onChange: (v: 
       <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={300}>
         <div style={{ padding: 12, width: "100%" }}>
           <span className="ds-form-field__label" style={{ display: "block", marginBottom: 6 }}>Comentario de la línea</span>
-          <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} placeholder="Nota para esta línea…"
+          <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} placeholder="Nota para esta línea…" maxLength={255}
             style={{ display: "block", width: "100%", minWidth: 276, height: 84, resize: "vertical", padding: "10px 12px", borderRadius: 10, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-color-white)", color: "var(--ds-color-ink)" }} />
         </div>
       </Popover>
@@ -1382,7 +1385,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       // guardaron vacía, y ahí manda la del artículo de BC.
       rows.push({ key: uid(), grupoKey: gKey, articuloId: a.id, variantCode: vCode, variantNombre: vNombre, cantidad: pl2.cantidad || 1, unidad: (pl2.unidad ?? "").trim() || undefined, obraCodigo: oc || undefined, obraNombre: oc ? obraNombreDe(oc) : undefined,
         // Subcontrato: sin esto, editarlo perdía el alcance escrito y los montos.
-        detalle: pl2.detalle, monto: pl2.monto });
+        detalle: pl2.detalle, monto: pl2.monto,
+        // Al editar un pedido, su comentario de línea vuelve al panel: si no, guardar
+        // la corrección lo borraba.
+        notas: pl2.notas });
     }
     return { grupos: nuevosGrupos, rows, extras, bloqueadas };
   }

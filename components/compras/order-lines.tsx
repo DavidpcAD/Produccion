@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/compras/ui";
+import { Badge, LineaPedidaInfo } from "@/components/compras/ui";
 import { money, num, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenLineaPendiente } from "@/lib/compras/helpers";
 import type { Orden, OrdenLinea } from "@/lib/compras/types";
 
@@ -30,7 +30,7 @@ export function OrderLinesTable({ orden, showRecepcion = true, solicitudHref }: 
                   <div className="ds-body-sm ds-muted">
                     {(() => {
                       // La obra solo si NO es consumo directo (ahí ya se lee en Proy./Tarea).
-                      const rest = [!ordenLineaEsConsumoDirecto(l) && l.obra && `Obra ${l.obra}`, l.proyecto && `Proy. ${l.proyecto}`, l.taskNo && `Tarea ${l.taskNo}`, l.descuentoPct ? `−${l.descuentoPct}%` : null].filter(Boolean).join(" · ");
+                      const rest = [!ordenLineaEsConsumoDirecto(l) && l.obra && `Obra ${l.obra}`, l.variantCode && `Variante ${l.variantCode}`, l.proyecto && `Proy. ${l.proyecto}`, l.taskNo && `Tarea ${l.taskNo}`, l.descuentoPct ? `−${l.descuentoPct}%` : null].filter(Boolean).join(" · ");
                       const href = l.pedidoNumero ? solicitudHref?.(l) : null;
                       return <>
                         {l.pedidoNumero && (href
@@ -40,6 +40,10 @@ export function OrderLinesTable({ orden, showRecepcion = true, solicitudHref }: 
                       </>;
                     })()}
                   </div>
+                  {/* Lo que pidió quien hizo la solicitud para ESTA línea. La orden no lo
+                      guarda: se hereda del pedido origen, y es lo que hay que respetar al
+                      comprar y al recibir. */}
+                  <LineaPedidaInfo nota={l.notaPedido} />
                 </td>
                 {/* En consumo directo el "almacén" es la obra: se marca para que no se
                     lea como una recepción a bodega. */}

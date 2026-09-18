@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
-import { Badge, Button, Card, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
+import { Badge, Button, Card, Field, Input, LineaPedidaInfo, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
 import { money, numeroOrden, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, precioEnUnidad, mismaMoneda, ALMACEN_GENERAL, esLineaConsumoDirecto, obraDeLinea, destinoDeLinea, type UnidadItem } from "@/lib/compras/helpers";
@@ -15,6 +15,9 @@ interface Row {
   pedidoLineaId: string;
   articuloId: string;
   variantCode: string;
+  /** Comentario que el solicitante le escribió a la línea ("marca X", "sin filo"…).
+   *  Se arrastra desde la solicitud: es lo que hay que respetar al comprar. */
+  notas?: string;
   descripcion: string;
   unidad: string;
   almacen: string;
@@ -92,7 +95,7 @@ export default function ArmarOrdenPage() {
 
   const [rows, setRows] = useState<Row[]>(() =>
     borrador.map((b) => {
-      let info = { pedidoNumero: "", articuloId: "", variantCode: "", descripcion: "", unidad: "", almacen: "", proyecto: "", tarea: "" };
+      let info = { pedidoNumero: "", articuloId: "", variantCode: "", notas: undefined as string | undefined, descripcion: "", unidad: "", almacen: "", proyecto: "", tarea: "" };
       for (const p of pedidos) {
         const l = p.lineas.find((x) => x.id === b.pedidoLineaId);
         // Consumo directo = la línea trae TAREA: va contra proyecto (obra) + tarea.
@@ -104,7 +107,7 @@ export default function ArmarOrdenPage() {
           // parque de maquinaria (proyecto MAQ · tarea CMAQ, que la solicitud ya trae
           // en la línea). En los dos casos el proyecto de la línea es su `obra`.
           const consumo = esLineaConsumoDirecto(l, p);
-          info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", descripcion: l.descripcion, unidad: l.unidad,
+          info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", notas: l.notas, descripcion: l.descripcion, unidad: l.unidad,
             // Un ACTIVO FIJO no lleva almacén (no entra a inventario): no cae al General.
             almacen: p.tipoSolicitud === "activo" ? "" : consumo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
             proyecto: consumo ? obraDeLinea(l, p) : "", tarea: l.taskNo ?? "" };
@@ -187,7 +190,7 @@ export default function ArmarOrdenPage() {
     const hist = precioSugerido(l.articuloId, l.unidad) ?? 0;
     setRows((rs) => [...rs, {
       pedidoNumero: p.numero, pedidoLineaId: l.id, articuloId: l.articuloId, variantCode: l.variantCode ?? "",
-      descripcion: l.descripcion, unidad: l.unidad,
+      notas: l.notas, descripcion: l.descripcion, unidad: l.unidad,
       // Mismo criterio que arriba: con tarea → proyecto + tarea (almacén de la obra);
       // sin tarea → el almacén elegido en el pedido, o el General si no trae.
       almacen: p.tipoSolicitud === "activo" ? "" : esLineaConsumoDirecto(l, p) ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
@@ -424,7 +427,10 @@ export default function ArmarOrdenPage() {
                 {rows.map((r) => (
                   <tr key={r.pedidoLineaId}>
                     <td className="ds-body-sm ds-strong">{r.pedidoNumero}</td>
-                    <td><div className="ds-truncate" title={`${r.articuloId} — ${r.descripcion}`} style={{ maxWidth: 260 }}><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div></td>
+                    <td>
+                      <div className="ds-truncate" title={`${r.articuloId} — ${r.descripcion}`} style={{ maxWidth: 260 }}><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>
+                      <LineaPedidaInfo variante={r.variantCode || undefined} nota={r.notas} />
+                    </td>
                     <td className="ds-muted ds-body-sm">{r.almacen}</td>
                     <td className="ds-num">
                       <span className="row gap-1" style={{ alignItems: "center", justifyContent: "flex-end" }}>
@@ -549,7 +555,10 @@ export default function ArmarOrdenPage() {
                   {lineasDispFiltradas.map(({ p, l, pend }) => (
                     <tr key={l.id}>
                       <td className="ds-body-sm ds-strong">{p.numero}</td>
-                      <td><div className="ds-truncate" style={{ maxWidth: 260 }} title={`${l.articuloId} — ${l.descripcion}`}><span className="ds-strong ds-body-sm">{l.articuloId}</span> <span className="ds-muted">— {l.descripcion}</span></div></td>
+                      <td>
+                        <div className="ds-truncate" style={{ maxWidth: 260 }} title={`${l.articuloId} — ${l.descripcion}`}><span className="ds-strong ds-body-sm">{l.articuloId}</span> <span className="ds-muted">— {l.descripcion}</span></div>
+                        <LineaPedidaInfo variante={l.variantCode} nota={l.notas} />
+                      </td>
                       <td className="ds-muted ds-body-sm">{destinoDeLinea(l, p) || "—"}</td>
                       <td className="ds-num">{pend} {l.unidad}</td>
                       <td className="ds-num"><Button variant="outline" size="sm" onClick={() => agregarDeSolicitud(p, l, pend)}>Agregar</Button></td>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
-import { Badge, Button, Card, useToast } from "@/components/compras/ui";
+import { Badge, Button, Card, LineaPedidaInfo, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
@@ -74,6 +74,12 @@ export default function PedidoDetallePage() {
     code: l.articuloId, cantidad: l.cantidad,
     obraCodigo: (pedido.tipoSolicitud === "material" || esSub) ? (obraDeLinea(l, pedido) || undefined) : undefined,
     variantCode: l.variantCode, descripcion: l.descripcion, unidad: l.unidad,
+    // Con variante, la descripción de la línea ES la de la variante (así se guarda al
+    // crear): devolverla como `variantNombre` evita que al editar el pedido la línea
+    // se vuelva a guardar con la descripción genérica del artículo.
+    variantNombre: l.variantCode ? l.descripcion : undefined,
+    // El comentario de la línea viaja también: editar el pedido no debe borrarlo.
+    notas: l.notas,
     // La actividad (tarea) del consumo directo viaja con la línea.
     taskNo: l.taskNo, taskDescr: l.taskDescr,
     // SUBCONTRATO: el alcance escrito (que es la descripción de la línea) y el monto
@@ -228,7 +234,7 @@ export default function PedidoDetallePage() {
                   const recibido = recibidoDeLineaPedido(ordenes, l.id) > 0;
                   return (
                     <tr key={l.id}>
-                      <td>{l.descripcion}</td>
+                      <td>{l.descripcion}<LineaPedidaInfo nota={l.notas} /></td>
                       <td className="ds-muted">{obraDeLinea(l, pedido) || pedido.obraCodigo || "—"}</td>
                       <td className="ds-muted">{l.taskNo ? `${l.taskNo}${l.taskDescr ? ` — ${l.taskDescr}` : ""}` : "—"}</td>
                       <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
@@ -277,6 +283,9 @@ export default function PedidoDetallePage() {
                           {l.devuelta && <Badge tone="red">Devuelta</Badge>}
                           {baja > 0 && <Badge tone="gray" title={`Se archivó la solicitud: ${num.format(baja)} ${l.unidad} nunca se ordenaron y ya no se van a comprar.`}>Ya no se compra</Badge>}
                         </div>
+                        {/* La variante y el comentario que se escribieron al pedir: sin
+                            esto el pedido enviado no decía QUÉ variante se pidió. */}
+                        <LineaPedidaInfo code={l.articuloId} variante={l.variantCode} nota={l.notas} />
                       </td>
                       {pedido.tipoSolicitud === "material" && <td className="ds-muted">{obraDeLinea(l, pedido) || "—"}</td>}
                       {conTarea && <td className="ds-muted">{l.taskNo ? `${l.taskNo}${l.taskDescr ? ` — ${l.taskDescr}` : ""}` : "—"}</td>}
