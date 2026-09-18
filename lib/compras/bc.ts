@@ -1359,10 +1359,25 @@ export async function bcQuitarObraDeLineas(
   // material que eligió el ALMACÉN como obra caía en el "el CC es la obra" con el CC
   // correcto puesto. Y el último recurso de abajo le escribía ese mismo valor, o sea
   // que la orden no se podía lanzar ni arreglándola a mano en BC (CP-005480).
+  //
+  // Por eso la REGLA va antes que la lista: en BC el CC de un almacén es su propio
+  // código, y la env solo está para las excepciones (ALM-GRAL y ALM-BAR → INV). Con
+  // la lista sola quedaban afuera los ALMACENES DE OBRA, que nadie va a enumerar
+  // —hay uno por obra— y donde el CC correcto es, letra por letra, el código de la
+  // obra: CP-005584 (almacén INF-HDAII, CC INF-HDAII, sin proyecto, o sea BIEN) no
+  // se podía lanzar ni a mano, igual que CP-005480. Comprobado contra BC Production
+  // el 18/09/2026: INF-HDAII 32/32 líneas sin proyecto con CC = INF-HDAII, y lo
+  // mismo CS-JOSE H., CS-D.JOSE, VN-L.46, QFI, PD-AD-LOC… cada almacén el suyo.
+  // Esto NO afloja el caso que importa: en ALM-GRAL el CC exigido es INV, así que
+  // una línea con el CC de una obra (VN-L.03) se sigue bloqueando igual.
   const ccExigido = ccPorAlmacenDeEnv();
   const ccEsElDelAlmacen = (linea: LineaJobBc) => {
-    const exige = ccExigido.get(claveBc(linea.locationCode || ""));
-    return !!exige && claveBc(linea.cc) === claveBc(exige);
+    const alm = claveBc(linea.locationCode || "");
+    if (!alm) return false;                      // servicio / no inventariable: no hay almacén que exija nada
+    const exige = ccExigido.get(alm);
+    // Configurado a mano = excepción conocida; ahí manda la env y nada más.
+    if (exige) return claveBc(linea.cc) === claveBc(exige);
+    return claveBc(linea.cc) === alm;            // el caso normal: CC = el código del almacén
   };
   // Línea sucia = tiene proyecto/tarea, o su centro de costo ES la obra de la solicitud
   // (y no es, a la vez, el que el almacén exige).
