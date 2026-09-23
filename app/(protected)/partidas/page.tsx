@@ -26,6 +26,8 @@ interface TipoObra {
   usaSprints: boolean; usaTiposCasa: boolean; genero: 'F' | 'M';
   /** true = un solo catálogo para todas las obras del tipo (vivienda / infra). */
   catalogoCompartido: boolean;
+  /** true = la subpartida es la misma partida; "Traer de BC" crea la espejo (postventa). */
+  subpartidaEspejo?: boolean;
   grupos?: number; partidas?: number; subpartidas?: number; obras?: number;
   obrasBC?: { numeroObra: string; nombre: string }[];
 }
@@ -56,6 +58,11 @@ const plural = (n: number, sing: string, plu: string) => `${n} ${n === 1 ? sing 
 // propósito (la máquina es el proceso, la partida y la subpartida), así que el
 // nombre solo no dice en qué nivel estás parado. Cada fila lo dice.
 const NIVEL = 'text-[9px] font-semibold uppercase tracking-[0.08em] text-ds-gray-400 shrink-0';
+
+/** Cuántas cosas nuevas traería BC para una obra (los tres niveles juntos). */
+function nuevosDeBC(d: { gruposCreados: string[]; partidasCreadas: string[]; subpartidasCreadas?: string[] }) {
+  return d.gruposCreados.length + d.partidasCreadas.length + (d.subpartidasCreadas?.length ?? 0);
+}
 
 export default function PartidasPage() {
   const session = useSession();
@@ -124,9 +131,9 @@ export default function PartidasPage() {
   const [bcObra, setBcObra] = useState('');
   const [bcSync, setBcSync] = useState<false | 'ver' | 'traer'>(false);
   const [bcPreview, setBcPreview] = useState<null | {
-    obrasProcesadas: number; gruposCreados: number; partidasCreadas: number;
+    obrasProcesadas: number; gruposCreados: number; partidasCreadas: number; subpartidasCreadas: number;
     gruposActualizados: number; partidasActualizadas: number;
-    detalle: { obra: string; fuente: string; compania?: string | null; version?: string | null; gruposCreados: string[]; partidasCreadas: string[] }[];
+    detalle: { obra: string; fuente: string; compania?: string | null; version?: string | null; gruposCreados: string[]; partidasCreadas: string[]; subpartidasCreadas: string[] }[];
   }>(null);
 
   function cambiarTipo(t: string) {
@@ -438,11 +445,12 @@ export default function PartidasPage() {
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { toast(d.error || 'No se pudo traer de BC', 'error'); return; }
-      const nuevo = (d.gruposCreados ?? 0) + (d.partidasCreadas ?? 0);
+      const nuevo = (d.gruposCreados ?? 0) + (d.partidasCreadas ?? 0) + (d.subpartidasCreadas ?? 0);
       toast(
         nuevo === 0
           ? `Sin cambios: BC no tiene nada que no esté ya en el catálogo (${plural(d.obrasProcesadas ?? 0, 'obra revisada', 'obras revisadas')}).`
-          : `De BC: ${plural(d.gruposCreados, termGrupoLow, termGrupoPlural)} y ${plural(d.partidasCreadas, 'partida', 'partidas')} nuevas en ${plural(d.obrasProcesadas ?? 0, 'obra', 'obras')}.`,
+          : `De BC: ${plural(d.gruposCreados, termGrupoLow, termGrupoPlural)} y ${plural(d.partidasCreadas, 'partida', 'partidas')} nuevas en ${plural(d.obrasProcesadas ?? 0, 'obra', 'obras')}`
+            + (d.subpartidasCreadas ? `, con ${plural(d.subpartidasCreadas, 'subpartida', 'subpartidas')} igual que su partida.` : '.'),
         nuevo === 0 ? 'info' : 'success',
       );
       for (const a of (d.avisos ?? []) as string[]) toast(a, 'warning');
@@ -997,7 +1005,10 @@ export default function PartidasPage() {
             Lee el presupuesto de la obra en BC y agrega al catálogo de{' '}
             <span className="font-semibold text-ds-ink">{tipo?.nombre.toLowerCase() ?? tipoCodigo.toLowerCase()}</span> los
             capítulos que falten como <span className="font-semibold text-ds-ink">{termGrupoPlural}</span> y sus partidas como{' '}
-            <span className="font-semibold text-ds-ink">partidas</span>. No borra nada y no toca las subpartidas.
+            <span className="font-semibold text-ds-ink">partidas</span>. No borra nada
+            {tipo?.subpartidaEspejo
+              ? <> y a cada partida nueva le crea su subpartida, igual que la partida.</>
+              : <> y no toca las subpartidas.</>}
           </p>
           <Combobox
             label="Obra"
@@ -1023,13 +1034,14 @@ export default function PartidasPage() {
           {bcPreview && (
             <div className="rounded-ds border border-ds-gray-200 bg-ds-gray-100/60 p-3 space-y-2">
               <p className="text-body-sm text-ds-ink">
-                {bcPreview.gruposCreados + bcPreview.partidasCreadas === 0
+                {bcPreview.gruposCreados + bcPreview.partidasCreadas + (bcPreview.subpartidasCreadas ?? 0) === 0
                   ? `Nada nuevo: lo de BC ya está en el catálogo (${plural(bcPreview.obrasProcesadas, 'obra revisada', 'obras revisadas')}).`
-                  : <>Traería <span className="font-semibold">{plural(bcPreview.gruposCreados, termGrupoLow, termGrupoPlural)}</span> y <span className="font-semibold">{plural(bcPreview.partidasCreadas, 'partida', 'partidas')}</span> nuevas de {plural(bcPreview.obrasProcesadas, 'obra', 'obras')}.</>}
+                  : <>Traería <span className="font-semibold">{plural(bcPreview.gruposCreados, termGrupoLow, termGrupoPlural)}</span> y <span className="font-semibold">{plural(bcPreview.partidasCreadas, 'partida', 'partidas')}</span> nuevas de {plural(bcPreview.obrasProcesadas, 'obra', 'obras')}
+                    {bcPreview.subpartidasCreadas ? <>, más <span className="font-semibold">{plural(bcPreview.subpartidasCreadas, 'subpartida', 'subpartidas')}</span> igual que su partida</> : null}.</>}
               </p>
-              {bcPreview.detalle.some(d => d.gruposCreados.length + d.partidasCreadas.length > 0) && (
+              {bcPreview.detalle.some(d => nuevosDeBC(d) > 0) && (
                 <ul className="max-h-48 overflow-y-auto space-y-1.5 text-body-sm">
-                  {bcPreview.detalle.filter(d => d.gruposCreados.length + d.partidasCreadas.length > 0).map(d => (
+                  {bcPreview.detalle.filter(d => nuevosDeBC(d) > 0).map(d => (
                     <li key={d.obra}>
                       <span className="font-mono text-xs font-semibold text-ds-gray-500">{d.obra}</span>
                       <span className="text-ds-gray-400">
@@ -1040,10 +1052,11 @@ export default function PartidasPage() {
                         {d.version ? ` · versión ${d.version}` : ''}
                       </span>
                       <div className="pl-3 text-ds-gray-500">
-                        {[...d.gruposCreados.map(g => `${termGrupo}: ${g}`), ...d.partidasCreadas.map(p => `Partida: ${p}`)]
+                        {[...d.gruposCreados.map(g => `${termGrupo}: ${g}`), ...d.partidasCreadas.map(p => `Partida: ${p}`),
+                          ...(d.subpartidasCreadas ?? []).map(sp => `Subpartida: ${sp}`)]
                           .slice(0, 12).map(t => <div key={t} className="truncate">{t}</div>)}
-                        {d.gruposCreados.length + d.partidasCreadas.length > 12 && (
-                          <div className="text-ds-gray-400">…y {d.gruposCreados.length + d.partidasCreadas.length - 12} más</div>
+                        {nuevosDeBC(d) > 12 && (
+                          <div className="text-ds-gray-400">…y {nuevosDeBC(d) - 12} más</div>
                         )}
                       </div>
                     </li>

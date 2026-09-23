@@ -14,11 +14,12 @@ export const dynamic = 'force-dynamic';
 
 /**
  * TRAER DE BC la estructura del catálogo: capítulos ("Total") → grupos y partidas
- * ("Posting") → partidas. Las subpartidas NO se tocan nunca: ese nivel no existe
- * en BC y es 100% de SQL.
+ * ("Posting") → partidas. Las subpartidas NO se tocan, salvo en los tipos donde la
+ * subpartida ES la partida (postventa): ahí se crea la espejo `<partida>.1` de la
+ * partida que no tenga ninguna.
  *
  * POST { tipo, obra?, dryRun? }
- *   tipo   — VIVIENDA | INFRA | ADMIN | FABRICA | TORRES
+ *   tipo   — VIVIENDA | INFRA | ADMIN | FABRICA | TORRES | POSTVENTA
  *   obra   — N° de obra de BC. Sin obra se recorren TODAS las obras de ese tipo
  *            (según el área de costeo de dbo.Obra), con tope de 30 por llamada.
  *   dryRun — true = solo mira y reporta qué crearía, sin escribir nada. Importa
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
       obrasProcesadas: resultados.length,
       gruposCreados: resultados.reduce((s, r) => s + r.gruposCreados.length, 0),
       partidasCreadas: resultados.reduce((s, r) => s + r.partidasCreadas.length, 0),
+      subpartidasCreadas: resultados.reduce((s, r) => s + r.subpartidasCreadas.length, 0),
       gruposActualizados: resultados.reduce((s, r) => s + r.gruposActualizados, 0),
       partidasActualizadas: resultados.reduce((s, r) => s + r.partidasActualizadas, 0),
     };

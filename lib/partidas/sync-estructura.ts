@@ -19,7 +19,9 @@ import { capituloDePartida, mapaAreaCosteoTipo, TIPO_POR_DEFECTO, type TipoObra 
  *   · Los capítulos sin ninguna partida NO se crean.
  *   · Es ADITIVO: crea lo que falta, refresca el nombre de las partidas que ya
  *     están y nunca borra ni mueve nada. Las subpartidas no se tocan: ese nivel
- *     no existe afuera, es solo de esta base.
+ *     no existe afuera, es solo de esta base. La ÚNICA excepción son los tipos
+ *     con `subpartidaEspejo` (postventa), donde la subpartida ES la partida: ahí
+ *     se crea la espejo `<partida>.1` para la partida que no tenga ninguna.
  *   · Vivienda e infra escriben en el catálogo COMPARTIDO (bc_works_no NULL);
  *     administrativas y fábricas, en la estructura de ESA obra.
  */
@@ -37,6 +39,8 @@ export interface ResultadoEstructura {
   gruposActualizados: number;
   partidasCreadas: string[];
   partidasActualizadas: number;
+  /** Solo en tipos con subpartida espejo (postventa): las `<partida>.1` creadas. */
+  subpartidasCreadas: string[];
   /** Capítulos que venían sin ninguna partida: no se crean. */
   capitulosSinPartidas: string[];
 }
@@ -114,25 +118,45 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
   };
 }
 
-/** Arma la jerarquía capítulo → partidas a partir de las líneas crudas. */
-export function armarJerarquia(lineas: LineaEstructura[]): {
+/**
+ * Arma la jerarquía capítulo → partidas a partir de las líneas crudas.
+ *
+ * `porOrden` agrega el respaldo de los tipos cuya jerarquía en BC es el orden de
+ * las líneas (postventa): la partida que no calza con ningún capítulo por código
+ * cuelga del último capítulo que venía ARRIBA de ella, que es como se ve la obra
+ * en la pantalla de BC. Sin eso, PV-MAT "MATERIALES GENERALES" quedaría suelta en
+ * vez de colgar de PV-GEN "GENERALES POST VENTA".
+ */
+export function armarJerarquia(lineas: LineaEstructura[], porOrden = false): {
   capitulos: Map<string, string>;
   hijos: Map<string, [string, string][]>;
   sueltas: [string, string][];
 } {
   const capitulos = new Map<string, string>();
   const postings = new Map<string, string>();
+  // Capítulo que venía arriba de cada partida, en el orden en que las dio BC.
+  const capituloArriba = new Map<string, string>();
+  let ultimoCapitulo: string | null = null;
   for (const l of lineas) {
     const cod = String(l.taskNo ?? '').trim();
     if (!cod || cod.length > 50) continue;
-    const bag = l.taskType === 'Total' ? capitulos : postings;
-    if (!bag.has(cod)) bag.set(cod, (String(l.description ?? '').trim() || cod).slice(0, 150));
+    const nombre = (String(l.description ?? '').trim() || cod).slice(0, 150);
+    if (l.taskType === 'Total') {
+      if (!capitulos.has(cod)) capitulos.set(cod, nombre);
+      ultimoCapitulo = cod;
+      continue;
+    }
+    if (!postings.has(cod)) {
+      postings.set(cod, nombre);
+      if (ultimoCapitulo) capituloArriba.set(cod, ultimoCapitulo);
+    }
   }
   const hijos = new Map<string, [string, string][]>();
   const sueltas: [string, string][] = [];
   for (const [cod, nombre] of [...postings.entries()].sort((a, b) =>
     a[0].localeCompare(b[0], undefined, { numeric: true }))) {
-    const cap = capituloDePartida(cod, capitulos.keys());
+    const cap = capituloDePartida(cod, capitulos.keys())
+      ?? (porOrden ? capituloArriba.get(cod) ?? null : null);
     if (cap) {
       if (!hijos.has(cap)) hijos.set(cap, []);
       hijos.get(cap)!.push([cod, nombre]);
@@ -154,11 +178,12 @@ export async function sincronizarEstructura(
 ): Promise<ResultadoEstructura> {
   const res: ResultadoEstructura = {
     obra, gruposCreados: [], gruposActualizados: 0,
-    partidasCreadas: [], partidasActualizadas: 0, capitulosSinPartidas: [],
+    partidasCreadas: [], partidasActualizadas: 0, subpartidasCreadas: [],
+    capitulosSinPartidas: [],
   };
   if (lineas.length === 0) return res;
 
-  const { capitulos, hijos, sueltas } = armarJerarquia(lineas);
+  const { capitulos, hijos, sueltas } = armarJerarquia(lineas, tipo.jerarquiaPorOrden);
   res.capitulosSinPartidas = [...capitulos.keys()].filter((c) => !hijos.has(c));
 
   const scope = tipo.catalogoCompartido ? null : obra;
@@ -227,29 +252,63 @@ export async function sincronizarEstructura(
           AND p.codigo = @cod
       `);
     if (q.recordset[0]) {
+      const id = q.recordset[0].id;
       res.partidasActualizadas++;
-      if (dryRun) return;
-      await db.request()
-        .input('id', sql.Int, q.recordset[0].id)
-        .input('nombre', sql.NVarChar(150), nombre)
-        .input('cod', sql.VarChar(50), codigo)
-        .query(`UPDATE pro_obc.partidas
-                SET nombre = @nombre, bc_task_no = ISNULL(bc_task_no, @cod), activo = 1
-                WHERE id = @id`);
+      if (!dryRun) {
+        await db.request()
+          .input('id', sql.Int, id)
+          .input('nombre', sql.NVarChar(150), nombre)
+          .input('cod', sql.VarChar(50), codigo)
+          .query(`UPDATE pro_obc.partidas
+                  SET nombre = @nombre, bc_task_no = ISNULL(bc_task_no, @cod), activo = 1
+                  WHERE id = @id`);
+      }
+      await espejoDeLaPartida(id, codigo, nombre);
       return;
     }
     res.partidasCreadas.push(`${codigo} — ${nombre}`);
     // Grupo que todavía no existe (dryRun): no hay dónde insertar, ya quedó contada.
-    if (dryRun || idGrupo === null) return;
-    await db.request()
+    if (dryRun || idGrupo === null) {
+      await espejoDeLaPartida(null, codigo, nombre);
+      return;
+    }
+    const ins = await db.request()
       .input('cod', sql.VarChar(50), codigo)
       .input('nombre', sql.NVarChar(150), nombre)
       .input('g', sql.Int, idGrupo)
-      .query(`
+      .query<{ id: number }>(`
         INSERT INTO pro_obc.partidas (codigo, nombre, grupo_id, orden, activo, bc_task_no, creado_en)
+        OUTPUT INSERTED.id AS id
         VALUES (@cod, @nombre, @g,
           (SELECT ISNULL(MAX(orden), 0) + 1 FROM pro_obc.partidas WHERE grupo_id = @g),
           1, @cod, SYSUTCDATETIME())
+      `);
+    await espejoDeLaPartida(ins.recordset[0].id, codigo, nombre);
+  }
+
+  // LA SUBPARTIDA ES LA PARTIDA (postventa): cada casa es una sola cosa, no tiene
+  // desglose abajo. Se crea la espejo `<partida>.1` con el mismo nombre y SOLO si
+  // la partida no tiene ninguna subpartida — el desglose que haya hecho el negocio
+  // manda. Mismo criterio que migrations/2026-09-17_subpartida_espejo_toda_partida.
+  // `idPartida` null = la partida tampoco existe todavía (dryRun).
+  async function espejoDeLaPartida(idPartida: number | null, codigo: string, nombre: string) {
+    if (!tipo.subpartidaEspejo) return;
+    const cod = `${codigo}.1`.slice(0, 50);
+    if (idPartida !== null) {
+      const ya = await db.request()
+        .input('p', sql.Int, idPartida)
+        .query<{ id: number }>('SELECT TOP 1 id FROM pro_obc.sub_partidas WHERE partida_id = @p');
+      if (ya.recordset[0]) return;
+    }
+    res.subpartidasCreadas.push(`${cod} — ${nombre}`);
+    if (dryRun || idPartida === null) return;
+    await db.request()
+      .input('cod', sql.VarChar(50), cod)
+      .input('nombre', sql.NVarChar(300), nombre)
+      .input('p', sql.Int, idPartida)
+      .query(`
+        INSERT INTO pro_obc.sub_partidas (codigo, nombre, partida_id, sprint_numero, es_critica, activo, creado_en)
+        VALUES (@cod, @nombre, @p, NULL, 0, 1, SYSUTCDATETIME())
       `);
   }
 

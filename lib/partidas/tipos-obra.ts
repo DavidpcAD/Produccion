@@ -3,11 +3,11 @@ import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getDb, sql as sqlApp } from '@/lib/db';
 
 /**
- * TIPOS DE OBRA del catálogo (`pro_obc.tipos_obra`). Son cinco y los define el
+ * TIPOS DE OBRA del catálogo (`pro_obc.tipos_obra`). Son seis y los define el
  * negocio, no el código:
  *
  *   O = Obra Vivienda · I = Infraestructura · A = Administrativa
- *   F = Fábrica       · T = Torres
+ *   F = Fábrica       · T = Torres         · P = Postventa
  *
  * Cada tipo tiene su propio catálogo de tres niveles:
  *
@@ -40,12 +40,36 @@ export interface TipoObra {
   usaTiposCasa: boolean;
   /** true = catálogo compartido por todas las obras del tipo (vivienda / infra). */
   catalogoCompartido: boolean;
+  /** true = la partida cuelga del capítulo que tiene ARRIBA en BC, no del que dice su código. */
+  jerarquiaPorOrden: boolean;
+  /** true = la subpartida es la misma partida; al traer de BC se crea `<partida>.1`. */
+  subpartidaEspejo: boolean;
   orden: number;
   activo: boolean;
 }
 
 /** Tipos cuyo catálogo es UNO para todas sus obras; el resto es por obra de BC. */
 const COMPARTIDOS = new Set(['VIVIENDA', 'INFRA']);
+
+/**
+ * Tipos donde la jerarquía de BC viene por el ORDEN de las líneas y no por el
+ * código. Lo normal es que la partida diga de qué capítulo cuelga (VN-C.01 → VN-C),
+ * y esa es la regla de `capituloDePartida`. En postventa hay líneas que no lo dicen
+ * —PV-MAT "MATERIALES GENERALES" cuelga de PV-GEN "GENERALES POST VENTA"— y la
+ * única pista es que en BC van una debajo de la otra, que es como se ve la obra en
+ * pantalla. Para esos tipos, la partida que no calza por código cuelga del último
+ * capítulo que venía arriba.
+ */
+const JERARQUIA_POR_ORDEN = new Set(['POSTVENTA']);
+
+/**
+ * Tipos donde la subpartida ES la partida: no hay desglose abajo, así que al traer
+ * de BC se crea la subpartida espejo `<partida>.1` con el mismo nombre. Es la regla
+ * que el negocio ya fijó para postventa (cada casa es una sola cosa) y la misma que
+ * dejó escrita a mano `migrations/2026-09-17_subpartida_espejo_toda_partida.sql`
+ * para fábrica, infra y administrativas.
+ */
+const SUB_ESPEJO = new Set(['POSTVENTA']);
 
 /** Tipo al que caen las obras cuya área de costeo no está mapeada. */
 export const TIPO_POR_DEFECTO = 'ADMIN';
@@ -74,12 +98,14 @@ function mapTipo(r: FilaTipo): TipoObra {
     usaSprints: !!r.usa_sprints,
     usaTiposCasa: !!r.usa_tipos_casa,
     catalogoCompartido: COMPARTIDOS.has(r.codigo),
+    jerarquiaPorOrden: JERARQUIA_POR_ORDEN.has(r.codigo),
+    subpartidaEspejo: SUB_ESPEJO.has(r.codigo),
     orden: Number(r.orden) || 0,
     activo: !!r.activo,
   };
 }
 
-/** Los cinco tipos, en el orden del negocio. */
+/** Los tipos activos, en el orden del negocio. */
 export async function listarTiposObra(): Promise<TipoObra[]> {
   const db = await getAdelanteDb();
   const r = await db.request().query<FilaTipo>(`
