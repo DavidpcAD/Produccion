@@ -35,8 +35,10 @@ interface NavItemDef {
   children?: { href: string; label: string; exact?: boolean }[];
 }
 
+// Sin Dashboard: la app entra directo a la primera pantalla de esta lista que la
+// persona puede abrir (ver `rutaDeEntrada` en lib/permissions.ts). Si se agrega una
+// entrada nueva arriba, acordate de agregarla también en RUTAS_DE_ENTRADA.
 const navItems: NavItemDef[] = [
-  { href: '/',          label: 'Dashboard',     icon: 'home',      minLevel: 1 },
   { href: '/proyectos', label: 'Proyectos',     icon: 'folder',    minLevel: 2 },
   { href: '/obras',     label: 'Obras',         icon: 'place',     minLevel: 2 },
   { href: '/cuadrillas',label: 'Cuadrillas',    icon: 'cuadrillas',minLevel: 2 },

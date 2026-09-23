@@ -330,6 +330,65 @@ export function modulosDeRuta(pathname: string): Modulo[] {
   return [getRouteModule(pathname)];
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// PANTALLA DE ENTRADA
+//
+// La app ya no tiene Dashboard: se entra directo a trabajar. Pero "directo a
+// Proyectos" no sirve para todos —Proyectos es del módulo Presupuesto y un
+// bodeguero o el de concreto no lo abren—, así que la entrada es la PRIMERA
+// pantalla del menú que esa persona sí puede abrir, en el mismo orden en que la ve.
+//
+// OJO al tocar esto: la ruta que salga de acá tiene que pasar TAMBIÉN el filtro del
+// proxy y el del layout (protected). Si devuelve una que alguno de los dos rebota,
+// ese rebote vuelve a "/" y queda un ciclo infinito; por eso `puedeEntrar` repite
+// las reglas de los dos en vez de confiar en una sola.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** El menú, en orden y con el mismo `minLevel` que usa Sidebar.tsx. Tiene que quedar
+ *  igual a esa lista: si acá sobra una ruta, la app entra a una pantalla que la
+ *  persona no tiene en el menú. */
+const RUTAS_DE_ENTRADA: { href: string; minLevel: number }[] = [
+  { href: '/proyectos', minLevel: 2 },
+  { href: '/obras', minLevel: 2 },
+  { href: '/cuadrillas', minLevel: 2 },
+  { href: '/partidas', minLevel: 4 },
+  { href: '/presupuesto', minLevel: 2 },
+  { href: '/bc/integracion', minLevel: 2 },
+  { href: '/avance', minLevel: 2 },
+  { href: '/concreto/dashboard', minLevel: 2 },
+  { href: '/compras/ingenieria', minLevel: 4 },
+  { href: '/compras/aprobacion', minLevel: 4 },
+  { href: '/compras/facturacion', minLevel: 4 },
+  { href: '/desembolsos/dashboard', minLevel: 2 },
+  { href: '/utilidades', minLevel: 2 },
+  { href: '/reporte-h4', minLevel: 2 },
+];
+
+function puedeEntrar(item: { href: string; minLevel: number }, modules: string[] | undefined, nivelAdmin: number): boolean {
+  const { href, minLevel } = item;
+  // Módulo apagado (Avance de obra, ver AVANCE_OBRA_ACTIVO): no existe para nadie.
+  if (!moduloPublicado(getRouteModule(href))) return false;
+  // 1) ¿Está en SU menú? Es la misma regla del Sidebar: con rol de Producción manda
+  //    el módulo; sin él, el nivel.
+  const enElMenu = modules
+    ? modulosDeRuta(href).some((m) => modules.includes(m))
+    : nivelAdmin >= minLevel;
+  if (!enElMenu) return false;
+  // 2) ¿La deja pasar el proxy? Órdenes de Compra va por módulo cuando el token los
+  //    trae (un bodeguero de nivel 1 entra) y por nivel cuando no; el resto, por nivel.
+  //    Sin esto la entrada podía caer en una ruta que el proxy rebota de vuelta a "/".
+  if (href.startsWith('/compras')) {
+    return modules ? rutaPermitida(href, modules) : nivelAdmin >= getRouteLevel(href);
+  }
+  return nivelAdmin >= getRouteLevel(href);
+}
+
+/** A dónde entra esta persona al abrir la app. `null` = su rol no habilita ninguna
+ *  pantalla (hay que decírselo, no mandarla a dar vueltas). */
+export function rutaDeEntrada(modules: string[] | undefined, nivelAdmin: number): string | null {
+  return RUTAS_DE_ENTRADA.find((r) => puedeEntrar(r, modules, nivelAdmin))?.href ?? null;
+}
+
 /** ¿Los módulos de un usuario abren esta ruta? `modules` undefined = sin rol de
  *  Producción (quien llama decide el fallback, normalmente el nivel). */
 export function rutaPermitida(pathname: string, modules: string[] | undefined): boolean {

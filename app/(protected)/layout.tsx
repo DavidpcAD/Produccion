@@ -26,10 +26,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   );
 
   // Guard de página: si el rol no habilita NINGUNO de los módulos que abren la ruta,
-  // al Dashboard. Se usa `rutaPermitida` (la misma que gatea el proxy y arma el menú)
-  // y no `getRouteModule`, que mapea TODO /compras a 'ingenieria': con eso el rol
-  // Bodega veía "Mis solicitudes" en el menú pero al entrar lo rebotaba al Dashboard,
-  // o sea no podía pedir material. Ver modulosDeRuta en lib/permissions.ts.
+  // a la raíz, que reenvía a su pantalla de entrada (ver `rutaDeEntrada`). Se usa
+  // `rutaPermitida` (la misma que gatea el proxy y arma el menú) y no
+  // `getRouteModule`, que mapea TODO /compras a 'ingenieria': con eso el rol Bodega
+  // veía "Mis solicitudes" en el menú pero al entrar lo rebotaba afuera, o sea no
+  // podía pedir material. Ver modulosDeRuta en lib/permissions.ts.
   useEffect(() => {
     if (!session || !allowedModules) return;
     if (!rutaPermitida(pathname, allowedModules)) router.replace('/');
