@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listMovimientosAll, listOrdenes, listPedidos, listRecepciones } from "@/lib/compras/repo";
+import { listMovimientosResumen, listOrdenes, listPedidos, listRecepciones } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ export async function GET() {
 
   try {
     const [pedidos, ordenes, recepciones, movimientos] = await Promise.all([
-      listPedidos(), listOrdenes(), listRecepciones(), listMovimientosAll(),
+      listPedidos(), listOrdenes(), listRecepciones(), listMovimientosResumen(),
     ]);
     return NextResponse.json({ pedidos, ordenes, recepciones, movimientos });
   } catch (e: any) {

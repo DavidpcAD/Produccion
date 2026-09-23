@@ -74,7 +74,12 @@ interface StoreShape {
   pedidos: Pedido[];
   ordenes: Orden[];
   recepciones: Recepcion[];
+  /** Resumen de bitácora que usan las listas + la traza de los documentos que alguna
+   *  pantalla de detalle haya pedido (ver `cargarMovimientos`). */
   movimientos: Movimiento[];
+  /** Trae la bitácora COMPLETA de estos documentos (la carga inicial solo trae el
+   *  resumen). Cada documento se pide una sola vez por sesión. */
+  cargarMovimientos: (refs: { entidad: string; id: string }[]) => Promise<void>;
 
   addPedido: (input: NewPedidoInput) => Promise<Pedido>;
   editPedido: (id: string, input: NewPedidoInput) => Promise<void>;
@@ -145,6 +150,10 @@ interface StoreShape {
 const StoreCtx = createContext<StoreShape | null>(null);
 const LS_KEY = "adelante_oc_state_v3";
 
+/** Cada cuánto, como mucho, se vuelve a bajar la data de compras. También es la edad
+ *  a partir de la cual una navegación o un "volver a la pestaña" la dan por vieja. */
+const REFRESCO_MS = 20_000;
+
 interface Persisted {
   pedidos: Pedido[];
   ordenes: Orden[];
@@ -202,27 +211,32 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   // Notas de crédito (aparte del bootstrap para no romper la carga si la tabla no existe).
   const [notasCredito, setNotasCredito] = useState<NotaCreditoLinea[]>([]);
+  // Bitácora completa por documento, pedida por las pantallas de detalle. Va aparte de
+  // `data.movimientos` a propósito: esa la pisa cada recarga, y si viviera ahí la traza
+  // abierta se vaciaría sola cuando corriera el refresco de fondo.
+  const [movsDoc, setMovsDoc] = useState<Record<string, Movimiento[]>>({});
+  const movsPedidos = useRef(new Set<string>());
 
-  // hidratación
+  // hidratación. `hydrated` = "ya leí el rol/usuario de localStorage", NO "ya llegaron
+  // los datos": eso es `cargando`. Antes se prendía recién cuando el bootstrap
+  // terminaba, así que la pantalla no podía pintar NADA —ni el esqueleto— hasta que
+  // la base contestara.
   useEffect(() => {
     const r = localStorage.getItem("adelante_oc_role") as Role | null;
     if (r) setRole(r);
     const u = localStorage.getItem("adelante_oc_usuario");
     if (u) setUsuario(u);
-    if (USE_API) {
-      api.bootstrap()
-        .then((b) => {
-          setErrorCarga(null);
-          setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
-        })
-        .catch((e) => { console.error("bootstrap", e); setErrorCarga(String(e?.message ?? e)); })
-        .finally(() => { setCargando(false); setHydrated(true); });
-    } else {
+    if (!USE_API) {
       try {
         const raw = localStorage.getItem(LS_KEY);
         if (raw) setData({ ...freshData(), ...JSON.parse(raw) } as Persisted); // merge: rellena llaves nuevas
       } catch { /* ignore */ }
-      setHydrated(true);
+    }
+    setHydrated(true);
+    if (USE_API) {
+      cargarDesdeApi()
+        .catch((e) => { console.error("bootstrap", e); setErrorCarga(String(e?.message ?? e)); })
+        .finally(() => { setCargando(false); });
     }
   }, []);
 
@@ -240,40 +254,88 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     else localStorage.removeItem("adelante_oc_usuario");
   }, [role, usuario, hydrated]);
 
-  async function refreshFromApi() {
-    const b = await api.bootstrap();
-    setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+  // Última carga buena y petición en vuelo. Sin esto, abrir el menú de Compras
+  // disparaba un bootstrap COMPLETO por cada clic (y otro más si el temporizador
+  // caía en el medio): la misma lista de pedidos, órdenes, recepciones y bitácora
+  // bajada seis veces seguidas.
+  const ultimaCarga = useRef(0);
+  const enVuelo = useRef<Promise<void> | null>(null);
+
+  /** Trae la data SIEMPRE. Es lo que usan las acciones (crear, aprobar, recibir…):
+   *  tienen que ver lo que acaban de escribir, así que no pueden colgarse de una
+   *  petición que ya venía en camino desde antes del cambio. */
+  async function cargarDesdeApi(): Promise<void> {
+    const p = api.bootstrap().then((b) => {
+      setErrorCarga(null);
+      ultimaCarga.current = Date.now();
+      setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+    }).finally(() => { if (enVuelo.current === p) enVuelo.current = null; });
+    enVuelo.current = p;
+    return p;
   }
+
+  /** Refresco de fondo (temporizador, navegación, volver a la pestaña): no pide nada
+   *  si lo que hay en pantalla es reciente, ni encima de una petición en curso. */
+  async function refrescarSiViejo(maxEdadMs: number): Promise<void> {
+    if (enVuelo.current) return enVuelo.current;
+    if (Date.now() - ultimaCarga.current < maxEdadMs) return;
+    return cargarDesdeApi();
+  }
+
+  const refreshFromApi = cargarDesdeApi;
+
+  const cargarMovimientos: StoreShape["cargarMovimientos"] = async (refs) => {
+    if (!USE_API) return;
+    const faltan = refs.filter((r) => r.id && !movsPedidos.current.has(`${r.entidad}:${r.id}`));
+    if (!faltan.length) return;
+    for (const r of faltan) movsPedidos.current.add(`${r.entidad}:${r.id}`);
+    const lotes = await Promise.all(faltan.map(async (r): Promise<[string, Movimiento[]] | null> => {
+      // Si falla, se descarta el marcador para poder reintentar al volver a entrar.
+      try { return [`${r.entidad}:${r.id}`, await api.movimientos(r.entidad, r.id)]; }
+      catch { movsPedidos.current.delete(`${r.entidad}:${r.id}`); return null; }
+    }));
+    const ok = lotes.filter((x): x is [string, Movimiento[]] => x !== null);
+    if (ok.length) setMovsDoc((m) => ({ ...m, ...Object.fromEntries(ok) }));
+  };
+
+  // Lo que ven las pantallas: el resumen de la carga inicial + las trazas ya pedidas,
+  // sin repetir (un movimiento puede estar en los dos lados).
+  const movimientos = useMemo(() => {
+    const docs = Object.values(movsDoc);
+    if (!docs.length) return data.movimientos;
+    const vistos = new Set(data.movimientos.map((m) => m.id));
+    const extra: Movimiento[] = [];
+    for (const m of docs.flat()) {
+      if (vistos.has(m.id)) continue;
+      vistos.add(m.id);
+      extra.push(m);
+    }
+    return extra.length ? [...data.movimientos, ...extra] : data.movimientos;
+  }, [data.movimientos, movsDoc]);
 
   // Auto-refresco (solo modo SQL): mantiene Producción al día con lo que crea
   // Proveeduría en la base compartida —p. ej. una OC enviada a Aprobación— sin
-  // recargar a mano. Refresca cada 20s SOLO con la pestaña visible, y al instante
-  // cuando volvés a la pestaña. Silencioso (no toca el estado de carga) y sin
-  // solapar peticiones.
+  // recargar a mano. Solo con la pestaña visible, y al volver a la pestaña.
+  // Silencioso (no toca el estado de carga) y sin solapar peticiones.
+  //
+  // El intervalo es un piso, no una obligación: `refrescarSiViejo` no vuelve a pedir
+  // si algo ya recargó hace poco (una navegación, el volver a la pestaña, una acción).
   useEffect(() => {
     if (!USE_API || !hydrated) return;
-    let cancel = false;
-    let busy = false;
-    const tick = async () => {
-      if (busy || typeof document === "undefined" || document.visibilityState !== "visible") return;
-      busy = true;
-      try {
-        const b = await api.bootstrap();
-        if (!cancel) setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
-      } catch { /* red intermitente: reintenta en el próximo tick */ }
-      finally { busy = false; }
+    const tick = () => {
+      if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+      void refrescarSiViejo(REFRESCO_MS).catch(() => { /* red intermitente: al próximo tick */ });
     };
-    const id = setInterval(tick, 20000);
+    const id = setInterval(tick, REFRESCO_MS);
     const onVisible = () => { if (document.visibilityState === "visible") tick(); };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
     return () => {
-      cancel = true;
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [USE_API, hydrated]);
+  }, [USE_API, hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sincronización con BC (solo modo SQL): al cargar y cada 5 min con la pestaña
   // visible. Es UNA lectura de BC (todos los pedidos vivos) contra las órdenes que
@@ -298,18 +360,20 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     tick();
     const id = setInterval(tick, 5 * 60_000);
     return () => { cancel = true; clearInterval(id); };
-  }, [USE_API, hydrated, cargando, usuario, role]);
+  }, [USE_API, hydrated, cargando, usuario, role]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Refresco inmediato al cambiar de menú dentro de compras (el store persiste
-  // entre navegaciones, así que sin esto los datos quedaban "viejos" hasta el
-  // próximo tick). No refetch en el montaje (la hidratación ya trajo todo).
+  // Al cambiar de menú dentro de compras (el store persiste entre navegaciones, así
+  // que sin esto los datos quedarían viejos hasta el próximo tick). Pero SOLO si ya
+  // están viejos: pasear por las siete pestañas de Ingeniería no son siete descargas
+  // de la base entera, es ninguna. No refetch en el montaje (la hidratación ya trajo
+  // todo).
   const pathname = usePathname();
   const primeraNav = useRef(true);
   useEffect(() => {
     if (!USE_API || !hydrated) return;
     if (primeraNav.current) { primeraNav.current = false; return; }
-    refreshFromApi().catch(() => { /* red intermitente */ });
-  }, [pathname, USE_API, hydrated]);
+    void refrescarSiViejo(REFRESCO_MS).catch(() => { /* red intermitente */ });
+  }, [pathname, USE_API, hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const api2 = useMemo<StoreShape>(() => {
     const uid = () => Math.random().toString(36).slice(2, 9);
@@ -761,7 +825,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     const cargarPlanificacion: StoreShape["cargarPlanificacion"] = (categorias, filas) =>
       setData((d) => ({ ...d, planCategorias: categorias, planFilas: filas }));
 
-    const reset: StoreShape["reset"] = () => setData(freshData());
+    const reset: StoreShape["reset"] = () => { movsPedidos.current.clear(); setMovsDoc({}); setData(freshData()); };
 
     const reintentarCarga: StoreShape["reintentarCarga"] = async () => {
       setCargando(true);
@@ -774,7 +838,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       role, setRole, usuario, setUsuario, cargando, hydrated, errorCarga, reintentarCarga,
       proveedores: seed.proveedores, articulos: seed.articulos, obras: seed.obras,
       maquinas: seed.maquinas, almacenes: seed.almacenes,
-      pedidos: data.pedidos, ordenes: data.ordenes, recepciones: data.recepciones, movimientos: data.movimientos,
+      pedidos: data.pedidos, ordenes: data.ordenes, recepciones: data.recepciones, movimientos, cargarMovimientos,
       addPedido, editPedido, editSubcontrato, updatePedido, setPedidoEstado, deletePedido,
       createOrden, updateOrden, setOrdenEstado, sincronizarBc, bcEstados, registrarRecepcion, facturarRecepcion, devolverPedido, devolverLineasPedido, devolverOrden, reset,
       notasCredito, marcarNotasCredito, cargarNotasCredito,
@@ -784,7 +848,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       planContexto, setPlanContexto,
       borrador, setBorrador,
     };
-  }, [role, usuario, data, borrador, planContexto, cargando, errorCarga, bcEstados]);
+  }, [role, usuario, data, movimientos, borrador, planContexto, cargando, errorCarga, bcEstados]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <StoreCtx.Provider value={api2}>{children}</StoreCtx.Provider>;
 }

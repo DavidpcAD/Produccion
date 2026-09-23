@@ -87,12 +87,40 @@ const enOrdenViva = (det: string) => `EXISTS (
       JOIN dbo.OrdenCompra oc ON oc.idOrdenCompra = o.idOrdenCompra AND oc.esEliminada = 0
      WHERE o.idPedidoCompraDet = ${det})`;
 
+/** Agrupa las líneas por el id de su cabecera de una pasada. Antes cada cabecera
+ *  recorría TODO el arreglo de líneas (`.filter`), o sea 500 x 1600 comparaciones
+ *  por listado. */
+function porCabecera<T>(lineas: T[], fk: string): Map<number, T[]> {
+  const m = new Map<number, T[]>();
+  for (const l of lineas) {
+    const k = (l as Record<string, number>)[fk];
+    const arr = m.get(k);
+    if (arr) arr.push(l); else m.set(k, [l]);
+  }
+  return m;
+}
+
+// Columnas que `mapPedido` realmente lee. Un `SELECT *` traía 30 columnas de la
+// cabecera y 23 de la línea —notas de aprobador, campos de BC, fechas de
+// modificación— que nadie mira en pantalla y que igual viajan por la red.
+const COLS_PEDIDO = `idPedidoCompra, idEstado, pedidoNo, tipoSolicitud, obra, proyecto, maquinaNo,
+  solicitante, creadoPor, prioridad, notaCreador, idClasificacion, fechaCreacion`;
+const COLS_PEDIDO_DET = `d.idPedidoCompraDet, d.idPedidoCompra, d.idEstado, d.itemNo, d.descripcion,
+  d.quantitySolicitado, d.quantityOrdenado, d.unitOfMeasureCode, d.locationCode, d.obra,
+  d.variantCode, d.notaCreador, d.taskNo, d.taskDescr`;
+
 export async function listPedidos(): Promise<Pedido[]> {
   await ensureEstados();
   const pool = await getPool();
-  const h = await pool.request().query("SELECT * FROM dbo.PedidoCompra WHERE esEliminada = 0 ORDER BY idPedidoCompra DESC");
-  const d = await pool.request().query(`SELECT d.*, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d ORDER BY d.idPedidoCompraDet`);
-  return h.recordset.map((p) => mapPedido(p, d.recordset.filter((x) => x.idPedidoCompra === p.idPedidoCompra)));
+  const h = await pool.request().query(`SELECT ${COLS_PEDIDO} FROM dbo.PedidoCompra WHERE esEliminada = 0 ORDER BY idPedidoCompra DESC`);
+  // Solo las líneas de los pedidos que este listado devuelve: las de pedidos borrados
+  // se mapeaban y se tiraban.
+  const d = await pool.request().query(`SELECT ${COLS_PEDIDO_DET}, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden
+      FROM dbo.PedidoCompraDet d
+      JOIN dbo.PedidoCompra p ON p.idPedidoCompra = d.idPedidoCompra AND p.esEliminada = 0
+      ORDER BY d.idPedidoCompraDet`);
+  const porPedido = porCabecera(d.recordset, "idPedidoCompra");
+  return h.recordset.map((p) => mapPedido(p, porPedido.get(p.idPedidoCompra) ?? []));
 }
 
 export async function getPedido(id: number): Promise<Pedido | null> {
@@ -510,11 +538,21 @@ export async function softDeletePedido(id: number, usuario: string, rol: Role) {
 }
 
 // ----------------------------------------------------------------- ORDENES
+// Columnas que `mapOrden` realmente lee. La cabecera tiene 47 y la línea 44; el
+// `SELECT *` arrastraba entre otras `bcCheckDetalle` (el volcado del cotejo contra
+// BC, la columna más pesada de la base) en cada carga de cada pantalla.
+const COLS_ORDEN = `idOrdenCompra, idEstado, ordenNo, proveedorNo, proveedorNombre, currencyCode,
+  versionesArchivadas, bcNo, fechaEmision, fechaCreacion`;
+const COLS_ORDEN_DET = `d.idOrdenCompraDet, d.idOrdenCompra, d.idPedidoCompraDet, d.lineNum, d.tipoLinea,
+  d.itemNo, d.variantCode, d.descripcion, d.quantity, d.quantityRecibida, d.quantityFacturada,
+  d.unitOfMeasureCode, d.locationCode, d.directUnitCost, d.vatPct, d.lineDiscountPct,
+  d.jobNo, d.taskNo, d.chargeNo, d.chargeMethod`;
+
 export async function listOrdenes(): Promise<Orden[]> {
   await ensureEstados();
   const pool = await getPool();
-  const h = await pool.request().query("SELECT * FROM dbo.OrdenCompra WHERE esEliminada = 0 ORDER BY idOrdenCompra DESC");
-  const d = await pool.request().query(`SELECT d.*,
+  const h = await pool.request().query(`SELECT ${COLS_ORDEN} FROM dbo.OrdenCompra WHERE esEliminada = 0 ORDER BY idOrdenCompra DESC`);
+  const d = await pool.request().query(`SELECT ${COLS_ORDEN_DET},
              -- Consumo inmediato: la TAREA (Job Task) puede venir en NULL si la orden se
              -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
              -- la tarea del pedido. Sin tarea, BC no puede consumir contra el proyecto y
@@ -545,10 +583,12 @@ export async function listOrdenes(): Promise<Orden[]> {
              -- (GomEqp Machine No.) al lanzar el pedido.
              pc.maquinaNo AS maquinaOrigen
       FROM dbo.OrdenCompraDet d
+      JOIN dbo.OrdenCompra oc ON oc.idOrdenCompra = d.idOrdenCompra AND oc.esEliminada = 0
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
       ORDER BY d.idOrdenCompraDet`);
-  return h.recordset.map((o) => mapOrden(o, d.recordset.filter((x) => x.idOrdenCompra === o.idOrdenCompra)));
+  const porOrden = porCabecera(d.recordset, "idOrdenCompra");
+  return h.recordset.map((o) => mapOrden(o, porOrden.get(o.idOrdenCompra) ?? []));
 }
 
 export async function getOrden(id: number): Promise<Orden | null> {
@@ -896,17 +936,53 @@ export async function setRecepcionFactura(idRec: number, numeroFactura: string, 
 }
 
 // ----------------------------------------------------------------- listas extra
+/** Los dos números del badge de devoluciones de la barra lateral.
+ *
+ *  Los contaba en JavaScript sobre `listPedidos()` + `listOrdenes()`: la barra lateral
+ *  está en TODAS las pantallas de la app (no solo en Compras), así que abrir cualquier
+ *  página bajaba las dos tablas enteras con todas sus líneas para mostrar un número.
+ *  Es la misma definición que `pedidoTieneDevolucion`: el pedido entero devuelto, o
+ *  alguna línea suelta devuelta. */
+export async function contarDevoluciones(): Promise<{ pedidosDevueltos: number; ordenesRechazadas: number }> {
+  await ensureEstados();
+  const pool = await getPool();
+  const r = await pool.request()
+    .input("devuelto", sql.NVarChar(50), NOMBRE_POR_CODIGO.devuelto)
+    .input("rechazado", sql.NVarChar(50), NOMBRE_POR_CODIGO.rechazado)
+    .query(`
+      SELECT
+        (SELECT COUNT(*) FROM dbo.PedidoCompra p
+          WHERE p.esEliminada = 0
+            AND (EXISTS (SELECT 1 FROM dbo.Estado e WHERE e.idEstado = p.idEstado AND e.modulo = 'Compras' AND e.estado = @devuelto)
+              OR EXISTS (SELECT 1 FROM dbo.PedidoCompraDet d
+                           JOIN dbo.Estado e2 ON e2.idEstado = d.idEstado AND e2.modulo = 'Compras'
+                          WHERE d.idPedidoCompra = p.idPedidoCompra AND e2.estado = @devuelto))
+        ) AS pedidosDevueltos,
+        (SELECT COUNT(*) FROM dbo.OrdenCompra o
+           JOIN dbo.Estado e ON e.idEstado = o.idEstado AND e.modulo = 'Compras'
+          WHERE o.esEliminada = 0 AND e.estado = @rechazado
+        ) AS ordenesRechazadas`);
+  const f = r.recordset[0];
+  return { pedidosDevueltos: Number(f?.pedidosDevueltos ?? 0), ordenesRechazadas: Number(f?.ordenesRechazadas ?? 0) };
+}
+
 export async function listRecepciones(): Promise<Recepcion[]> {
   const pool = await getPool();
-  const h = await pool.request().query("SELECT * FROM dbo.RecepcionCompra WHERE esEliminada = 0 ORDER BY idRecepcionCompra DESC");
-  const d = await pool.request().query("SELECT * FROM dbo.RecepcionCompraDet ORDER BY idRecepcionCompraDet");
+  const h = await pool.request().query(`SELECT idRecepcionCompra, idOrdenCompra, numeroFactura, total, esParcial, creadoPor,
+      fechaFactura, fechaRecepcion, fechaRegistro
+      FROM dbo.RecepcionCompra WHERE esEliminada = 0 ORDER BY idRecepcionCompra DESC`);
+  const d = await pool.request().query(`SELECT d.idRecepcionCompra, d.idOrdenCompraDet, d.quantityRecibida, d.precioFactura
+      FROM dbo.RecepcionCompraDet d
+      JOIN dbo.RecepcionCompra r ON r.idRecepcionCompra = d.idRecepcionCompra AND r.esEliminada = 0
+      ORDER BY d.idRecepcionCompraDet`);
+  const porRecepcion = porCabecera(d.recordset, "idRecepcionCompra");
   return h.recordset.map((r): Recepcion => ({
     id: String(r.idRecepcionCompra), ordenId: String(r.idOrdenCompra), numeroFactura: r.numeroFactura ?? "",
     fechaFactura: (r.fechaFactura?.toISOString?.() ?? "").slice(0, 10),
     fechaRecepcion: (r.fechaRecepcion?.toISOString?.() ?? "").slice(0, 10),
     fechaRegistro: (r.fechaRegistro?.toISOString?.() ?? "").slice(0, 10),
     total: Number(r.total ?? 0), parcial: !!r.esParcial, recibidoPor: r.creadoPor ?? undefined,
-    lineas: d.recordset.filter((x) => x.idRecepcionCompra === r.idRecepcionCompra)
+    lineas: (porRecepcion.get(r.idRecepcionCompra) ?? [])
       .map((l): RecepcionLinea => ({
         ordenLineaId: String(l.idOrdenCompraDet),
         cantidadRecibida: Number(l.quantityRecibida ?? 0),
@@ -915,15 +991,49 @@ export async function listRecepciones(): Promise<Recepcion[]> {
   }));
 }
 
-export async function listMovimientosAll() {
-  await ensureEstados();
-  const pool = await getPool();
-  const r = await pool.request().query("SELECT * FROM dbo.Movimiento ORDER BY fecha DESC, idMovimiento DESC");
-  return r.recordset.map((m) => ({
+const COLS_MOVIMIENTO = `idMovimiento, entidad, idEntidad, documentoNo, tipoMovimiento,
+  idEstadoAnterior, idEstadoNuevo, detalle, usuario, rol, fecha`;
+
+interface FilaMovimiento {
+  idMovimiento: number; entidad: string; idEntidad: number; documentoNo: string | null;
+  tipoMovimiento: string; idEstadoAnterior: number | null; idEstadoNuevo: number | null;
+  detalle: string | null; usuario: string; rol: string; fecha: Date | null;
+}
+
+function mapMovimiento(m: FilaMovimiento) {
+  return {
     id: String(m.idMovimiento), entidad: m.entidad, idEntidad: String(m.idEntidad), documentoNo: m.documentoNo ?? "",
     tipoMovimiento: m.tipoMovimiento, estadoAnterior: codigoDeId(m.idEstadoAnterior), estadoNuevo: codigoDeId(m.idEstadoNuevo),
-    detalle: m.detalle ?? undefined, usuario: m.usuario, rol: m.rol as Role, fecha: m.fecha?.toISOString?.() ?? "",
-  }));
+    detalle: m.detalle ?? undefined, usuario: m.usuario, rol: m.rol as Role, fecha: m.fecha?.toISOString() ?? "",
+  };
+}
+
+/** La rebanada de bitácora que necesitan las LISTAS, y nada más.
+ *
+ *  Antes la carga inicial se traía dbo.Movimiento entera —miles de filas que crecen
+ *  para siempre— para que dos pantallas respondieran dos preguntas muy chicas:
+ *    · Mis solicitudes: quién devolvió un pedido (`devolucionInfo`).
+ *    · Aprobación: si una orden volvió por BC (`ordenDevueltaPorBc`), que solo mira
+ *      órdenes en "Pendiente de aprobación".
+ *  La traza completa de un documento la carga su propia pantalla de detalle
+ *  (`listMovimientos`), que es donde de verdad se lee. */
+export async function listMovimientosResumen() {
+  await ensureEstados();
+  const pool = await getPool();
+  const r = await pool.request()
+    .input("devuelto", sql.NVarChar(50), NOMBRE_POR_CODIGO.devuelto)
+    .input("pendiente", sql.NVarChar(50), NOMBRE_POR_CODIGO.pendiente_aprobacion)
+    .query(`SELECT ${COLS_MOVIMIENTO} FROM dbo.Movimiento m
+       WHERE (m.entidad = 'pedido' AND m.tipoMovimiento = 'devuelto'
+              AND EXISTS (SELECT 1 FROM dbo.PedidoCompra p
+                            JOIN dbo.Estado e ON e.idEstado = p.idEstado AND e.modulo = 'Compras'
+                           WHERE p.idPedidoCompra = m.idEntidad AND p.esEliminada = 0 AND e.estado = @devuelto))
+          OR (m.entidad = 'orden'
+              AND EXISTS (SELECT 1 FROM dbo.OrdenCompra o
+                            JOIN dbo.Estado e ON e.idEstado = o.idEstado AND e.modulo = 'Compras'
+                           WHERE o.idOrdenCompra = m.idEntidad AND o.esEliminada = 0 AND e.estado = @pendiente))
+       ORDER BY m.fecha DESC, m.idMovimiento DESC`);
+  return r.recordset.map(mapMovimiento);
 }
 
 // ----------------------------------------------------------------- MOVIMIENTOS
@@ -952,12 +1062,8 @@ export async function listMovimientos(entidad: string, idEntidad: number) {
   await ensureEstados();
   const pool = await getPool();
   const r = await pool.request().input("e", sql.NVarChar(20), entidad).input("id", sql.Int, idEntidad)
-    .query("SELECT * FROM dbo.Movimiento WHERE entidad=@e AND idEntidad=@id ORDER BY fecha DESC, idMovimiento DESC");
-  return r.recordset.map((m) => ({
-    id: String(m.idMovimiento), entidad: m.entidad, idEntidad: String(m.idEntidad), documentoNo: m.documentoNo ?? "",
-    tipoMovimiento: m.tipoMovimiento, estadoAnterior: codigoDeId(m.idEstadoAnterior), estadoNuevo: codigoDeId(m.idEstadoNuevo),
-    detalle: m.detalle ?? undefined, usuario: m.usuario, rol: m.rol as Role, fecha: m.fecha?.toISOString?.() ?? "",
-  }));
+    .query(`SELECT ${COLS_MOVIMIENTO} FROM dbo.Movimiento WHERE entidad=@e AND idEntidad=@id ORDER BY fecha DESC, idMovimiento DESC`);
+  return r.recordset.map(mapMovimiento);
 }
 
 /* ============================================================================

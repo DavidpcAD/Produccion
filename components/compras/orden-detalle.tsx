@@ -30,7 +30,11 @@ export function OrdenDetalle({
   // compartida; Proveeduría la manda a la suya, donde además puede ordenarla.
   pedidoHref?: (p: Pedido) => string;
 }) {
-  const { proveedores, recepciones, pedidos, movimientos, bcEstados, sincronizarBc, setOrdenEstado } = useStore();
+  const { proveedores, recepciones, pedidos, movimientos, bcEstados, sincronizarBc, setOrdenEstado, cargarMovimientos } = useStore();
+  // La bitácora completa de ESTA orden (la carga inicial solo trae el resumen de las
+  // listas). Hace falta acá, y no solo en la línea de tiempo de abajo, porque de ella
+  // sale si el último intento de lanzar a BC falló.
+  useEffect(() => { void cargarMovimientos([{ entidad: "orden", id: orden.id }]); }, [orden.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const router = useRouter();
   const toast = useToast();
   const [verFactura, setVerFactura] = useState<string | null>(null);

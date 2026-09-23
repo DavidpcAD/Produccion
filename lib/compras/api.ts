@@ -65,6 +65,11 @@ export const api = {
   setRecepcionFactura: (id: string, body: unknown): Promise<{ ok: true }> =>
     fetch(`/api/compras/recepciones/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
 
+  /** La traza (bitácora) de UN documento. La carga inicial solo trae el resumen que
+   *  necesitan las listas; el historial completo lo pide la pantalla de detalle. */
+  movimientos: (entidad: string, id: string): Promise<Movimiento[]> =>
+    fetch(`/api/compras/movimientos?entidad=${encodeURIComponent(entidad)}&id=${encodeURIComponent(id)}`).then(jsonOrThrow),
+
   // Notas de crédito (líneas de factura con problema, para emitir NC).
   createNotasCredito: (body: unknown): Promise<{ ok: true }> =>
     fetch("/api/compras/notas-credito", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),

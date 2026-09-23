@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { listOrdenes, listPedidos } from "@/lib/compras/repo";
-import { pedidoTieneDevolucion } from "@/lib/compras/helpers";
+import { contarDevoluciones } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
@@ -15,10 +14,7 @@ export async function GET() {
   if (esRechazo(g)) return g;
 
   try {
-    const [pedidos, ordenes] = await Promise.all([listPedidos(), listOrdenes()]);
-    const pedidosDevueltos = pedidos.filter((p) => pedidoTieneDevolucion(p)).length;
-    const ordenesRechazadas = ordenes.filter((o) => o.estado === "rechazado").length;
-    return NextResponse.json({ pedidosDevueltos, ordenesRechazadas });
+    return NextResponse.json(await contarDevoluciones());
   } catch (e: unknown) {
     return NextResponse.json({ error: String((e as { message?: string })?.message ?? e) }, { status: 500 });
   }

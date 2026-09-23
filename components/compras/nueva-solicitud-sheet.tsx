@@ -859,7 +859,15 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const [bcBloqueados, setBcBloqueados] = useState<Set<string>>(new Set());
   const [bcObras, setBcObras] = useState<Obra[] | null>(null);
   const [bcAlm, setBcAlm] = useState<Almacen[] | null>(null);
+  // Los catálogos de BC se piden la primera vez que el panel SE ABRE, no cuando se
+  // monta. Este componente vive montado (cerrado) en las pantallas de Ingeniería, y
+  // mientras lo hacía en el montaje toda lista pagaba el catálogo de artículos, las
+  // obras, los almacenes, las plantillas y las existencias del almacén —varios
+  // segundos contra BC— solo para mostrar una tabla que ya tenía todo lo que necesita.
+  const catalogosPedidos = useRef(false);
   useEffect(() => {
+    if (!open || catalogosPedidos.current) return;
+    catalogosPedidos.current = true;
     let cancel = false;
     (async () => {
       try {
@@ -881,10 +889,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         }
         if (obrasBc.length) setBcObras(obrasBc);
         if (almBc.length) setBcAlm(almBc);
-      } catch { /* respaldo del store */ }
+      } catch { catalogosPedidos.current = false; /* respaldo del store; reintenta al reabrir */ }
     })();
     return () => { cancel = true; };
-  }, []);
+  }, [open]);
   // Materiales sintetizados desde una plantilla cuando su código NO está en el
   // catálogo cargado (ej. BC no devolvió el catálogo completo). Así la plantilla
   // agrega sus líneas igual, usando la info que ella misma trae.
@@ -972,9 +980,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const [plantillaSel, setPlantillaSel] = useState("");                          // plantilla elegida (para mostrarla en el campo)
 
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
+  const plantillasPedidas = useRef(false);
   useEffect(() => {
-    (async () => { try { const r = await fetch("/api/compras/plantillas"); if (r.ok) setPlantillas(((await r.json()).plantillas ?? []) as Plantilla[]); } catch { /* prototipo */ } })();
-  }, []);
+    if (!open || plantillasPedidas.current) return;
+    plantillasPedidas.current = true;
+    (async () => { try { const r = await fetch("/api/compras/plantillas"); if (r.ok) setPlantillas(((await r.json()).plantillas ?? []) as Plantilla[]); } catch { plantillasPedidas.current = false; /* prototipo */ } })();
+  }, [open]);
 
   async function getVariantes(code: string): Promise<Variante[]> {
     if (!code) return [];
@@ -1045,6 +1056,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const usaAlmacen = tipo === "stock" || (tipo !== "subcontrato" && tipo !== "activo" && destinoMat === "almacen");
   const verStock = usaAlmacen && !!almacenSel;
   useEffect(() => {
+    if (!open) return;   // panel cerrado: no se le pregunta el inventario a BC
     if (!verStock) { setStockReady(false); setStockPorCode({}); return; }
     let cancel = false;
     setStockReady(false);
@@ -1061,7 +1073,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       })
       .catch(() => { if (!cancel) { setStockPorCode({}); setStockReady(true); } });
     return () => { cancel = true; };
-  }, [verStock, almacenSel]);
+  }, [open, verStock, almacenSel]);
 
   // Con el stock listo, prellenar "pedir" = max(0, requerido − stock) en las líneas de
   // Bodega que vienen de plantilla. Una sola vez por línea (autoPedir → false al aplicar),

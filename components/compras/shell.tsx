@@ -4,6 +4,7 @@ import { useSession } from "@/hooks/useSession";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useStore } from "@/lib/compras/store";
+import { PantallaSkeleton } from "@/components/compras/pantalla-skeleton";
 import type { Role } from "@/lib/compras/types";
 import { devolucionesCount } from "@/lib/compras/helpers";
 import {
@@ -21,6 +22,7 @@ const ROLE_META: Record<Role, { label: string; persona: string; home: string; na
   ingenieria: {
     label: "Ingeniería", persona: "Laura", home: "/compras/ingenieria", color: "var(--ds-color-green-100)",
     nav: [
+      { href: "/compras/ingenieria/resumen", label: "Resumen", icon: IconDashboard },
       { href: "/compras/ingenieria", label: "Mis solicitudes", icon: IconList },
       { href: "/compras/ingenieria/devoluciones", label: "Devoluciones", icon: IconWarning },
       { href: "/compras/ingenieria/matriz", label: "Matriz", icon: IconMatrix },
@@ -72,6 +74,12 @@ const ROLE_META: Record<Role, { label: string; persona: string; home: string; na
   },
 };
 
+// Cuántas tarjetas de resumen lleva la pantalla de entrada de cada rol, para que el
+// esqueleto tenga la forma de lo que está por aparecer y no salte al llegar los datos.
+const TILES_POR_ROL: Record<Role, number> = {
+  ingenieria: 5, proveeduria: 4, aprobacion: 0, facturacion: 0, contabilidad: 0,
+};
+
 export function AppShell({ role, children }: { role: Role; children: React.ReactNode }) {
   const { role: current, setRole, usuario, setUsuario, hydrated, pedidos, ordenes, errorCarga, reintentarCarga, cargando } = useStore();
   const router = useRouter();
@@ -92,8 +100,10 @@ export function AppShell({ role, children }: { role: Role; children: React.React
     if (baseSession?.nombre && usuario !== baseSession.nombre) setUsuario(baseSession.nombre);
   }, [current, role, hydrated, setRole, usuario, setUsuario, baseSession]);
 
-  if (!hydrated || current !== role) {
-    return <div className="page"><div className="empty">Cargando…</div></div>;
+  if (!hydrated || cargando || current !== role) {
+    // El Resumen no es una lista: su esqueleto lleva paneles, no filas de tabla.
+    const forma = pathname.endsWith("/resumen") ? "paneles" : "tabla";
+    return <PantallaSkeleton tiles={TILES_POR_ROL[role]} forma={forma} conTabs={ROLE_META[role].nav.length > 1 && role !== "ingenieria"} />;
   }
 
   // La carga inicial falló (base en pausa, red, 500…). Decirlo, porque la alternativa es

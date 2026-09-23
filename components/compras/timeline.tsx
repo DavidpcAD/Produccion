@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { useStore } from "@/lib/compras/store";
 import { formatDateTime, numeroOrden, ROL_LABEL } from "@/lib/compras/helpers";
 import type { Movimiento } from "@/lib/compras/types";
@@ -112,29 +113,37 @@ export function Timeline({
   // para mostrar el historial completo hasta que se factura.
   traza?: boolean;
 }) {
-  const { movimientos, pedidos, ordenes } = useStore();
+  const { movimientos, pedidos, ordenes, cargarMovimientos } = useStore();
 
-  // Movimientos propios de la entidad.
-  let items = movimientos.filter((m) => m.entidad === entidad && m.idEntidad === idEntidad);
+  // Los documentos cuya bitácora hay que tener para armar esta línea de tiempo: el
+  // propio y, con `traza`, las órdenes en las que entró el pedido.
+  const refs = useMemo(() => {
+    const r = [{ entidad, id: idEntidad }];
+    if (traza && entidad === "pedido") {
+      const pedido = pedidos.find((p) => p.id === idEntidad);
+      const lineasPedido = new Set(pedido?.lineas.map((l) => l.id) ?? []);
+      for (const o of ordenes) {
+        if (o.lineas.some((l) => l.pedidoLineaId && lineasPedido.has(l.pedidoLineaId))) r.push({ entidad: "orden", id: o.id });
+      }
+    }
+    return r;
+  }, [entidad, idEntidad, traza, pedidos, ordenes]);
+  // La carga inicial de compras solo trae el resumen de bitácora que usan las listas;
+  // el historial completo se pide acá, que es la única pantalla que lo muestra.
+  const clave = refs.map((r) => `${r.entidad}:${r.id}`).join(",");
+  useEffect(() => { void cargarMovimientos(refs); }, [clave]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mapa idOrden -> rótulo de la orden, para mostrar de qué orden viene cada evento.
   // Es el N.º de BC si ya está allá y "Interno NN" si no: el `numero` crudo
   // ("CP-000062") se lee igual que un pedido de BC y en BC no existe.
-  const numeroDeOrden = new Map(ordenes.map((o) => [o.id, numeroOrden(o)]));
+  const numeroDeOrden = useMemo(() => new Map(ordenes.map((o) => [o.id, numeroOrden(o)])), [ordenes]);
 
-  if (traza && entidad === "pedido") {
-    const pedido = pedidos.find((p) => p.id === idEntidad);
-    const lineasPedido = new Set(pedido?.lineas.map((l) => l.id) ?? []);
-    // Órdenes que incluyen al menos una línea de este pedido (enlace N:M).
-    const ordenesLigadas = ordenes.filter((o) =>
-      o.lineas.some((l) => l.pedidoLineaId && lineasPedido.has(l.pedidoLineaId))
-    );
-    const idsOrden = new Set(ordenesLigadas.map((o) => o.id));
-    const movsOrden = movimientos.filter((m) => m.entidad === "orden" && idsOrden.has(m.idEntidad));
-    items = [...items, ...movsOrden];
-  }
-
-  const ordenados = items.slice().sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  const ordenados = useMemo(() => {
+    const quiero = new Set(refs.map((r) => `${r.entidad}:${r.id}`));
+    return movimientos
+      .filter((m) => quiero.has(`${m.entidad}:${m.idEntidad}`))
+      .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  }, [movimientos, refs]);
 
   if (ordenados.length === 0) {
     return <div className="ds-muted ds-label">Sin movimientos registrados todavía.</div>;
