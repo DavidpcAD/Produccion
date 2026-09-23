@@ -290,7 +290,11 @@ export function getRouteModule(pathname: string): Modulo {
 const COMPRAS_SOLO_INGENIERIA =
   /^\/(?:api\/)?compras\/proveeduria/;
 const COMPRAS_INGENIERIA_INTERNO =
-  /^\/compras\/ingenieria\/(?:matriz|clasificaciones|plantillas|inventarios|seguimiento|devoluciones)/;
+  // `resumen` va acá y no en la lista compartida con Bodega a propósito: es el
+  // panorama de la plata (montos por año, saldo pendiente, proveedores a los que
+  // corretearle, lo que BC tiene recibido sin facturar). Bodega pide material, no
+  // lleva la compra.
+  /^\/compras\/ingenieria\/(?:matriz|clasificaciones|plantillas|inventarios|seguimiento|devoluciones|resumen)/;
 // Dentro de /compras/facturacion conviven DOS oficios: la RECEPCIÓN del material
 // (bodeguero: por recibir, recibidas, el detalle y el registro de la recepción) y
 // lo de CONTABILIDAD (Kattya: notas de crédito, cargos sobre factura, todas,

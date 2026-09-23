@@ -21,6 +21,19 @@ export const ALMACEN_MAQUINARIA = "MAQ";
 export const OBRA_MAQUINARIA = "MAQ";
 export const TAREA_PARQUE_MAQUINARIA = "CMAQ";
 
+/** Una línea que se RECIBE y se FACTURA por cantidad, o sea todo menos el cargo.
+ *  Un flete no es material que llegue: se reparte entre las demás líneas al
+ *  registrar, así que contarlo infla lo pedido sin que nunca aparezca nada por
+ *  entregar. */
+export const esLineaRecibible = (l: Pick<OrdenLinea, "tipo">) => l.tipo !== "cargo";
+
+/** La moneda de la app: "" y "CRC" son lo mismo (colones), el resto va en mayúsculas.
+ *  Sirve para agrupar sin que la misma moneda cuente dos veces. */
+export function monedaApp(code?: string): string {
+  const c = (code ?? "").trim().toUpperCase();
+  return c === "CRC" ? "" : c;
+}
+
 /** La línea va CONTRA PROYECTO + TAREA (consumo directo), no a inventario. El
  *  discriminante es la TAREA: material contra la obra+actividad, o repuesto contra
  *  MAQ+CMAQ. Todo lo demás entra al almacén elegido. */
@@ -205,7 +218,7 @@ export function etiquetaArticulo(a: { code: string; descripcion: string; tipo?: 
 // El scope de las listas es por USUARIO, no por rol: cada uno ve sus solicitudes y
 // —si solo recibe lo suyo— las órdenes que salieron de ellas. Ojo: esto es cosmética
 // de cliente; el bootstrap sigue trayendo todo (el blindaje por API está pendiente).
-type Sesion = { username?: string; nombre?: string; modules?: string[]; roleNames?: string[]; nivelAdmin?: number } | null;
+export type Sesion = { username?: string; nombre?: string; modules?: string[]; roleNames?: string[]; nivelAdmin?: number } | null;
 
 /** Super Admin ve TODO, no solo lo suyo. Se decide por el módulo 'admin' (que solo
  *  sale del rol comodín); quien no tiene rol de Producción conserva el criterio

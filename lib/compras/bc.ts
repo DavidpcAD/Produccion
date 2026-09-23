@@ -2374,3 +2374,177 @@ export async function bcHealth() {
   try { out.obras = (await bcObras()).length; } catch (e: any) { out.obrasError = String(e?.message ?? e); }
   return out;
 }
+
+/* ============================================================================
+   PANORAMA DEL RESUMEN — los dos números que viven en BC y no en esta base.
+
+   Portado de proveeduria.adelante.cr (`lib/bc.ts`), que es donde nació el panel
+   "Resumen" de Órdenes de compra:
+     · lo recibido en bodega que sigue SIN factura registrada en BC, con su antigüedad;
+     · el material pedido al que NADIE le puso fecha de entrega.
+
+   Los dos salen del mismo web service OData (`purchaseDocumentLines`), así que se
+   piden juntos y la pantalla los pinta en el mismo momento.
+   ============================================================================ */
+
+export type BcSinFecha = {
+  total: number;
+  lineas: number;
+  ordenes: number;
+  proveedores: number;
+};
+
+export type BcSinFacturar = {
+  total: number;
+  lineas: number;
+  ordenes: number;
+  proveedores: number;
+  masViejoDias: number | null;
+  /** Franjas de antigüedad. Solo las que tienen algo: dos franjas en cero permanente
+   *  hacen que una tarjeta sana se lea como rota. */
+  tramos: { etiqueta: string; monto: number; lineas: number }[];
+  obras: string[];
+};
+
+const DIA_MS = 86_400_000;
+// En BC la fecha vacía es `0001-01-01`, que es MENOR que hoy y DISTINTA de la de la
+// orden. Cualquier filtro por fecha tiene que descartarla ANTES de comparar, o esas
+// líneas se cuelan como "atrasadas" (y su antigüedad da 740.000 días).
+const FECHA_VACIA_BC = "0001-01-01";
+const soloDia = (v: unknown) => String(v ?? "").slice(0, 10);
+
+let companyNameCache: string | null = null;
+
+// El web service OData V4 direcciona la compañía por NOMBRE, no por el GUID que usa
+// la API custom. Se resuelve igual que `getCompanyId`: listando, para no depender de
+// una env mal escrita, con el nombre configurado como respaldo.
+async function getCompanyName(): Promise<string> {
+  if (companyNameCache) return companyNameCache;
+  const nombre = process.env.BC_COMPANY || "ADELANTE_DESARROLLOS_NUEVA";
+  try {
+    const res = await bcFetch(`${customRoot("inventory")}/companies`, { cache: "no-store" });
+    if (res.ok) {
+      const lista = ((await res.json()).value ?? []) as { name?: string; displayName?: string }[];
+      const comp = lista.find((c) => (c.name ?? c.displayName) === nombre) ?? lista[0];
+      const n = (comp?.name ?? comp?.displayName ?? "").toString().trim();
+      if (n) { companyNameCache = n; return n; }
+    }
+  } catch { /* cae al nombre configurado */ }
+  companyNameCache = nombre;
+  return nombre;
+}
+
+/** Una línea de compra tal como la devuelve el web service (solo lo que se pide en
+ *  `$select`; cada consumidor sabe qué campos pidió). */
+type LineaCompraBc = Record<string, unknown>;
+
+/** Una página del web service OData `purchaseDocumentLines`, con paginación. */
+async function leerLineasDeCompra(filtro: string, select: string): Promise<LineaCompraBc[]> {
+  const empresa = await getCompanyName();
+  let url: string | null = `${odataRoot()}/Company('${encodeURIComponent(empresa)}')/purchaseDocumentLines`
+    + `?$filter=${encodeURIComponent(filtro)}&$select=${select}`;
+  const out: LineaCompraBc[] = [];
+  let guard = 0;
+  while (url && guard++ < 50) {
+    const res = await bcFetch(url, { next: { revalidate: 300 } } as RequestInit);
+    if (!res.ok) throw new Error(`BC ${res.status} en purchaseDocumentLines: ${(await res.text()).slice(0, 250)}`);
+    const data = await res.json() as { value?: LineaCompraBc[]; "@odata.nextLink"?: string };
+    out.push(...(data.value ?? []));
+    url = data["@odata.nextLink"] ?? null;
+  }
+  return out;
+}
+
+/** Material pedido con la fecha de entrega EN BLANCO en BC.
+ *
+ *  Salió buscando el "vencido" y resultó que no se puede: la fecha esperada que traen
+ *  casi todas las líneas es el relleno automático de BC (idéntica a la de la orden),
+ *  no una promesa de nadie, así que no hay contra qué medir un atraso. Lo que sí es
+ *  accionable son las que ni siquiera tienen ese relleno: son órdenes de proveedores
+ *  a los que nadie les preguntó cuándo entregan. */
+export async function bcSinFechaDeEntrega(): Promise<BcSinFecha> {
+  const lineas = await leerLineasDeCompra(
+    "documentType eq 'Order' and outstandingAmountLcy gt 0",
+    "documentNumber,buyFromVendorNumber,orderDate,expectedReceiptDate,promisedReceiptDate,outstandingAmountLcy",
+  );
+  const enBlanco = (v: unknown) => { const d = soloDia(v); return !d || d === FECHA_VACIA_BC; };
+  const sinFecha = lineas.filter((l) => enBlanco(l.promisedReceiptDate) && enBlanco(l.expectedReceiptDate));
+  return {
+    total: sinFecha.reduce((s, l) => s + (Number(l.outstandingAmountLcy) || 0), 0),
+    lineas: sinFecha.length,
+    ordenes: new Set(sinFecha.map((l) => String(l.documentNumber ?? ""))).size,
+    proveedores: new Set(sinFecha.map((l) => String(l.buyFromVendorNumber ?? ""))).size,
+  };
+}
+
+/** Recibido en bodega y todavía sin factura registrada en BC, con su antigüedad.
+ *  `hoyISO` lo manda el navegador: el servidor puede estar en UTC y en Costa Rica
+ *  (UTC−6) eso corre la antigüedad un día — con tramos de 15 días, un día importa. */
+export async function bcRecibidoSinFacturar(hoyISO: string): Promise<BcSinFacturar> {
+  const lineas = await leerLineasDeCompra(
+    "documentType eq 'Order' and amtRcdNotInvoicedLcy gt 0",
+    "documentNumber,lineNumber,buyFromVendorNumber,amtRcdNotInvoicedLcy,shortcutDimension1Code",
+  );
+
+  const total = lineas.reduce((s, l) => s + (Number(l.amtRcdNotInvoicedLcy) || 0), 0);
+  const ordenes = [...new Set(lineas.map((l) => String(l.documentNumber ?? "")).filter(Boolean))];
+  const proveedores = new Set(lineas.map((l) => String(l.buyFromVendorNumber ?? "")).filter(Boolean));
+  const obras = [...new Set(lineas.map((l) => String(l.shortcutDimension1Code ?? "").trim()).filter(Boolean))].sort();
+
+  // La fecha de recepción, solo de esos pedidos. El filtro se arma con sus números en
+  // vez de leer las recepciones enteras: son decenas de miles de líneas y acá hacen
+  // falta unas pocas. El `or` se parte en tandas porque una URL con 200 cláusulas
+  // rebota con 400 en BC.
+  const fechaPorLinea = new Map<string, string>();
+  for (let i = 0; i < ordenes.length; i += 20) {
+    const tanda = ordenes.slice(i, i + 20);
+    const filtro = tanda.map((n) => `orderNo eq '${n.replace(/'/g, "''")}'`).join(" or ");
+    const filas = await listCustom(
+      "purchasing",
+      `postedReceiptLines?$filter=${encodeURIComponent(filtro)}&$select=orderNo,orderLineNo,postingDate`,
+      { next: { revalidate: 300 } } as RequestInit,
+    );
+    for (const r of filas) {
+      const fecha = soloDia(r.postingDate);
+      if (!fecha || fecha === FECHA_VACIA_BC) continue;
+      const clave = `${r.orderNo}|${r.orderLineNo}`;
+      const previa = fechaPorLinea.get(clave);
+      // La MÁS VIEJA de esa línea: si se recibió en dos tandas y solo una se facturó,
+      // lo que sigue esperando es lo que llegó primero.
+      if (!previa || fecha < previa) fechaPorLinea.set(clave, fecha);
+    }
+  }
+
+  const hoy = Date.parse(soloDia(hoyISO));
+  const edad = (l: LineaCompraBc): number | null => {
+    const f = fechaPorLinea.get(`${l.documentNumber}|${l.lineNumber}`);
+    if (!f) return null;
+    const d = Math.floor((hoy - Date.parse(f)) / DIA_MS);
+    return Number.isFinite(d) ? Math.max(0, d) : null;
+  };
+
+  const cubos = [
+    { etiqueta: "0 a 15 días", tope: 15, monto: 0, lineas: 0 },
+    { etiqueta: "16 a 30 días", tope: 30, monto: 0, lineas: 0 },
+    { etiqueta: "más de 30 días", tope: Infinity, monto: 0, lineas: 0 },
+    { etiqueta: "sin recepción registrada", tope: -1, monto: 0, lineas: 0 },
+  ];
+  let masViejoDias: number | null = null;
+  for (const l of lineas) {
+    const d = edad(l);
+    const cubo = d === null ? cubos[3] : cubos.find((c) => c.tope >= d && c.tope >= 0)!;
+    cubo.monto += Number(l.amtRcdNotInvoicedLcy) || 0;
+    cubo.lineas += 1;
+    if (d !== null && (masViejoDias === null || d > masViejoDias)) masViejoDias = d;
+  }
+
+  return {
+    total,
+    lineas: lineas.length,
+    ordenes: ordenes.length,
+    proveedores: proveedores.size,
+    masViejoDias,
+    tramos: cubos.filter((c) => c.lineas > 0).map(({ etiqueta, monto, lineas }) => ({ etiqueta, monto, lineas })),
+    obras,
+  };
+}

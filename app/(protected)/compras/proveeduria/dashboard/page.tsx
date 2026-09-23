@@ -6,20 +6,13 @@ import { AppShell } from "@/components/compras/shell";
 import { Tile, ProgressBar } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
-import { money, num, numeroOrden } from "@/lib/compras/helpers";
+import { money, num } from "@/lib/compras/helpers";
+import { resumenPorProveedor, type FilaProv } from "@/lib/compras/proveedores-resumen";
 
-// Importe de una línea de artículo (pedido) y su parte recibida.
-const impPedido = (l: { cantidad: number; precioUnitario: number; descuentoPct?: number }) =>
-  l.cantidad * l.precioUnitario * (1 - (l.descuentoPct ?? 0) / 100);
-const impRecibido = (l: { cantidadRecibida: number; precioUnitario: number; descuentoPct?: number }) =>
-  (l.cantidadRecibida ?? 0) * l.precioUnitario * (1 - (l.descuentoPct ?? 0) / 100);
-
-type LineaRow = { orden: string; estado: string; code: string; desc: string; unidad: string; cantidad: number; recibida: number; pendiente: number; monto: number };
-type ProvRow = {
-  proveedorId: string; nombre: string; currency: string;
-  nOrdenes: number; pedido: number; recibido: number; pendiente: number; pct: number;
-  lineas: LineaRow[];
-};
+// El cálculo vive en lib/compras/proveedores-resumen: lo comparte con el Resumen de
+// Órdenes de compra, que arma con él el ranking de "a quién hay que corretearle". Dos
+// pantallas con dos cuentas para el mismo rótulo es como se empieza a desconfiar.
+type ProvRow = FilaProv;
 
 // Dashboard de Proveeduría: qué se ha pedido vs. entregado, por proveedor.
 // Cada fila se puede expandir para ver sus líneas. La tabla se puede filtrar,
@@ -28,40 +21,8 @@ export default function ProveeduriaDashboardPage() {
   const { ordenes, proveedores } = useStore();
 
   const { filas, tot } = useMemo(() => {
-    const byProv = new Map<string, ProvRow>();
-    for (const o of ordenes) {
-      const prov = proveedores.find((p) => p.id === o.proveedorId);
-      const nombre = o.proveedorNombre || prov?.nombre || o.proveedorId || "(sin proveedor)";
-      const currency = o.currencyCode || prov?.currencyCode || "";
-      // Agrupar por el MISMO proveedor aunque venga con distinto id (mock vs BC):
-      // clave = código de proveedor si hay, si no el nombre normalizado. Así no se
-      // repite "FERRETERIA EPA S.A" en dos filas.
-      const key = (o.proveedorNo?.trim()) || nombre.trim().toUpperCase().replace(/\s+/g, " ");
-      if (!byProv.has(key)) {
-        byProv.set(key, { proveedorId: key, nombre, currency, nOrdenes: 0, pedido: 0, recibido: 0, pendiente: 0, pct: 0, lineas: [] });
-      }
-      const r = byProv.get(key)!;
-      r.nOrdenes += 1;
-      for (const l of o.lineas) {
-        if (l.tipo !== "articulo") continue;
-        const ped = impPedido(l);
-        const rec = impRecibido(l);
-        r.pedido += ped; r.recibido += rec;
-        r.lineas.push({
-          orden: numeroOrden(o), estado: o.estado,
-          code: l.articuloId || "", desc: l.descripcion, unidad: l.unidad,
-          cantidad: l.cantidad, recibida: l.cantidadRecibida ?? 0,
-          pendiente: Math.max(0, l.cantidad - (l.cantidadRecibida ?? 0)), monto: ped,
-        });
-      }
-    }
-    const filas = [...byProv.values()].map((r) => {
-      r.pendiente = Math.max(0, r.pedido - r.recibido);
-      r.pct = r.pedido > 0 ? Math.round((r.recibido / r.pedido) * 100) : 0;
-      return r;
-    }).sort((a, b) => b.pendiente - a.pendiente);
-    const tot = filas.reduce((s, r) => ({ pedido: s.pedido + r.pedido, recibido: s.recibido + r.recibido }), { pedido: 0, recibido: 0 });
-    return { filas, tot };
+    const r = resumenPorProveedor(ordenes, proveedores);
+    return { filas: r.filas, tot: { pedido: r.pedido, recibido: r.recibido } };
   }, [ordenes, proveedores]);
 
   const pctGlobal = tot.pedido > 0 ? Math.round((tot.recibido / tot.pedido) * 100) : 0;
