@@ -11,7 +11,10 @@ import type { LineaEstructura } from './sync-estructura';
  * Recorre las compañías igual que el resto del app (`bcCompanies()`): primero la
  * del app (BC_COMPANY_ID) y después las anteriores (BC_COMPANY_IDS_LEGACY). Hay
  * obras cuyo presupuesto quedó SOLO en la compañía vieja —las casas de socios, por
- * ejemplo— y sin este recorrido se verían como "sin estructura".
+ * ejemplo— y sin este recorrido se verían como "sin estructura". Las otras
+ * compañías se miran SOLO cuando la del app contestó y no tiene líneas: si la del
+ * app falló, se avisa y se cae al snapshot, porque la compañía anterior tiene
+ * versiones viejas de las mismas obras.
  *
  * Si BC no responde (o no está configurado en el entorno), cae al snapshot del ETL
  * (`pro_bi.fact_presupuesto`) y lo avisa: es mejor traer algo viejo y decirlo que
@@ -61,12 +64,36 @@ export async function leerEstructuraBC(obra: string): Promise<EstructuraObra> {
   if (bcConstructionConfigured()) {
     const [principal, ...otras] = bcCompanies();
     const errores: string[] = [];
-    try {
-      const propia = await estructuraDeCompania(obra, principal);
-      if (propia) return { ...propia, fuente: 'bc', compania: null };
-    } catch (e) {
-      errores.push(e instanceof Error ? e.message : String(e));
+
+    // La compañía del app, con UN reintento: leer 400 líneas de BC falla cada
+    // tanto por red ("fetch failed") y volver a preguntar sale mucho más barato
+    // que el camino de abajo.
+    let fallo: string | null = null;
+    for (let intento = 0; intento < 2; intento++) {
+      try {
+        const propia = await estructuraDeCompania(obra, principal);
+        if (propia) return { ...propia, fuente: 'bc', compania: null };
+        fallo = null;
+        break;
+      } catch (e) {
+        fallo = e instanceof Error ? e.message : String(e);
+        if (intento === 0) await new Promise((r) => setTimeout(r, 800));
+      }
     }
+
+    // OJO: si la compañía del app FALLÓ (no es que "no tiene"), NO se buscan las
+    // otras. Traer la estructura de otra compañía por un error de red es peor que
+    // no traer nada: la Antigua tiene versiones VIEJAS de las mismas obras —en
+    // PV-NOVARUM, partidas PRUEBA y VN-E04 que no existen hoy— y el sync es
+    // aditivo, así que esa basura entra al catálogo y hay que borrarla a mano.
+    if (fallo) {
+      const snap = await leerEstructuraSnapshot(obra);
+      return {
+        ...snap,
+        aviso: `${obra}: BC no respondió (${fallo}); se usó el snapshot del ETL y NO la compañía anterior. Probá de nuevo en un rato.`,
+      };
+    }
+
     for (const company of otras) {
       try {
         const alt = await estructuraDeCompania(obra, company);

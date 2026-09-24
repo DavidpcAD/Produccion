@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     }
     const partidasPorCodigo = new Map(partidas.map((p) => [clave(p.codigo), p]));
     // El capítulo al que caería cada partida que falta (para poder crearla).
-    const { hijos } = armarJerarquia(lineas, tipo.jerarquiaPorOrden);
+    const { hijos } = armarJerarquia(lineas, tipo.deduceCapitulo);
     const capituloDe = new Map<string, string>();
     for (const [cap, hs] of hijos) for (const [cod] of hs) capituloDe.set(clave(cod), cap);
 

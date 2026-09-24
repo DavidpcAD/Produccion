@@ -1,7 +1,10 @@
 import 'server-only';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getDb, sql as sqlApp } from '@/lib/db';
-import { capituloDePartida, mapaAreaCosteoTipo, TIPO_POR_DEFECTO, type TipoObra } from './tipos-obra';
+import {
+  capituloDePartida, mapaAreaCosteoTipo, nombreDeCapituloFaltante,
+  TIPO_POR_DEFECTO, type TipoObra,
+} from './tipos-obra';
 
 /**
  * Meter en el catálogo (`pro_obc.grupos_partida` → `partidas`) una estructura de
@@ -16,6 +19,9 @@ import { capituloDePartida, mapaAreaCosteoTipo, TIPO_POR_DEFECTO, type TipoObra 
  *   · Cada partida cuelga del capítulo cuyo código es su prefijo más largo
  *     (FG-01→FG, G1.1→G1). Las que no tienen capítulo cuelgan de un grupo con el
  *     código de la obra — pasa en administrativas, donde el presupuesto es plano.
+ *     En los tipos con `deduceCapitulo` (postventa) antes de eso se deduce: por el
+ *     código si BC no tiene la línea "Total" (VN-L.05 → VN-L) y, si el código no
+ *     dice nada, por el orden de las líneas de BC (PV-MAT → PV-GEN).
  *   · Los capítulos sin ninguna partida NO se crean.
  *   · Es ADITIVO: crea lo que falta, refresca el nombre de las partidas que ya
  *     están y nunca borra ni mueve nada. Las subpartidas no se tocan: ese nivel
@@ -89,6 +95,24 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
 }> {
   const scope = tipo.catalogoCompartido ? null : obra;
   const db = await getAdelanteDb();
+
+  // Qué partidas del catálogo YA tienen subpartida, de una sola query. Con 204
+  // casas (PV-NOVARUM) preguntar de a una duplicaba los viajes a la base, y esto
+  // corre por cada obra que se sincroniza.
+  const conSubpartida = new Set<number>();
+  if (tipo.subpartidaEspejo) {
+    const r = await db.request()
+      .input('tipo', sql.VarChar(20), tipo.codigo)
+      .input('obra', sql.VarChar(20), scope)
+      .query<{ id: number }>(`
+        SELECT p.id
+        FROM pro_obc.partidas p
+        JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+        WHERE g.tipo_obra = @tipo AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
+          AND EXISTS (SELECT 1 FROM pro_obc.sub_partidas sp WHERE sp.partida_id = p.id)
+      `);
+    for (const f of r.recordset) conSubpartida.add(f.id);
+  }
   const [g, p] = await Promise.all([
     db.request()
       .input('tipo', sql.VarChar(20), tipo.codigo)
@@ -121,16 +145,25 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
 /**
  * Arma la jerarquía capítulo → partidas a partir de las líneas crudas.
  *
- * `porOrden` agrega el respaldo de los tipos cuya jerarquía en BC es el orden de
- * las líneas (postventa): la partida que no calza con ningún capítulo por código
- * cuelga del último capítulo que venía ARRIBA de ella, que es como se ve la obra
- * en la pantalla de BC. Sin eso, PV-MAT "MATERIALES GENERALES" quedaría suelta en
- * vez de colgar de PV-GEN "GENERALES POST VENTA".
+ * `deducir` prende los dos respaldos de los tipos donde BC no siempre dice de qué
+ * capítulo cuelga la partida (postventa), en este orden:
+ *
+ *   1. El CÓDIGO lo dice aunque BC no tenga la línea "Total": VN-L.05 y VN-L.15
+ *      con ningún VN-L arriba. Se deduce el capítulo VN-L y se le pone el nombre
+ *      que sugieren sus hermanos ("BLOQUE L"). Sin esto caían en el bloque
+ *      anterior —BLOQUE K— que no tiene nada que ver.
+ *   2. El código NO dice nada: manda el ORDEN de las líneas de BC, que es como se
+ *      ve la obra en pantalla. Es el caso de PV-MAT "MATERIALES GENERALES", que
+ *      cuelga de PV-GEN "GENERALES POST VENTA".
+ *
+ * `deducidos` son los capítulos que salieron de la regla 1: existen en el catálogo
+ * pero NO en BC, así que no se les pone puente (`bc_task_no`).
  */
-export function armarJerarquia(lineas: LineaEstructura[], porOrden = false): {
+export function armarJerarquia(lineas: LineaEstructura[], deducir = false): {
   capitulos: Map<string, string>;
   hijos: Map<string, [string, string][]>;
   sueltas: [string, string][];
+  deducidos: Set<string>;
 } {
   const capitulos = new Map<string, string>();
   const postings = new Map<string, string>();
@@ -153,16 +186,30 @@ export function armarJerarquia(lineas: LineaEstructura[], porOrden = false): {
   }
   const hijos = new Map<string, [string, string][]>();
   const sueltas: [string, string][] = [];
+  const deducidos = new Set<string>();
   for (const [cod, nombre] of [...postings.entries()].sort((a, b) =>
     a[0].localeCompare(b[0], undefined, { numeric: true }))) {
-    const cap = capituloDePartida(cod, capitulos.keys())
-      ?? (porOrden ? capituloArriba.get(cod) ?? null : null);
+    let cap = capituloDePartida(cod, capitulos.keys());
+    if (!cap && deducir) {
+      const punto = cod.indexOf('.');
+      if (punto > 0) {
+        // Regla 1: el bloque está en el código (VN-L.05 → VN-L) y BC no lo tiene.
+        cap = cod.slice(0, punto);
+        if (!capitulos.has(cap)) {
+          deducidos.add(cap);
+          capitulos.set(cap, nombreDeCapituloFaltante(cap, capitulos) ?? cap);
+        }
+      } else {
+        // Regla 2: el código no dice nada; manda el orden de las líneas de BC.
+        cap = capituloArriba.get(cod) ?? null;
+      }
+    }
     if (cap) {
       if (!hijos.has(cap)) hijos.set(cap, []);
       hijos.get(cap)!.push([cod, nombre]);
     } else sueltas.push([cod, nombre]);
   }
-  return { capitulos, hijos, sueltas };
+  return { capitulos, hijos, sueltas, deducidos };
 }
 
 /**
@@ -183,11 +230,29 @@ export async function sincronizarEstructura(
   };
   if (lineas.length === 0) return res;
 
-  const { capitulos, hijos, sueltas } = armarJerarquia(lineas, tipo.jerarquiaPorOrden);
+  const { capitulos, hijos, sueltas, deducidos } = armarJerarquia(lineas, tipo.deduceCapitulo);
   res.capitulosSinPartidas = [...capitulos.keys()].filter((c) => !hijos.has(c));
 
   const scope = tipo.catalogoCompartido ? null : obra;
   const db = await getAdelanteDb();
+
+  // Qué partidas del catálogo YA tienen subpartida, de una sola query. Con 204
+  // casas (PV-NOVARUM) preguntar de a una duplicaba los viajes a la base, y esto
+  // corre por cada obra que se sincroniza.
+  const conSubpartida = new Set<number>();
+  if (tipo.subpartidaEspejo) {
+    const r = await db.request()
+      .input('tipo', sql.VarChar(20), tipo.codigo)
+      .input('obra', sql.VarChar(20), scope)
+      .query<{ id: number }>(`
+        SELECT p.id
+        FROM pro_obc.partidas p
+        JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+        WHERE g.tipo_obra = @tipo AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
+          AND EXISTS (SELECT 1 FROM pro_obc.sub_partidas sp WHERE sp.partida_id = p.id)
+      `);
+    for (const f of r.recordset) conSubpartida.add(f.id);
+  }
 
   // Busca el grupo por su puente a BC y, si no, por código: en vivienda los grupos
   // se llaman `gris`/`acabados` y su capítulo es "1"/"2", así que buscar solo por
@@ -293,15 +358,11 @@ export async function sincronizarEstructura(
   // `idPartida` null = la partida tampoco existe todavía (dryRun).
   async function espejoDeLaPartida(idPartida: number | null, codigo: string, nombre: string) {
     if (!tipo.subpartidaEspejo) return;
+    if (idPartida !== null && conSubpartida.has(idPartida)) return;
     const cod = `${codigo}.1`.slice(0, 50);
-    if (idPartida !== null) {
-      const ya = await db.request()
-        .input('p', sql.Int, idPartida)
-        .query<{ id: number }>('SELECT TOP 1 id FROM pro_obc.sub_partidas WHERE partida_id = @p');
-      if (ya.recordset[0]) return;
-    }
     res.subpartidasCreadas.push(`${cod} — ${nombre}`);
     if (dryRun || idPartida === null) return;
+    conSubpartida.add(idPartida);
     await db.request()
       .input('cod', sql.VarChar(50), cod)
       .input('nombre', sql.NVarChar(300), nombre)
@@ -318,7 +379,8 @@ export async function sincronizarEstructura(
   }
   for (const [cap, hs] of [...hijos.entries()].sort((a, b) =>
     a[0].localeCompare(b[0], undefined, { numeric: true }))) {
-    const id = await grupoId(cap, capitulos.get(cap) ?? cap, cap);
+    // El capítulo deducido (VN-L) no existe en BC: se queda sin puente a BC.
+    const id = await grupoId(cap, capitulos.get(cap) ?? cap, deducidos.has(cap) ? null : cap);
     for (const [cod, nombre] of hs) await upsertPartida(id, cod, nombre);
   }
   return res;

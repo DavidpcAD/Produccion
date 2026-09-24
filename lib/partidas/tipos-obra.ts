@@ -40,8 +40,8 @@ export interface TipoObra {
   usaTiposCasa: boolean;
   /** true = catálogo compartido por todas las obras del tipo (vivienda / infra). */
   catalogoCompartido: boolean;
-  /** true = la partida cuelga del capítulo que tiene ARRIBA en BC, no del que dice su código. */
-  jerarquiaPorOrden: boolean;
+  /** true = cuando BC no da el capítulo de una partida, se deduce (del código o del orden). */
+  deduceCapitulo: boolean;
   /** true = la subpartida es la misma partida; al traer de BC se crea `<partida>.1`. */
   subpartidaEspejo: boolean;
   orden: number;
@@ -52,15 +52,19 @@ export interface TipoObra {
 const COMPARTIDOS = new Set(['VIVIENDA', 'INFRA']);
 
 /**
- * Tipos donde la jerarquía de BC viene por el ORDEN de las líneas y no por el
- * código. Lo normal es que la partida diga de qué capítulo cuelga (VN-C.01 → VN-C),
- * y esa es la regla de `capituloDePartida`. En postventa hay líneas que no lo dicen
- * —PV-MAT "MATERIALES GENERALES" cuelga de PV-GEN "GENERALES POST VENTA"— y la
- * única pista es que en BC van una debajo de la otra, que es como se ve la obra en
- * pantalla. Para esos tipos, la partida que no calza por código cuelga del último
- * capítulo que venía arriba.
+ * Tipos donde BC NO siempre dice de qué capítulo cuelga la partida y hay que
+ * deducirlo. Lo normal es que lo diga el código (VN-C.01 → VN-C, la regla de
+ * `capituloDePartida`); en postventa hay dos huecos reales:
+ *
+ *   · El bloque existe en el código pero NO tiene línea "Total" en BC: VN-L.05,
+ *     VN-L.15… en PV-NOVARUM, sin ningún VN-L arriba. Se crea la etapa VN-L
+ *     (sin puente a BC, porque BC no la tiene) y ahí caen sus partidas. Sin esto
+ *     se pegaban al bloque anterior —BLOQUE K— que no tiene nada que ver.
+ *   · El código no dice nada: PV-MAT "MATERIALES GENERALES" cuelga de PV-GEN
+ *     "GENERALES POST VENTA" y la única pista es que en BC va debajo de él. Ahí
+ *     manda el ORDEN de las líneas, que es como se ve la obra en pantalla.
  */
-const JERARQUIA_POR_ORDEN = new Set(['POSTVENTA']);
+const CAPITULO_DEDUCIDO = new Set(['POSTVENTA']);
 
 /**
  * Tipos donde la subpartida ES la partida: no hay desglose abajo, así que al traer
@@ -98,7 +102,7 @@ function mapTipo(r: FilaTipo): TipoObra {
     usaSprints: !!r.usa_sprints,
     usaTiposCasa: !!r.usa_tipos_casa,
     catalogoCompartido: COMPARTIDOS.has(r.codigo),
-    jerarquiaPorOrden: JERARQUIA_POR_ORDEN.has(r.codigo),
+    deduceCapitulo: CAPITULO_DEDUCIDO.has(r.codigo),
     subpartidaEspejo: SUB_ESPEJO.has(r.codigo),
     orden: Number(r.orden) || 0,
     activo: !!r.activo,
@@ -199,13 +203,50 @@ export async function mapaAreaCosteoTipo(): Promise<Map<string, string>> {
   return new Map(r.recordset.map((f) => [f.area_costeo.trim().toUpperCase(), f.tipo_obra]));
 }
 
+/** Separadores con los que se corta un código de BC: 'VN-L.05' → 'VN-L' → 'VN-'. */
+const SEPARADORES = ['.', '-', ' ', '/', '_'];
+
+/**
+ * Cómo se llama un capítulo que BC no tiene. Pasa en postventa: PV-NOVARUM tiene
+ * partidas VN-L.05, VN-L.15… y ninguna línea "Total" VN-L, así que no hay nombre
+ * que copiar. Se saca del patrón de los HERMANOS: si VN-A…VN-K se llaman
+ * "BLOQUE A"…"BLOQUE K", entonces VN-L es "BLOQUE L".
+ *
+ * Pide al menos dos hermanos con el mismo patrón para no inventar un nombre a
+ * partir de una coincidencia; si no lo encuentra devuelve null y el capítulo se
+ * queda con su código de nombre.
+ */
+export function nombreDeCapituloFaltante(codigo: string, capitulos: Map<string, string>): string | null {
+  const cod = String(codigo ?? '').trim();
+  // Corte en el último separador: 'VN-L' → prefijo 'VN-', sufijo 'L'.
+  const corte = Math.max(...SEPARADORES.map((s) => cod.lastIndexOf(s)));
+  if (corte <= 0 || corte === cod.length - 1) return null;
+  const prefijo = cod.slice(0, corte + 1);
+  const sufijo = cod.slice(corte + 1);
+
+  const bases = new Map<string, number>();
+  for (const [hermano, nombre] of capitulos) {
+    if (hermano === cod || !hermano.startsWith(prefijo)) continue;
+    const suf = hermano.slice(prefijo.length);
+    // El nombre del hermano tiene que terminar en SU sufijo ("BLOQUE K" ← VN-K):
+    // eso es lo que deja a la vista el patrón "<base> <sufijo>".
+    if (!suf || !nombre.endsWith(suf)) continue;
+    const base = nombre.slice(0, nombre.length - suf.length).trim();
+    if (!base) continue;
+    bases.set(base, (bases.get(base) ?? 0) + 1);
+  }
+  let mejor: string | null = null;
+  let repeticiones = 0;
+  for (const [base, n] of bases) if (n > repeticiones) { mejor = base; repeticiones = n; }
+  return mejor && repeticiones >= 2 ? `${mejor} ${sufijo}` : null;
+}
+
 /**
  * Cuelga cada partida ("Posting" de BC) del capítulo ("Total") cuyo código es su
  * prefijo más largo: FG-01 → FG, G1.1 → G1, SPL-01 → SPL (no SP). Devuelve null
  * cuando BC no tiene capítulo para esa partida — pasa seguido en administrativas
  * (SSCC, HER, MAQ…), donde el presupuesto es plano.
  */
-const SEPARADORES = ['.', '-', ' ', '/', '_'];
 export function capituloDePartida(taskNo: string, capitulos: Iterable<string>): string | null {
   const t = String(taskNo ?? '').trim().toUpperCase();
   let mejor: string | null = null;
