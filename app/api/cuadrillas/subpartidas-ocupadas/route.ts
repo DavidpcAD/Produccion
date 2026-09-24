@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 
-// Subpartidas ya tomadas por cuadrillas activas en un proyecto (para bloquearlas
+// Subpartidas que otras cuadrillas activas ya trabajan en un proyecto (para avisar
 // en el selector). ?idProyecto=..&excluir=<idCuadrilla opcional>
 export async function GET(req: NextRequest) {
   const session = await getSession();

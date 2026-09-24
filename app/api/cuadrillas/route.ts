@@ -69,26 +69,9 @@ export async function POST(req: NextRequest) {
   try {
     await tx.begin();
 
-    // Exclusividad POR PROYECTO: ninguna subpartida elegida puede estar tomada
-    // por otra cuadrilla activa del MISMO proyecto (en otro proyecto sí se puede).
-    for (const b of bloques) {
-      const conflictos = await new sql.Request(tx)
-        .input('idProyecto', sql.Int, b.idProyecto)
-        .query(`
-          SELECT sp.codigo AS subCodigo, c.Nombre AS cuadrilla, pr.nombre AS proyecto
-          FROM dbo.CuadrillaSubPartida cs
-          JOIN dbo.Cuadrilla c ON c.IDCuadrilla = cs.IDCuadrilla AND c.Activo = 1
-          JOIN dbo.SubPartida sp ON sp.idSubPartida = cs.idSubPartida
-          LEFT JOIN dbo.Proyecto pr ON pr.idProyecto = cs.idProyecto
-          WHERE cs.idProyecto = @idProyecto AND cs.idSubPartida IN (${b.idSubPartidas.join(',')})
-        `);
-      if (conflictos.recordset.length > 0) {
-        await tx.rollback();
-        const proy = conflictos.recordset[0].proyecto ?? 'ese proyecto';
-        const detalle = conflictos.recordset.map(r => `${r.subCodigo} (${r.cuadrilla})`).join(', ');
-        return NextResponse.json({ error: `En ${proy} estas subpartidas ya están tomadas: ${detalle}` }, { status: 409 });
-      }
-    }
+    // OJO: varias cuadrillas pueden compartir la misma subpartida en un proyecto
+    // (los datos de H4 siempre fueron así: Pintura y Apoyo trabajan lo mismo).
+    // La UI avisa quién más la tiene; aquí no se bloquea nada.
 
     // Denormalizado legacy: la primera subpartida queda en idSubPartida/TaskNoBC.
     const spRes = await new sql.Request(tx)

@@ -268,27 +268,23 @@ function SubpartidasPicker({ tipos, catalogos, cargandoTipos, onCargarTipo, subs
           <p className="px-3 py-5 text-sm text-ds-gray-400 text-center">Sin subpartidas</p>
         ) : filtered.slice(0, 400).map(sp => {
           const on = sel.has(sp.idSubPartida);
-          const ocupadaPor = !on ? ocupadas?.get(sp.idSubPartida) : undefined;
-          if (ocupadaPor) {
-            return (
-              <div key={sp.idSubPartida} title={`Ya tomada por ${ocupadaPor} en este proyecto`}
-                className="w-full flex items-center gap-3 px-3 py-2 bg-ds-gray-100/60 cursor-not-allowed">
-                <span className="w-4 h-4 rounded border-2 border-ds-gray-200 bg-ds-gray-100 flex items-center justify-center shrink-0 text-ds-gray-300 text-[11px] leading-none">×</span>
-                <span className="text-sm text-ds-gray-400 font-semibold shrink-0 w-16">{sp.codigo}</span>
-                <span className="text-xs text-ds-gray-400 truncate flex-1">{sp.nombre}</span>
-                <span className="text-[10px] font-semibold text-ds-gray-400 shrink-0 truncate max-w-[9rem] bg-ds-gray-200/60 rounded-full px-2 py-0.5">{ocupadaPor}</span>
-              </div>
-            );
-          }
+          // Varias cuadrillas SÍ pueden compartir subpartida en un proyecto (así trabajan:
+          // Apoyo entra a lo de Pintura, etc.) — solo se AVISA quién más la tiene.
+          const tambienEn = ocupadas?.get(sp.idSubPartida);
           return (
             <button key={sp.idSubPartida} type="button" onClick={() => toggle(sp.idSubPartida)}
+              title={tambienEn ? `También la trabaja ${tambienEn} en este proyecto` : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${on ? 'bg-brand/10' : 'hover:bg-ds-gray-100'}`}>
               <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${on ? 'bg-brand border-brand' : 'border-ds-gray-300 bg-ds-surface'}`}>
                 {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
               </span>
               <span className="text-sm text-ds-ink font-semibold shrink-0 w-16">{sp.codigo}</span>
               <span className="text-xs text-ds-gray-400 truncate flex-1">{sp.nombre}</span>
-              {sp.partidaCodigo && <span className="text-[10px] text-ds-gray-300 shrink-0">{sp.partidaCodigo}</span>}
+              {tambienEn ? (
+                <span className="text-[10px] font-semibold text-ds-gray-400 shrink-0 truncate max-w-[9rem] bg-ds-gray-200/60 rounded-full px-2 py-0.5">{tambienEn}</span>
+              ) : sp.partidaCodigo ? (
+                <span className="text-[10px] text-ds-gray-300 shrink-0">{sp.partidaCodigo}</span>
+              ) : null}
             </button>
           );
         })}
@@ -319,7 +315,7 @@ export default function CuadrillasPage() {
   // Subpartidas de la cuadrilla que se está editando (por si son de un tipo aún no cargado).
   const [subsExtra, setSubsExtra] = useState<SubLite[]>([]);
   const [proyectos, setProyectos] = useState<ProyectoLite[]>([]);
-  // Subpartidas ya tomadas, POR proyecto (para bloquearlas en el form).
+  // Subpartidas que otras cuadrillas ya trabajan, POR proyecto (solo para AVISAR en el form).
   const [ocupadasByProy, setOcupadasByProy] = useState<Record<number, Map<number, string>>>({});
   const [q, setQ] = useState('');
   // Dos vistas: la grilla de cuadrillas y los encargados por subpartida.
