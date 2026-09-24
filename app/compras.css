@@ -502,7 +502,6 @@
 .oc-scope .hc-step__state--next { background: rgba(255,255,255,.12); color: rgba(255,255,255,.72); }
 .oc-scope .hc-step__motivo { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(255,255,255,.16); color: rgba(255,255,255,.92); }
 /* Contenido: comentario completo */
-.oc-scope .hc-comentario { display: block; white-space: normal; word-break: break-word; }
 
 /* =====================  TABLE  ===================== */
 .oc-scope .ds-table-wrap { width: 100%; overflow-x: auto; border-radius: var(--ds-radius-lg); background: var(--ds-surface); box-shadow: var(--ds-shadow-01); }
@@ -530,10 +529,11 @@
 /* Tabla con columnas numéricas centradas (ej. detalle de pedido: Solicitado/En orden/Recibido/Por recibir). */
 .oc-scope .ds-table--center-num td.ds-num,
 .oc-scope .ds-table--center-num thead th.ds-num { text-align: center; }
-/* Nombre de artículo: se lee entero (baja de línea) en vez de cortarse con «…»,
-   que no dice cuál de todos es. El mínimo evita que la columna se aplaste entre
-   las numéricas; el máximo evita renglones larguísimos. */
-.oc-scope .ds-cell-nombre { white-space: normal; overflow-wrap: break-word; min-width: 200px; max-width: 380px; }
+/* Texto de celda que hay que LEER (nombre de artículo, comentario del solicitante):
+   se lee entero, bajando de línea, en vez de cortarse con «…», que no dice nada.
+   El mínimo evita que la columna se aplaste entre las numéricas; el máximo evita
+   renglones larguísimos. */
+.oc-scope .ds-cell-texto { white-space: normal; overflow-wrap: break-word; min-width: 200px; max-width: 380px; }
 /* Lo que nunca debe partirse en dos renglones al dejar respirar al nombre:
    cantidades/importes y los códigos cortos (almacén, obra). */
 .oc-scope .ds-table tbody td.ds-num { white-space: nowrap; }

@@ -138,7 +138,7 @@ export default function ProveeduriaMaterialesPage() {
     { id: "articulo", header: "Artículo", accessorFn: (r) => `${r.articuloId} ${r.descripcion} ${r.variantCode ?? ""} ${r.notas ?? ""}`, meta: { label: "Artículo" },
       cell: (c) => { const r = c.row.original; return (
         <div style={{ maxWidth: 380 }}>
-          <div className="ds-cell-nombre"><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>
+          <div className="ds-cell-texto"><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>
           <LineaPedidaInfo variante={r.variantCode} nota={r.notas} />
         </div>
       ); } },
@@ -255,7 +255,7 @@ export default function ProveeduriaMaterialesPage() {
                 {preview.lineas.map((l) => (
                   <tr key={l.id}>
                     <td>
-                      <div className="ds-cell-nombre">{l.descripcion}</div>
+                      <div className="ds-cell-texto">{l.descripcion}</div>
                       <LineaPedidaInfo code={l.articuloId} variante={l.variantCode} nota={l.notas} />
                     </td>
                     <td className="ds-muted ds-body-sm ds-nowrap">{destinoDeLinea(l, preview) || "—"}</td>

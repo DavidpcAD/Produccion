@@ -67,7 +67,7 @@ export function SolicitudDetalle({
                 <tr key={l.id}>
                   <td>
                     <div className="row gap-2" style={{ alignItems: "center" }}>
-                      <div className="ds-cell-nombre">{l.descripcion}</div>
+                      <div className="ds-cell-texto">{l.descripcion}</div>
                       {l.devuelta && <Badge tone="red">Devuelta</Badge>}
                       {baja > 0 && <Badge tone="gray" title={`Se archivó la solicitud: ${num.format(baja)} ${l.unidad} nunca se ordenaron y ya no se van a comprar.`}>Ya no se compra</Badge>}
                     </div>

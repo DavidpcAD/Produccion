@@ -428,7 +428,7 @@ export default function ArmarOrdenPage() {
                   <tr key={r.pedidoLineaId}>
                     <td className="ds-body-sm ds-strong">{r.pedidoNumero}</td>
                     <td>
-                      <div className="ds-cell-nombre"><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>
+                      <div className="ds-cell-texto"><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>
                       <LineaPedidaInfo variante={r.variantCode || undefined} nota={r.notas} />
                     </td>
                     <td className="ds-muted ds-body-sm">{r.almacen}</td>
@@ -483,7 +483,7 @@ export default function ArmarOrdenPage() {
                 {cargos.map((c, i) => cargoImporte(c) > 0 ? (
                   <tr key={`cargo-${i}`} style={{ background: "color-mix(in srgb, var(--ds-color-yellow) 7%, var(--ds-tint-base))" }}>
                     <td><Badge tone="yellow">Cargo</Badge></td>
-                    <td><div className="ds-cell-nombre">{c.chargeNo ? `${c.chargeNo} · ` : ""}{c.descripcion}</div></td>
+                    <td><div className="ds-cell-texto">{c.chargeNo ? `${c.chargeNo} · ` : ""}{c.descripcion}</div></td>
                     <td className="ds-muted ds-body-sm">—</td>
                     <td className="ds-num ds-body-sm">{c.cantidad}</td>
                     <td className="ds-num ds-body-sm">{money(Number(c.precio) || 0, currency)}</td>
@@ -556,7 +556,7 @@ export default function ArmarOrdenPage() {
                     <tr key={l.id}>
                       <td className="ds-body-sm ds-strong">{p.numero}</td>
                       <td>
-                        <div className="ds-cell-nombre"><span className="ds-strong ds-body-sm">{l.articuloId}</span> <span className="ds-muted">— {l.descripcion}</span></div>
+                        <div className="ds-cell-texto"><span className="ds-strong ds-body-sm">{l.articuloId}</span> <span className="ds-muted">— {l.descripcion}</span></div>
                         <LineaPedidaInfo variante={l.variantCode} nota={l.notas} />
                       </td>
                       <td className="ds-muted ds-body-sm">{destinoDeLinea(l, p) || "—"}</td>
