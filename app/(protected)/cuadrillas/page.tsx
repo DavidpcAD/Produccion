@@ -873,8 +873,10 @@ export default function CuadrillasPage() {
                 <div>
                   <p className="text-xs font-semibold text-ds-gray-400 mb-1">Subpartidas</p>
                   <div className="flex flex-wrap gap-1.5">
+                    {/* La misma subpartida puede estar en varios proyectos (una fila por
+                        proyecto en CuadrillaSubPartida): la clave lleva ambos. */}
                     {verCuad!.subpartidas.map(s => (
-                      <Badge key={s.idSubPartida} variant="black">{s.codigo} · {s.nombre}</Badge>
+                      <Badge key={`${s.idSubPartida}-${s.idProyecto ?? 0}`} variant="black">{s.codigo} · {s.nombre}</Badge>
                     ))}
                   </div>
                 </div>
