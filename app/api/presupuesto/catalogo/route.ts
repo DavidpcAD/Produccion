@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic';
  *
  * El tipo de obra sale de la obra: manda `dbo.Obra.tipoObra` (lo que se eligió al
  * crearla) y, si está vacío, se deduce del área de costeo de BC
- * (pro_obc.tipo_obra_area_costeo). Así el cruce va contra el catálogo correcto:
+ * (h4.tipo_obra_area_costeo). Así el cruce va contra el catálogo correcto:
  * vivienda contra vivienda, la fábrica de maderas contra su propia estructura, etc.
  *
  * Nivel 2 (el mismo que subir el presupuesto): crear acá es parte del flujo de
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   const tipo = await getTipoObra(tipoCodigo);
   if (!tipo) {
     return NextResponse.json(
-      { error: `La obra ${worksNo} apunta al tipo "${tipoCodigo}", que no existe en pro_obc.tipos_obra.` },
+      { error: `La obra ${worksNo} apunta al tipo "${tipoCodigo}", que no existe en h4.tipos_obra.` },
       { status: 500 },
     );
   }

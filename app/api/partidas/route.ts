@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
+import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { getTipoObra, listarTiposObra } from '@/lib/partidas/tipos-obra';
@@ -7,7 +7,7 @@ import { getTipoObra, listarTiposObra } from '@/lib/partidas/tipos-obra';
 export const dynamic = 'force-dynamic';
 
 // Catálogo ÚNICO de partidas y subpartidas = el núcleo de ObrasControl
-// (pro_obc.grupos_partida → partidas → sub_partidas + sub_partida_tipos), el
+// (h4.grupos_partida → partidas → sub_partidas + sub_partida_tipos), el
 // mismo que usa Avance. Antes esta pantalla leía dbo.Etapa/Partida/SubPartida
 // (catálogo duplicado); se unificó a pro_obc — mismos IDs, sin migrar datos.
 // Se exponen con alias a la forma que ya espera el frontend (idEtapa/idPartida/
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  // El catálogo está partido por TIPO DE OBRA (pro_obc.tipos_obra): VIVIENDA,
+  // El catálogo está partido por TIPO DE OBRA (h4.tipos_obra): VIVIENDA,
   // INFRA, ADMIN, FABRICA y TORRES. Sin `tipo` se devuelve VIVIENDA para no
   // cambiarle nada a quien ya consumía este endpoint.
   const url = new URL(req.url);
@@ -42,20 +42,20 @@ export async function GET(req: NextRequest) {
     return r;
   };
 
-  const db = await getAdelanteDb();
+  const db = await getDb();
   const [etapas, partidas, subpartidas, obras] = await Promise.all([
     conObra(db.request().input('tipo', sql.VarChar(20), tipo.codigo)).query(`
       SELECT g.id AS idEtapa, g.codigo, g.nombre, g.tipo_obra AS tipoObra,
              g.orden, g.bc_task_no AS bcTaskNo, g.bc_works_no AS bcWorksNo
-      FROM pro_obc.grupos_partida g
+      FROM h4.grupos_partida g
       WHERE g.tipo_obra = @tipo AND g.activo = 1 ${filtroObra}
       ORDER BY g.bc_works_no, g.orden, g.codigo
     `),
     conObra(db.request().input('tipo', sql.VarChar(20), tipo.codigo)).query(`
       SELECT p.id AS idPartida, p.codigo, p.nombre, p.grupo_id AS idEtapa, p.activo,
              p.orden, p.bc_task_no AS bcTaskNo
-      FROM pro_obc.partidas p
-      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+      FROM h4.partidas p
+      JOIN h4.grupos_partida g ON g.id = p.grupo_id
       WHERE g.tipo_obra = @tipo AND g.activo = 1 AND p.activo = 1 ${filtroObra}
       ORDER BY p.orden, p.codigo
     `),
@@ -66,14 +66,14 @@ export async function GET(req: NextRequest) {
         sp.activo,
         STUFF((
           SELECT ',' + t.tipo_casa
-          FROM pro_obc.sub_partida_tipos t
+          FROM h4.sub_partida_tipos t
           WHERE t.sub_partida_id = sp.id
           ORDER BY t.tipo_casa
           FOR XML PATH('')
         ), 1, 1, '') AS tiposCasaStr
-      FROM pro_obc.sub_partidas sp
-      JOIN pro_obc.partidas p ON p.id = sp.partida_id
-      JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+      FROM h4.sub_partidas sp
+      JOIN h4.partidas p ON p.id = sp.partida_id
+      JOIN h4.grupos_partida g ON g.id = p.grupo_id
       WHERE g.tipo_obra = @tipo AND g.activo = 1 ${filtroObra}
       ORDER BY sp.codigo
     `),
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
     // pantalla). En vivienda/infra viene vacío: ahí el catálogo es compartido.
     db.request().input('tipo', sql.VarChar(20), tipo.codigo).query(`
       SELECT g.bc_works_no AS worksNo, COUNT(*) AS grupos
-      FROM pro_obc.grupos_partida g
+      FROM h4.grupos_partida g
       WHERE g.tipo_obra = @tipo AND g.activo = 1 AND g.bc_works_no IS NOT NULL
       GROUP BY g.bc_works_no
       ORDER BY g.bc_works_no
@@ -131,11 +131,11 @@ export async function POST(req: NextRequest) {
   if (codigo.length > 50) return NextResponse.json({ error: 'El código no puede superar 50 caracteres' }, { status: 400 });
   if (nombre.length > 150) return NextResponse.json({ error: 'El nombre no puede superar 150 caracteres' }, { status: 400 });
 
-  const db = await getAdelanteDb();
+  const db = await getDb();
   try {
     const e = await db.request()
       .input('idE', sql.Int, idEtapa)
-      .query('SELECT id, tipo_obra, bc_works_no FROM pro_obc.grupos_partida WHERE id = @idE');
+      .query('SELECT id, tipo_obra, bc_works_no FROM h4.grupos_partida WHERE id = @idE');
     if (e.recordset.length === 0) {
       return NextResponse.json({ error: 'La etapa no existe' }, { status: 400 });
     }
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     const dup = await db.request()
       .input('cod', sql.VarChar(50), codigo)
       .input('idE', sql.Int, idEtapa)
-      .query('SELECT 1 AS ok FROM pro_obc.partidas WHERE codigo = @cod AND grupo_id = @idE');
+      .query('SELECT 1 AS ok FROM h4.partidas WHERE codigo = @cod AND grupo_id = @idE');
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe una partida con el código "${codigo}" en esta etapa` }, { status: 409 });
     }
@@ -158,11 +158,11 @@ export async function POST(req: NextRequest) {
       .input('idEtapa', sql.Int, idEtapa)
       .input('bcTaskNo', sql.VarChar(50), bcTaskNo)
       .query(`
-        INSERT INTO pro_obc.partidas (codigo, nombre, grupo_id, orden, activo, bc_task_no)
+        INSERT INTO h4.partidas (codigo, nombre, grupo_id, orden, activo, bc_task_no)
         OUTPUT INSERTED.id AS idPartida
         VALUES (
           @codigo, @nombre, @idEtapa,
-          (SELECT ISNULL(MAX(orden), 0) + 1 FROM pro_obc.partidas WHERE grupo_id = @idEtapa),
+          (SELECT ISNULL(MAX(orden), 0) + 1 FROM h4.partidas WHERE grupo_id = @idEtapa),
           1, @bcTaskNo
         )
       `);

@@ -1,13 +1,12 @@
 import 'server-only';
-import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
-import { getDb, sql as sqlApp } from '@/lib/db';
+import { getDb, sql } from '@/lib/db';
 import {
   capituloDePartida, mapaAreaCosteoTipo, nombreDeCapituloFaltante,
   TIPO_POR_DEFECTO, type TipoObra,
 } from './tipos-obra';
 
 /**
- * Meter en el catálogo (`pro_obc.grupos_partida` → `partidas`) una estructura de
+ * Meter en el catálogo (`h4.grupos_partida` → `partidas`) una estructura de
  * dos niveles que viene de afuera: capítulos ("Total") y partidas ("Posting") de
  * una obra. Lo usan los dos caminos que existen:
  *
@@ -56,7 +55,7 @@ export async function nombreObra(obra: string): Promise<string> {
   try {
     const app = await getDb();
     const r = await app.request()
-      .input('no', sqlApp.NVarChar(50), obra)
+      .input('no', sql.NVarChar(50), obra)
       .query<{ nombreMostrado: string | null; descripcion: string | null }>(
         'SELECT TOP 1 nombreMostrado, descripcion FROM dbo.Obra WHERE numeroObra = @no',
       );
@@ -94,7 +93,7 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
   partidas: { id: number; codigo: string; nombre: string; idGrupo: number; grupoCodigo: string; grupoNombre: string }[];
 }> {
   const scope = tipo.catalogoCompartido ? null : obra;
-  const db = await getAdelanteDb();
+  const db = await getDb();
 
   // Qué partidas del catálogo YA tienen subpartida, de una sola query. Con 204
   // casas (PV-NOVARUM) preguntar de a una duplicaba los viajes a la base, y esto
@@ -106,10 +105,10 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
       .input('obra', sql.VarChar(20), scope)
       .query<{ id: number }>(`
         SELECT p.id
-        FROM pro_obc.partidas p
-        JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+        FROM h4.partidas p
+        JOIN h4.grupos_partida g ON g.id = p.grupo_id
         WHERE g.tipo_obra = @tipo AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
-          AND EXISTS (SELECT 1 FROM pro_obc.sub_partidas sp WHERE sp.partida_id = p.id)
+          AND EXISTS (SELECT 1 FROM h4.sub_partidas sp WHERE sp.partida_id = p.id)
       `);
     for (const f of r.recordset) conSubpartida.add(f.id);
   }
@@ -119,7 +118,7 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
       .input('obra', sql.VarChar(20), scope)
       .query<{ id: number; codigo: string; nombre: string; bc_task_no: string | null }>(`
         SELECT id, codigo, nombre, bc_task_no
-        FROM pro_obc.grupos_partida
+        FROM h4.grupos_partida
         WHERE tipo_obra = @tipo AND activo = 1 AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')
       `),
     db.request()
@@ -127,8 +126,8 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
       .input('obra', sql.VarChar(20), scope)
       .query<{ id: number; codigo: string; nombre: string; grupo_id: number; grupo_codigo: string; grupo_nombre: string }>(`
         SELECT p.id, p.codigo, p.nombre, p.grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
-        FROM pro_obc.partidas p
-        JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+        FROM h4.partidas p
+        JOIN h4.grupos_partida g ON g.id = p.grupo_id
         WHERE g.tipo_obra = @tipo AND g.activo = 1 AND p.activo = 1
           AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
       `),
@@ -234,7 +233,7 @@ export async function sincronizarEstructura(
   res.capitulosSinPartidas = [...capitulos.keys()].filter((c) => !hijos.has(c));
 
   const scope = tipo.catalogoCompartido ? null : obra;
-  const db = await getAdelanteDb();
+  const db = await getDb();
 
   // Qué partidas del catálogo YA tienen subpartida, de una sola query. Con 204
   // casas (PV-NOVARUM) preguntar de a una duplicaba los viajes a la base, y esto
@@ -246,10 +245,10 @@ export async function sincronizarEstructura(
       .input('obra', sql.VarChar(20), scope)
       .query<{ id: number }>(`
         SELECT p.id
-        FROM pro_obc.partidas p
-        JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+        FROM h4.partidas p
+        JOIN h4.grupos_partida g ON g.id = p.grupo_id
         WHERE g.tipo_obra = @tipo AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
-          AND EXISTS (SELECT 1 FROM pro_obc.sub_partidas sp WHERE sp.partida_id = p.id)
+          AND EXISTS (SELECT 1 FROM h4.sub_partidas sp WHERE sp.partida_id = p.id)
       `);
     for (const f of r.recordset) conSubpartida.add(f.id);
   }
@@ -264,7 +263,7 @@ export async function sincronizarEstructura(
       .input('cod', sql.VarChar(50), codigo)
       .input('task', sql.VarChar(50), bcTaskNo)
       .query<{ id: number }>(`
-        SELECT TOP 1 id FROM pro_obc.grupos_partida
+        SELECT TOP 1 id FROM h4.grupos_partida
         WHERE tipo_obra = @tipo AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')
           AND (codigo = @cod OR (@task IS NOT NULL AND bc_task_no = @task))
         ORDER BY CASE WHEN codigo = @cod THEN 0 ELSE 1 END
@@ -278,7 +277,7 @@ export async function sincronizarEstructura(
       await db.request()
         .input('id', sql.Int, id)
         .input('task', sql.VarChar(50), bcTaskNo)
-        .query('UPDATE pro_obc.grupos_partida SET bc_task_no = ISNULL(bc_task_no, @task) WHERE id = @id');
+        .query('UPDATE h4.grupos_partida SET bc_task_no = ISNULL(bc_task_no, @task) WHERE id = @id');
       return id;
     }
     res.gruposCreados.push(`${codigo} — ${nombre}`);
@@ -290,10 +289,10 @@ export async function sincronizarEstructura(
       .input('obra', sql.VarChar(20), scope)
       .input('task', sql.VarChar(50), bcTaskNo)
       .query<{ id: number }>(`
-        INSERT INTO pro_obc.grupos_partida (codigo, nombre, tipo_obra, orden, activo, creado_en, bc_works_no, bc_task_no)
+        INSERT INTO h4.grupos_partida (codigo, nombre, tipo_obra, orden, activo, creado_en, bc_works_no, bc_task_no)
         OUTPUT INSERTED.id AS id
         VALUES (@cod, @nombre, @tipo,
-          (SELECT ISNULL(MAX(orden), 0) + 1 FROM pro_obc.grupos_partida
+          (SELECT ISNULL(MAX(orden), 0) + 1 FROM h4.grupos_partida
             WHERE tipo_obra = @tipo AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')),
           1, SYSUTCDATETIME(), @obra, @task)
       `);
@@ -311,8 +310,8 @@ export async function sincronizarEstructura(
       .input('obra', sql.VarChar(20), scope)
       .input('cod', sql.VarChar(50), codigo)
       .query<{ id: number }>(`
-        SELECT p.id FROM pro_obc.partidas p
-        JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+        SELECT p.id FROM h4.partidas p
+        JOIN h4.grupos_partida g ON g.id = p.grupo_id
         WHERE g.tipo_obra = @tipo AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
           AND p.codigo = @cod
       `);
@@ -324,7 +323,7 @@ export async function sincronizarEstructura(
           .input('id', sql.Int, id)
           .input('nombre', sql.NVarChar(150), nombre)
           .input('cod', sql.VarChar(50), codigo)
-          .query(`UPDATE pro_obc.partidas
+          .query(`UPDATE h4.partidas
                   SET nombre = @nombre, bc_task_no = ISNULL(bc_task_no, @cod), activo = 1
                   WHERE id = @id`);
       }
@@ -342,10 +341,10 @@ export async function sincronizarEstructura(
       .input('nombre', sql.NVarChar(150), nombre)
       .input('g', sql.Int, idGrupo)
       .query<{ id: number }>(`
-        INSERT INTO pro_obc.partidas (codigo, nombre, grupo_id, orden, activo, bc_task_no, creado_en)
+        INSERT INTO h4.partidas (codigo, nombre, grupo_id, orden, activo, bc_task_no, creado_en)
         OUTPUT INSERTED.id AS id
         VALUES (@cod, @nombre, @g,
-          (SELECT ISNULL(MAX(orden), 0) + 1 FROM pro_obc.partidas WHERE grupo_id = @g),
+          (SELECT ISNULL(MAX(orden), 0) + 1 FROM h4.partidas WHERE grupo_id = @g),
           1, @cod, SYSUTCDATETIME())
       `);
     await espejoDeLaPartida(ins.recordset[0].id, codigo, nombre);
@@ -368,7 +367,7 @@ export async function sincronizarEstructura(
       .input('nombre', sql.NVarChar(300), nombre)
       .input('p', sql.Int, idPartida)
       .query(`
-        INSERT INTO pro_obc.sub_partidas (codigo, nombre, partida_id, sprint_numero, es_critica, activo, creado_en)
+        INSERT INTO h4.sub_partidas (codigo, nombre, partida_id, sprint_numero, es_critica, activo, creado_en)
         VALUES (@cod, @nombre, @p, NULL, 0, 1, SYSUTCDATETIME())
       `);
   }

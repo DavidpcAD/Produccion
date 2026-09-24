@@ -98,7 +98,7 @@ export default function PartidasPage() {
   const termGrupoLow = termGrupo.toLowerCase();
   const termGrupoPlural = (tipo?.terminoGrupoPlural ?? 'Etapas').toLowerCase();
   // Concordancia del rótulo del nivel 1: "Nueva etapa" / "Nuevo proceso",
-  // "esta área" / "este sistema" (pro_obc.tipos_obra.genero).
+  // "esta área" / "este sistema" (h4.tipos_obra.genero).
   const fem = (tipo?.genero ?? 'F') === 'F';
   const nuevoGrupo = `${fem ? 'Nueva' : 'Nuevo'} ${termGrupoLow}`;
   const elGrupo = `${fem ? 'la' : 'el'} ${termGrupoLow}`;
@@ -511,7 +511,7 @@ export default function PartidasPage() {
           vez de cuatro bloques sueltos y una tarjeta por obra. */}
       <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-4 pt-3 pb-3 border-b border-ds-gray-200 space-y-3">
-          {/* Tipos de obra: O · I · A · F · T (pro_obc.tipos_obra). Filtro, no una
+          {/* Tipos de obra: O · I · A · F · T (h4.tipos_obra). Filtro, no una
               segunda barra de pestañas: sin caja y sin número en los inactivos. */}
           <div className="flex flex-wrap items-center gap-1">
             {(tipos.length > 0 ? tipos : [{ codigo: 'VIVIENDA', letra: 'O', nombre: 'Obra Vivienda' } as TipoObra]).map(t => {

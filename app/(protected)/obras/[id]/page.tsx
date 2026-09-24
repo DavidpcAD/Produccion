@@ -283,7 +283,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  // Nombre del tipo de obra (el catálogo con el que trabaja): pro_obc.tipos_obra.
+  // Nombre del tipo de obra (el catálogo con el que trabaja): h4.tipos_obra.
   const tipoObraNombre = tiposObra.find(t => t.codigo === (obra.tipoObraEfectivo ?? obra.tipoObra))?.nombre ?? null;
 
   const secciones = [

@@ -1,6 +1,10 @@
 import sql from 'mssql';
 
 // Conexión de los módulos del Grupo B (avance / concreto / utilidades / desembolsos).
+// OJO (2026-09-24): el CATÁLOGO de partidas ya NO se lee por acá — vive en el esquema
+// h4 de la base principal (getDb: AdelantePRO en producción) y con los mismos IDs.
+// Por esta conexión siguen pro_hor/pro_lab/pro_uti/pro_app/pro_bi/pro_ventas y las
+// tablas de avance/pesos de pro_obc, que quedaron en AdelanteSBX.
 // Desde 2026-08-04 apunta a AdelanteSBX: el esquema de AdelanteDB se replicó a SBX bajo
 // schemas con prefijo `pro_*` (pro_obc / pro_hor / pro_lab / pro_uti / pro_app / pro_bi /
 // pro_ventas) y el SQL del app ya referencia esos schemas. Mismo servidor y credenciales

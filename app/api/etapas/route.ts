@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
+import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { getTipoObra, listarTiposObra } from '@/lib/partidas/tipos-obra';
 
-// Crear un grupo del catálogo (pro_obc.grupos_partida). Es el nivel 1 del árbol y
+// Crear un grupo del catálogo (h4.grupos_partida). Es el nivel 1 del árbol y
 // cambia de nombre según el tipo de obra: "Etapa" en vivienda, "Sistema" en
 // infraestructura, "Área" en administrativas, "Proceso" en fábrica, "Torre" en
-// torres (pro_obc.tipos_obra.termino_grupo). Solo Super Admin (nivel 4).
+// torres (h4.tipos_obra.termino_grupo). Solo Super Admin (nivel 4).
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 4) {
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (nombre.length > 150) return NextResponse.json({ error: 'El nombre no puede superar 150 caracteres' }, { status: 400 });
   if (bcWorksNo && bcWorksNo.length > 20) return NextResponse.json({ error: 'La obra de BC no puede superar 20 caracteres' }, { status: 400 });
 
-  const db = await getAdelanteDb();
+  const db = await getDb();
   try {
     // El código es único DENTRO del tipo de obra Y de la obra de BC: vivienda e
     // infra son catálogos aparte y pueden repetir códigos entre sí, y cada obra
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       .input('cod', sql.VarChar(50), codigo)
       .input('tipo', sql.VarChar(20), tipo.codigo)
       .input('obra', sql.VarChar(20), bcWorksNo)
-      .query(`SELECT 1 AS ok FROM pro_obc.grupos_partida
+      .query(`SELECT 1 AS ok FROM h4.grupos_partida
               WHERE codigo = @cod AND tipo_obra = @tipo
                 AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')`);
     if (dup.recordset.length > 0) {
@@ -66,11 +66,11 @@ export async function POST(req: NextRequest) {
       .input('obra', sql.VarChar(20), bcWorksNo)
       .input('task', sql.VarChar(50), bcTaskNo)
       .query(`
-        INSERT INTO pro_obc.grupos_partida (codigo, nombre, tipo_obra, orden, activo, creado_en, bc_works_no, bc_task_no)
+        INSERT INTO h4.grupos_partida (codigo, nombre, tipo_obra, orden, activo, creado_en, bc_works_no, bc_task_no)
         OUTPUT INSERTED.id AS idEtapa
         VALUES (
           @codigo, @nombre, @tipo,
-          (SELECT ISNULL(MAX(orden), 0) + 1 FROM pro_obc.grupos_partida
+          (SELECT ISNULL(MAX(orden), 0) + 1 FROM h4.grupos_partida
             WHERE tipo_obra = @tipo AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')),
           1, SYSUTCDATETIME(), @obra, @task
         )

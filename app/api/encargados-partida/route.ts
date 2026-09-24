@@ -23,8 +23,8 @@ export async function GET() {
              sp.partida_id AS partidaId, pa.codigo AS partidaCodigo, pa.nombre AS partida
       FROM dbo.EncargadoPartida ep
       JOIN dbo.Colaborador col ON col.idColaborador = ep.idColaborador
-      JOIN pro_obc.sub_partidas sp ON sp.id = ep.idSubPartida
-      LEFT JOIN pro_obc.partidas pa ON pa.id = sp.partida_id
+      JOIN h4.sub_partidas sp ON sp.id = ep.idSubPartida
+      LEFT JOIN h4.partidas pa ON pa.id = sp.partida_id
       ORDER BY pa.codigo, sp.codigo
     `);
     directos = res.recordset;
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         SELECT col.calcNombreCompleto AS encargado, sp.codigo AS subCodigo
         FROM dbo.EncargadoPartida ep
         JOIN dbo.Colaborador col ON col.idColaborador = ep.idColaborador
-        JOIN pro_obc.sub_partidas sp ON sp.id = ep.idSubPartida
+        JOIN h4.sub_partidas sp ON sp.id = ep.idSubPartida
         WHERE ep.idEncargadoPartida = @id
       `);
     const d = det.recordset[0];
@@ -131,7 +131,7 @@ export async function DELETE(req: NextRequest) {
         SELECT col.calcNombreCompleto AS encargado, sp.codigo AS subCodigo
         FROM dbo.EncargadoPartida ep
         JOIN dbo.Colaborador col ON col.idColaborador = ep.idColaborador
-        JOIN pro_obc.sub_partidas sp ON sp.id = ep.idSubPartida
+        JOIN h4.sub_partidas sp ON sp.id = ep.idSubPartida
         WHERE ep.idEncargadoPartida = @id
       `);
     const d = det.recordset[0];

@@ -46,8 +46,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
                sp.partida_id AS idPartida, pa.codigo AS partidaCodigo, pa.nombre AS partidaNombre,
                cs.idProyecto AS idProyecto
         FROM dbo.CuadrillaSubPartida cs
-        JOIN pro_obc.sub_partidas sp ON sp.id = cs.idSubPartida
-        LEFT JOIN pro_obc.partidas pa ON pa.id = sp.partida_id
+        JOIN h4.sub_partidas sp ON sp.id = cs.idSubPartida
+        LEFT JOIN h4.partidas pa ON pa.id = sp.partida_id
         WHERE cs.IDCuadrilla = @id
         ORDER BY sp.codigo
       `);
@@ -150,7 +150,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           SELECT sp.codigo AS subCodigo, c.Nombre AS cuadrilla, pr.nombre AS proyecto
           FROM dbo.CuadrillaSubPartida cs
           JOIN dbo.Cuadrilla c ON c.IDCuadrilla = cs.IDCuadrilla AND c.Activo = 1
-          JOIN pro_obc.sub_partidas sp ON sp.id = cs.idSubPartida
+          JOIN h4.sub_partidas sp ON sp.id = cs.idSubPartida
           LEFT JOIN dbo.Proyecto pr ON pr.idProyecto = cs.idProyecto
           WHERE cs.idProyecto = @idProyecto AND cs.IDCuadrilla <> @idCuad
             AND cs.idSubPartida IN (${b.idSubPartidas.join(',')})
@@ -174,7 +174,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const spRes = await new sql.Request(tx)
       .input('idSub', sql.Int, primeraSub)
-      .query('SELECT codigo FROM pro_obc.sub_partidas WHERE id = @idSub');
+      .query('SELECT codigo FROM h4.sub_partidas WHERE id = @idSub');
     const taskNoBC = spRes.recordset[0]?.codigo ?? null;
 
     const encRes = await new sql.Request(tx)

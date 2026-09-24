@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
+import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 
-// Editar / desactivar una partida del catálogo unificado (pro_obc.partidas).
+// Editar / desactivar una partida del catálogo unificado (h4.partidas).
 // Solo Super Admin (nivel 4).
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -25,7 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (codigo.length > 50) return NextResponse.json({ error: 'El código no puede superar 50 caracteres' }, { status: 400 });
   if (nombre.length > 150) return NextResponse.json({ error: 'El nombre no puede superar 150 caracteres' }, { status: 400 });
 
-  const db = await getAdelanteDb();
+  const db = await getDb();
   try {
     // Único DENTRO DEL GRUPO (índice UX_partidas_grupo_codigo): infra repite a
     // propósito los códigos de vivienda, y cada obra administrativa/fábrica trae
@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       .input('cod', sql.VarChar(50), codigo)
       .input('id', sql.Int, idPartida)
       .input('idE', sql.Int, idEtapa)
-      .query('SELECT 1 AS ok FROM pro_obc.partidas WHERE codigo = @cod AND id <> @id AND grupo_id = @idE');
+      .query('SELECT 1 AS ok FROM h4.partidas WHERE codigo = @cod AND id <> @id AND grupo_id = @idE');
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe otra partida con el código "${codigo}" en esa etapa` }, { status: 409 });
     }
@@ -48,7 +48,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       .input('nombre', sql.NVarChar(150), nombre)
       .input('idEtapa', sql.Int, idEtapa)
       .query(`
-        UPDATE pro_obc.partidas
+        UPDATE h4.partidas
         SET codigo = @codigo, nombre = @nombre, grupo_id = @idEtapa,
             bc_task_no = CASE WHEN bc_task_no IS NULL OR bc_task_no = codigo THEN @codigo ELSE bc_task_no END
         WHERE id = @id
@@ -78,18 +78,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!idPartida) return NextResponse.json({ error: 'Partida inválida' }, { status: 400 });
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? '';
 
-  const db = await getAdelanteDb();
+  const db = await getDb();
   try {
     // No permitir desactivar si tiene subpartidas activas.
     const subs = await db.request()
       .input('id', sql.Int, idPartida)
-      .query('SELECT COUNT(*) AS n FROM pro_obc.sub_partidas WHERE partida_id = @id AND activo = 1');
+      .query('SELECT COUNT(*) AS n FROM h4.sub_partidas WHERE partida_id = @id AND activo = 1');
     if (subs.recordset[0].n > 0) {
       return NextResponse.json({ error: 'La partida tiene subpartidas activas. Borralas o movelas primero.' }, { status: 409 });
     }
     const upd = await db.request()
       .input('id', sql.Int, idPartida)
-      .query('UPDATE pro_obc.partidas SET activo = 0 WHERE id = @id AND activo = 1');
+      .query('UPDATE h4.partidas SET activo = 0 WHERE id = @id AND activo = 1');
     if (upd.rowsAffected[0] === 0) {
       return NextResponse.json({ error: 'La partida no existe o ya está inactiva' }, { status: 404 });
     }

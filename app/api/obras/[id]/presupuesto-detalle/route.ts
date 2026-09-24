@@ -83,13 +83,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 /**
  * Detalle desde el snapshot ETL (pro_bi.fact_presupuesto), enriquecido con el
- * catálogo de partidas (nombre / grupo / orden) de pro_obc — la misma fuente que
+ * catálogo de partidas (nombre / grupo / orden) de h4 — la misma fuente que
  * usan los reportes y AD Obras Control ("Detalle del presupuesto").
  */
 async function detalleETL(worksNo: string): Promise<{
   version: string | null; fecha: string | null; total: number; grupos: Grupo[]; partidas: Partida[];
 } | null> {
-  const bi = await getAdelanteDb();
+  // El snapshot del ETL sigue en AdelanteSBX (pro_bi); el catálogo ya vive en h4
+  // de la base principal. Dos conexiones a propósito.
+  const [bi, db] = await Promise.all([getAdelanteDb(), getDb()]);
   const [lineas, cat] = await Promise.all([
     bi.request().input('o', sql.NVarChar(20), worksNo).query<{
       taskNo: string; monto: number; descripcion: string | null; versionCode: string | null; fecha: Date | null;
@@ -101,10 +103,10 @@ async function detalleETL(worksNo: string): Promise<{
       WHERE fp.works_no = @o AND fp.task_type = 'Posting' AND fp.tipo_costo = 'Cost'
         AND CAST(fp.es_ultima_version AS INT) = 1
       GROUP BY fp.task_no`),
-    bi.request().query<{ codigo: string; nombre: string; grupo: string | null; grupoOrden: number | null; partidaOrden: number | null }>(`
+    db.request().query<{ codigo: string; nombre: string; grupo: string | null; grupoOrden: number | null; partidaOrden: number | null }>(`
       SELECT p.codigo, p.nombre, g.nombre AS grupo, g.orden AS grupoOrden, p.orden AS partidaOrden
-      FROM pro_obc.partidas p
-      LEFT JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id`),
+      FROM h4.partidas p
+      LEFT JOIN h4.grupos_partida g ON g.id = p.grupo_id`),
   ]);
   if (lineas.recordset.length === 0) return null;
 

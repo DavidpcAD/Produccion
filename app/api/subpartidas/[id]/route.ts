@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
+import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 
 const TIPOS_CASA = new Set(['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea']);
 
-// Editar una subpartida del catálogo unificado (pro_obc.sub_partidas +
+// Editar una subpartida del catálogo unificado (h4.sub_partidas +
 // sub_partida_tipos). Solo Super Admin (nivel 4).
 //
 // Como en el POST, las reglas salen del tipo de obra de la partida a la que ya
-// está amarrada (pro_obc.tipos_obra): usa_sprints exige sprint y usa_tipos_casa
+// está amarrada (h4.tipos_obra): usa_sprints exige sprint y usa_tipos_casa
 // exige al menos un tipo de casa —hoy solo vivienda—; los demás tipos (infra,
 // administrativas, fábrica, torres) los guardan vacíos.
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,16 +37,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (codigo.length > 50) return NextResponse.json({ error: 'El código no puede superar 50 caracteres' }, { status: 400 });
   if (nombre.length > 150) return NextResponse.json({ error: 'El nombre no puede superar 150 caracteres' }, { status: 400 });
 
-  const db = await getAdelanteDb();
+  const db = await getDb();
   try {
     const act = await db.request()
       .input('id', sql.Int, idSubPartida)
       .query(`SELECT g.tipo_obra AS tipoObra, g.bc_works_no AS bcWorksNo,
                      t.usa_sprints AS usaSprints, t.usa_tipos_casa AS usaTiposCasa
-              FROM pro_obc.sub_partidas sp
-              JOIN pro_obc.partidas p ON p.id = sp.partida_id
-              JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
-              JOIN pro_obc.tipos_obra t ON t.codigo = g.tipo_obra
+              FROM h4.sub_partidas sp
+              JOIN h4.partidas p ON p.id = sp.partida_id
+              JOIN h4.grupos_partida g ON g.id = p.grupo_id
+              JOIN h4.tipos_obra t ON t.codigo = g.tipo_obra
               WHERE sp.id = @id`);
     if (act.recordset.length === 0) {
       return NextResponse.json({ error: 'La subpartida no existe' }, { status: 404 });
@@ -72,9 +72,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       .input('id', sql.Int, idSubPartida)
       .input('tipo', sql.VarChar(20), tipoObra)
       .input('obra', sql.VarChar(20), bcWorksNo)
-      .query(`SELECT 1 AS ok FROM pro_obc.sub_partidas sp
-              JOIN pro_obc.partidas p ON p.id = sp.partida_id
-              JOIN pro_obc.grupos_partida g ON g.id = p.grupo_id
+      .query(`SELECT 1 AS ok FROM h4.sub_partidas sp
+              JOIN h4.partidas p ON p.id = sp.partida_id
+              JOIN h4.grupos_partida g ON g.id = p.grupo_id
               WHERE sp.codigo = @cod AND sp.id <> @id AND g.tipo_obra = @tipo
                 AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')`);
     if (dup.recordset.length > 0) {
@@ -93,7 +93,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         .input('descripcion', sql.NVarChar(sql.MAX), descripcion)
         .input('activo', sql.Bit, activo)
         .query(`
-          UPDATE pro_obc.sub_partidas
+          UPDATE h4.sub_partidas
           SET codigo = @codigo, nombre = @nombre, sprint_numero = @numSprint,
               es_critica = @esCritica, descripcion = @descripcion, activo = @activo
           WHERE id = @id
@@ -104,12 +104,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
       // Reemplazar tipos de casa.
       await new sql.Request(tx).input('id', sql.Int, idSubPartida)
-        .query('DELETE FROM pro_obc.sub_partida_tipos WHERE sub_partida_id = @id');
+        .query('DELETE FROM h4.sub_partida_tipos WHERE sub_partida_id = @id');
       for (const tc of tiposGuardados) {
         await new sql.Request(tx)
           .input('id', sql.Int, idSubPartida)
           .input('tc', sql.VarChar(20), tc)
-          .query('INSERT INTO pro_obc.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)');
+          .query('INSERT INTO h4.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)');
       }
       await tx.commit();
     } catch (e) {
@@ -138,11 +138,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!idSubPartida) return NextResponse.json({ error: 'Subpartida inválida' }, { status: 400 });
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? '';
 
-  const db = await getAdelanteDb();
+  const db = await getDb();
   try {
     const upd = await db.request()
       .input('id', sql.Int, idSubPartida)
-      .query('UPDATE pro_obc.sub_partidas SET activo = 0 WHERE id = @id AND activo = 1');
+      .query('UPDATE h4.sub_partidas SET activo = 0 WHERE id = @id AND activo = 1');
     if (upd.rowsAffected[0] === 0) {
       return NextResponse.json({ error: 'La subpartida no existe o ya está inactiva' }, { status: 404 });
     }
