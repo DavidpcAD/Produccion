@@ -172,10 +172,10 @@ export default function MatrizPage() {
               <table className="ds-table" style={{ tableLayout: "auto" }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 200, position: "sticky", left: 0, top: 0, color: "var(--ds-text)", background: "var(--ds-surface)", zIndex: 3 }}>Obra</th>
+                    <th style={{ width: 200, minWidth: 200, position: "sticky", left: 0, top: 0, color: "var(--ds-text)", background: "var(--ds-surface)", zIndex: 3 }}>Obra</th>
                     {columnas.map((c) => { const par = partidaDeClas(c); return (
-                      <th key={c.id} style={{ width: 150, textAlign: "center", verticalAlign: "bottom", position: "sticky", top: 0, color: "var(--ds-text)", background: "var(--ds-surface)", zIndex: 2 }}>
-                        {par && <div className="ds-body-sm ds-muted ds-truncate" title={par.nombre} style={{ fontWeight: 400, maxWidth: 150, margin: "0 auto" }}>{par.codigo ? `${par.codigo} · ` : ""}{par.nombre}</div>}
+                      <th key={c.id} style={{ width: 150, minWidth: 150, textAlign: "center", verticalAlign: "bottom", position: "sticky", top: 0, color: "var(--ds-text)", background: "var(--ds-surface)", zIndex: 2 }}>
+                        {par && <div className="ds-body-sm ds-muted ds-wrap" style={{ fontWeight: 400, maxWidth: 150, margin: "0 auto" }}>{par.codigo ? `${par.codigo} · ` : ""}{par.nombre}</div>}
                         <div className="ds-strong ds-body-sm">{c.nombre}</div>
                       </th>
                     ); })}
@@ -189,7 +189,7 @@ export default function MatrizPage() {
                     <tr key={o.idObra}>
                       <td style={{ position: "sticky", left: 0, background: "var(--ds-surface)", zIndex: 1 }}>
                         <div className="ds-strong ds-body-sm">{o.numeroObra}</div>
-                        {o.nombreMostrado && <div className="ds-muted ds-body-sm ds-truncate" style={{ maxWidth: 180 }} title={o.nombreMostrado}>{o.nombreMostrado}</div>}
+                        {o.nombreMostrado && <div className="ds-muted ds-body-sm ds-wrap" style={{ maxWidth: 180 }}>{o.nombreMostrado}</div>}
                       </td>
                       {columnas.map((c) => {
                         const est = mapa.get(`${o.idObra}|${c.id}`);

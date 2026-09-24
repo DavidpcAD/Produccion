@@ -137,7 +137,7 @@ export function BarRanking({
               className="rank__cuerpo"
               {...(onFila ? { type: "button" as const, onClick: () => onFila(f.clave) } : {})}
             >
-              <span className="rank__nombre ds-truncate" title={f.nombre}>{f.nombre}</span>
+              <span className="rank__nombre ds-wrap">{f.nombre}</span>
               <span className="rank__pista" aria-hidden>
                 <span className="rank__barra" style={{ width: `${(f.valor / tope) * 100}%`, background: color }} />
               </span>

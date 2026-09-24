@@ -538,6 +538,10 @@
    cantidades/importes y los códigos cortos (almacén, obra). */
 .oc-scope .ds-table tbody td.ds-num { white-space: nowrap; }
 .oc-scope .ds-nowrap { white-space: nowrap; }
+/* Texto que baja de línea donde el ANCHO YA LO PONE EL CONTENEDOR (encabezados de la
+   matriz, nombre del ranking): igual que ds-cell-texto pero sin mínimo ni máximo
+   propios, que ahí romperían la cuadrícula. */
+.oc-scope .ds-wrap { white-space: normal; overflow-wrap: break-word; }
 
 /* ─── Maestro de clasificaciones: jerarquía etapa → partida → clasificación ─── */
 .oc-scope .clasif-groups { display: flex; flex-direction: column; gap: 26px; }
@@ -1778,11 +1782,16 @@
 .oc-scope .rank__fila { display: grid; grid-template-columns: 24px 1fr; align-items: center; column-gap: var(--ds-space-2); padding: 6px 0; border-bottom: 1px solid var(--ds-color-gray-100); }
 .oc-scope .rank__fila:last-child { border-bottom: 0; }
 .oc-scope .rank__pos { color: var(--ds-color-gray-300); font-size: var(--ds-font-size-body-sm); font-variant-numeric: tabular-nums; text-align: right; }
-.oc-scope .rank__cuerpo { display: grid; grid-template-columns: minmax(130px, 1.4fr) minmax(50px, 1fr) auto; align-items: center; gap: var(--ds-space-3); width: 100%; border: 0; background: transparent; font-family: inherit; font-size: var(--ds-font-size-label); color: inherit; text-align: left; padding: 4px; border-radius: var(--ds-radius-md); }
-.oc-scope .rank__nombre { font-weight: var(--ds-font-weight-semibold); }
-.oc-scope .rank__pista { height: 18px; border-radius: var(--ds-radius-sm); background: var(--ds-color-gray-100); overflow: hidden; }
+/* El nombre va en su propio renglon, a todo el ancho, y debajo la barra con el monto.
+   Compartiendo renglon le tocaban ~150px: "FERRETERIA Y MATERIALES DE CONSTRUCCION EL
+   COLONO S.A." caia en cuatro lineas o, antes, se cortaba con «…» y no se sabia a quien
+   hay que corretearle. Las barras siguen arrancando todas del mismo borde, que es lo
+   que hace comparable el ranking. */
+.oc-scope .rank__cuerpo { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "nombre nombre" "pista valor"; align-items: center; gap: 5px var(--ds-space-3); width: 100%; border: 0; background: transparent; font-family: inherit; font-size: var(--ds-font-size-label); color: inherit; text-align: left; padding: 4px; border-radius: var(--ds-radius-md); }
+.oc-scope .rank__nombre { grid-area: nombre; font-weight: var(--ds-font-weight-semibold); }
+.oc-scope .rank__pista { grid-area: pista; height: 18px; border-radius: var(--ds-radius-sm); background: var(--ds-color-gray-100); overflow: hidden; }
 .oc-scope .rank__barra { display: block; height: 100%; border-radius: var(--ds-radius-sm); }
-.oc-scope .rank__valor { font-variant-numeric: tabular-nums; font-weight: var(--ds-font-weight-semibold); white-space: nowrap; }
+.oc-scope .rank__valor { grid-area: valor; font-variant-numeric: tabular-nums; font-weight: var(--ds-font-weight-semibold); white-space: nowrap; }
 .oc-scope .rank__nota { grid-column: 2; padding-left: 4px; margin-top: -4px; }
 
 /* ---- Serie mensual ---- */
@@ -1805,6 +1814,6 @@
   /* La nota del ranking ("3 órdenes · 40% entregado") se cae: a 375 px el nombre del
      proveedor ya ocupa la fila entera y esa segunda línea duplicaba el alto de cada una. */
   .oc-scope .rank__nota { display: none; }
-  .oc-scope .rank__cuerpo { grid-template-columns: 1fr auto; }
+  .oc-scope .rank__cuerpo { grid-template-columns: 1fr auto; grid-template-areas: "nombre valor"; }
   .oc-scope .rank__pista { display: none; }
 }
