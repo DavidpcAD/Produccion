@@ -32,7 +32,14 @@ export async function POST(req: NextRequest) {
   const db = await getDb();
   const [obrasRes, subsRes] = await Promise.all([
     db.request().query<{ idObra: number; numeroObra: string }>('SELECT idObra, numeroObra FROM dbo.Obra'),
-    db.request().query<{ idSubPartida: number; codigo: string }>('SELECT idSubPartida, codigo FROM dbo.SubPartida WHERE esActivo = 1'),
+    // Solo el catálogo COMPARTIDO de vivienda: el Excel de horas es de casas y los
+    // códigos (1.1.1…) se repiten en otros tipos de obra desde que dbo tiene todo.
+    db.request().query<{ idSubPartida: number; codigo: string }>(`
+      SELECT sp.idSubPartida, sp.codigo
+      FROM dbo.SubPartida sp
+      JOIN dbo.Partida p ON p.idPartida = sp.idPartida
+      JOIN dbo.Etapa e ON e.id = p.idEtapa
+      WHERE sp.esActivo = 1 AND e.tipoObra = 'VIVIENDA' AND e.bcWorksNo IS NULL`),
   ]);
   const obraByNum = new Map(obrasRes.recordset.map((o) => [o.numeroObra.toLowerCase(), o.idObra]));
   const subByCod = new Map(subsRes.recordset.map((s) => [s.codigo.toLowerCase(), s.idSubPartida]));

@@ -69,7 +69,7 @@ export default function ObrasPage() {
   const { toast } = useToast();
   const [obras, setObras] = useState<Obra[]>([]);
   const [proyectos, setProyectos] = useState<{ IDProyecto: number; Nombre: string; CodigoBC: string }[]>([]);
-  // Tipos de obra del catálogo (O/I/A/F/T) — h4.tipos_obra.
+  // Tipos de obra del catálogo (O/I/A/F/T) — dbo.TipoObra.
   const [tiposObra, setTiposObra] = useState<TipoObraOpt[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -6,7 +6,7 @@ import {
 } from './tipos-obra';
 
 /**
- * Meter en el catálogo (`h4.grupos_partida` → `partidas`) una estructura de
+ * Meter en el catálogo (`dbo.Etapa` → `partidas`) una estructura de
  * dos niveles que viene de afuera: capítulos ("Total") y partidas ("Posting") de
  * una obra. Lo usan los dos caminos que existen:
  *
@@ -105,11 +105,11 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
       .input('tipo', sql.VarChar(20), tipo.codigo)
       .input('obra', sql.VarChar(20), scope)
       .query<{ id: number }>(`
-        SELECT p.id
-        FROM h4.partidas p
-        JOIN h4.grupos_partida g ON g.id = p.grupo_id
-        WHERE g.tipo_obra = @tipo AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
-          AND EXISTS (SELECT 1 FROM h4.sub_partidas sp WHERE sp.partida_id = p.id)
+        SELECT p.idPartida AS id
+        FROM dbo.Partida p
+        JOIN dbo.Etapa g ON g.id = p.idEtapa
+        WHERE g.tipoObra = @tipo AND ISNULL(g.bcWorksNo, '') = ISNULL(@obra, '')
+          AND EXISTS (SELECT 1 FROM dbo.SubPartida sp WHERE sp.idPartida = p.idPartida)
       `);
     for (const f of r.recordset) conSubpartida.add(f.id);
   }
@@ -118,19 +118,19 @@ export async function catalogoDeObra(tipo: TipoObra, obra: string): Promise<{
       .input('tipo', sql.VarChar(20), tipo.codigo)
       .input('obra', sql.VarChar(20), scope)
       .query<{ id: number; codigo: string; nombre: string; bc_task_no: string | null }>(`
-        SELECT id, codigo, nombre, bc_task_no
-        FROM h4.grupos_partida
-        WHERE tipo_obra = @tipo AND activo = 1 AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')
+        SELECT id, codigo, nombre, bcTaskNo AS bc_task_no
+        FROM dbo.Etapa
+        WHERE tipoObra = @tipo AND activo = 1 AND ISNULL(bcWorksNo, '') = ISNULL(@obra, '')
       `),
     db.request()
       .input('tipo', sql.VarChar(20), tipo.codigo)
       .input('obra', sql.VarChar(20), scope)
       .query<{ id: number; codigo: string; nombre: string; grupo_id: number; grupo_codigo: string; grupo_nombre: string }>(`
-        SELECT p.id, p.codigo, p.nombre, p.grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
-        FROM h4.partidas p
-        JOIN h4.grupos_partida g ON g.id = p.grupo_id
-        WHERE g.tipo_obra = @tipo AND g.activo = 1 AND p.activo = 1
-          AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
+        SELECT p.idPartida AS id, p.codigo, p.nombre, p.idEtapa AS grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
+        FROM dbo.Partida p
+        JOIN dbo.Etapa g ON g.id = p.idEtapa
+        WHERE g.tipoObra = @tipo AND g.activo = 1 AND p.esActivo = 1
+          AND ISNULL(g.bcWorksNo, '') = ISNULL(@obra, '')
       `),
   ]);
   return {
@@ -245,11 +245,11 @@ export async function sincronizarEstructura(
       .input('tipo', sql.VarChar(20), tipo.codigo)
       .input('obra', sql.VarChar(20), scope)
       .query<{ id: number }>(`
-        SELECT p.id
-        FROM h4.partidas p
-        JOIN h4.grupos_partida g ON g.id = p.grupo_id
-        WHERE g.tipo_obra = @tipo AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
-          AND EXISTS (SELECT 1 FROM h4.sub_partidas sp WHERE sp.partida_id = p.id)
+        SELECT p.idPartida AS id
+        FROM dbo.Partida p
+        JOIN dbo.Etapa g ON g.id = p.idEtapa
+        WHERE g.tipoObra = @tipo AND ISNULL(g.bcWorksNo, '') = ISNULL(@obra, '')
+          AND EXISTS (SELECT 1 FROM dbo.SubPartida sp WHERE sp.idPartida = p.idPartida)
       `);
     for (const f of r.recordset) conSubpartida.add(f.id);
   }
@@ -264,9 +264,9 @@ export async function sincronizarEstructura(
       .input('cod', sql.VarChar(50), codigo)
       .input('task', sql.VarChar(50), bcTaskNo)
       .query<{ id: number }>(`
-        SELECT TOP 1 id FROM h4.grupos_partida
-        WHERE tipo_obra = @tipo AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')
-          AND (codigo = @cod OR (@task IS NOT NULL AND bc_task_no = @task))
+        SELECT TOP 1 id FROM dbo.Etapa
+        WHERE tipoObra = @tipo AND ISNULL(bcWorksNo, '') = ISNULL(@obra, '')
+          AND (codigo = @cod OR (@task IS NOT NULL AND bcTaskNo = @task))
         ORDER BY CASE WHEN codigo = @cod THEN 0 ELSE 1 END
       `);
     if (q.recordset[0]) {
@@ -278,7 +278,7 @@ export async function sincronizarEstructura(
       await db.request()
         .input('id', sql.Int, id)
         .input('task', sql.VarChar(50), bcTaskNo)
-        .query('UPDATE h4.grupos_partida SET bc_task_no = ISNULL(bc_task_no, @task) WHERE id = @id');
+        .query('UPDATE dbo.Etapa SET bcTaskNo = ISNULL(bcTaskNo, @task) WHERE id = @id');
       return id;
     }
     res.gruposCreados.push(`${codigo} — ${nombre}`);
@@ -290,11 +290,11 @@ export async function sincronizarEstructura(
       .input('obra', sql.VarChar(20), scope)
       .input('task', sql.VarChar(50), bcTaskNo)
       .query<{ id: number }>(`
-        INSERT INTO h4.grupos_partida (codigo, nombre, tipo_obra, orden, activo, creado_en, bc_works_no, bc_task_no)
+        INSERT INTO dbo.Etapa (codigo, nombre, tipoObra, orden, activo, creado_en, bcWorksNo, bcTaskNo)
         OUTPUT INSERTED.id AS id
         VALUES (@cod, @nombre, @tipo,
-          (SELECT ISNULL(MAX(orden), 0) + 1 FROM h4.grupos_partida
-            WHERE tipo_obra = @tipo AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')),
+          (SELECT ISNULL(MAX(orden), 0) + 1 FROM dbo.Etapa
+            WHERE tipoObra = @tipo AND ISNULL(bcWorksNo, '') = ISNULL(@obra, '')),
           1, SYSUTCDATETIME(), @obra, @task)
       `);
     return ins.recordset[0].id;
@@ -311,9 +311,9 @@ export async function sincronizarEstructura(
       .input('obra', sql.VarChar(20), scope)
       .input('cod', sql.VarChar(50), codigo)
       .query<{ id: number }>(`
-        SELECT p.id FROM h4.partidas p
-        JOIN h4.grupos_partida g ON g.id = p.grupo_id
-        WHERE g.tipo_obra = @tipo AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')
+        SELECT p.idPartida AS id FROM dbo.Partida p
+        JOIN dbo.Etapa g ON g.id = p.idEtapa
+        WHERE g.tipoObra = @tipo AND ISNULL(g.bcWorksNo, '') = ISNULL(@obra, '')
           AND p.codigo = @cod
       `);
     if (q.recordset[0]) {
@@ -324,9 +324,9 @@ export async function sincronizarEstructura(
           .input('id', sql.Int, id)
           .input('nombre', sql.NVarChar(150), nombre)
           .input('cod', sql.VarChar(50), codigo)
-          .query(`UPDATE h4.partidas
-                  SET nombre = @nombre, bc_task_no = ISNULL(bc_task_no, @cod), activo = 1
-                  WHERE id = @id`);
+          .query(`UPDATE dbo.Partida
+                  SET nombre = @nombre, bcTaskNo = ISNULL(bcTaskNo, @cod), esActivo = 1
+                  WHERE idPartida = @id`);
       }
       await espejoDeLaPartida(id, codigo, nombre);
       return;
@@ -341,12 +341,15 @@ export async function sincronizarEstructura(
       .input('cod', sql.VarChar(50), codigo)
       .input('nombre', sql.NVarChar(150), nombre)
       .input('g', sql.Int, idGrupo)
+      // esPosting es lo que filtran las vistas de Boletas: solo las partidas del
+      // catálogo compartido de vivienda (las casas), que son las que ellos usan.
+      .input('esPosting', sql.Bit, tipo.codigo === 'VIVIENDA' && tipo.catalogoCompartido ? 1 : 0)
       .query<{ id: number }>(`
-        INSERT INTO h4.partidas (codigo, nombre, grupo_id, orden, activo, bc_task_no, creado_en)
-        OUTPUT INSERTED.id AS id
+        INSERT INTO dbo.Partida (codigo, nombre, idEtapa, orden, esActivo, bcTaskNo, fechaCreacion, esPosting)
+        OUTPUT INSERTED.idPartida AS id
         VALUES (@cod, @nombre, @g,
-          (SELECT ISNULL(MAX(orden), 0) + 1 FROM h4.partidas WHERE grupo_id = @g),
-          1, @cod, SYSUTCDATETIME())
+          (SELECT ISNULL(MAX(orden), 0) + 1 FROM dbo.Partida WHERE idEtapa = @g),
+          1, @cod, SYSUTCDATETIME(), @esPosting)
       `);
     await espejoDeLaPartida(ins.recordset[0].id, codigo, nombre);
   }
@@ -369,7 +372,7 @@ export async function sincronizarEstructura(
       .input('nombre', sql.NVarChar(300), nombre)
       .input('p', sql.Int, idPartida)
       .query(`
-        INSERT INTO h4.sub_partidas (codigo, nombre, partida_id, sprint_numero, es_critica, activo, creado_en)
+        INSERT INTO dbo.SubPartida (codigo, nombre, idPartida, numSprint, esCritica, esActivo, fechaCreacion)
         VALUES (@cod, @nombre, @p, NULL, 0, 1, SYSUTCDATETIME())
       `);
   }

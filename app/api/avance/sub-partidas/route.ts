@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  *   GET  /api/avance/sub-partidas → listado (+ catálogo de partidas para el select)
  *   POST /api/avance/sub-partidas → crear (sin pesos; se asignan luego en Pesos)
  *
- * Fuente: h4.sub_partidas + h4.partidas + h4.grupos_partida + h4.sub_partida_tipos
+ * Fuente: dbo.SubPartida + dbo.Partida + dbo.Etapa + dbo.SubPartidaTipoCasa
  */
 
 const TIPOS_CASA_SET = new Set<string>(TIPOS_CASA);
@@ -43,17 +43,17 @@ export async function GET(req: NextRequest) {
     // Avance es un módulo de vivienda (sprints + tipos de casa). El catálogo
     // también tiene partidas de INFRAESTRUCTURA (grupos_partida.tipo_obra), que
     // no llevan sprint: no tienen nada que hacer en esta pantalla.
-    const where: string[] = ["g.tipo_obra = 'VIVIENDA'"];
+    const where: string[] = ["g.tipoObra = 'VIVIENDA'"];
     if (partidaId > 0) {
-      where.push('sp.partida_id = @partida_id');
+      where.push('sp.idPartida = @partida_id');
       listReq.input('partida_id', sql.Int, partidaId);
     }
     if (sprint > 0) {
-      where.push('sp.sprint_numero = @sprint');
+      where.push('sp.numSprint = @sprint');
       listReq.input('sprint', sql.SmallInt, sprint);
     }
     if (activoRaw === 'true' || activoRaw === 'false') {
-      where.push('sp.activo = @activo');
+      where.push('sp.esActivo = @activo');
       listReq.input('activo', sql.Bit, activoRaw === 'true');
     }
     if (q.length > 0) {
@@ -62,8 +62,8 @@ export async function GET(req: NextRequest) {
     }
     if (tipoCasa && TIPOS_CASA_SET.has(tipoCasa)) {
       where.push(`EXISTS (
-        SELECT 1 FROM h4.sub_partida_tipos t
-        WHERE t.sub_partida_id = sp.id AND t.tipo_casa = @tipo_casa
+        SELECT 1 FROM dbo.SubPartidaTipoCasa t
+        WHERE t.idSubPartida = sp.idSubPartida AND t.tipoCasa = @tipo_casa
       )`);
       listReq.input('tipo_casa', sql.VarChar(20), tipoCasa);
     }
@@ -72,21 +72,21 @@ export async function GET(req: NextRequest) {
       Omit<SubPartidaListado, 'tipos_casa'> & { tipos_casa_str: string | null }
     >(`
       SELECT
-        sp.id, sp.codigo, sp.nombre, sp.sprint_numero, sp.es_critica, sp.activo,
-        p.id AS partida_id, p.codigo AS partida_codigo, p.nombre AS partida_nombre,
+        sp.idSubPartida AS id, sp.codigo, sp.nombre, sp.numSprint AS sprint_numero, sp.esCritica AS es_critica, sp.esActivo AS activo,
+        p.idPartida AS partida_id, p.codigo AS partida_codigo, p.nombre AS partida_nombre,
         g.id AS grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre,
         STUFF((
-          SELECT ',' + t.tipo_casa
-          FROM h4.sub_partida_tipos t
-          WHERE t.sub_partida_id = sp.id
-          ORDER BY t.tipo_casa
+          SELECT ',' + t.tipoCasa
+          FROM dbo.SubPartidaTipoCasa t
+          WHERE t.idSubPartida = sp.idSubPartida
+          ORDER BY t.tipoCasa
           FOR XML PATH('')
         ), 1, 1, '') AS tipos_casa_str
-      FROM h4.sub_partidas sp
-      JOIN h4.partidas p       ON p.id = sp.partida_id
-      JOIN h4.grupos_partida g ON g.id = p.grupo_id
+      FROM dbo.SubPartida sp
+      JOIN dbo.Partida p       ON p.idPartida = sp.idPartida
+      JOIN dbo.Etapa g ON g.id = p.idEtapa
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY sp.sprint_numero, p.codigo, sp.codigo
+      ORDER BY sp.numSprint, p.codigo, sp.codigo
     `);
 
     const subPartidas: SubPartidaListado[] = listRes.recordset.map((r) => ({
@@ -108,11 +108,11 @@ export async function GET(req: NextRequest) {
     // Catálogo de partidas para el <select> de crear/editar (mismo endpoint,
     // así la pantalla carga con un solo fetch).
     const partidasRes = await db.request().query<PartidaConGrupo>(`
-      SELECT p.id, p.codigo, p.nombre, p.orden, p.activo,
+      SELECT p.idPartida AS id, p.codigo, p.nombre, p.orden, p.esActivo AS activo,
              g.id AS grupo_id, g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
-      FROM h4.partidas p
-      JOIN h4.grupos_partida g ON g.id = p.grupo_id
-      WHERE p.activo = 1 AND g.tipo_obra = 'VIVIENDA'
+      FROM dbo.Partida p
+      JOIN dbo.Etapa g ON g.id = p.idEtapa
+      WHERE p.esActivo = 1 AND g.tipoObra = 'VIVIENDA'
       ORDER BY p.orden, p.codigo
     `);
 
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
     const dup = await db
       .request()
       .input('codigo', sql.VarChar(50), codigo)
-      .query<{ id: number }>('SELECT id FROM h4.sub_partidas WHERE codigo = @codigo');
+      .query<{ id: number }>('SELECT idSubPartida AS id FROM dbo.SubPartida WHERE codigo = @codigo');
     if (dup.recordset.length > 0) {
       return NextResponse.json(
         { error: `Ya existe una sub-partida con el código ${codigo}` },
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     const partida = await db
       .request()
       .input('pid', sql.Int, partidaId)
-      .query<{ id: number }>('SELECT id FROM h4.partidas WHERE id = @pid');
+      .query<{ id: number }>('SELECT idPartida AS id FROM dbo.Partida WHERE idPartida = @pid');
     if (partida.recordset.length === 0) {
       return NextResponse.json({ error: `La partida ${partidaId} no existe` }, { status: 400 });
     }
@@ -197,9 +197,9 @@ export async function POST(req: NextRequest) {
         .input('descripcion', sql.NVarChar(4000), descripcion)
         .input('activo', sql.Bit, activo)
         .query<{ id: number }>(`
-          INSERT INTO h4.sub_partidas
-            (codigo, nombre, partida_id, sprint_numero, es_critica, descripcion, activo)
-          OUTPUT INSERTED.id
+          INSERT INTO dbo.SubPartida
+            (codigo, nombre, idPartida, numSprint, esCritica, descripcion, esActivo)
+          OUTPUT INSERTED.idSubPartida AS id
           VALUES
             (@codigo, @nombre, @partida_id, @sprint_numero, @es_critica, @descripcion, @activo)
         `);
@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
           .input('id', sql.Int, nuevoId)
           .input('tc', sql.VarChar(20), tc)
           .query(
-            'INSERT INTO h4.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)',
+            'INSERT INTO dbo.SubPartidaTipoCasa (idSubPartida, tipoCasa) VALUES (@id, @tc)',
           );
       }
 

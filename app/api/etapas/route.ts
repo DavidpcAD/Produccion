@@ -4,10 +4,10 @@ import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { getTipoObra, listarTiposObra } from '@/lib/partidas/tipos-obra';
 
-// Crear un grupo del catálogo (h4.grupos_partida). Es el nivel 1 del árbol y
+// Crear un grupo del catálogo (dbo.Etapa). Es el nivel 1 del árbol y
 // cambia de nombre según el tipo de obra: "Etapa" en vivienda, "Sistema" en
 // infraestructura, "Área" en administrativas, "Proceso" en fábrica, "Torre" en
-// torres (h4.tipos_obra.termino_grupo). Solo Super Admin (nivel 4).
+// torres (dbo.TipoObra.termino_grupo). Solo Super Admin (nivel 4).
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 4) {
@@ -51,9 +51,9 @@ export async function POST(req: NextRequest) {
       .input('cod', sql.VarChar(50), codigo)
       .input('tipo', sql.VarChar(20), tipo.codigo)
       .input('obra', sql.VarChar(20), bcWorksNo)
-      .query(`SELECT 1 AS ok FROM h4.grupos_partida
-              WHERE codigo = @cod AND tipo_obra = @tipo
-                AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')`);
+      .query(`SELECT 1 AS ok FROM dbo.Etapa
+              WHERE codigo = @cod AND tipoObra = @tipo
+                AND ISNULL(bcWorksNo, '') = ISNULL(@obra, '')`);
     if (dup.recordset.length > 0) {
       const donde = bcWorksNo ? ` en la obra ${bcWorksNo}` : '';
       return NextResponse.json({ error: `Ya existe ${un} ${termino} con el código "${codigo}"${donde}` }, { status: 409 });
@@ -66,12 +66,12 @@ export async function POST(req: NextRequest) {
       .input('obra', sql.VarChar(20), bcWorksNo)
       .input('task', sql.VarChar(50), bcTaskNo)
       .query(`
-        INSERT INTO h4.grupos_partida (codigo, nombre, tipo_obra, orden, activo, creado_en, bc_works_no, bc_task_no)
+        INSERT INTO dbo.Etapa (codigo, nombre, tipoObra, orden, activo, creado_en, bcWorksNo, bcTaskNo)
         OUTPUT INSERTED.id AS idEtapa
         VALUES (
           @codigo, @nombre, @tipo,
-          (SELECT ISNULL(MAX(orden), 0) + 1 FROM h4.grupos_partida
-            WHERE tipo_obra = @tipo AND ISNULL(bc_works_no, '') = ISNULL(@obra, '')),
+          (SELECT ISNULL(MAX(orden), 0) + 1 FROM dbo.Etapa
+            WHERE tipoObra = @tipo AND ISNULL(bcWorksNo, '') = ISNULL(@obra, '')),
           1, SYSUTCDATETIME(), @obra, @task
         )
       `);

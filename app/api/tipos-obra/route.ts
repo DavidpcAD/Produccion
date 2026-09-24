@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 // Torres puede venir en 0/0/0: existe a propósito y se llena a mano.
 //
 // ?conObras=1 agrega las obras de BC que caen en cada tipo según su área de costeo
-// (dbo.Obra + h4.tipo_obra_area_costeo). Se usa para el filtro por obra y
+// (dbo.Obra + dbo.TipoObraAreaCosteo). Se usa para el filtro por obra y
 // para "Traer de BC" — incluye obras que todavía no tienen nada en el catálogo.
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -25,21 +25,21 @@ export async function GET(req: NextRequest) {
     db.request().query<{
       tipo_obra: string; grupos: number; partidas: number; subpartidas: number; obras: number;
     }>(`
-      SELECT g.tipo_obra,
+      SELECT g.tipoObra AS tipo_obra,
              COUNT(DISTINCT g.id)  AS grupos,
-             COUNT(DISTINCT p.id)  AS partidas,
-             COUNT(DISTINCT sp.id) AS subpartidas,
-             COUNT(DISTINCT g.bc_works_no) AS obras
-      FROM h4.grupos_partida g
-      LEFT JOIN h4.partidas p      ON p.grupo_id = g.id AND p.activo = 1
-      LEFT JOIN h4.sub_partidas sp ON sp.partida_id = p.id AND sp.activo = 1
+             COUNT(DISTINCT p.idPartida)  AS partidas,
+             COUNT(DISTINCT sp.idSubPartida) AS subpartidas,
+             COUNT(DISTINCT g.bcWorksNo) AS obras
+      FROM dbo.Etapa g
+      LEFT JOIN dbo.Partida p      ON p.idEtapa = g.id AND p.esActivo = 1
+      LEFT JOIN dbo.SubPartida sp ON sp.idPartida = p.idPartida AND sp.esActivo = 1
       WHERE g.activo = 1
-      GROUP BY g.tipo_obra
+      GROUP BY g.tipoObra
     `),
     // Áreas de costeo de BC que caen en cada tipo: la pantalla de obras las usa
     // para avisar si el área elegida no calza con el tipo que se marcó.
     db.request().query<{ area_costeo: string; tipo_obra: string }>(
-      'SELECT area_costeo, tipo_obra FROM h4.tipo_obra_area_costeo ORDER BY area_costeo',
+      'SELECT areaCosteo AS area_costeo, tipoObra AS tipo_obra FROM dbo.TipoObraAreaCosteo ORDER BY areaCosteo',
     ),
   ]);
 

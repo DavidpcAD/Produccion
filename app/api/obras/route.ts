@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Tipo de obra (O/I/A/F/T): opcional, pero si viene tiene que existir en el
-  // catálogo (h4.tipos_obra). Vacío = se deduce del área de costeo.
+  // catálogo (dbo.TipoObra). Vacío = se deduce del área de costeo.
   const tipoObra = String(body.tipoObra ?? '').trim().toUpperCase();
   if (tipoObra) {
     const t = await getTipoObra(tipoObra).catch(() => null);

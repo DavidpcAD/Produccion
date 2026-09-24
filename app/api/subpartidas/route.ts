@@ -5,14 +5,14 @@ import { logAudit } from '@/lib/audit';
 
 const TIPOS_CASA = new Set(['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea']);
 
-// Crear una subpartida en el catálogo unificado (h4.sub_partidas +
+// Crear una subpartida en el catálogo unificado (dbo.SubPartida +
 // sub_partida_tipos). Amarrada a una partida existente. Solo Super Admin (nivel 4).
 //
 // Las subpartidas son el ÚNICO nivel que no existe en Business Central: BC llega
 // hasta la partida ("Posting"). Este nivel es 100% de SQL.
 //
-// El TIPO DE OBRA sale de la partida (grupos_partida.tipo_obra), no del cliente, y
-// con él las dos reglas que trae h4.tipos_obra:
+// El TIPO DE OBRA sale de la partida (Etapa.tipoObra), no del cliente, y
+// con él las dos reglas que trae dbo.TipoObra:
 //   usa_sprints    -> sprint obligatorio (hoy solo vivienda: es lo que usa Avance).
 //   usa_tipos_casa -> al menos un tipo de casa (hoy solo vivienda).
 // Los demás tipos (infra, administrativas, fábrica, torres) guardan sprint NULL y
@@ -47,12 +47,12 @@ export async function POST(req: NextRequest) {
   try {
     const p = await db.request()
       .input('idP', sql.Int, idPartida)
-      .query(`SELECT p.id, g.tipo_obra AS tipoObra, g.bc_works_no AS bcWorksNo,
-                     t.usa_sprints AS usaSprints, t.usa_tipos_casa AS usaTiposCasa
-              FROM h4.partidas p
-              JOIN h4.grupos_partida g ON g.id = p.grupo_id
-              JOIN h4.tipos_obra t ON t.codigo = g.tipo_obra
-              WHERE p.id = @idP`);
+      .query(`SELECT p.idPartida AS id, g.tipoObra, g.bcWorksNo,
+                     t.usaSprints, t.usaTiposCasa
+              FROM dbo.Partida p
+              JOIN dbo.Etapa g ON g.id = p.idEtapa
+              JOIN dbo.TipoObra t ON t.codigo = g.tipoObra
+              WHERE p.idPartida = @idP`);
     if (p.recordset.length === 0) {
       return NextResponse.json({ error: 'La partida no existe' }, { status: 400 });
     }
@@ -78,11 +78,11 @@ export async function POST(req: NextRequest) {
       .input('cod', sql.VarChar(50), codigo)
       .input('tipo', sql.VarChar(20), tipoObra)
       .input('obra', sql.VarChar(20), bcWorksNo)
-      .query(`SELECT 1 AS ok FROM h4.sub_partidas sp
-              JOIN h4.partidas p ON p.id = sp.partida_id
-              JOIN h4.grupos_partida g ON g.id = p.grupo_id
-              WHERE sp.codigo = @cod AND g.tipo_obra = @tipo
-                AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')`);
+      .query(`SELECT 1 AS ok FROM dbo.SubPartida sp
+              JOIN dbo.Partida p ON p.idPartida = sp.idPartida
+              JOIN dbo.Etapa g ON g.id = p.idEtapa
+              WHERE sp.codigo = @cod AND g.tipoObra = @tipo
+                AND ISNULL(g.bcWorksNo, '') = ISNULL(@obra, '')`);
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe una subpartida con el código "${codigo}"` }, { status: 409 });
     }
@@ -100,9 +100,9 @@ export async function POST(req: NextRequest) {
         .input('descripcion', sql.NVarChar(sql.MAX), descripcion)
         .input('activo', sql.Bit, activo)
         .query(`
-          INSERT INTO h4.sub_partidas
-            (codigo, nombre, partida_id, sprint_numero, es_critica, descripcion, activo)
-          OUTPUT INSERTED.id AS idSubPartida
+          INSERT INTO dbo.SubPartida
+            (codigo, nombre, idPartida, numSprint, esCritica, descripcion, esActivo)
+          OUTPUT INSERTED.idSubPartida AS idSubPartida
           VALUES (@codigo, @nombre, @idPartida, @numSprint, @esCritica, @descripcion, @activo)
         `);
       idSubPartida = ins.recordset[0].idSubPartida;
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         await new sql.Request(tx)
           .input('id', sql.Int, idSubPartida)
           .input('tc', sql.VarChar(20), tc)
-          .query('INSERT INTO h4.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)');
+          .query('INSERT INTO dbo.SubPartidaTipoCasa (idSubPartida, tipoCasa) VALUES (@id, @tc)');
       }
       await tx.commit();
     } catch (e) {

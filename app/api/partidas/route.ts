@@ -7,7 +7,7 @@ import { getTipoObra, listarTiposObra } from '@/lib/partidas/tipos-obra';
 export const dynamic = 'force-dynamic';
 
 // Catálogo ÚNICO de partidas y subpartidas = el núcleo de ObrasControl
-// (h4.grupos_partida → partidas → sub_partidas + sub_partida_tipos), el
+// (dbo.Etapa → partidas → sub_partidas + sub_partida_tipos), el
 // mismo que usa Avance. Antes esta pantalla leía dbo.Etapa/Partida/SubPartida
 // (catálogo duplicado); se unificó a pro_obc — mismos IDs, sin migrar datos.
 // Se exponen con alias a la forma que ya espera el frontend (idEtapa/idPartida/
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  // El catálogo está partido por TIPO DE OBRA (h4.tipos_obra): VIVIENDA
+  // El catálogo está partido por TIPO DE OBRA (dbo.TipoObra): VIVIENDA
   // (construcción), VIVIENDA_GEN, INFRA, ADMIN, FABRICA, TORRES y POSTVENTA.
   // Sin `tipo` se devuelve VIVIENDA para no
   // cambiarle nada a quien ya consumía este endpoint.
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const filtroObra = obra ? 'AND (g.bc_works_no IS NULL OR g.bc_works_no = @obra)' : '';
+  const filtroObra = obra ? 'AND (g.bcWorksNo IS NULL OR g.bcWorksNo = @obra)' : '';
   const conObra = <T extends sql.Request>(r: T): T => {
     if (obra) r.input('obra', sql.VarChar(20), obra);
     return r;
@@ -46,46 +46,46 @@ export async function GET(req: NextRequest) {
   const db = await getDb();
   const [etapas, partidas, subpartidas, obras] = await Promise.all([
     conObra(db.request().input('tipo', sql.VarChar(20), tipo.codigo)).query(`
-      SELECT g.id AS idEtapa, g.codigo, g.nombre, g.tipo_obra AS tipoObra,
-             g.orden, g.bc_task_no AS bcTaskNo, g.bc_works_no AS bcWorksNo
-      FROM h4.grupos_partida g
-      WHERE g.tipo_obra = @tipo AND g.activo = 1 ${filtroObra}
-      ORDER BY g.bc_works_no, g.orden, g.codigo
+      SELECT g.id AS idEtapa, g.codigo, g.nombre, g.tipoObra,
+             g.orden, g.bcTaskNo, g.bcWorksNo
+      FROM dbo.Etapa g
+      WHERE g.tipoObra = @tipo AND g.activo = 1 ${filtroObra}
+      ORDER BY g.bcWorksNo, g.orden, g.codigo
     `),
     conObra(db.request().input('tipo', sql.VarChar(20), tipo.codigo)).query(`
-      SELECT p.id AS idPartida, p.codigo, p.nombre, p.grupo_id AS idEtapa, p.activo,
-             p.orden, p.bc_task_no AS bcTaskNo
-      FROM h4.partidas p
-      JOIN h4.grupos_partida g ON g.id = p.grupo_id
-      WHERE g.tipo_obra = @tipo AND g.activo = 1 AND p.activo = 1 ${filtroObra}
+      SELECT p.idPartida, p.codigo, p.nombre, p.idEtapa, p.esActivo AS activo,
+             p.orden, p.bcTaskNo
+      FROM dbo.Partida p
+      JOIN dbo.Etapa g ON g.id = p.idEtapa
+      WHERE g.tipoObra = @tipo AND g.activo = 1 AND p.esActivo = 1 ${filtroObra}
       ORDER BY p.orden, p.codigo
     `),
     conObra(db.request().input('tipo', sql.VarChar(20), tipo.codigo)).query(`
       SELECT
-        sp.id AS idSubPartida, sp.codigo, sp.nombre, sp.partida_id AS idPartida,
-        sp.sprint_numero AS numSprint, sp.es_critica AS esCritica, sp.descripcion,
-        sp.activo,
+        sp.idSubPartida, sp.codigo, sp.nombre, sp.idPartida,
+        sp.numSprint, sp.esCritica, sp.descripcion,
+        sp.esActivo AS activo,
         STUFF((
-          SELECT ',' + t.tipo_casa
-          FROM h4.sub_partida_tipos t
-          WHERE t.sub_partida_id = sp.id
-          ORDER BY t.tipo_casa
+          SELECT ',' + t.tipoCasa
+          FROM dbo.SubPartidaTipoCasa t
+          WHERE t.idSubPartida = sp.idSubPartida
+          ORDER BY t.tipoCasa
           FOR XML PATH('')
         ), 1, 1, '') AS tiposCasaStr
-      FROM h4.sub_partidas sp
-      JOIN h4.partidas p ON p.id = sp.partida_id
-      JOIN h4.grupos_partida g ON g.id = p.grupo_id
-      WHERE g.tipo_obra = @tipo AND g.activo = 1 ${filtroObra}
+      FROM dbo.SubPartida sp
+      JOIN dbo.Partida p ON p.idPartida = sp.idPartida
+      JOIN dbo.Etapa g ON g.id = p.idEtapa
+      WHERE g.tipoObra = @tipo AND g.activo = 1 ${filtroObra}
       ORDER BY sp.codigo
     `),
     // Obras de BC que tienen estructura propia en este tipo (para el filtro de la
     // pantalla). En vivienda/infra viene vacío: ahí el catálogo es compartido.
     db.request().input('tipo', sql.VarChar(20), tipo.codigo).query(`
-      SELECT g.bc_works_no AS worksNo, COUNT(*) AS grupos
-      FROM h4.grupos_partida g
-      WHERE g.tipo_obra = @tipo AND g.activo = 1 AND g.bc_works_no IS NOT NULL
-      GROUP BY g.bc_works_no
-      ORDER BY g.bc_works_no
+      SELECT g.bcWorksNo AS worksNo, COUNT(*) AS grupos
+      FROM dbo.Etapa g
+      WHERE g.tipoObra = @tipo AND g.activo = 1 AND g.bcWorksNo IS NOT NULL
+      GROUP BY g.bcWorksNo
+      ORDER BY g.bcWorksNo
     `),
   ]);
 
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
   try {
     const e = await db.request()
       .input('idE', sql.Int, idEtapa)
-      .query('SELECT id, tipo_obra, bc_works_no FROM h4.grupos_partida WHERE id = @idE');
+      .query('SELECT id, tipoObra AS tipo_obra, bcWorksNo AS bc_works_no FROM dbo.Etapa WHERE id = @idE');
     if (e.recordset.length === 0) {
       return NextResponse.json({ error: 'La etapa no existe' }, { status: 400 });
     }
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     const dup = await db.request()
       .input('cod', sql.VarChar(50), codigo)
       .input('idE', sql.Int, idEtapa)
-      .query('SELECT 1 AS ok FROM h4.partidas WHERE codigo = @cod AND grupo_id = @idE');
+      .query('SELECT 1 AS ok FROM dbo.Partida WHERE codigo = @cod AND idEtapa = @idE');
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe una partida con el código "${codigo}" en esta etapa` }, { status: 409 });
     }
@@ -159,12 +159,15 @@ export async function POST(req: NextRequest) {
       .input('idEtapa', sql.Int, idEtapa)
       .input('bcTaskNo', sql.VarChar(50), bcTaskNo)
       .query(`
-        INSERT INTO h4.partidas (codigo, nombre, grupo_id, orden, activo, bc_task_no)
-        OUTPUT INSERTED.id AS idPartida
+        INSERT INTO dbo.Partida (codigo, nombre, idEtapa, orden, esActivo, bcTaskNo, esPosting)
+        OUTPUT INSERTED.idPartida AS idPartida
         VALUES (
           @codigo, @nombre, @idEtapa,
-          (SELECT ISNULL(MAX(orden), 0) + 1 FROM h4.partidas WHERE grupo_id = @idEtapa),
-          1, @bcTaskNo
+          (SELECT ISNULL(MAX(orden), 0) + 1 FROM dbo.Partida WHERE idEtapa = @idEtapa),
+          1, @bcTaskNo,
+          -- esPosting es lo que filtran las vistas de Boletas: solo las casas (catálogo
+          -- compartido de vivienda construcción).
+          (SELECT CASE WHEN e.tipoObra = 'VIVIENDA' AND e.bcWorksNo IS NULL THEN 1 ELSE 0 END FROM dbo.Etapa e WHERE e.id = @idEtapa)
         )
       `);
     const idPartida = ins.recordset[0].idPartida;

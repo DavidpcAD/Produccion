@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         SELECT cs.idSubPartida, c.Nombre AS cuadrilla, sp.codigo AS subCodigo
         FROM dbo.CuadrillaSubPartida cs
         JOIN dbo.Cuadrilla c ON c.IDCuadrilla = cs.IDCuadrilla AND c.Activo = 1
-        JOIN h4.sub_partidas sp ON sp.id = cs.idSubPartida
+        JOIN dbo.SubPartida sp ON sp.idSubPartida = cs.idSubPartida
         WHERE cs.idProyecto = @idProyecto AND (@excluir = 0 OR cs.IDCuadrilla <> @excluir)
       `);
     return NextResponse.json({ data: res.recordset });

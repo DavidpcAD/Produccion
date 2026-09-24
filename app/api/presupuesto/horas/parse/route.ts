@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
     db.request().query<{ codigo: string; nombre: string; partida: string }>(
       `SELECT sp.codigo, sp.nombre, (p.codigo + ' ' + p.nombre) AS partida
        FROM dbo.SubPartida sp JOIN dbo.Partida p ON p.idPartida = sp.idPartida
-       WHERE sp.esActivo = 1
+       JOIN dbo.Etapa e ON e.id = p.idEtapa
+       WHERE sp.esActivo = 1 AND e.tipoObra = 'VIVIENDA' AND e.bcWorksNo IS NULL
        ORDER BY sp.codigo`),
   ]);
   const obraByNum = new Map(obrasRes.recordset.map((o) => [o.numeroObra.toLowerCase(), o]));

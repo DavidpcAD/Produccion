@@ -83,7 +83,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 /**
  * Detalle desde el snapshot ETL (pro_bi.fact_presupuesto), enriquecido con el
- * catálogo de partidas (nombre / grupo / orden) de h4 — la misma fuente que
+ * catálogo de partidas (nombre / grupo / orden) de dbo — la misma fuente que
  * usan los reportes y AD Obras Control ("Detalle del presupuesto").
  */
 async function detalleETL(worksNo: string): Promise<{
@@ -105,8 +105,8 @@ async function detalleETL(worksNo: string): Promise<{
       GROUP BY fp.task_no`),
     db.request().query<{ codigo: string; nombre: string; grupo: string | null; grupoOrden: number | null; partidaOrden: number | null }>(`
       SELECT p.codigo, p.nombre, g.nombre AS grupo, g.orden AS grupoOrden, p.orden AS partidaOrden
-      FROM h4.partidas p
-      LEFT JOIN h4.grupos_partida g ON g.id = p.grupo_id`),
+      FROM dbo.Partida p
+      LEFT JOIN dbo.Etapa g ON g.id = p.idEtapa`),
   ]);
   if (lineas.recordset.length === 0) return null;
 

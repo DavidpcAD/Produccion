@@ -2,7 +2,7 @@ import 'server-only';
 import { getDb, sql } from '@/lib/db';
 
 /**
- * TIPOS DE OBRA del catálogo (`h4.tipos_obra`). Son siete y los define el
+ * TIPOS DE OBRA del catálogo (`dbo.TipoObra`). Son siete y los define el
  * negocio, no el código:
  *
  *   C = Vivienda Construcción · G = Vivienda General · I = Infraestructura
@@ -15,15 +15,15 @@ import { getDb, sql } from '@/lib/db';
  *
  * Cada tipo tiene su propio catálogo de tres niveles:
  *
- *   grupo (h4.grupos_partida)  ← capítulo "Total" de la obra en BC
- *     partida (h4.partidas)    ← partida "Posting" de la obra en BC
- *       subpartida (h4.sub_partidas)  ← SOLO SQL, BC no tiene este nivel
+ *   grupo (dbo.Etapa)  ← capítulo "Total" de la obra en BC
+ *     partida (dbo.Partida)    ← partida "Posting" de la obra en BC
+ *       subpartida (dbo.SubPartida)  ← SOLO SQL, BC no tiene este nivel
  *
  * El rótulo del nivel 1 cambia por tipo (Etapa en vivienda, Sistema en infra,
  * Área en administrativas, Proceso en fábrica, Torre en torres) y vive en la
  * tabla — así se puede cambiar sin deploy.
  *
- * CATÁLOGO COMPARTIDO vs POR OBRA (`grupos_partida.bc_works_no`):
+ * CATÁLOGO COMPARTIDO vs POR OBRA (`Etapa.bcWorksNo`):
  *   NULL      → el grupo lo comparten TODAS las obras del tipo. Es como se usan
  *               vivienda e infra: un catálogo y muchas obras.
  *   con valor → el grupo es de ESA obra de BC. Es la realidad de administrativas
@@ -118,10 +118,10 @@ function mapTipo(r: FilaTipo): TipoObra {
 export async function listarTiposObra(): Promise<TipoObra[]> {
   const db = await getDb();
   const r = await db.request().query<FilaTipo>(`
-    SELECT codigo, letra, nombre, termino_grupo, termino_grupo_pl, genero,
-           usa_sprints, usa_tipos_casa, orden, activo
-    FROM h4.tipos_obra
-    WHERE activo = 1
+    SELECT codigo, letra, nombre, terminoGrupo AS termino_grupo, terminoGrupoPl AS termino_grupo_pl, genero,
+           usaSprints AS usa_sprints, usaTiposCasa AS usa_tipos_casa, orden, esActivo AS activo
+    FROM dbo.TipoObra
+    WHERE esActivo = 1
     ORDER BY orden, codigo
   `);
   return r.recordset.map(mapTipo);
@@ -133,9 +133,9 @@ export async function getTipoObra(codigo: string): Promise<TipoObra | null> {
   const r = await db.request()
     .input('cod', sql.VarChar(20), String(codigo ?? '').trim().toUpperCase())
     .query<FilaTipo>(`
-      SELECT codigo, letra, nombre, termino_grupo, termino_grupo_pl, genero,
-             usa_sprints, usa_tipos_casa, orden, activo
-      FROM h4.tipos_obra WHERE codigo = @cod
+      SELECT codigo, letra, nombre, terminoGrupo AS termino_grupo, terminoGrupoPl AS termino_grupo_pl, genero,
+             usaSprints AS usa_sprints, usaTiposCasa AS usa_tipos_casa, orden, esActivo AS activo
+      FROM dbo.TipoObra WHERE codigo = @cod
     `);
   return r.recordset[0] ? mapTipo(r.recordset[0]) : null;
 }
@@ -148,10 +148,10 @@ export async function getTipoObraDeGrupo(idGrupo: number): Promise<
   const r = await db.request()
     .input('id', sql.Int, idGrupo)
     .query<FilaTipo & { bc_works_no: string | null }>(`
-      SELECT t.codigo, t.letra, t.nombre, t.termino_grupo, t.termino_grupo_pl, t.genero,
-             t.usa_sprints, t.usa_tipos_casa, t.orden, t.activo, g.bc_works_no
-      FROM h4.grupos_partida g
-      JOIN h4.tipos_obra t ON t.codigo = g.tipo_obra
+      SELECT t.codigo, t.letra, t.nombre, t.terminoGrupo AS termino_grupo, t.terminoGrupoPl AS termino_grupo_pl, t.genero,
+             t.usaSprints AS usa_sprints, t.usaTiposCasa AS usa_tipos_casa, t.orden, t.esActivo AS activo, g.bcWorksNo AS bc_works_no
+      FROM dbo.Etapa g
+      JOIN dbo.TipoObra t ON t.codigo = g.tipoObra
       WHERE g.id = @id
     `);
   const f = r.recordset[0];
@@ -160,7 +160,7 @@ export async function getTipoObraDeGrupo(idGrupo: number): Promise<
 
 /**
  * De qué tipo es una obra según su ÁREA DE COSTEO de BC
- * (`h4.tipo_obra_area_costeo`). Lo que no esté mapeado cae en ADMIN, que es
+ * (`dbo.TipoObraAreaCosteo`). Lo que no esté mapeado cae en ADMIN, que es
  * donde viven los centros de costo de BC.
  */
 export async function tipoObraDeAreaCosteo(areaCosteo: string | null | undefined): Promise<string> {
@@ -170,7 +170,7 @@ export async function tipoObraDeAreaCosteo(areaCosteo: string | null | undefined
   const r = await db.request()
     .input('area', sql.VarChar(50), area)
     .query<{ tipo_obra: string }>(
-      'SELECT tipo_obra FROM h4.tipo_obra_area_costeo WHERE area_costeo = @area',
+      'SELECT tipoObra AS tipo_obra FROM dbo.TipoObraAreaCosteo WHERE areaCosteo = @area',
     );
   return r.recordset[0]?.tipo_obra ?? TIPO_POR_DEFECTO;
 }
@@ -203,7 +203,7 @@ export async function tipoObraDeObra(numeroObra: string): Promise<
 export async function mapaAreaCosteoTipo(): Promise<Map<string, string>> {
   const db = await getDb();
   const r = await db.request().query<{ area_costeo: string; tipo_obra: string }>(
-    'SELECT area_costeo, tipo_obra FROM h4.tipo_obra_area_costeo',
+    'SELECT areaCosteo AS area_costeo, tipoObra AS tipo_obra FROM dbo.TipoObraAreaCosteo',
   );
   return new Map(r.recordset.map((f) => [f.area_costeo.trim().toUpperCase(), f.tipo_obra]));
 }

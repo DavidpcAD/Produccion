@@ -3,7 +3,7 @@ import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 
-// Editar / desactivar una partida del catálogo unificado (h4.partidas).
+// Editar / desactivar una partida del catálogo unificado (dbo.Partida).
 // Solo Super Admin (nivel 4).
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       .input('cod', sql.VarChar(50), codigo)
       .input('id', sql.Int, idPartida)
       .input('idE', sql.Int, idEtapa)
-      .query('SELECT 1 AS ok FROM h4.partidas WHERE codigo = @cod AND id <> @id AND grupo_id = @idE');
+      .query('SELECT 1 AS ok FROM dbo.Partida WHERE codigo = @cod AND idPartida <> @id AND idEtapa = @idE');
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe otra partida con el código "${codigo}" en esa etapa` }, { status: 409 });
     }
@@ -48,10 +48,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       .input('nombre', sql.NVarChar(150), nombre)
       .input('idEtapa', sql.Int, idEtapa)
       .query(`
-        UPDATE h4.partidas
-        SET codigo = @codigo, nombre = @nombre, grupo_id = @idEtapa,
-            bc_task_no = CASE WHEN bc_task_no IS NULL OR bc_task_no = codigo THEN @codigo ELSE bc_task_no END
-        WHERE id = @id
+        UPDATE dbo.Partida
+        SET codigo = @codigo, nombre = @nombre, idEtapa = @idEtapa,
+            bcTaskNo = CASE WHEN bcTaskNo IS NULL OR bcTaskNo = codigo THEN @codigo ELSE bcTaskNo END
+        WHERE idPartida = @id
       `);
     if (upd.rowsAffected[0] === 0) {
       return NextResponse.json({ error: 'La partida no existe' }, { status: 404 });
@@ -83,13 +83,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     // No permitir desactivar si tiene subpartidas activas.
     const subs = await db.request()
       .input('id', sql.Int, idPartida)
-      .query('SELECT COUNT(*) AS n FROM h4.sub_partidas WHERE partida_id = @id AND activo = 1');
+      .query('SELECT COUNT(*) AS n FROM dbo.SubPartida WHERE idPartida = @id AND esActivo = 1');
     if (subs.recordset[0].n > 0) {
       return NextResponse.json({ error: 'La partida tiene subpartidas activas. Borralas o movelas primero.' }, { status: 409 });
     }
     const upd = await db.request()
       .input('id', sql.Int, idPartida)
-      .query('UPDATE h4.partidas SET activo = 0 WHERE id = @id AND activo = 1');
+      .query('UPDATE dbo.Partida SET esActivo = 0 WHERE idPartida = @id AND esActivo = 1');
     if (upd.rowsAffected[0] === 0) {
       return NextResponse.json({ error: 'La partida no existe o ya está inactiva' }, { status: 404 });
     }

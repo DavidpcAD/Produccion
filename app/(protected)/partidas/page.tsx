@@ -127,7 +127,7 @@ export default function PartidasPage() {
   const termGrupoLow = termGrupo.toLowerCase();
   const termGrupoPlural = (tipo?.terminoGrupoPlural ?? 'Etapas').toLowerCase();
   // Concordancia del rótulo del nivel 1: "Nueva etapa" / "Nuevo proceso",
-  // "esta área" / "este sistema" (h4.tipos_obra.genero).
+  // "esta área" / "este sistema" (dbo.TipoObra.genero).
   const fem = (tipo?.genero ?? 'F') === 'F';
   const nuevoGrupo = `${fem ? 'Nueva' : 'Nuevo'} ${termGrupoLow}`;
   const elGrupo = `${fem ? 'la' : 'el'} ${termGrupoLow}`;
@@ -211,7 +211,7 @@ export default function PartidasPage() {
   }, []);
 
   // Las pestañas de arriba: una por familia (Obra Vivienda) y una por cada tipo que
-  // no está en ninguna. El orden es el de h4.tipos_obra.
+  // no está en ninguna. El orden es el de dbo.TipoObra.
   const pestanas = useMemo(() => {
     const out: { key: string; letra: string; nombre: string; miembros: TipoObra[] }[] = [];
     const puestas = new Set<string>();
@@ -606,7 +606,7 @@ export default function PartidasPage() {
           vez de cuatro bloques sueltos y una tarjeta por obra. */}
       <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-4 pt-3 pb-3 border-b border-ds-gray-200 space-y-3">
-          {/* Tipos de obra (h4.tipos_obra), agrupados por familia: O · I · A · F · T · P.
+          {/* Tipos de obra (dbo.TipoObra), agrupados por familia: O · I · A · F · T · P.
               Filtro, no una segunda barra de pestañas: sin caja y sin número en los
               inactivos. Vivienda abre su propia barra debajo. */}
           <div className="flex flex-wrap items-center gap-1">

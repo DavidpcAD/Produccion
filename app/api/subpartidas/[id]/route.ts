@@ -5,11 +5,11 @@ import { logAudit } from '@/lib/audit';
 
 const TIPOS_CASA = new Set(['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea']);
 
-// Editar una subpartida del catálogo unificado (h4.sub_partidas +
+// Editar una subpartida del catálogo unificado (dbo.SubPartida +
 // sub_partida_tipos). Solo Super Admin (nivel 4).
 //
 // Como en el POST, las reglas salen del tipo de obra de la partida a la que ya
-// está amarrada (h4.tipos_obra): usa_sprints exige sprint y usa_tipos_casa
+// está amarrada (dbo.TipoObra): usa_sprints exige sprint y usa_tipos_casa
 // exige al menos un tipo de casa —hoy solo vivienda—; los demás tipos (infra,
 // administrativas, fábrica, torres) los guardan vacíos.
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -41,13 +41,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const act = await db.request()
       .input('id', sql.Int, idSubPartida)
-      .query(`SELECT g.tipo_obra AS tipoObra, g.bc_works_no AS bcWorksNo,
-                     t.usa_sprints AS usaSprints, t.usa_tipos_casa AS usaTiposCasa
-              FROM h4.sub_partidas sp
-              JOIN h4.partidas p ON p.id = sp.partida_id
-              JOIN h4.grupos_partida g ON g.id = p.grupo_id
-              JOIN h4.tipos_obra t ON t.codigo = g.tipo_obra
-              WHERE sp.id = @id`);
+      .query(`SELECT g.tipoObra, g.bcWorksNo,
+                     t.usaSprints, t.usaTiposCasa
+              FROM dbo.SubPartida sp
+              JOIN dbo.Partida p ON p.idPartida = sp.idPartida
+              JOIN dbo.Etapa g ON g.id = p.idEtapa
+              JOIN dbo.TipoObra t ON t.codigo = g.tipoObra
+              WHERE sp.idSubPartida = @id`);
     if (act.recordset.length === 0) {
       return NextResponse.json({ error: 'La subpartida no existe' }, { status: 404 });
     }
@@ -72,11 +72,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       .input('id', sql.Int, idSubPartida)
       .input('tipo', sql.VarChar(20), tipoObra)
       .input('obra', sql.VarChar(20), bcWorksNo)
-      .query(`SELECT 1 AS ok FROM h4.sub_partidas sp
-              JOIN h4.partidas p ON p.id = sp.partida_id
-              JOIN h4.grupos_partida g ON g.id = p.grupo_id
-              WHERE sp.codigo = @cod AND sp.id <> @id AND g.tipo_obra = @tipo
-                AND ISNULL(g.bc_works_no, '') = ISNULL(@obra, '')`);
+      .query(`SELECT 1 AS ok FROM dbo.SubPartida sp
+              JOIN dbo.Partida p ON p.idPartida = sp.idPartida
+              JOIN dbo.Etapa g ON g.id = p.idEtapa
+              WHERE sp.codigo = @cod AND sp.idSubPartida <> @id AND g.tipoObra = @tipo
+                AND ISNULL(g.bcWorksNo, '') = ISNULL(@obra, '')`);
     if (dup.recordset.length > 0) {
       return NextResponse.json({ error: `Ya existe otra subpartida con el código "${codigo}"` }, { status: 409 });
     }
@@ -93,10 +93,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         .input('descripcion', sql.NVarChar(sql.MAX), descripcion)
         .input('activo', sql.Bit, activo)
         .query(`
-          UPDATE h4.sub_partidas
-          SET codigo = @codigo, nombre = @nombre, sprint_numero = @numSprint,
-              es_critica = @esCritica, descripcion = @descripcion, activo = @activo
-          WHERE id = @id
+          UPDATE dbo.SubPartida
+          SET codigo = @codigo, nombre = @nombre, numSprint = @numSprint,
+              esCritica = @esCritica, descripcion = @descripcion, esActivo = @activo
+          WHERE idSubPartida = @id
         `);
       if (upd.rowsAffected[0] === 0) {
         await tx.rollback();
@@ -104,12 +104,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }
       // Reemplazar tipos de casa.
       await new sql.Request(tx).input('id', sql.Int, idSubPartida)
-        .query('DELETE FROM h4.sub_partida_tipos WHERE sub_partida_id = @id');
+        .query('DELETE FROM dbo.SubPartidaTipoCasa WHERE idSubPartida = @id');
       for (const tc of tiposGuardados) {
         await new sql.Request(tx)
           .input('id', sql.Int, idSubPartida)
           .input('tc', sql.VarChar(20), tc)
-          .query('INSERT INTO h4.sub_partida_tipos (sub_partida_id, tipo_casa) VALUES (@id, @tc)');
+          .query('INSERT INTO dbo.SubPartidaTipoCasa (idSubPartida, tipoCasa) VALUES (@id, @tc)');
       }
       await tx.commit();
     } catch (e) {
@@ -142,7 +142,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     const upd = await db.request()
       .input('id', sql.Int, idSubPartida)
-      .query('UPDATE h4.sub_partidas SET activo = 0 WHERE id = @id AND activo = 1');
+      .query('UPDATE dbo.SubPartida SET esActivo = 0 WHERE idSubPartida = @id AND esActivo = 1');
     if (upd.rowsAffected[0] === 0) {
       return NextResponse.json({ error: 'La subpartida no existe o ya está inactiva' }, { status: 404 });
     }
