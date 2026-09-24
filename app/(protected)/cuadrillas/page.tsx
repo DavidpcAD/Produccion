@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
@@ -17,7 +17,10 @@ import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 interface ObraLite { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null; }
 interface SubLite { idSubPartida: number; codigo: string; nombre: string; idPartida: number; partidaCodigo: string | null; partidaNombre: string | null; idProyecto?: number | null; }
-interface PartidaLite { idPartida: number; codigo: string; nombre: string; }
+interface PartidaLite { idPartida: number; codigo: string; nombre: string; idEtapa?: number | null; }
+interface EtapaLite { idEtapa: number; codigo: string; nombre: string; tipoObra: string; bcWorksNo: string | null; }
+interface TipoLite { codigo: string; letra: string; nombre: string; terminoGrupo: string; }
+interface CatalogoTipo { etapas: EtapaLite[]; partidas: PartidaLite[]; subpartidas: SubLite[]; }
 interface ProyectoLite { idProyecto: number; nombre: string; }
 // Asignación de encargado a una subpartida (tabla dbo.EncargadoPartida).
 // Cada subpartida tiene UN solo encargado; un encargado puede tomar varias.
@@ -158,22 +161,48 @@ function ObrasPicker({ obras, selected, onChange }: {
   );
 }
 
-// ─── Selector de SUBPARTIDAS: filtro por partida + buscador + checkboxes ──────
-function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas }: {
-  partidas: PartidaLite[]; subpartidas: SubLite[]; selected: number[]; onChange: (ids: number[]) => void;
-  ocupadas?: Map<number, string>;   // idSubPartida -> nombre de la cuadrilla que ya la tiene (en este proyecto)
+// ─── Selector de SUBPARTIDAS en cascada: tipo de obra → etapa/área → partida ──
+// Así se le indica a la cuadrilla QUÉ puede trabajar recorriendo el catálogo como
+// está organizado: primero el tipo (vivienda, infra, fábrica…), después la etapa
+// (o área/sistema/proceso, según el tipo), después la partida y ahí sus subpartidas.
+function SubpartidasPicker({ tipos, catalogos, cargandoTipos, onCargarTipo, subsIndex, selected, onChange, ocupadas }: {
+  tipos: TipoLite[];
+  catalogos: Record<string, CatalogoTipo>;
+  cargandoTipos: Set<string>;
+  onCargarTipo: (codigo: string) => void;
+  subsIndex: Map<number, { codigo: string; nombre: string }>;
+  selected: number[]; onChange: (ids: number[]) => void;
+  ocupadas?: Map<number, string>;   // idSubPartida -> cuadrilla que ya la tiene (en este proyecto)
 }) {
   const [q, setQ] = useState('');
-  const [filtroPartida, setFiltroPartida] = useState('');
+  const [tipoSel, setTipoSel] = useState('VIVIENDA');
+  const [etapaSel, setEtapaSel] = useState('');
+  const [partidaSel, setPartidaSel] = useState('');
   const term = q.trim().toLowerCase();
-  const filtered = subpartidas.filter(s => {
-    if (filtroPartida && String(s.idPartida) !== filtroPartida) return false;
-    if (term && !coincideBusqueda(`${s.codigo} ${s.nombre}`, term)) return false;
+
+  const cat = catalogos[tipoSel];
+  const cargando = cargandoTipos.has(tipoSel);
+  const tipoActual = tipos.find(t => t.codigo === tipoSel);
+  const termGrupo = tipoActual?.terminoGrupo ?? 'Etapa';
+
+  const cambiarTipo = (t: string) => { setTipoSel(t); setEtapaSel(''); setPartidaSel(''); if (t) onCargarTipo(t); };
+  const cambiarEtapa = (e: string) => { setEtapaSel(e); setPartidaSel(''); };
+
+  const partidasDeEtapa = (cat?.partidas ?? []).filter(pa => !etapaSel || String(pa.idEtapa ?? '') === etapaSel);
+  const idsPartidasVisibles = new Set(partidasDeEtapa.map(pa => pa.idPartida));
+
+  // La lista pide al menos la etapa (o una búsqueda): fábrica trae 5.800 subpartidas
+  // y volcarlas de una no ayuda a nadie.
+  const listaActiva = !!(etapaSel || partidaSel || term);
+  const filtered = !cat || !listaActiva ? [] : cat.subpartidas.filter(sp => {
+    if (partidaSel && String(sp.idPartida) !== partidaSel) return false;
+    if (!partidaSel && etapaSel && !idsPartidasVisibles.has(sp.idPartida)) return false;
+    if (term && !coincideBusqueda(`${sp.codigo} ${sp.nombre}`, term)) return false;
     return true;
   });
+
   const sel = new Set(selected);
   const toggle = (id: number) => onChange(sel.has(id) ? selected.filter(x => x !== id) : [...selected, id]);
-  const selSubs = subpartidas.filter(s => sel.has(s.idSubPartida));
 
   return (
     <div className="rounded-ds-lg border border-ds-gray-200 p-3.5 space-y-2.5">
@@ -183,7 +212,7 @@ function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas
         </div>
         <div className="flex-1 min-w-0">
           <label className="text-sm font-bold text-ds-ink">Subpartidas <span className="text-ds-red">*</span></label>
-          <p className="text-xs text-ds-gray-400">Marcá las que ejecuta. Podés filtrar por partida.</p>
+          <p className="text-xs text-ds-gray-400">Elegí tipo de obra → {termGrupo.toLowerCase()} → partida, y marcá las que ejecuta.</p>
         </div>
         {selected.length > 0 && (
           <span className="text-[11px] font-bold rounded-full px-2 py-0.5 shrink-0 bg-brand text-black">
@@ -191,12 +220,13 @@ function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas
           </span>
         )}
       </div>
-      {selSubs.length > 0 && (
+      {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {selSubs.map(s => (
-            <span key={s.idSubPartida} className="inline-flex items-center gap-1 rounded-full bg-black text-white text-xs font-semibold pl-2.5 pr-1.5 py-1">
-              {s.codigo}
-              <button type="button" onClick={() => toggle(s.idSubPartida)} aria-label="Quitar" title="Quitar"
+          {selected.map(id => (
+            <span key={id} className="inline-flex items-center gap-1 rounded-full bg-black text-white text-xs font-semibold pl-2.5 pr-1.5 py-1"
+              title={subsIndex.get(id)?.nombre ?? ''}>
+              {subsIndex.get(id)?.codigo ?? `#${id}`}
+              <button type="button" onClick={() => toggle(id)} aria-label="Quitar" title="Quitar"
                 className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-ds-surface/20 leading-none">
                 ×
               </button>
@@ -204,41 +234,60 @@ function SubpartidasPicker({ partidas, subpartidas, selected, onChange, ocupadas
           ))}
         </div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <Combobox value={filtroPartida} onChange={setFiltroPartida} placeholder="Filtrar por partida"
-          options={[{ value: '', label: 'Todas las partidas' }, ...partidas.map(p => ({
-            value: String(p.idPartida), label: `${p.codigo} · ${p.nombre}`,
-            parts: [{ text: p.codigo, weight: 'bold' as const }, { text: p.nombre, weight: 'light' as const }],
+      {/* La cascada: tipo → etapa/área/sistema/proceso → partida */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <Combobox value={tipoSel} onChange={cambiarTipo} placeholder="Tipo de obra"
+          options={tipos.map(t => ({
+            value: t.codigo, label: `${t.letra} · ${t.nombre}`,
+            parts: [{ text: t.letra, weight: 'bold' as const }, { text: t.nombre, weight: 'light' as const }],
+          }))} />
+        <Combobox value={etapaSel} onChange={cambiarEtapa} placeholder={cargando ? 'Cargando…' : termGrupo}
+          options={[{ value: '', label: `Todas (${termGrupo.toLowerCase()})` }, ...(cat?.etapas ?? []).map(e => ({
+            value: String(e.idEtapa),
+            label: `${e.bcWorksNo ? `${e.bcWorksNo} — ` : ''}${e.nombre}`,
+            parts: [{ text: e.bcWorksNo ?? e.codigo, weight: 'bold' as const }, { text: e.nombre, weight: 'light' as const }],
+            search: `${e.bcWorksNo ?? ''} ${e.codigo} ${e.nombre}`,
           }))]} />
-        <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar subpartida…"
-          leftIcon={<Icon name="search" size="sm" color="currentColor" className="text-ds-gray-400" />} />
+        <Combobox value={partidaSel} onChange={setPartidaSel} placeholder="Partida"
+          options={[{ value: '', label: 'Todas las partidas' }, ...partidasDeEtapa.map(pa => ({
+            value: String(pa.idPartida), label: `${pa.codigo} · ${pa.nombre}`,
+            parts: [{ text: pa.codigo, weight: 'bold' as const }, { text: pa.nombre, weight: 'light' as const }],
+          }))]} />
       </div>
+      <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar subpartida…"
+        leftIcon={<Icon name="search" size="sm" color="currentColor" className="text-ds-gray-400" />} />
       <div className="max-h-52 overflow-y-auto rounded-ds border border-ds-gray-200 divide-y divide-ds-gray-100 bg-ds-surface">
-        {filtered.length === 0 ? (
+        {cargando ? (
+          <p className="px-3 py-5 text-sm text-ds-gray-400 text-center">Cargando el catálogo…</p>
+        ) : !listaActiva ? (
+          <p className="px-3 py-5 text-sm text-ds-gray-400 text-center">
+            Elegí {termGrupo.toLowerCase()} y partida (o buscá) para ver las subpartidas.
+          </p>
+        ) : filtered.length === 0 ? (
           <p className="px-3 py-5 text-sm text-ds-gray-400 text-center">Sin subpartidas</p>
-        ) : filtered.slice(0, 400).map(s => {
-          const on = sel.has(s.idSubPartida);
-          const ocupadaPor = !on ? ocupadas?.get(s.idSubPartida) : undefined;
+        ) : filtered.slice(0, 400).map(sp => {
+          const on = sel.has(sp.idSubPartida);
+          const ocupadaPor = !on ? ocupadas?.get(sp.idSubPartida) : undefined;
           if (ocupadaPor) {
             return (
-              <div key={s.idSubPartida} title={`Ya tomada por ${ocupadaPor} en este proyecto`}
+              <div key={sp.idSubPartida} title={`Ya tomada por ${ocupadaPor} en este proyecto`}
                 className="w-full flex items-center gap-3 px-3 py-2 bg-ds-gray-100/60 cursor-not-allowed">
                 <span className="w-4 h-4 rounded border-2 border-ds-gray-200 bg-ds-gray-100 flex items-center justify-center shrink-0 text-ds-gray-300 text-[11px] leading-none">×</span>
-                <span className="text-sm text-ds-gray-400 font-semibold shrink-0 w-16">{s.codigo}</span>
-                <span className="text-xs text-ds-gray-400 truncate flex-1">{s.nombre}</span>
+                <span className="text-sm text-ds-gray-400 font-semibold shrink-0 w-16">{sp.codigo}</span>
+                <span className="text-xs text-ds-gray-400 truncate flex-1">{sp.nombre}</span>
                 <span className="text-[10px] font-semibold text-ds-gray-400 shrink-0 truncate max-w-[9rem] bg-ds-gray-200/60 rounded-full px-2 py-0.5">{ocupadaPor}</span>
               </div>
             );
           }
           return (
-            <button key={s.idSubPartida} type="button" onClick={() => toggle(s.idSubPartida)}
+            <button key={sp.idSubPartida} type="button" onClick={() => toggle(sp.idSubPartida)}
               className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${on ? 'bg-brand/10' : 'hover:bg-ds-gray-100'}`}>
               <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${on ? 'bg-brand border-brand' : 'border-ds-gray-300 bg-ds-surface'}`}>
                 {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
               </span>
-              <span className="text-sm text-ds-ink font-semibold shrink-0 w-16">{s.codigo}</span>
-              <span className="text-xs text-ds-gray-400 truncate flex-1">{s.nombre}</span>
-              {s.partidaCodigo && <span className="text-[10px] text-ds-gray-300 shrink-0">{s.partidaCodigo}</span>}
+              <span className="text-sm text-ds-ink font-semibold shrink-0 w-16">{sp.codigo}</span>
+              <span className="text-xs text-ds-gray-400 truncate flex-1">{sp.nombre}</span>
+              {sp.partidaCodigo && <span className="text-[10px] text-ds-gray-300 shrink-0">{sp.partidaCodigo}</span>}
             </button>
           );
         })}
@@ -262,6 +311,12 @@ export default function CuadrillasPage() {
   const [usuariosLogin, setUsuariosLogin] = useState<Colaborador[]>([]);
   const [partidas, setPartidas] = useState<PartidaLite[]>([]);
   const [subpartidas, setSubpartidas] = useState<SubLite[]>([]);
+  // Catálogo por tipo de obra para el selector en cascada (se carga al elegir el tipo).
+  const [tipos, setTipos] = useState<TipoLite[]>([]);
+  const [catalogos, setCatalogos] = useState<Record<string, CatalogoTipo>>({});
+  const [cargandoTipos, setCargandoTipos] = useState<Set<string>>(new Set());
+  // Subpartidas de la cuadrilla que se está editando (por si son de un tipo aún no cargado).
+  const [subsExtra, setSubsExtra] = useState<SubLite[]>([]);
   const [proyectos, setProyectos] = useState<ProyectoLite[]>([]);
   // Subpartidas ya tomadas, POR proyecto (para bloquearlas en el form).
   const [ocupadasByProy, setOcupadasByProy] = useState<Record<number, Map<number, string>>>({});
@@ -294,6 +349,30 @@ export default function CuadrillasPage() {
   const [addingMiembro, setAddingMiembro] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
 
+  // Catálogo de un tipo de obra, una sola vez (fábrica pesa ~1 MB: solo si se pide).
+  const catalogosEnVuelo = useRef(new Set<string>());
+  const cargarCatalogo = useCallback(async (codigo: string) => {
+    if (!codigo || catalogos[codigo] || catalogosEnVuelo.current.has(codigo)) return;
+    catalogosEnVuelo.current.add(codigo);
+    setCargandoTipos(prev => new Set(prev).add(codigo));
+    try {
+      const d = await fetch(`/api/partidas?tipo=${encodeURIComponent(codigo)}`).then(r => (r.ok ? r.json() : null));
+      if (d) setCatalogos(prev => ({ ...prev, [codigo]: { etapas: d.etapas ?? [], partidas: d.partidas ?? [], subpartidas: d.subpartidas ?? [] } }));
+    } finally {
+      catalogosEnVuelo.current.delete(codigo);
+      setCargandoTipos(prev => { const n = new Set(prev); n.delete(codigo); return n; });
+    }
+  }, [catalogos]);
+
+  // Código y nombre de CUALQUIER subpartida conocida (catálogos cargados + las de la
+  // cuadrilla en edición): es lo que usan las chips de seleccionadas.
+  const subsIndex = useMemo(() => {
+    const m = new Map<number, { codigo: string; nombre: string }>();
+    for (const c of Object.values(catalogos)) for (const sp of c.subpartidas) m.set(sp.idSubPartida, { codigo: sp.codigo, nombre: sp.nombre });
+    for (const sp of subsExtra) if (!m.has(sp.idSubPartida)) m.set(sp.idSubPartida, { codigo: sp.codigo, nombre: sp.nombre });
+    return m;
+  }, [catalogos, subsExtra]);
+
   async function loadCuadrillas() {
     const data = await fetch('/api/cuadrillas').then(r => r.json());
     setCuadrillas(data.data ?? []);
@@ -310,7 +389,10 @@ export default function CuadrillasPage() {
       fetch('/api/encargados-partida').then(r => r.json()).catch(() => ({})),
       fetch('/api/usuarios?activo=1&soloUsuarios=1&porPagina=500').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/proyectos').then(r => r.json()).catch(() => ({ data: [] })),
-    ]).then(([c, o, u, pt, en, usu, pr]) => {
+      fetch('/api/tipos-obra').then(r => r.json()).catch(() => ({ tipos: [] })),
+    ]).then(([c, o, u, pt, en, usu, pr, ti]) => {
+      setTipos(((ti.tipos ?? []) as TipoLite[]).map(t => ({ codigo: t.codigo, letra: t.letra, nombre: t.nombre, terminoGrupo: t.terminoGrupo })));
+      setCatalogos({ VIVIENDA: { etapas: pt.etapas ?? [], partidas: pt.partidas ?? [], subpartidas: pt.subpartidas ?? [] } });
       setProyectos(((pr.data ?? []) as { IDProyecto: number; Nombre: string }[]).map(x => ({ idProyecto: x.IDProyecto, nombre: x.Nombre })));
       setCuadrillas(c.data ?? []);
       setObras((o.data ?? []).map((x: { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null }) => ({ idObra: x.idObra, numeroObra: x.numeroObra, nombreMostrado: x.nombreMostrado, idProyecto: x.idProyecto ?? null })));
@@ -318,6 +400,7 @@ export default function CuadrillasPage() {
       setUsuariosLogin(usu.data ?? []);
       setPartidas(pt.partidas ?? []);
       setSubpartidas(pt.subpartidas ?? []);
+
       setDirectos(en.directos ?? []);
       setTablaFaltante(!!en.tablaFaltante);
     }).catch(() => toast('Error cargando datos', 'error'))
@@ -363,6 +446,7 @@ export default function CuadrillasPage() {
   function openEdit(c: CuadrillaDetalle) {
     setEditId(c.IDCuadrilla);
     // Reconstruir bloques por proyecto desde obras (obra.idProyecto) y subpartidas (cs.idProyecto).
+    setSubsExtra(c.subpartidas ?? []);
     const obrasByProy: Record<number, number[]> = {};
     const subsByProy: Record<number, number[]> = {};
     for (const o of (c.obras ?? [])) if (o.idProyecto != null) (obrasByProy[o.idProyecto] ??= []).push(o.idObra);
@@ -831,7 +915,9 @@ export default function CuadrillasPage() {
                         obras={obras.filter(o => o.idProyecto === pid)}
                         selected={form.obrasByProy[pid] ?? []}
                         onChange={ids => setForm(p => ({ ...p, obrasByProy: { ...p.obrasByProy, [pid]: ids } }))} />
-                      <SubpartidasPicker partidas={partidas} subpartidas={subpartidas}
+                      <SubpartidasPicker tipos={tipos} catalogos={catalogos}
+                        cargandoTipos={cargandoTipos} onCargarTipo={cargarCatalogo}
+                        subsIndex={subsIndex}
                         selected={form.subsByProy[pid] ?? []}
                         ocupadas={ocupadasByProy[pid]}
                         onChange={ids => setForm(p => ({ ...p, subsByProy: { ...p.subsByProy, [pid]: ids } }))} />
