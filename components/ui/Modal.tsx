@@ -17,6 +17,9 @@ interface ModalProps {
 }
 
 const sizes = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl', '2xl': 'max-w-6xl' };
+// Ancho del drawer: el de su size, pero dejando SIEMPRE visible la página de atrás
+// (como el editor de RH). En rem, espejo de la escala de Tailwind de arriba.
+const anchosDrawer = { sm: '24rem', md: '28rem', lg: '42rem', xl: '56rem', '2xl': '72rem' };
 
 export function Modal({ open, onClose, title, children, footer, size = 'md', variant = 'center' }: ModalProps) {
   useEffect(() => {
@@ -51,8 +54,11 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', var
             aria-modal="true"
             aria-label={title}
             className={variant === 'drawer'
-              ? `relative w-full ${sizes[size]} bg-ds-surface rounded-l-ds-lg shadow-ds-01 flex flex-col h-full max-h-full`
+              ? 'relative w-full bg-ds-surface rounded-l-ds-lg shadow-ds-01 flex flex-col h-full max-h-full'
               : `relative w-full ${sizes[size]} bg-ds-surface rounded-ds-lg shadow-ds-01 flex flex-col max-h-[90vh]`}
+            // El panel nunca tapa toda la pantalla: por angosta que sea la ventana,
+            // la página de atrás queda visible a la izquierda (como el editor de RH).
+            style={variant === 'drawer' ? { maxWidth: `min(${anchosDrawer[size]}, 100vw - 6rem)` } : undefined}
             initial={variant === 'drawer' ? { x: '100%' } : { opacity: 0, scale: 0.95, y: 12 }}
             animate={variant === 'drawer' ? { x: 0 } : { opacity: 1, scale: 1, y: 0 }}
             exit={variant === 'drawer' ? { x: '100%' } : { opacity: 0, scale: 0.95, y: 12 }}

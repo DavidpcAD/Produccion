@@ -866,7 +866,7 @@ export default function CuadrillasPage() {
       ))}
 
       {/* Crear / editar cuadrilla */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} size="2xl" variant="drawer"
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} size="xl" variant="drawer"
         title={editId ? `Cuadrilla: ${form.nombre || '…'}` : 'Nueva cuadrilla'}
         footer={
           <>
