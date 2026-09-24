@@ -279,7 +279,7 @@ export default function PedidoDetallePage() {
                     <tr key={l.id}>
                       <td>
                         <div className="row gap-2" style={{ alignItems: "center" }}>
-                          <div className="ds-truncate" style={{ maxWidth: 220 }}>{l.descripcion}</div>
+                          <div className="ds-cell-nombre">{l.descripcion}</div>
                           {l.devuelta && <Badge tone="red">Devuelta</Badge>}
                           {baja > 0 && <Badge tone="gray" title={`Se archivó la solicitud: ${num.format(baja)} ${l.unidad} nunca se ordenaron y ya no se van a comprar.`}>Ya no se compra</Badge>}
                         </div>
@@ -287,12 +287,12 @@ export default function PedidoDetallePage() {
                             esto el pedido enviado no decía QUÉ variante se pidió. */}
                         <LineaPedidaInfo code={l.articuloId} variante={l.variantCode} nota={l.notas} />
                       </td>
-                      {pedido.tipoSolicitud === "material" && <td className="ds-muted">{obraDeLinea(l, pedido) || "—"}</td>}
+                      {pedido.tipoSolicitud === "material" && <td className="ds-muted ds-nowrap">{obraDeLinea(l, pedido) || "—"}</td>}
                       {conTarea && <td className="ds-muted">{l.taskNo ? `${l.taskNo}${l.taskDescr ? ` — ${l.taskDescr}` : ""}` : "—"}</td>}
                       {/* Almacén de destino, igual que lo resuelve Proveeduría al armar la orden:
                           consumo directo → el almacén de la obra (mismo código que el proyecto en
                           BC); si no es consumo directo el material entra al almacén general. */}
-                      <td className="ds-muted">{l.almacen || (l.taskNo ? obraDeLinea(l, pedido) : ALMACEN_GENERAL)}</td>
+                      <td className="ds-muted ds-nowrap">{l.almacen || (l.taskNo ? obraDeLinea(l, pedido) : ALMACEN_GENERAL)}</td>
                       <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                       <td className="ds-num">{num.format(l.cantidadOrdenada)}</td>
                       <td className="ds-num ds-strong">{num.format(recibido)}</td>

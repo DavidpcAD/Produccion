@@ -332,8 +332,8 @@ export default function CargoSobreFacturaPage() {
                               <td className="ds-num"><input type="checkbox" className="ds-cbx" checked={checked} onChange={() => toggleLinea(l)} /></td>
                               <td className="ds-body-sm ds-strong">{l.documentNo}<span className="ds-muted"> · {l.lineNo}</span></td>
                               <td className="ds-body-sm">{l.itemNo}</td>
-                              <td><div className="ds-truncate" title={l.descripcion} style={{ maxWidth: 240 }}>{l.descripcion}</div></td>
-                              <td className="ds-muted ds-body-sm">{l.locationCode}</td>
+                              <td><div className="ds-cell-nombre">{l.descripcion}</div></td>
+                              <td className="ds-muted ds-body-sm ds-nowrap">{l.locationCode}</td>
                               <td className="ds-num ds-body-sm">
                                 {l.cantidad}{l.unidad ? ` ${l.unidad}` : ""}
                                 {/* Si la unidad del documento no es la base, se dice a
@@ -401,7 +401,7 @@ export default function CargoSobreFacturaPage() {
                     {lineasSel.map((l) => (
                       <tr key={lineKey(l)}>
                         <td className="ds-body-sm ds-strong">{l.documentNo}<span className="ds-muted"> · {l.lineNo}</span></td>
-                        <td className="ds-body-sm"><div className="ds-truncate" title={l.descripcion} style={{ maxWidth: 240 }}>{l.itemNo} — {l.descripcion}</div></td>
+                        <td className="ds-body-sm"><div className="ds-cell-nombre">{l.itemNo} — {l.descripcion}</div></td>
                         <td className="ds-num ds-body-sm">{money(l.importe || 0, currency)}</td>
                         <td className="ds-num ds-strong">{previewReparto ? money(share(l), currency) : "—"}</td>
                         <td className="ds-num"><button type="button" className="icon-btn" title="Quitar" onClick={() => toggleLinea(l)}>×</button></td>

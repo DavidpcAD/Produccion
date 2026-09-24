@@ -530,6 +530,14 @@
 /* Tabla con columnas numéricas centradas (ej. detalle de pedido: Solicitado/En orden/Recibido/Por recibir). */
 .oc-scope .ds-table--center-num td.ds-num,
 .oc-scope .ds-table--center-num thead th.ds-num { text-align: center; }
+/* Nombre de artículo: se lee entero (baja de línea) en vez de cortarse con «…»,
+   que no dice cuál de todos es. El mínimo evita que la columna se aplaste entre
+   las numéricas; el máximo evita renglones larguísimos. */
+.oc-scope .ds-cell-nombre { white-space: normal; overflow-wrap: break-word; min-width: 200px; max-width: 380px; }
+/* Lo que nunca debe partirse en dos renglones al dejar respirar al nombre:
+   cantidades/importes y los códigos cortos (almacén, obra). */
+.oc-scope .ds-table tbody td.ds-num { white-space: nowrap; }
+.oc-scope .ds-nowrap { white-space: nowrap; }
 
 /* ─── Maestro de clasificaciones: jerarquía etapa → partida → clasificación ─── */
 .oc-scope .clasif-groups { display: flex; flex-direction: column; gap: 26px; }

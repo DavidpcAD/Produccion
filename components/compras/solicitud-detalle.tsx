@@ -67,7 +67,7 @@ export function SolicitudDetalle({
                 <tr key={l.id}>
                   <td>
                     <div className="row gap-2" style={{ alignItems: "center" }}>
-                      <div className="ds-truncate" title={l.descripcion} style={{ maxWidth: 260 }}>{l.descripcion}</div>
+                      <div className="ds-cell-nombre">{l.descripcion}</div>
                       {l.devuelta && <Badge tone="red">Devuelta</Badge>}
                       {baja > 0 && <Badge tone="gray" title={`Se archivó la solicitud: ${num.format(baja)} ${l.unidad} nunca se ordenaron y ya no se van a comprar.`}>Ya no se compra</Badge>}
                     </div>
@@ -75,7 +75,7 @@ export function SolicitudDetalle({
                         leer antes de comprar (marca, color, "sin filo"…). */}
                     <LineaPedidaInfo code={l.articuloId} variante={l.variantCode} nota={l.notas} />
                   </td>
-                  <td className="ds-muted ds-body-sm">{destinoDeLinea(l, pedido) || "—"}</td>
+                  <td className="ds-muted ds-body-sm ds-nowrap">{destinoDeLinea(l, pedido) || "—"}</td>
                   <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                   <td className="ds-num">{num.format(l.cantidadOrdenada)}</td>
                   <td className="ds-num">{pend > 0 ? <span className="ds-pending-text">{num.format(pend)}</span> : "0"}</td>

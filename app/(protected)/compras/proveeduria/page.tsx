@@ -137,8 +137,8 @@ export default function ProveeduriaMaterialesPage() {
       cell: (c) => { const r = c.row.original; return <span className="row gap-2" style={{ alignItems: "center" }}>{dot(r.tipo === "repuesto" ? "yellow" : "green")}<span className="ds-body-sm ds-strong">{r.pedidoNumero}</span></span>; } },
     { id: "articulo", header: "Artículo", accessorFn: (r) => `${r.articuloId} ${r.descripcion} ${r.variantCode ?? ""} ${r.notas ?? ""}`, meta: { label: "Artículo" },
       cell: (c) => { const r = c.row.original; return (
-        <div style={{ maxWidth: 320 }}>
-          <div className="ds-truncate" title={`${r.articuloId} — ${r.descripcion}`}><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>
+        <div style={{ maxWidth: 380 }}>
+          <div className="ds-cell-nombre"><span className="ds-strong ds-body-sm">{r.articuloId}</span> <span className="ds-muted">— {r.descripcion}</span></div>
           <LineaPedidaInfo variante={r.variantCode} nota={r.notas} />
         </div>
       ); } },
@@ -255,10 +255,10 @@ export default function ProveeduriaMaterialesPage() {
                 {preview.lineas.map((l) => (
                   <tr key={l.id}>
                     <td>
-                      <div className="ds-truncate" title={l.descripcion}>{l.descripcion}</div>
+                      <div className="ds-cell-nombre">{l.descripcion}</div>
                       <LineaPedidaInfo code={l.articuloId} variante={l.variantCode} nota={l.notas} />
                     </td>
-                    <td className="ds-muted ds-body-sm">{destinoDeLinea(l, preview) || "—"}</td>
+                    <td className="ds-muted ds-body-sm ds-nowrap">{destinoDeLinea(l, preview) || "—"}</td>
                     <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                     <td className="ds-num">{pedidoLineaPendiente(l, preview) > 0 ? <span className="ds-pending-text">{num.format(pedidoLineaPendiente(l, preview))}</span> : "0"}</td>
                   </tr>
