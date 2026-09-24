@@ -121,7 +121,7 @@ export default function RecibidasPage() {
                       <span className="ds-strong" style={{ fontSize: "var(--ds-font-size-subtitle)" }}>
                         {enRevision ? (o ? numeroOrden(o) : "—") : `Factura ${r.numeroFactura}`}
                       </span>
-                      <span className="ds-body-sm ds-muted ds-truncate">
+                      <span className="ds-body-sm ds-muted ds-wrap">
                         {o ? numeroOrden(o) : "—"} · {provNombre(r.ordenId)}
                       </span>
                     </div>

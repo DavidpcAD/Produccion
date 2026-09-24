@@ -1102,7 +1102,6 @@
 .oc-scope .role-option__desc { color: var(--ds-color-gray-400); font-size: var(--ds-font-size-body-sm); }
 
 /* truncate long cell text to keep rows on one line */
-.oc-scope .ds-truncate { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* sticky action bar (appears when there's a selection) */
 .oc-scope .action-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: var(--ds-surface); box-shadow: 0 -4px 18px #0000001f; padding: var(--ds-space-3) var(--ds-space-6); animation: barUp .2s ease; transition: left .34s cubic-bezier(.34, 1.4, .5, 1); }

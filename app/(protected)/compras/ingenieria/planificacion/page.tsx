@@ -106,7 +106,7 @@ export default function PlanificacionPage() {
                   <tr key={o}>
                     <td style={{ position: "sticky", left: 0, background: "var(--ds-surface)", zIndex: 1 }}>
                       <div className="ds-strong ds-body-sm">{o}</div>
-                      {obraNombre[o] && <div className="ds-muted ds-body-sm ds-truncate" style={{ maxWidth: 200 }} title={obraNombre[o]}>{obraNombre[o]}</div>}
+                      {obraNombre[o] && <div className="ds-muted ds-body-sm ds-wrap" style={{ maxWidth: 200 }}>{obraNombre[o]}</div>}
                     </td>
                     {partidas.map((c) => {
                       const cel = matriz[o]?.[c];

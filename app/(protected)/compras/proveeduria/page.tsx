@@ -198,7 +198,7 @@ export default function ProveeduriaMaterialesPage() {
                     </span>
                   </div>
                   {(() => { const r = solicitudResumen(p); return (
-                    <span className="ds-body-sm ds-muted ds-truncate" style={{ maxWidth: 220 }} title={r.secundaria ? `${r.principal} · ${r.secundaria}` : r.principal}>
+                    <span className="ds-body-sm ds-muted ds-wrap">
                       {tipoSolicitudBadge(p.tipoSolicitud).label} · <span className="ds-strong">{r.principal}</span>{r.secundaria ? ` · ${r.secundaria}` : ""}
                     </span>
                   ); })()}
