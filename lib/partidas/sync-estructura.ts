@@ -25,8 +25,9 @@ import {
  *   · Es ADITIVO: crea lo que falta, refresca el nombre de las partidas que ya
  *     están y nunca borra ni mueve nada. Las subpartidas no se tocan: ese nivel
  *     no existe afuera, es solo de esta base. La ÚNICA excepción son los tipos
- *     con `subpartidaEspejo` (postventa), donde la subpartida ES la partida: ahí
- *     se crea la espejo `<partida>.1` para la partida que no tenga ninguna.
+ *     con `subpartidaEspejo` (postventa y vivienda general), donde la subpartida
+ *     ES la partida: ahí se crea la espejo `<partida>.1` para la partida que no
+ *     tenga ninguna.
  *   · Vivienda e infra escriben en el catálogo COMPARTIDO (bc_works_no NULL);
  *     administrativas y fábricas, en la estructura de ESA obra.
  */
@@ -350,7 +351,8 @@ export async function sincronizarEstructura(
     await espejoDeLaPartida(ins.recordset[0].id, codigo, nombre);
   }
 
-  // LA SUBPARTIDA ES LA PARTIDA (postventa): cada casa es una sola cosa, no tiene
+  // LA SUBPARTIDA ES LA PARTIDA (postventa, vivienda general): la casa —o el
+  // renglón de generales— es una sola cosa, no tiene
   // desglose abajo. Se crea la espejo `<partida>.1` con el mismo nombre y SOLO si
   // la partida no tiene ninguna subpartida — el desglose que haya hecho el negocio
   // manda. Mismo criterio que migrations/2026-09-17_subpartida_espejo_toda_partida.

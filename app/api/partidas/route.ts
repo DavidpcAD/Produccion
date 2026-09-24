@@ -18,8 +18,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  // El catálogo está partido por TIPO DE OBRA (h4.tipos_obra): VIVIENDA,
-  // INFRA, ADMIN, FABRICA y TORRES. Sin `tipo` se devuelve VIVIENDA para no
+  // El catálogo está partido por TIPO DE OBRA (h4.tipos_obra): VIVIENDA
+  // (construcción), VIVIENDA_GEN, INFRA, ADMIN, FABRICA, TORRES y POSTVENTA.
+  // Sin `tipo` se devuelve VIVIENDA para no
   // cambiarle nada a quien ya consumía este endpoint.
   const url = new URL(req.url);
   const tipoParam = (url.searchParams.get('tipo') ?? 'VIVIENDA').toUpperCase();

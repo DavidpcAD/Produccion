@@ -5,8 +5,8 @@ import { listarTiposObra, mapaAreaCosteoTipo, TIPO_POR_DEFECTO } from '@/lib/par
 
 export const dynamic = 'force-dynamic';
 
-// Los cinco tipos de obra del catálogo (O/I/A/F/T) con cuántos grupos, partidas y
-// subpartidas tiene cada uno. Es lo que alimenta las pestañas de /partidas.
+// Los siete tipos de obra del catálogo (C/G/I/A/F/T/P) con cuántos grupos, partidas
+// y subpartidas tiene cada uno. Es lo que alimenta las pestañas de /partidas.
 // Torres puede venir en 0/0/0: existe a propósito y se llena a mano.
 //
 // ?conObras=1 agrega las obras de BC que caen en cada tipo según su área de costeo

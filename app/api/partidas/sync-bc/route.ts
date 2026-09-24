@@ -15,11 +15,11 @@ export const dynamic = 'force-dynamic';
 /**
  * TRAER DE BC la estructura del catálogo: capítulos ("Total") → grupos y partidas
  * ("Posting") → partidas. Las subpartidas NO se tocan, salvo en los tipos donde la
- * subpartida ES la partida (postventa): ahí se crea la espejo `<partida>.1` de la
- * partida que no tenga ninguna.
+ * subpartida ES la partida (postventa, vivienda general): ahí se crea la espejo
+ * `<partida>.1` de la partida que no tenga ninguna.
  *
  * POST { tipo, obra?, dryRun? }
- *   tipo   — VIVIENDA | INFRA | ADMIN | FABRICA | TORRES | POSTVENTA
+ *   tipo   — VIVIENDA | VIVIENDA_GEN | INFRA | ADMIN | FABRICA | TORRES | POSTVENTA
  *   obra   — N° de obra de BC. Sin obra se recorren TODAS las obras de ese tipo
  *            (según el área de costeo de dbo.Obra), con tope de 30 por llamada.
  *   dryRun — true = solo mira y reporta qué crearía, sin escribir nada. Importa

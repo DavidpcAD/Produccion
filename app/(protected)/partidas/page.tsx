@@ -16,6 +16,17 @@ import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 const TIPOS_CASA = ['1N-Techo', '1N-Azotea', '2N-Techo', '2N-Azotea'] as const;
 
+// FAMILIAS de la barra de tipos: la gente ve UNA pestaña por cosa del negocio.
+// "Obra Vivienda" es una sola —como Infraestructura, Administrativa o Fábrica— y por
+// dentro son dos catálogos distintos: la casa (VIVIENDA) y los generales del
+// residencial (VIVIENDA_GEN, las obras GEN-*). Por eso la pestaña abre una segunda
+// barra con las dos, y recién ahí se elige cuál árbol se mira.
+// Se agrupan ACÁ, en la pantalla: en la base siguen siendo dos tipos de obra, que es
+// lo que le da a cada uno su propio árbol, su nivel 1 y su "Traer de BC".
+const FAMILIAS: { key: string; letra: string; nombre: string; tipos: string[] }[] = [
+  { key: 'OBRA_VIVIENDA', letra: 'O', nombre: 'Obra Vivienda', tipos: ['VIVIENDA', 'VIVIENDA_GEN'] },
+];
+
 // El catálogo es un ÁRBOL de tres niveles por tipo de obra:
 //   grupo (etapa/sistema/área/proceso/torre) → partida → subpartida
 // Los dos primeros niveles existen también en Business Central (capítulo "Total" y
@@ -31,9 +42,27 @@ interface TipoObra {
   grupos?: number; partidas?: number; subpartidas?: number; obras?: number;
   obrasBC?: { numeroObra: string; nombre: string }[];
 }
+/** Lo que deja "Traer de BC", sumando todos los catálogos de la pestaña. */
+interface ResumenBC {
+  obrasProcesadas: number; gruposCreados: number; partidasCreadas: number;
+  subpartidasCreadas: number; gruposActualizados: number; partidasActualizadas: number;
+  avisos: string[];
+  detalle: {
+    obra: string; fuente: string; compania?: string | null; version?: string | null;
+    gruposCreados: string[]; partidasCreadas: string[]; subpartidasCreadas: string[];
+  }[];
+}
+
+/** Lo que devuelve /api/partidas para UN tipo de obra. */
+interface RespPartidas {
+  tipo?: TipoObra; etapas?: Etapa[]; partidas?: Partida[]; subpartidas?: SubPartida[];
+}
 interface Etapa {
   idEtapa: number; codigo: string; nombre: string;
   bcTaskNo: string | null; bcWorksNo: string | null;
+  /** Tipo de obra del que se cargó; lo pone el cliente, no la API. En "Obra
+   *  Vivienda" conviven los dos (VIVIENDA y VIVIENDA_GEN) en la misma pantalla. */
+  tipo?: string;
 }
 interface Partida {
   idPartida: number; codigo: string; nombre: string; idEtapa: number | null;
@@ -130,11 +159,7 @@ export default function PartidasPage() {
   const [bcOpen, setBcOpen] = useState(false);
   const [bcObra, setBcObra] = useState('');
   const [bcSync, setBcSync] = useState<false | 'ver' | 'traer'>(false);
-  const [bcPreview, setBcPreview] = useState<null | {
-    obrasProcesadas: number; gruposCreados: number; partidasCreadas: number; subpartidasCreadas: number;
-    gruposActualizados: number; partidasActualizadas: number;
-    detalle: { obra: string; fuente: string; compania?: string | null; version?: string | null; gruposCreados: string[]; partidasCreadas: string[]; subpartidasCreadas: string[] }[];
-  }>(null);
+  const [bcPreview, setBcPreview] = useState<ResumenBC | null>(null);
 
   function cambiarTipo(t: string) {
     if (t === tipoCodigo) return;
@@ -152,16 +177,26 @@ export default function PartidasPage() {
   }, []);
   useEffect(() => { cargarTipos(); }, [cargarTipos]);
 
+  // Una pestaña puede traer VARIOS catálogos: "Obra Vivienda" muestra a la vez el
+  // de construcción y el de generales, uno debajo del otro, como las obras de
+  // administrativas. Cada etapa se queda marcada con el tipo del que vino.
   const load = useCallback(async () => {
     setLoading(true);
-    const qs = new URLSearchParams({ tipo: tipoCodigo });
-    if (obraFiltro) qs.set('obra', obraFiltro);
-    const d = await fetch(`/api/partidas?${qs}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
-    if (d) {
-      setTipo(d.tipo ?? null);
-      setEtapas(d.etapas ?? []);
-      setPartidas(d.partidas ?? []);
-      setSubpartidas(d.subpartidas ?? []);
+    const fam = FAMILIAS.find(f => f.tipos.includes(tipoCodigo));
+    const codigos = fam ? fam.tipos : [tipoCodigo];
+    const respuestas = await Promise.all(codigos.map(async (cod) => {
+      const qs = new URLSearchParams({ tipo: cod });
+      if (obraFiltro && !fam) qs.set('obra', obraFiltro);
+      const d: RespPartidas | null = await fetch(`/api/partidas?${qs}`)
+        .then(r => (r.ok ? r.json() : null)).catch(() => null);
+      return d ? { cod, d } : null;
+    }));
+    const vivos = respuestas.filter((r): r is { cod: string; d: RespPartidas } => !!r);
+    if (vivos.length > 0) {
+      setTipo(vivos[0].d.tipo ?? null);
+      setEtapas(vivos.flatMap(b => (b.d.etapas ?? []).map(e => ({ ...e, tipo: b.cod }))));
+      setPartidas(vivos.flatMap(b => b.d.partidas ?? []));
+      setSubpartidas(vivos.flatMap(b => b.d.subpartidas ?? []));
     }
     setLoading(false);
   }, [tipoCodigo, obraFiltro]);
@@ -174,6 +209,28 @@ export default function PartidasPage() {
       .then(d => setSprintsCat(d?.sprints ?? []))
       .catch(() => {});
   }, []);
+
+  // Las pestañas de arriba: una por familia (Obra Vivienda) y una por cada tipo que
+  // no está en ninguna. El orden es el de h4.tipos_obra.
+  const pestanas = useMemo(() => {
+    const out: { key: string; letra: string; nombre: string; miembros: TipoObra[] }[] = [];
+    const puestas = new Set<string>();
+    for (const t of tipos) {
+      const fam = FAMILIAS.find(f => f.tipos.includes(t.codigo));
+      if (!fam) { out.push({ key: t.codigo, letra: t.letra, nombre: t.nombre, miembros: [t] }); continue; }
+      if (puestas.has(fam.key)) continue;
+      puestas.add(fam.key);
+      const miembros = fam.tipos.map(c => tipos.find(x => x.codigo === c)).filter((x): x is TipoObra => !!x);
+      out.push({ key: fam.key, letra: fam.letra, nombre: fam.nombre, miembros });
+    }
+    return out;
+  }, [tipos]);
+  const pestanaActual = useMemo(
+    () => pestanas.find(p => p.miembros.some(m => m.codigo === tipoCodigo)) ?? null,
+    [pestanas, tipoCodigo],
+  );
+  /** Los catálogos que se ven a la vez en la pestaña (vivienda son dos). */
+  const miembrosActivos = useMemo(() => pestanaActual?.miembros ?? [], [pestanaActual]);
 
   const sprintsValidos = useMemo(() => new Set(sprintsCat.map(s => s.numero_global)), [sprintsCat]);
   const tipoActual = useMemo(() => tipos.find(t => t.codigo === tipoCodigo) ?? null, [tipos, tipoCodigo]);
@@ -230,26 +287,44 @@ export default function PartidasPage() {
       };
     }).filter(g => g.visible);
 
-    // Agrupado por obra de BC cuando el catálogo es por obra (admin / fábrica).
+    // De qué cuelga cada rama de arriba:
+    //   · Familia (Obra Vivienda) → del CATÁLOGO: una fila por tipo, "Vivienda
+    //     Construcción" y "Vivienda General", como ALM-SSO y COM-FORM en
+    //     administrativas. Dentro van sus etapas/áreas derecho, sin repetir la obra
+    //     (en generales el área YA es la obra: GEN-BAR).
+    //   · Resto → de la OBRA de BC, como siempre (admin / fábrica / postventa).
+    const porCatalogo = (miembrosActivos?.length ?? 0) > 1;
     const secciones = new Map<string, typeof grupos>();
     for (const g of grupos) {
-      const k = g.etapa.bcWorksNo ?? SIN_OBRA;
+      const k = porCatalogo ? (g.etapa.tipo ?? tipoCodigo) : (g.etapa.bcWorksNo ?? SIN_OBRA);
       if (!secciones.has(k)) secciones.set(k, []);
       secciones.get(k)!.push(g);
     }
+    const orden = (k: string) => (porCatalogo ? (miembrosActivos ?? []).findIndex(m => m.codigo === k) : 0);
     return [...secciones.entries()]
-      .sort((a, b) => (a[0] === SIN_OBRA ? -1 : b[0] === SIN_OBRA ? 1 : porCodigo(a[0], b[0])))
-      .map(([obra, grupos]) => ({
-        obra: obra === SIN_OBRA ? null : obra,
-        grupos,
-        totalPartidas: grupos.reduce((n, g) => n + g.totalPartidas, 0),
-        totalSubs: grupos.reduce((n, g) => n + g.totalSubs, 0),
-      }));
-  }, [etapas, partidas, subsByPartida, buscando, term]);
+      .sort((a, b) => porCatalogo
+        ? orden(a[0]) - orden(b[0])
+        : (a[0] === SIN_OBRA ? -1 : b[0] === SIN_OBRA ? 1 : porCodigo(a[0], b[0])))
+      .map(([clave, grupos]) => {
+        const tipoSec = porCatalogo ? (miembrosActivos ?? []).find(m => m.codigo === clave) ?? null : null;
+        return {
+          clave,
+          // Con qué se rotula la fila de arriba: el catálogo (C · Vivienda
+          // Construcción) o la obra de BC (ALM-SSO · Seguridad ocupacional).
+          codigo: tipoSec ? tipoSec.letra : (clave === SIN_OBRA ? null : clave),
+          nombre: tipoSec ? tipoSec.nombre : (obrasDelTipo.find(o => o.numeroObra === clave)?.nombre ?? ''),
+          conFila: tipoSec ? true : clave !== SIN_OBRA,
+          tipoSec,
+          grupos,
+          totalPartidas: grupos.reduce((n, g) => n + g.totalPartidas, 0),
+          totalSubs: grupos.reduce((n, g) => n + g.totalSubs, 0),
+        };
+      });
+  }, [etapas, partidas, subsByPartida, buscando, term, miembrosActivos, tipoCodigo, obrasDelTipo]);
 
-  // Con una sola obra (o buscando) no tiene sentido tenerla cerrada.
-  const obraAbierta = (obra: string | null) =>
-    obra === null || buscando || arbol.length === 1 || obrasAbiertas.has(obra);
+  // Con una sola rama (o buscando) no tiene sentido tenerla cerrada.
+  const seccionAbierta = (clave: string, conFila: boolean) =>
+    !conFila || buscando || arbol.length === 1 || obrasAbiertas.has(clave);
   const grupoAbierto = (id: number) => buscando || gruposAbiertos.has(id);
   const partidaAbierta = (id: number, forzar: boolean) => forzar || partidasAbiertas.has(id);
 
@@ -261,7 +336,7 @@ export default function PartidasPage() {
   function expandirTodo() {
     setGruposAbiertos(new Set(etapas.map(e => e.idEtapa)));
     setPartidasAbiertas(new Set(partidas.map(p => p.idPartida)));
-    setObrasAbiertas(new Set(etapas.map(e => e.bcWorksNo).filter((o): o is string => !!o)));
+    setObrasAbiertas(new Set(arbol.map(s => s.clave)));
   }
   function colapsarTodo() {
     setGruposAbiertos(new Set());
@@ -421,30 +496,50 @@ export default function PartidasPage() {
     setBcPreview(null);
     setBcOpen(true);
   }
+  // Una pestaña puede tener más de un catálogo (Obra Vivienda: construcción y
+  // generales): se le pide a BC por cada uno y se suma, porque para la gente el
+  // botón es uno solo.
+  async function sincronizarConBC(dryRun: boolean): Promise<ResumenBC | { error: string }> {
+    const codigos = miembrosActivos.length > 0 ? miembrosActivos.map(m => m.codigo) : [tipoCodigo];
+    const partes = await Promise.all(codigos.map(async (t) => {
+      const res = await fetch('/api/partidas/sync-bc', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: t, obra: bcObra || undefined, dryRun }),
+      });
+      const d = await res.json().catch(() => ({}));
+      return { ok: res.ok, d };
+    }));
+    const error = partes.find(p => !p.ok);
+    if (error) return { error: (error.d?.error as string) || 'No se pudo leer BC' };
+    const suma = (k: string) => partes.reduce((n, p) => n + (Number(p.d?.[k]) || 0), 0);
+    return {
+      obrasProcesadas: suma('obrasProcesadas'),
+      gruposCreados: suma('gruposCreados'),
+      partidasCreadas: suma('partidasCreadas'),
+      subpartidasCreadas: suma('subpartidasCreadas'),
+      gruposActualizados: suma('gruposActualizados'),
+      partidasActualizadas: suma('partidasActualizadas'),
+      avisos: partes.flatMap(p => (p.d?.avisos ?? []) as string[]),
+      detalle: partes.flatMap(p => (p.d?.detalle ?? []) as ResumenBC['detalle']),
+    };
+  }
+
   // dryRun: mira BC y dice qué crearía, sin escribir. En vivienda e infra importa
   // de más, porque el catálogo es uno para todas las obras.
   async function verQueTraeriaDeBC() {
     setBcSync('ver');
     try {
-      const res = await fetch('/api/partidas/sync-bc', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo: tipoCodigo, obra: bcObra || undefined, dryRun: true }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) { toast(d.error || 'No se pudo leer BC', 'error'); return; }
+      const d = await sincronizarConBC(true);
+      if ('error' in d) { toast(d.error, 'error'); return; }
       setBcPreview(d);
-      for (const a of (d.avisos ?? []) as string[]) toast(a, 'warning');
+      for (const a of d.avisos) toast(a, 'warning');
     } finally { setBcSync(false); }
   }
   async function traerDeBC() {
     setBcSync('traer');
     try {
-      const res = await fetch('/api/partidas/sync-bc', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo: tipoCodigo, obra: bcObra || undefined }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) { toast(d.error || 'No se pudo traer de BC', 'error'); return; }
+      const d = await sincronizarConBC(false);
+      if ('error' in d) { toast(d.error, 'error'); return; }
       const nuevo = (d.gruposCreados ?? 0) + (d.partidasCreadas ?? 0) + (d.subpartidasCreadas ?? 0);
       toast(
         nuevo === 0
@@ -453,7 +548,7 @@ export default function PartidasPage() {
             + (d.subpartidasCreadas ? `, con ${plural(d.subpartidasCreadas, 'subpartida', 'subpartidas')} igual que su partida.` : '.'),
         nuevo === 0 ? 'info' : 'success',
       );
-      for (const a of (d.avisos ?? []) as string[]) toast(a, 'warning');
+      for (const a of d.avisos) toast(a, 'warning');
       setBcOpen(false);
       setBcPreview(null);
       await Promise.all([load(), cargarTipos()]);
@@ -511,23 +606,34 @@ export default function PartidasPage() {
           vez de cuatro bloques sueltos y una tarjeta por obra. */}
       <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-4 pt-3 pb-3 border-b border-ds-gray-200 space-y-3">
-          {/* Tipos de obra: O · I · A · F · T (h4.tipos_obra). Filtro, no una
-              segunda barra de pestañas: sin caja y sin número en los inactivos. */}
+          {/* Tipos de obra (h4.tipos_obra), agrupados por familia: O · I · A · F · T · P.
+              Filtro, no una segunda barra de pestañas: sin caja y sin número en los
+              inactivos. Vivienda abre su propia barra debajo. */}
           <div className="flex flex-wrap items-center gap-1">
-            {(tipos.length > 0 ? tipos : [{ codigo: 'VIVIENDA', letra: 'O', nombre: 'Obra Vivienda' } as TipoObra]).map(t => {
-              const activo = tipoCodigo === t.codigo;
+            {(pestanas.length > 0
+              ? pestanas
+              : [{ key: 'VIVIENDA', letra: 'O', nombre: 'Obra Vivienda', miembros: [] as TipoObra[] }]
+            ).map(p => {
+              const activo = pestanaActual?.key === p.key;
+              const partidas = p.miembros.reduce((n, m) => n + (m.partidas ?? 0), 0);
+              const detalle = p.miembros.length > 1
+                ? p.miembros.map(m => m.nombre).join(' · ')
+                : p.miembros[0]
+                  ? `${plural(p.miembros[0].grupos ?? 0, p.miembros[0].terminoGrupo.toLowerCase(), p.miembros[0].terminoGrupoPlural.toLowerCase())}, ${plural(p.miembros[0].partidas ?? 0, 'partida', 'partidas')}, ${plural(p.miembros[0].subpartidas ?? 0, 'subpartida', 'subpartidas')}`
+                  : '';
               return (
-                <button key={t.codigo} onClick={() => cambiarTipo(t.codigo)}
+                <button key={p.key} onClick={() => { if (!activo && p.miembros[0]) cambiarTipo(p.miembros[0].codigo); }}
                   aria-current={activo ? 'true' : undefined}
-                  title={`${t.letra} = ${t.nombre}${t.grupos != null ? ` · ${plural(t.grupos, t.terminoGrupo?.toLowerCase() ?? 'grupo', t.terminoGrupoPlural?.toLowerCase() ?? 'grupos')}, ${plural(t.partidas ?? 0, 'partida', 'partidas')}, ${plural(t.subpartidas ?? 0, 'subpartida', 'subpartidas')}` : ''}`}
+                  title={`${p.letra} = ${p.nombre}${detalle ? ` · ${detalle}` : ''}`}
                   className={'inline-flex items-center gap-1.5 rounded-ds px-3 py-1.5 text-label font-semibold transition-colors ' + (activo ? 'bg-black text-white' : 'text-ds-gray-500 hover:bg-ds-gray-100 hover:text-ds-ink')}>
-                  <span className={'font-mono text-body-sm font-bold ' + (activo ? 'text-white/60' : 'text-ds-gray-300')}>{t.letra}</span>
-                  {t.nombre}
-                  {activo && t.partidas != null && <span className="text-body-sm font-normal text-white/70">{t.partidas}</span>}
+                  <span className={'font-mono text-body-sm font-bold ' + (activo ? 'text-white/60' : 'text-ds-gray-300')}>{p.letra}</span>
+                  {p.nombre}
+                  {activo && partidas > 0 && <span className="text-body-sm font-normal text-white/70">{partidas}</span>}
                 </button>
               );
             })}
           </div>
+
 
           {/* Buscar · obra · expandir, todo en una línea */}
           <div className="flex flex-wrap items-center gap-2">
@@ -594,25 +700,30 @@ export default function PartidasPage() {
         // era su propia tarjeta y seis tarjetas huecas llenaban la pantalla.
         <div>
           {arbol.map((sec, iSec) => (
-            <div key={sec.obra ?? SIN_OBRA} className={iSec > 0 ? 'border-t border-ds-gray-200' : ''}>
-              {/* Nivel 0 (solo admin/fábrica): la obra de BC dueña de la estructura */}
-              {sec.obra && (
+            <div key={sec.clave} className={iSec > 0 ? 'border-t border-ds-gray-200' : ''}>
+              {/* Nivel 0: la obra de BC dueña de la estructura (admin / fábrica /
+                  postventa) o, en Obra Vivienda, cada uno de sus dos catálogos. */}
+              {sec.conFila && (
                 <button
-                  onClick={() => setObrasAbiertas(s => toggleSet(s, sec.obra!))}
-                  title={obraAbierta(sec.obra) ? 'Colapsar la obra' : `Ver la estructura de ${sec.obra}`}
+                  onClick={() => setObrasAbiertas(st => toggleSet(st, sec.clave))}
+                  title={seccionAbierta(sec.clave, sec.conFila)
+                    ? 'Colapsar'
+                    : `Ver la estructura de ${sec.nombre || sec.codigo || sec.clave}`}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left border-b border-ds-gray-200 bg-ds-gray-100/60 hover:bg-ds-gray-100 transition-colors" 
                 >
-                  <span className={'text-ds-gray-300 transition-transform shrink-0 ' + (obraAbierta(sec.obra) ? 'rotate-90' : '')}>
+                  <span className={'text-ds-gray-300 transition-transform shrink-0 ' + (seccionAbierta(sec.clave, sec.conFila) ? 'rotate-90' : '')}>
                     <Icon name="chevron-right" size="sm" color="currentColor" />
                   </span>
                   <span className="font-mono text-body-sm font-semibold text-ds-gray-500 shrink-0 min-w-[84px] whitespace-nowrap">
-                    {sec.obra}
+                    {sec.codigo}
                   </span>
                   <span className="text-label font-semibold text-ds-ink truncate flex-1 min-w-0">
-                    {obrasDelTipo.find(o => o.numeroObra === sec.obra)?.nombre ?? ''}
+                    {sec.nombre}
                   </span>
                   <span className="text-body-sm text-ds-gray-400 shrink-0 hidden sm:block whitespace-nowrap">
-                    {plural(sec.grupos.length, termGrupoLow, termGrupoPlural)} · {plural(sec.totalPartidas, 'partida', 'partidas')}
+                    {plural(sec.grupos.length,
+                      (sec.tipoSec?.terminoGrupo ?? termGrupo).toLowerCase(),
+                      (sec.tipoSec?.terminoGrupoPlural ?? termGrupoPlural).toLowerCase())} · {plural(sec.totalPartidas, 'partida', 'partidas')}
                     {sec.totalSubs > 0 ? ` · ${plural(sec.totalSubs, 'subpartida', 'subpartidas')}` : ''}
                   </span>
                   <span className="text-body-sm text-ds-gray-400 shrink-0 sm:hidden">{sec.totalPartidas}</span>
@@ -621,15 +732,15 @@ export default function PartidasPage() {
 
               {/* Cuando hay obra (admin / fábrica) todo lo suyo entra un escalón: si los
                   procesos arrancan pegados al borde no se lee que cuelgan de la obra. */}
-              {obraAbierta(sec.obra) && (
-              <div className={sec.obra ? 'pl-8' : ''}>
+              {seccionAbierta(sec.clave, sec.conFila) && (
+              <div className={sec.conFila ? 'pl-8' : ''}>
               {sec.grupos.map(({ etapa, partidas: parts, totalPartidas, totalSubs: subsGrupo }, iGrupo) => {
                 const abierto = grupoAbierto(etapa.idEtapa);
                 const ultimoGrupo = iGrupo === sec.grupos.length - 1;
                 return (
                   <div key={etapa.idEtapa} className="relative">
-                    {/* Riel de la obra hacia sus procesos (solo admin / fábrica). */}
-                    {sec.obra && (
+                    {/* Riel de la rama de arriba hacia sus grupos. */}
+                    {sec.conFila && (
                       <span aria-hidden className={'pointer-events-none absolute left-[-9px] top-0 w-px bg-ds-gray-200 ' + (ultimoGrupo ? 'h-[18px]' : 'bottom-0')} />
                     )}
                     {/* Nivel 1 — grupo (etapa / sistema / área / proceso / torre) */}
@@ -637,7 +748,7 @@ export default function PartidasPage() {
                       'group/proc relative flex items-center gap-2 px-3 py-2 border-b border-ds-gray-100 transition-colors '
                       + (abierto ? 'bg-ds-gray-100/60' : 'hover:bg-ds-gray-100/40')
                     }>
-                      {sec.obra && <span aria-hidden className="pointer-events-none absolute left-[-9px] top-[18px] h-px w-[9px] bg-ds-gray-200" />}
+                      {sec.conFila && <span aria-hidden className="pointer-events-none absolute left-[-9px] top-[18px] h-px w-[9px] bg-ds-gray-200" />}
                       <button
                         onClick={() => setGruposAbiertos(s => toggleSet(s, etapa.idEtapa))}
                         className="flex items-center gap-2 flex-1 min-w-0 text-left"
@@ -654,7 +765,7 @@ export default function PartidasPage() {
                           </span>
                         )}
                       </button>
-                      <span className={NIVEL}>{termGrupo}</span>
+                      <span className={NIVEL}>{sec.tipoSec?.terminoGrupo ?? termGrupo}</span>
                       <span className="text-[11px] text-ds-gray-300 shrink-0 whitespace-nowrap hidden sm:inline">
                         {plural(totalPartidas, 'partida', 'partidas')}
                         {subsGrupo > 0 ? ` · ${plural(subsGrupo, 'subpartida', 'subpartidas')}` : ''}

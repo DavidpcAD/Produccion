@@ -2,11 +2,16 @@ import 'server-only';
 import { getDb, sql } from '@/lib/db';
 
 /**
- * TIPOS DE OBRA del catálogo (`h4.tipos_obra`). Son seis y los define el
+ * TIPOS DE OBRA del catálogo (`h4.tipos_obra`). Son siete y los define el
  * negocio, no el código:
  *
- *   O = Obra Vivienda · I = Infraestructura · A = Administrativa
- *   F = Fábrica       · T = Torres         · P = Postventa
+ *   C = Vivienda Construcción · G = Vivienda General · I = Infraestructura
+ *   A = Administrativa        · F = Fábrica          · T = Torres · P = Postventa
+ *
+ * Vivienda son dos: CONSTRUCCIÓN es la casa (el catálogo compartido de siempre:
+ * Gris, Acabados…) y GENERAL son las obras de generales de cada residencial
+ * (GEN-BAR, GEN-ILIOS, GEN-NOVA), que en BC también son PRO VIVIENDA pero no son
+ * casas: son materiales, mano de obra y servicios del proyecto, uno por obra.
  *
  * Cada tipo tiene su propio catálogo de tres niveles:
  *
@@ -68,11 +73,12 @@ const CAPITULO_DEDUCIDO = new Set(['POSTVENTA']);
 /**
  * Tipos donde la subpartida ES la partida: no hay desglose abajo, así que al traer
  * de BC se crea la subpartida espejo `<partida>.1` con el mismo nombre. Es la regla
- * que el negocio ya fijó para postventa (cada casa es una sola cosa) y la misma que
- * dejó escrita a mano `migrations/2026-09-17_subpartida_espejo_toda_partida.sql`
+ * que el negocio ya fijó para postventa (cada casa es una sola cosa) y para
+ * vivienda general (GEN-MAT, GEN-MO, GEN-SERV… tampoco se desglosan), y la misma
+ * que dejó escrita a mano `migrations/2026-09-17_subpartida_espejo_toda_partida.sql`
  * para fábrica, infra y administrativas.
  */
-const SUB_ESPEJO = new Set(['POSTVENTA']);
+const SUB_ESPEJO = new Set(['POSTVENTA', 'VIVIENDA_GEN']);
 
 /** Tipo al que caen las obras cuya área de costeo no está mapeada. */
 export const TIPO_POR_DEFECTO = 'ADMIN';
