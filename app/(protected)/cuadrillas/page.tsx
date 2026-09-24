@@ -15,7 +15,7 @@ import { motion } from 'motion/react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
-interface ObraLite { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null; }
+interface ObraLite { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null; tipoObra: string; }
 interface SubLite { idSubPartida: number; codigo: string; nombre: string; idPartida: number; partidaCodigo: string | null; partidaNombre: string | null; idProyecto?: number | null; }
 interface PartidaLite { idPartida: number; codigo: string; nombre: string; idEtapa?: number | null; }
 interface EtapaLite { idEtapa: number; codigo: string; nombre: string; tipoObra: string; bcWorksNo: string | null; }
@@ -86,15 +86,21 @@ const EMPTY = {
   subsByProy: {} as Record<number, number[]>,
 };
 
-// ─── Selector de OBRAS: buscador + lista con checkboxes (multi) ───────────────
-function ObrasPicker({ obras, selected, onChange }: {
-  obras: ObraLite[]; selected: number[]; onChange: (ids: number[]) => void;
+// ─── Selector de OBRAS: tipo de obra → buscador + lista con checkboxes ────────
+// Las obras van AMARRADAS al tipo: vivienda construcción muestra las de
+// PRO VIVIENDA menos las GEN-*, vivienda general solo las GEN-*, infra las
+// INF-*, y así (es el tipoObraEfectivo que ya calcula /api/obras).
+function ObrasPicker({ obras, tipos, selected, onChange }: {
+  obras: ObraLite[]; tipos: TipoLite[]; selected: number[]; onChange: (ids: number[]) => void;
 }) {
   const [q, setQ] = useState('');
+  // Arranca en el tipo de las obras que la cuadrilla ya tiene en este proyecto.
+  const [tipoSel, setTipoSel] = useState(() => obras.find(o => selected.includes(o.idObra))?.tipoObra || 'VIVIENDA');
   const term = q.trim().toLowerCase();
+  const delTipo = obras.filter(o => o.tipoObra === tipoSel);
   const filtered = term
-    ? obras.filter(o => coincideBusqueda([o.numeroObra, o.nombreMostrado ?? ''].join(' '), term))
-    : obras;
+    ? delTipo.filter(o => coincideBusqueda([o.numeroObra, o.nombreMostrado ?? ''].join(' '), term))
+    : delTipo;
   const sel = new Set(selected);
   const toggle = (id: number) => onChange(sel.has(id) ? selected.filter(x => x !== id) : [...selected, id]);
   const selObras = obras.filter(o => sel.has(o.idObra));
@@ -107,7 +113,7 @@ function ObrasPicker({ obras, selected, onChange }: {
         </div>
         <div className="flex-1 min-w-0">
           <label className="text-sm font-bold text-ds-ink">Obras <span className="text-ds-red">*</span></label>
-          <p className="text-xs text-ds-gray-400">Marcá en qué obras trabaja esta cuadrilla.</p>
+          <p className="text-xs text-ds-gray-400">Elegí el tipo de obra y marcá en cuáles trabaja esta cuadrilla.</p>
         </div>
         {filtered.length > 0 && (
           <button type="button"
@@ -139,8 +145,15 @@ function ObrasPicker({ obras, selected, onChange }: {
           ))}
         </div>
       )}
-      <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar obra por número o nombre…"
-        leftIcon={<Icon name="search" size="sm" color="currentColor" className="text-ds-gray-400" />} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Combobox value={tipoSel} onChange={setTipoSel} placeholder="Tipo de obra"
+          options={tipos.map(t => ({
+            value: t.codigo, label: `${t.letra} · ${t.nombre}`,
+            parts: [{ text: t.letra, weight: 'bold' as const }, { text: t.nombre, weight: 'light' as const }],
+          }))} />
+        <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar obra por número o nombre…"
+          leftIcon={<Icon name="search" size="sm" color="currentColor" className="text-ds-gray-400" />} />
+      </div>
       <div className="max-h-52 overflow-y-auto rounded-ds border border-ds-gray-200 divide-y divide-ds-gray-100 bg-ds-surface">
         {filtered.length === 0 ? (
           <p className="px-3 py-5 text-sm text-ds-gray-400 text-center">Sin obras</p>
@@ -396,7 +409,7 @@ export default function CuadrillasPage() {
       setCatalogos({ VIVIENDA: { etapas: pt.etapas ?? [], partidas: pt.partidas ?? [], subpartidas: pt.subpartidas ?? [] } });
       setProyectos(((pr.data ?? []) as { IDProyecto: number; Nombre: string }[]).map(x => ({ idProyecto: x.IDProyecto, nombre: x.Nombre })));
       setCuadrillas(c.data ?? []);
-      setObras((o.data ?? []).map((x: { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null }) => ({ idObra: x.idObra, numeroObra: x.numeroObra, nombreMostrado: x.nombreMostrado, idProyecto: x.idProyecto ?? null })));
+      setObras((o.data ?? []).map((x: { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null; tipoObraEfectivo?: string | null }) => ({ idObra: x.idObra, numeroObra: x.numeroObra, nombreMostrado: x.nombreMostrado, idProyecto: x.idProyecto ?? null, tipoObra: (x.tipoObraEfectivo ?? 'VIVIENDA').toUpperCase() })));
       setColaboradores(u.data ?? []);
       setUsuariosLogin(usu.data ?? []);
       setPartidas(pt.partidas ?? []);
@@ -958,34 +971,36 @@ export default function CuadrillasPage() {
               <button type="button" onClick={() => setModoEdicion(true)} className="text-xs font-semibold text-ds-ink hover:text-ds-gray-400 shrink-0">Editar</button>
             )}
           </div>
-          <fieldset disabled={!modoEdicion || !isAdmin} className="contents">
-            {form.proyectos.length === 0 ? (
-              <div className="rounded-ds-lg border border-dashed border-ds-gray-200 p-8 text-center">
-                <p className="text-sm text-ds-gray-400">Primero elegí los <span className="font-semibold text-ds-ink">proyectos</span> en la pestaña Datos.</p>
-              </div>
-            ) : (
-              <>
-                {form.proyectos.length > 1 && (
-                  <div className="flex flex-wrap gap-1.5 border-b border-ds-gray-200 pb-1">
-                    {form.proyectos.map(pid => {
-                      const nom = proyectos.find(x => x.idProyecto === pid)?.nombre ?? 'Proyecto';
-                      const nObras = (form.obrasByProy[pid] ?? []).length;
-                      const nSubs = (form.subsByProy[pid] ?? []).length;
-                      const activa = activeProy === pid;
-                      const completo = nObras > 0 && nSubs > 0;
-                      return (
-                        <button key={pid} type="button" onClick={() => setActiveProy(pid)}
-                          className={`inline-flex items-center gap-2 px-4 h-9 rounded-full text-sm font-semibold transition-colors ${activa ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500 hover:text-ds-ink'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${completo ? 'bg-brand' : 'bg-ds-red'}`} />
-                          {nom}
-                          <span className="text-[11px] font-bold opacity-70">{tab === 'casas' ? nObras : nSubs}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+          {form.proyectos.length === 0 ? (
+            <div className="rounded-ds-lg border border-dashed border-ds-gray-200 p-8 text-center">
+              <p className="text-sm text-ds-gray-400">Primero elegí los <span className="font-semibold text-ds-ink">proyectos</span> en la pestaña Datos.</p>
+            </div>
+          ) : (
+            <>
+              {/* Cambiar de proyecto es NAVEGAR, no editar: queda fuera del fieldset
+                  para que también funcione viendo la cuadrilla en modo lectura. */}
+              {form.proyectos.length > 1 && (
+                <div className="flex flex-wrap gap-1.5 border-b border-ds-gray-200 pb-1">
+                  {form.proyectos.map(pid => {
+                    const nom = proyectos.find(x => x.idProyecto === pid)?.nombre ?? 'Proyecto';
+                    const nObras = (form.obrasByProy[pid] ?? []).length;
+                    const nSubs = (form.subsByProy[pid] ?? []).length;
+                    const activa = activeProy === pid;
+                    const completo = nObras > 0 && nSubs > 0;
+                    return (
+                      <button key={pid} type="button" onClick={() => setActiveProy(pid)}
+                        className={`inline-flex items-center gap-2 px-4 h-9 rounded-full text-sm font-semibold transition-colors ${activa ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500 hover:text-ds-ink'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${completo ? 'bg-brand' : 'bg-ds-red'}`} />
+                        {nom}
+                        <span className="text-[11px] font-bold opacity-70">{tab === 'casas' ? nObras : nSubs}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <fieldset disabled={!modoEdicion || !isAdmin} className="contents">
                 {activeProy != null && (tab === 'casas' ? (
-                  <ObrasPicker key={`o-${activeProy}`}
+                  <ObrasPicker key={`o-${activeProy}`} tipos={tipos}
                     obras={obras.filter(o => o.idProyecto === activeProy)}
                     selected={form.obrasByProy[activeProy] ?? []}
                     onChange={ids => setForm(p => ({ ...p, obrasByProy: { ...p.obrasByProy, [activeProy]: ids } }))} />
@@ -997,9 +1012,9 @@ export default function CuadrillasPage() {
                     ocupadas={ocupadasByProy[activeProy]}
                     onChange={ids => setForm(p => ({ ...p, subsByProy: { ...p.subsByProy, [activeProy]: ids } }))} />
                 ))}
-              </>
-            )}
-          </fieldset>
+              </fieldset>
+            </>
+          )}
           </div>
           )}
 
