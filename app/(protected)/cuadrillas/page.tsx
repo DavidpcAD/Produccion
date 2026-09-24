@@ -69,6 +69,7 @@ interface Miembro {
 interface OtraMembresia { IDCol: number; IDCuadrilla: number; Cuadrilla: string; }
 interface CuadrillaDetalle extends Cuadrilla {
   IDEncargado: number;
+  Activo?: boolean;
   proyectos?: { idProyecto: number; nombre: string }[];
   obras: ObraLite[];
   subpartidas: SubLite[];
@@ -334,8 +335,12 @@ export default function CuadrillasPage() {
   const [asignando, setAsignando] = useState(false);
   const [quitandoId, setQuitandoId] = useState<number | null>(null);
 
-  // Crear / editar cuadrilla
+  // Crear / editar cuadrilla — UN modal con pestañas (como el editor de RH):
+  // Datos → Casas → Subpartidas → Miembros.
   const [modalOpen, setModalOpen] = useState(false);
+  const [tab, setTab] = useState<'datos' | 'casas' | 'subpartidas' | 'miembros'>('datos');
+  // Como el editor de RH: se abre en LECTURA y "Editar" habilita los campos.
+  const [modoEdicion, setModoEdicion] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY);
@@ -441,17 +446,22 @@ export default function CuadrillasPage() {
   function openCreate() {
     setEditId(null);
     setForm(EMPTY);
+    setVerCuad(null);
+    setSubsExtra([]);
+    setSelectedCol('');
+    setTab('datos');
+    setModoEdicion(true);
     setModalOpen(true);
   }
-  function openEdit(c: CuadrillaDetalle) {
-    setEditId(c.IDCuadrilla);
-    // Reconstruir bloques por proyecto desde obras (obra.idProyecto) y subpartidas (cs.idProyecto).
+  // Vuelca el detalle de la cuadrilla en el formulario (bloques por proyecto,
+  // reconstruidos desde obras (obra.idProyecto) y subpartidas (cs.idProyecto)).
+  function poblarForm(c: CuadrillaDetalle) {
     setSubsExtra(c.subpartidas ?? []);
     const obrasByProy: Record<number, number[]> = {};
     const subsByProy: Record<number, number[]> = {};
     for (const o of (c.obras ?? [])) if (o.idProyecto != null) (obrasByProy[o.idProyecto] ??= []).push(o.idObra);
     for (const s of (c.subpartidas ?? [])) if (s.idProyecto != null) (subsByProy[s.idProyecto] ??= []).push(s.idSubPartida);
-    const proyectos = [...new Set([
+    const proys = [...new Set([
       ...(c.proyectos ?? []).map(p => p.idProyecto),
       ...Object.keys(obrasByProy).map(Number),
       ...Object.keys(subsByProy).map(Number),
@@ -460,12 +470,29 @@ export default function CuadrillasPage() {
       nombre: c.Nombre,
       idEncargado: String(c.IDEncargado),
       capacidad: String(c.Capacidad),
-      proyectos,
+      proyectos: proys,
       obrasByProy,
       subsByProy,
     });
+  }
+  // Abrir una cuadrilla = el modal de pestañas, cargando su detalle.
+  async function abrirCuadrilla(c: Cuadrilla) {
+    setEditId(c.IDCuadrilla);
+    setForm({ ...EMPTY, nombre: c.Nombre });
     setVerCuad(null);
+    setSubsExtra([]);
+    setSelectedCol('');
+    setTab('datos');
+    setModoEdicion(false);
+    setLoadingMiembros(true);
     setModalOpen(true);
+    try {
+      const d: CuadrillaDetalle = await fetch(`/api/cuadrillas/${c.IDCuadrilla}`).then(r => r.json());
+      setVerCuad(d);
+      poblarForm(d);
+    } catch { toast('No se pudo cargar la cuadrilla', 'error'); } finally {
+      setLoadingMiembros(false);
+    }
   }
 
   async function handleSave() {
@@ -495,7 +522,17 @@ export default function CuadrillasPage() {
       });
       if (!res.ok) { const e = await res.json().catch(() => ({})); toast(e.error || 'Error guardando cuadrilla', 'error'); return; }
       toast(editId ? 'Cuadrilla actualizada' : 'Cuadrilla creada', 'success');
-      setModalOpen(false);
+      if (editId) {
+        // Igual que RH: se guarda y el panel vuelve a lectura, ya refrescado.
+        setModoEdicion(false);
+        try {
+          const d: CuadrillaDetalle = await fetch(`/api/cuadrillas/${editId}`).then(r => r.json());
+          setVerCuad(d);
+          poblarForm(d);
+        } catch { /* la lista de abajo igual se refresca */ }
+      } else {
+        setModalOpen(false);
+      }
       await loadCuadrillas();
       await loadEncargados();
     } finally {
@@ -506,17 +543,6 @@ export default function CuadrillasPage() {
   async function loadDetalle(idCuadrilla: number) {
     const d: CuadrillaDetalle = await fetch(`/api/cuadrillas/${idCuadrilla}`).then(r => r.json());
     setVerCuad(d);
-  }
-
-  async function openVerMiembros(c: Cuadrilla) {
-    setSelectedCol('');
-    setLoadingMiembros(true);
-    setVerCuad({ ...c, IDEncargado: 0, obras: [], subpartidas: [], miembros: [], otrasMembresias: [] });
-    try {
-      await loadDetalle(c.IDCuadrilla);
-    } catch { toast('No se pudieron cargar los miembros', 'error'); } finally {
-      setLoadingMiembros(false);
-    }
   }
 
   const otraCuadrillaPorCol = useMemo(() => {
@@ -800,8 +826,8 @@ export default function CuadrillasPage() {
                 variants={listItem}
                 role="button"
                 tabIndex={0}
-                onClick={() => openVerMiembros(c)}
-                onKeyDown={e => { if (e.key === 'Enter') openVerMiembros(c); }}
+                onClick={() => abrirCuadrilla(c)}
+                onKeyDown={e => { if (e.key === 'Enter') abrirCuadrilla(c); }}
                 className="group bg-ds-surface rounded-ds border border-ds-gray-200 shadow-ds-01 p-4 flex flex-col cursor-pointer hover:border-black hover:shadow-ds-02 transition-all">
                 <div className="flex items-start justify-between mb-2 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -840,15 +866,58 @@ export default function CuadrillasPage() {
       ))}
 
       {/* Crear / editar cuadrilla */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} size="2xl" title={editId ? 'Editar cuadrilla' : 'Nueva cuadrilla'}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} size="2xl" variant="drawer"
+        title={editId ? `Cuadrilla: ${form.nombre || '…'}` : 'Nueva cuadrilla'}
         footer={
           <>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button loading={saving} onClick={handleSave}>{editId ? 'Guardar cambios' : 'Crear cuadrilla'}</Button>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>Cerrar</Button>
+            {isAdmin && editId && !modoEdicion && (
+              <Button onClick={() => setModoEdicion(true)} icon={<Icon name="edit" size="sm" color="currentColor" />}>Editar</Button>
+            )}
+            {isAdmin && modoEdicion && editId && (
+              <Button variant="outline" onClick={() => { if (verCuad) poblarForm(verCuad); setModoEdicion(false); }}>Descartar</Button>
+            )}
+            {isAdmin && modoEdicion && (
+              <Button loading={saving} onClick={handleSave}>{editId ? 'Guardar cambios' : 'Crear cuadrilla'}</Button>
+            )}
           </>
         }
       >
         <div className="space-y-5">
+          {/* Pestañas al estilo del editor de colaboradores de RH: primero los datos,
+              después qué casas toma, después qué subpartidas, y por último la gente. */}
+          <div className="inline-flex gap-1 p-1 bg-ds-gray-100 rounded-full flex-wrap">
+            {([
+              { val: 'datos' as const, label: 'Datos', icon: 'edit', badge: null },
+              { val: 'casas' as const, label: 'Casas', icon: 'folder', badge: Object.values(form.obrasByProy).reduce((n, a) => n + a.length, 0) || null },
+              { val: 'subpartidas' as const, label: 'Subpartidas', icon: 'list', badge: Object.values(form.subsByProy).reduce((n, a) => n + a.length, 0) || null },
+              { val: 'miembros' as const, label: 'Miembros', icon: 'user', badge: (verCuad?.miembros ?? []).filter(m => m.Activo).length || null },
+            ]).map(t => (
+              <button key={t.val} type="button" onClick={() => setTab(t.val)} aria-current={tab === t.val}
+                className={`inline-flex items-center gap-2 px-4 h-10 rounded-full text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${tab === t.val ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-ds-ink'}`}>
+                <Icon name={t.icon} size="sm" color="currentColor" />
+                {t.label}
+                {t.badge != null && (
+                  <span className={`inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold ${tab === t.val ? 'bg-brand text-black' : 'bg-ds-gray-200 text-ds-gray-500'}`}>
+                    {t.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'datos' && (
+          <div className="space-y-5">
+          <div className="flex items-center justify-between gap-3 border-b border-ds-gray-100 pb-2">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <h3 className="font-bold text-ds-ink text-sm shrink-0">Datos de la cuadrilla</h3>
+              {editId && <span className="font-mono text-[11px] font-semibold rounded-ds border border-ds-gray-200 bg-ds-gray-100 px-1.5 py-0.5 text-ds-gray-500">Cuadrilla #{editId}</span>}
+            </div>
+            {editId && verCuad && (
+              <Badge variant={verCuad.Activo === false ? 'gray' : 'green'}>{verCuad.Activo === false ? 'Inactiva' : 'Activa'}</Badge>
+            )}
+          </div>
+          <fieldset disabled={!modoEdicion || !isAdmin} className="contents">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Nombre de la cuadrilla" placeholder="Cuadrilla A — Cimentación" value={form.nombre}
               onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} required />
@@ -871,214 +940,188 @@ export default function CuadrillasPage() {
             <Input label="Capacidad máxima" type="number" min={1} value={form.capacidad}
               onChange={e => setForm(p => ({ ...p, capacidad: e.target.value }))} />
           </div>
-
-          {form.proyectos.length === 0 ? (
-            <div className="rounded-ds-lg border border-dashed border-ds-gray-200 p-8 text-center">
-              <p className="text-sm text-ds-gray-400">Elegí uno o más <span className="font-semibold text-ds-ink">proyectos</span> para ver sus obras y subpartidas.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Pestañas: se trabaja UN proyecto a la vez (obras + subpartidas de ese proyecto). */}
-              {form.proyectos.length > 1 && (
-                <div className="flex flex-wrap gap-1.5 border-b border-ds-gray-200 pb-1">
-                  {form.proyectos.map(pid => {
-                    const nom = proyectos.find(x => x.idProyecto === pid)?.nombre ?? 'Proyecto';
-                    const nObras = (form.obrasByProy[pid] ?? []).length;
-                    const nSubs = (form.subsByProy[pid] ?? []).length;
-                    const activa = activeProy === pid;
-                    const completo = nObras > 0 && nSubs > 0;
-                    return (
-                      <button key={pid} type="button" onClick={() => setActiveProy(pid)}
-                        className={`inline-flex items-center gap-2 px-4 h-9 rounded-full text-sm font-semibold transition-colors ${activa ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500 hover:text-ds-ink'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${completo ? 'bg-brand' : 'bg-ds-red'}`} />
-                        {nom}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {activeProy != null && (() => {
-                const pid = activeProy;
-                const nom = proyectos.find(x => x.idProyecto === pid)?.nombre ?? 'Proyecto';
-                return (
-                  <div key={pid} className="rounded-ds-lg border border-ds-gray-200 p-4 space-y-3 bg-ds-gray-100/30">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
-                        <Icon name="folder" size="sm" color="currentColor" className="text-brand" />
-                      </div>
-                      <h3 className="font-bold text-ds-ink text-label">{nom}</h3>
-                      <span className="text-xs text-ds-gray-400">· obras y subpartidas de este proyecto</span>
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                      <ObrasPicker
-                        obras={obras.filter(o => o.idProyecto === pid)}
-                        selected={form.obrasByProy[pid] ?? []}
-                        onChange={ids => setForm(p => ({ ...p, obrasByProy: { ...p.obrasByProy, [pid]: ids } }))} />
-                      <SubpartidasPicker tipos={tipos} catalogos={catalogos}
-                        cargandoTipos={cargandoTipos} onCargarTipo={cargarCatalogo}
-                        subsIndex={subsIndex}
-                        selected={form.subsByProy[pid] ?? []}
-                        ocupadas={ocupadasByProy[pid]}
-                        onChange={ids => setForm(p => ({ ...p, subsByProy: { ...p.subsByProy, [pid]: ids } }))} />
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
+          </fieldset>
+          <p className="text-xs text-ds-gray-400">
+            {modoEdicion
+              ? <>Con los proyectos elegidos, pasá a <span className="font-semibold text-ds-ink">Casas</span> para marcar en qué obras trabaja y a <span className="font-semibold text-ds-ink">Subpartidas</span> para indicarle qué puede ejecutar.</>
+              : <>Estás viendo la cuadrilla. Tocá <span className="font-semibold text-ds-ink">Editar</span> (abajo) para cambiar datos, casas o subpartidas.</>}
+          </p>
+          </div>
           )}
-        </div>
-      </Modal>
 
-      {/* Ver miembros de la cuadrilla */}
-      <Modal
-        open={!!verCuad}
-        onClose={() => setVerCuad(null)}
-        size="xl"
-        title={verCuad ? `Cuadrilla: ${verCuad.Nombre}` : ''}
-        footer={<Button variant="outline" onClick={() => setVerCuad(null)}>Cerrar</Button>}
-      >
-        <div className="space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 space-y-2">
-              {verCuad?.Proyecto && (
-                <div>
-                  <p className="text-xs font-semibold text-ds-gray-400 mb-1">Proyecto</p>
-                  <Badge variant="green">{verCuad.Proyecto}</Badge>
-                </div>
-              )}
-              {(verCuad?.obras?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-ds-gray-400 mb-1">Obras</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {verCuad!.obras.map(o => <Badge key={o.idObra} variant="green">{o.numeroObra}</Badge>)}
-                  </div>
-                </div>
-              )}
-              {(verCuad?.subpartidas?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-ds-gray-400 mb-1">Subpartidas</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {/* La misma subpartida puede estar en varios proyectos (una fila por
-                        proyecto en CuadrillaSubPartida): la clave lleva ambos. */}
-                    {verCuad!.subpartidas.map(s => (
-                      <Badge key={`${s.idSubPartida}-${s.idProyecto ?? 0}`} variant="black">{s.codigo} · {s.nombre}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* Un proyecto a la vez: la misma fila de pestañas de proyecto sirve para
+              Casas y para Subpartidas. */}
+          {(tab === 'casas' || tab === 'subpartidas') && (
+          <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 border-b border-ds-gray-100 pb-2">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <h3 className="font-bold text-ds-ink text-sm shrink-0">{tab === 'casas' ? 'Casas por proyecto' : 'Subpartidas que puede trabajar'}</h3>
+              {editId && <span className="font-mono text-[11px] font-semibold rounded-ds border border-ds-gray-200 bg-ds-gray-100 px-1.5 py-0.5 text-ds-gray-500">Cuadrilla #{editId}</span>}
             </div>
-            {isAdmin && verCuad && verCuad.IDEncargado > 0 && (
-              <Button variant="outline" size="sm" onClick={() => openEdit(verCuad)}
-                icon={<Icon name="edit" size="sm" color="currentColor" />} className="shrink-0">
-                Editar cuadrilla
-              </Button>
+            {!modoEdicion && editId && isAdmin && (
+              <button type="button" onClick={() => setModoEdicion(true)} className="text-xs font-semibold text-ds-ink hover:text-ds-gray-400 shrink-0">Editar</button>
             )}
           </div>
-
-          {isAdmin && (
-            <div className="flex items-end gap-2">
-              <div className="flex-1 min-w-0">
-                <Combobox label="Agregar usuario" value={selectedCol} onChange={setSelectedCol}
-                  placeholder="Buscar colaborador…"
-                  options={colaboradores
-                    .filter(c => !yaEnEsta.has(c.IDCol))
-                    .map(c => {
-                      const otra = otraCuadrillaPorCol.get(c.IDCol);
-                      return {
-                        value: String(c.IDCol),
-                        label: `${c.NombreCompleto}${otra ? ` (en ${otra})` : ''}`,
-                        parts: otra
-                          ? [{ text: c.NombreCompleto, weight: 'light' as const }, { text: `en ${otra}`, weight: 'light' as const }]
-                          : [{ text: c.NombreCompleto, weight: 'bold' as const }, ...(c.Cedula ? [{ text: c.Cedula, weight: 'light' as const }] : [])],
-                        search: c.Cedula,
-                      };
-                    })}
-                />
+          <fieldset disabled={!modoEdicion || !isAdmin} className="contents">
+            {form.proyectos.length === 0 ? (
+              <div className="rounded-ds-lg border border-dashed border-ds-gray-200 p-8 text-center">
+                <p className="text-sm text-ds-gray-400">Primero elegí los <span className="font-semibold text-ds-ink">proyectos</span> en la pestaña Datos.</p>
               </div>
-              <Button onClick={handleAgregarMiembro} loading={addingMiembro} disabled={!selectedCol}
-                icon={<Icon name="plus" size="sm" color="currentColor" />}>
-                Agregar
-              </Button>
-            </div>
-          )}
-          {selectedCol && otraCuadrillaPorCol.get(parseInt(selectedCol)) && (
-            <p className="text-xs text-ds-red">
-              Este colaborador ya pertenece a la cuadrilla “{otraCuadrillaPorCol.get(parseInt(selectedCol))}”. Quítalo de ahí antes de agregarlo aquí.
-            </p>
-          )}
-
-          {loadingMiembros ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
-            </div>
-          ) : (() => {
-            const activos = verCuad?.miembros.filter(m => m.Activo) ?? [];
-            const encId = verCuad?.IDEncargado ?? 0;
-            const encMiembro = activos.find(m => m.IDCol === encId);
-            const resto = activos.filter(m => m.IDCol !== encId);
-            const encNombre = encMiembro?.NombreCompleto ?? verCuad?.Encargado ?? null;
-            const encIni = (encNombre || '?').split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('');
-
-            if (activos.length === 0 && !encNombre) {
-              return (
-                <div className="flex flex-col items-center justify-center py-10 text-ds-gray-300">
-                  <Icon name="user" size="lg" color="currentColor" className="mb-2" />
-                  <p className="text-sm font-semibold text-ds-ink">Sin miembros en esta cuadrilla</p>
-                  <p className="text-xs text-ds-gray-400 mt-1">Agregá el primero con “Agregar”.</p>
-                </div>
-              );
-            }
-
-            return (
-              <div className="space-y-2">
-                {encNombre && (
-                  <div className="flex items-center gap-3 px-4 py-2.5 rounded-ds bg-black text-white">
-                    <div className="w-9 h-9 rounded-ds bg-brand flex items-center justify-center text-black text-xs font-bold shrink-0 shadow-ds-02">{encIni}</div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate">{encNombre}</p>
-                      <p className="text-xs text-ds-gray-300 truncate">
-                        {encMiembro ? `${encMiembro.Cedula} · ${encMiembro.Puesto || 'Sin puesto'}` : 'Encargado (no cuenta como miembro)'}
-                      </p>
-                    </div>
-                    <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-black bg-brand rounded-full px-2 py-0.5">
-                      <Icon name="rol" size="sm" color="currentColor" /> Encargado
-                    </span>
-                  </div>
-                )}
-
-                {resto.length > 0 && (
-                  <div className="rounded-ds border border-ds-gray-200 divide-y divide-ds-gray-100 max-h-[45vh] overflow-y-auto">
-                    {resto.map(m => {
-                      const ini = (m.NombreCompleto || '?').split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('');
+            ) : (
+              <>
+                {form.proyectos.length > 1 && (
+                  <div className="flex flex-wrap gap-1.5 border-b border-ds-gray-200 pb-1">
+                    {form.proyectos.map(pid => {
+                      const nom = proyectos.find(x => x.idProyecto === pid)?.nombre ?? 'Proyecto';
+                      const nObras = (form.obrasByProy[pid] ?? []).length;
+                      const nSubs = (form.subsByProy[pid] ?? []).length;
+                      const activa = activeProy === pid;
+                      const completo = nObras > 0 && nSubs > 0;
                       return (
-                        <div key={m.IDCuadMiembro} className="flex items-center gap-3 px-4 py-2.5">
-                          <div className="w-9 h-9 rounded-ds bg-ds-gray-100 flex items-center justify-center text-ds-ink text-xs font-bold shrink-0">{ini}</div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-ds-ink truncate">{m.NombreCompleto}</p>
-                            <p className="text-xs text-ds-gray-400 truncate">{m.Cedula} · {m.Puesto || 'Sin puesto'}</p>
-                          </div>
-                          {isAdmin && (
-                            <button
-                              onClick={() => handleQuitarMiembro(m.IDCuadMiembro)}
-                              disabled={removingId === m.IDCuadMiembro}
-                              title="Quitar de la cuadrilla"
-                              aria-label="Quitar de la cuadrilla"
-                              className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-ds text-ds-gray-400 hover:text-ds-red hover:bg-ds-gray-100 transition-colors disabled:opacity-50"
-                            >
-                              <Icon name="remove" size="sm" color="currentColor" />
-                            </button>
-                          )}
-                        </div>
+                        <button key={pid} type="button" onClick={() => setActiveProy(pid)}
+                          className={`inline-flex items-center gap-2 px-4 h-9 rounded-full text-sm font-semibold transition-colors ${activa ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500 hover:text-ds-ink'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${completo ? 'bg-brand' : 'bg-ds-red'}`} />
+                          {nom}
+                          <span className="text-[11px] font-bold opacity-70">{tab === 'casas' ? nObras : nSubs}</span>
+                        </button>
                       );
                     })}
                   </div>
                 )}
+                {activeProy != null && (tab === 'casas' ? (
+                  <ObrasPicker key={`o-${activeProy}`}
+                    obras={obras.filter(o => o.idProyecto === activeProy)}
+                    selected={form.obrasByProy[activeProy] ?? []}
+                    onChange={ids => setForm(p => ({ ...p, obrasByProy: { ...p.obrasByProy, [activeProy]: ids } }))} />
+                ) : (
+                  <SubpartidasPicker key={`s-${activeProy}`} tipos={tipos} catalogos={catalogos}
+                    cargandoTipos={cargandoTipos} onCargarTipo={cargarCatalogo}
+                    subsIndex={subsIndex}
+                    selected={form.subsByProy[activeProy] ?? []}
+                    ocupadas={ocupadasByProy[activeProy]}
+                    onChange={ids => setForm(p => ({ ...p, subsByProy: { ...p.subsByProy, [activeProy]: ids } }))} />
+                ))}
+              </>
+            )}
+          </fieldset>
+          </div>
+          )}
+
+          {tab === 'miembros' && (
+          <div className="space-y-3">
+            {!editId ? (
+              <div className="rounded-ds-lg border border-dashed border-ds-gray-200 p-8 text-center">
+                <p className="text-sm text-ds-gray-400">Creá la cuadrilla primero; después podés agregarle miembros acá.</p>
               </div>
-            );
-          })()}
+            ) : (
+              <>
+              {isAdmin && (
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Combobox label="Agregar usuario" value={selectedCol} onChange={setSelectedCol}
+                      placeholder="Buscar colaborador…"
+                      options={colaboradores
+                        .filter(c => !yaEnEsta.has(c.IDCol))
+                        .map(c => {
+                          const otra = otraCuadrillaPorCol.get(c.IDCol);
+                          return {
+                            value: String(c.IDCol),
+                            label: `${c.NombreCompleto}${otra ? ` (en ${otra})` : ''}`,
+                            parts: otra
+                              ? [{ text: c.NombreCompleto, weight: 'light' as const }, { text: `en ${otra}`, weight: 'light' as const }]
+                              : [{ text: c.NombreCompleto, weight: 'bold' as const }, ...(c.Cedula ? [{ text: c.Cedula, weight: 'light' as const }] : [])],
+                            search: c.Cedula,
+                          };
+                        })}
+                    />
+                  </div>
+                  <Button onClick={handleAgregarMiembro} loading={addingMiembro} disabled={!selectedCol}
+                    icon={<Icon name="plus" size="sm" color="currentColor" />}>
+                    Agregar
+                  </Button>
+                </div>
+              )}
+              {selectedCol && otraCuadrillaPorCol.get(parseInt(selectedCol)) && (
+                <p className="text-xs text-ds-red">
+                  Este colaborador ya pertenece a la cuadrilla “{otraCuadrillaPorCol.get(parseInt(selectedCol))}”. Quítalo de ahí antes de agregarlo aquí.
+                </p>
+              )}
+              {loadingMiembros ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : (() => {
+                const activos = verCuad?.miembros.filter(m => m.Activo) ?? [];
+                const encId = verCuad?.IDEncargado ?? 0;
+                const encMiembro = activos.find(m => m.IDCol === encId);
+                const resto = activos.filter(m => m.IDCol !== encId);
+                const encNombre = encMiembro?.NombreCompleto ?? verCuad?.Encargado ?? null;
+                const encIni = (encNombre || '?').split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('');
+
+                if (activos.length === 0 && !encNombre) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-10 text-ds-gray-300">
+                      <Icon name="user" size="lg" color="currentColor" className="mb-2" />
+                      <p className="text-sm font-semibold text-ds-ink">Sin miembros en esta cuadrilla</p>
+                      <p className="text-xs text-ds-gray-400 mt-1">Agregá el primero con “Agregar”.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {encNombre && (
+                      <div className="flex items-center gap-3 px-4 py-2.5 rounded-ds bg-black text-white">
+                        <div className="w-9 h-9 rounded-ds bg-brand flex items-center justify-center text-black text-xs font-bold shrink-0 shadow-ds-02">{encIni}</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold truncate">{encNombre}</p>
+                          <p className="text-xs text-ds-gray-300 truncate">
+                            {encMiembro ? `${encMiembro.Cedula} · ${encMiembro.Puesto || 'Sin puesto'}` : 'Encargado (no cuenta como miembro)'}
+                          </p>
+                        </div>
+                        <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-black bg-brand rounded-full px-2 py-0.5">
+                          <Icon name="rol" size="sm" color="currentColor" /> Encargado
+                        </span>
+                      </div>
+                    )}
+
+                    {resto.length > 0 && (
+                      <div className="rounded-ds border border-ds-gray-200 divide-y divide-ds-gray-100 max-h-[45vh] overflow-y-auto">
+                        {resto.map(m => {
+                          const ini = (m.NombreCompleto || '?').split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('');
+                          return (
+                            <div key={m.IDCuadMiembro} className="flex items-center gap-3 px-4 py-2.5">
+                              <div className="w-9 h-9 rounded-ds bg-ds-gray-100 flex items-center justify-center text-ds-ink text-xs font-bold shrink-0">{ini}</div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-ds-ink truncate">{m.NombreCompleto}</p>
+                                <p className="text-xs text-ds-gray-400 truncate">{m.Cedula} · {m.Puesto || 'Sin puesto'}</p>
+                              </div>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => handleQuitarMiembro(m.IDCuadMiembro)}
+                                  disabled={removingId === m.IDCuadMiembro}
+                                  title="Quitar de la cuadrilla"
+                                  aria-label="Quitar de la cuadrilla"
+                                  className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-ds text-ds-gray-400 hover:text-ds-red hover:bg-ds-gray-100 transition-colors disabled:opacity-50"
+                                >
+                                  <Icon name="remove" size="sm" color="currentColor" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              </>
+            )}
+          </div>
+          )}
         </div>
       </Modal>
+
 
       {/* Asignar UN encargado a varias subpartidas (libres) de la partida */}
       <Modal

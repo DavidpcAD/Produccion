@@ -12,11 +12,13 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  /** 'drawer' = panel pegado a la DERECHA, a toda altura (como el editor de RH). */
+  variant?: 'center' | 'drawer';
 }
 
 const sizes = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl', '2xl': 'max-w-6xl' };
 
-export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, size = 'md', variant = 'center' }: ModalProps) {
   useEffect(() => {
     if (open) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = '';
@@ -35,7 +37,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         // z-[70]: por ENCIMA del menú lateral (.app-nav, z-index 60) y de su velo
         // (.app-nav-overlay, 55). Con z-50 el menú abierto en tablet se pintaba sobre
         // el modal y el velo del menú lo dejaba gris. Ver la escala en globals.css.
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className={`fixed inset-0 z-[70] flex ${variant === 'drawer' ? 'items-stretch justify-end' : 'items-center justify-center p-4'}`}>
           <motion.div
             className="absolute inset-0 bg-black/50"
             initial={{ opacity: 0 }}
@@ -48,10 +50,12 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className={`relative w-full ${sizes[size]} bg-ds-surface rounded-ds-lg shadow-ds-01 flex flex-col max-h-[90vh]`}
-            initial={{ opacity: 0, scale: 0.95, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 12 }}
+            className={variant === 'drawer'
+              ? `relative w-full ${sizes[size]} bg-ds-surface rounded-l-ds-lg shadow-ds-01 flex flex-col h-full max-h-full`
+              : `relative w-full ${sizes[size]} bg-ds-surface rounded-ds-lg shadow-ds-01 flex flex-col max-h-[90vh]`}
+            initial={variant === 'drawer' ? { x: '100%' } : { opacity: 0, scale: 0.95, y: 12 }}
+            animate={variant === 'drawer' ? { x: 0 } : { opacity: 1, scale: 1, y: 0 }}
+            exit={variant === 'drawer' ? { x: '100%' } : { opacity: 0, scale: 0.95, y: 12 }}
             transition={springs.expanding}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-ds-gray-100">
@@ -67,7 +71,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
             {footer && (
-              <div className="px-6 py-4 border-t border-ds-gray-100 flex justify-end gap-3 bg-ds-gray-100/50 rounded-b-ds-lg">
+              <div className={`px-6 py-4 border-t border-ds-gray-100 flex justify-end gap-3 bg-ds-gray-100/50 ${variant === 'drawer' ? 'rounded-bl-ds-lg' : 'rounded-b-ds-lg'}`}>
                 {footer}
               </div>
             )}
