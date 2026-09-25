@@ -6,10 +6,13 @@ import { guardCompras, esRechazo } from "@/lib/compras/guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// `exigeTodo`: Registrar la recepción en BC es de quien recibe. Quien solo pide
+// material no tiene pantalla para esto, pero el proxy dejaba pasar la llamada.
+
 // MODO 2 — Solo recepción en BC (material bien, factura en revisión).
 // body: { orderNo, lineas: [{itemNo, qty}], postingDate? }
 export async function POST(req: Request) {
-  const g = await guardCompras();
+  const g = await guardCompras({ exigeTodo: true });
   if (esRechazo(g)) return g;
 
   try {

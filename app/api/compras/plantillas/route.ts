@@ -6,6 +6,9 @@ import { guardCompras, esRechazo } from "@/lib/compras/guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// `exigeTodo`: Las plantillas se leen desde el pedido nuevo, pero solo el ingeniero las guarda. Quien solo pide
+// material no tiene pantalla para esto, pero el proxy dejaba pasar la llamada.
+
 export async function GET() {
   const g = await guardCompras();
   if (esRechazo(g)) return g;
@@ -18,7 +21,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const g = await guardCompras();
+  const g = await guardCompras({ exigeTodo: true });
   if (esRechazo(g)) return g;
 
   try {

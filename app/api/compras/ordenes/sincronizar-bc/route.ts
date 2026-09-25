@@ -7,6 +7,9 @@ import { guardCompras, esRechazo } from "@/lib/compras/guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// `exigeTodo`: Sincronizar contra BC es de Proveeduría. Quien solo pide
+// material no tiene pantalla para esto, pero el proxy dejaba pasar la llamada.
+
 // EL ESTADO DE LA ORDEN SIGUE AL DEL PEDIDO EN BUSINESS CENTRAL.
 //
 // Hasta el 3/9/2026 la app escribía "lanzado" y no volvía a mirar. Si el lanzamiento
@@ -41,7 +44,7 @@ function estadoDe(e: BcEstadoPedido | undefined): EstadoBcOrden {
 }
 
 export async function POST(req: Request) {
-  const g = await guardCompras();
+  const g = await guardCompras({ exigeTodo: true });
   if (esRechazo(g)) return g;
 
   try {

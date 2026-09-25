@@ -1,7 +1,7 @@
 import { getPool, sql } from "./db";
 import { etiquetaInterna } from "./helpers";
 import { bcDeepLinkPedido } from "./bc";
-import type { Orden, OrdenLinea, Pedido, PedidoLinea, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
+import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
 
 /* ============================================================================
    Capa de acceso a datos (SQL Server) para Compras Adelante.
@@ -130,6 +130,46 @@ export async function getPedido(id: number): Promise<Pedido | null> {
   if (!h.recordset.length) return null;
   const d = await pool.request().input("id", sql.Int, id).query(`SELECT d.*, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d WHERE d.idPedidoCompra=@id ORDER BY d.idPedidoCompraDet`);
   return mapPedido(h.recordset[0], d.recordset);
+}
+
+/** Quién creó un pedido, sin bajar las líneas.
+ *
+ *  Lo usa `lib/compras/guard.ts` para decidir si quien llama puede tocar ESTE
+ *  pedido. Va aparte de `getPedido` a propósito: traer la cabecera y todas las
+ *  líneas para leer dos campos sería una consulta de más en cada escritura, y
+ *  esta corre antes de todas. Devuelve `null` si no existe o está borrado. */
+export async function autorDePedido(
+  id: number,
+): Promise<{ creadoPorId?: string; solicitante: string } | null> {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.Int, id).query(
+    "SELECT creadoPor, solicitante FROM dbo.PedidoCompra WHERE idPedidoCompra=@id AND esEliminada = 0",
+  );
+  if (!r.recordset.length) return null;
+  const f = r.recordset[0];
+  return { creadoPorId: f.creadoPor ?? undefined, solicitante: f.solicitante ?? "" };
+}
+
+/** Los creadores de los pedidos que originaron esta orden.
+ *
+ *  El enlace vive a nivel de LÍNEA (OrdenCompraDet.idPedidoCompraDet), y una
+ *  orden puede juntar líneas de varios pedidos —por eso es una lista y no un
+ *  autor—: alcanza con que UNO sea de quien pregunta para que la orden sea suya.
+ *  Devuelve vacío en una orden de compra directa, que no nace de ningún pedido. */
+export async function autoresDeOrden(
+  idOrden: number,
+): Promise<{ creadoPorId?: string; solicitante: string }[]> {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.Int, idOrden).query(`
+    SELECT DISTINCT p.creadoPor, p.solicitante
+      FROM dbo.OrdenCompraDet d
+      JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
+      JOIN dbo.PedidoCompra p ON p.idPedidoCompra = pd.idPedidoCompra AND p.esEliminada = 0
+     WHERE d.idOrdenCompra = @id`);
+  return r.recordset.map((f) => ({
+    creadoPorId: f.creadoPor ?? undefined,
+    solicitante: f.solicitante ?? "",
+  }));
 }
 
 function mapPedido(p: any, lineas: any[]): Pedido {
@@ -943,16 +983,37 @@ export async function setRecepcionFactura(idRec: number, numeroFactura: string, 
  *  página bajaba las dos tablas enteras con todas sus líneas para mostrar un número.
  *  Es la misma definición que `pedidoTieneDevolucion`: el pedido entero devuelto, o
  *  alguna línea suelta devuelta. */
-export async function contarDevoluciones(): Promise<{ pedidosDevueltos: number; ordenesRechazadas: number }> {
+/**
+ * Conteo para el badge de la navegación.
+ *
+ * `soloDe` acota a las solicitudes de una persona: es lo que necesita quien solo
+ * pide material (ver el alcance en lib/compras/guard.ts). Sin él, su badge contaba
+ * las devoluciones de TODA la empresa —un número que ni podía ver ni podía
+ * arreglar— y de paso le decía cuánto trabajo ajeno había dado vuelta.
+ *
+ * Las órdenes rechazadas no entran en ese conteo: rechazar es cosa de Aprobación y
+ * quien pide material no tiene pantalla donde atenderlas.
+ */
+export async function contarDevoluciones(
+  soloDe?: { username?: string; nombre?: string },
+): Promise<{ pedidosDevueltos: number; ordenesRechazadas: number }> {
   await ensureEstados();
   const pool = await getPool();
   const r = await pool.request()
     .input("devuelto", sql.NVarChar(50), NOMBRE_POR_CODIGO.devuelto)
     .input("rechazado", sql.NVarChar(50), NOMBRE_POR_CODIGO.rechazado)
+    // Mismo criterio que `pedidoEsDelUsuario`: el id estable (username) o, para los
+    // pedidos históricos que no lo traen, el nombre del solicitante.
+    .input("acotar", sql.Bit, soloDe ? 1 : 0)
+    .input("username", sql.NVarChar(200), soloDe?.username ?? "")
+    .input("nombre", sql.NVarChar(200), soloDe?.nombre ?? "")
     .query(`
       SELECT
         (SELECT COUNT(*) FROM dbo.PedidoCompra p
           WHERE p.esEliminada = 0
+            AND (@acotar = 0
+              OR (@username <> '' AND p.creadoPor = @username)
+              OR (@nombre <> '' AND p.solicitante = @nombre))
             AND (EXISTS (SELECT 1 FROM dbo.Estado e WHERE e.idEstado = p.idEstado AND e.modulo = 'Compras' AND e.estado = @devuelto)
               OR EXISTS (SELECT 1 FROM dbo.PedidoCompraDet d
                            JOIN dbo.Estado e2 ON e2.idEstado = d.idEstado AND e2.modulo = 'Compras'
@@ -960,7 +1021,7 @@ export async function contarDevoluciones(): Promise<{ pedidosDevueltos: number; 
         ) AS pedidosDevueltos,
         (SELECT COUNT(*) FROM dbo.OrdenCompra o
            JOIN dbo.Estado e ON e.idEstado = o.idEstado AND e.modulo = 'Compras'
-          WHERE o.esEliminada = 0 AND e.estado = @rechazado
+          WHERE o.esEliminada = 0 AND e.estado = @rechazado AND @acotar = 0
         ) AS ordenesRechazadas`);
   const f = r.recordset[0];
   return { pedidosDevueltos: Number(f?.pedidosDevueltos ?? 0), ordenesRechazadas: Number(f?.ordenesRechazadas ?? 0) };
@@ -1000,9 +1061,13 @@ interface FilaMovimiento {
   detalle: string | null; usuario: string; rol: string; fecha: Date | null;
 }
 
-function mapMovimiento(m: FilaMovimiento) {
+function mapMovimiento(m: FilaMovimiento): Movimiento {
   return {
-    id: String(m.idMovimiento), entidad: m.entidad, idEntidad: String(m.idEntidad), documentoNo: m.documentoNo ?? "",
+    // `entidad` y `rol` vienen como texto de la base; los valores los escribe esta
+    // misma app (ver logMov), así que se estrechan al tipo, igual que `rol`. Sin
+    // esto la lista sale como string suelto y no calza con Movimiento[].
+    id: String(m.idMovimiento), entidad: m.entidad as Movimiento["entidad"],
+    idEntidad: String(m.idEntidad), documentoNo: m.documentoNo ?? "",
     tipoMovimiento: m.tipoMovimiento, estadoAnterior: codigoDeId(m.idEstadoAnterior), estadoNuevo: codigoDeId(m.idEstadoNuevo),
     detalle: m.detalle ?? undefined, usuario: m.usuario, rol: m.rol as Role, fecha: m.fecha?.toISOString() ?? "",
   };

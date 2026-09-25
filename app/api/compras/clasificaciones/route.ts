@@ -6,6 +6,9 @@ import { guardCompras, esRechazo } from "@/lib/compras/guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// `exigeTodo`: El catálogo de clasificaciones lo edita el ingeniero. Quien solo pide
+// material no tiene pantalla para esto, pero el proxy dejaba pasar la llamada.
+
 // Árbol del maestro: etapa -> partida -> sub_partida + clasificaciones del ingeniero.
 export async function GET() {
   const g = await guardCompras();
@@ -20,7 +23,7 @@ export async function GET() {
 
 // Crear una clasificación (control del ingeniero) colgando de una partida O sub_partida.
 export async function POST(req: Request) {
-  const g = await guardCompras();
+  const g = await guardCompras({ exigeTodo: true });
   if (esRechazo(g)) return g;
 
   try {

@@ -6,12 +6,15 @@ import { guardCompras, esRechazo } from "@/lib/compras/guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// `exigeTodo`: Las notas de crédito son de contabilidad. Quien solo pide
+// material no tiene pantalla para esto, pero el proxy dejaba pasar la llamada.
+
 // GET  /api/notas-credito  → { notas: [...] }  (líneas marcadas para nota de crédito)
 // POST /api/notas-credito  → crea las líneas marcadas. Body: { idOrdenCompra, usuario, lineas }
 // Aislado del bootstrap: si la tabla dbo.NotaCreditoDet no existe, GET devuelve []
 // y no rompe el resto de la app.
 export async function GET() {
-  const g = await guardCompras();
+  const g = await guardCompras({ exigeTodo: true });
   if (esRechazo(g)) return g;
 
   try {
@@ -22,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const g = await guardCompras();
+  const g = await guardCompras({ exigeTodo: true });
   if (esRechazo(g)) return g;
 
   try {

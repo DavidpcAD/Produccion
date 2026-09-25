@@ -14,7 +14,12 @@ export async function GET() {
   if (esRechazo(g)) return g;
 
   try {
-    return NextResponse.json(await contarDevoluciones());
+    // Quien solo pide material cuenta LO SUYO: el badge le mostraba las
+    // devoluciones de toda la empresa, que ni ve ni puede atender.
+    const soloDe = g.alcance === "todo"
+      ? undefined
+      : { username: g.session.username, nombre: g.session.nombre };
+    return NextResponse.json(await contarDevoluciones(soloDe));
   } catch (e: unknown) {
     return NextResponse.json({ error: String((e as { message?: string })?.message ?? e) }, { status: 500 });
   }

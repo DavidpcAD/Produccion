@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { mensajeParaCliente } from "@/lib/errores";
 import { getOrden, setOrdenEstado } from "@/lib/compras/repo";
 import { bcEnviarAAprobacion, bcReabrirPedido } from "@/lib/compras/bc";
-import { guardCompras, esRechazo } from "@/lib/compras/guard";
+import { guardCompras, esRechazo, exigirOrdenPropia } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await guardCompras();
   if (esRechazo(g)) return g;
+  const ajena = await exigirOrdenPropia(g, Number((await params).id));
+  if (ajena) return ajena;
 
   try {
     const o = await getOrden(Number((await params).id));
@@ -39,8 +41,10 @@ function accionBcDelEstado(estado: string): "enviar" | "reabrir" | null {
   return null;
 }
 
+// Mover el estado de una orden (y con eso sincronizar BC) es de Proveeduría y
+// Aprobación. Quien solo pide material no tiene pantalla para esto.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const g = await guardCompras();
+  const g = await guardCompras({ exigeTodo: true });
   if (esRechazo(g)) return g;
 
   try {

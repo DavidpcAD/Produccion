@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { mensajeParaCliente } from "@/lib/errores";
 import { devolverLineasPedido } from "@/lib/compras/repo";
-import { guardCompras, esRechazo } from "@/lib/compras/guard";
+import { guardCompras, esRechazo, exigirPedidoPropio } from "@/lib/compras/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +12,8 @@ export const dynamic = "force-dynamic";
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await guardCompras();
   if (esRechazo(g)) return g;
+  const ajeno = await exigirPedidoPropio(g, Number((await params).id));
+  if (ajeno) return ajeno;
 
   try {
     const { lineaIds, motivo } = await req.json();

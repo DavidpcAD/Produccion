@@ -216,9 +216,46 @@ export function etiquetaArticulo(a: { code: string; descripcion: string; tipo?: 
 
 // ─── Quién ve QUÉ dentro de Órdenes de Compra ────────────────────────────────
 // El scope de las listas es por USUARIO, no por rol: cada uno ve sus solicitudes y
-// —si solo recibe lo suyo— las órdenes que salieron de ellas. Ojo: esto es cosmética
-// de cliente; el bootstrap sigue trayendo todo (el blindaje por API está pendiente).
+// —si solo recibe lo suyo— las órdenes que salieron de ellas.
+//
+// Esto ya NO es solo cosmética de cliente: desde 2026-09-25 el servidor recorta con
+// estas MISMAS funciones antes de responder (ver lib/compras/scope.ts y el `alcance`
+// de lib/compras/guard.ts), así que a quien solo pide material el bootstrap le llega
+// con lo suyo y nada más. Se reusan a propósito: si el servidor recortara con una
+// regla y la pantalla filtrara con otra, la diferencia se vería como datos que faltan.
+// Al tocarlas, acordate de que corren en los dos lados.
 export type Sesion = { username?: string; nombre?: string; modules?: string[]; roleNames?: string[]; nivelAdmin?: number } | null;
+
+/** Qué parte de Órdenes de Compra le toca a esta persona.
+ *
+ *  · `todo`            — Aprobación, Ingeniería, Proveeduría y quien recibe.
+ *  · `mis-solicitudes` — solo pide material: el rol Bodega sin recepción, o sea
+ *    Administración·Digitación y Administración·Locales.
+ *
+ *  Vive acá y no en el guard porque la usan los DOS lados: el servidor para
+ *  recortar lo que responde y la pantalla para no pedir lo que igual le van a
+ *  negar (ej. la sincronización con BC, que es de Proveeduría). */
+export type AlcanceCompras = "todo" | "mis-solicitudes";
+
+/**
+ * OJO con Recepción: entra en `todo` a propósito. Acotarla a "las órdenes de mis
+ * solicitudes" ya se probó y falló en las dos direcciones (01/09/2026) — ver el
+ * comentario de `ordenesDelAlcance` más abajo.
+ *
+ * Sin rol de Producción (`modules` undefined) también es `todo`: para entrar a
+ * Compras tuvo que pasar el nivel 4, o sea que ya veía todo.
+ */
+export function alcanceDeModulos(modules: string[] | undefined): AlcanceCompras {
+  if (!modules) return 'todo';
+  if (modules.includes('admin') || modules.includes('ingenieria')) return 'todo';
+  if (modules.includes('recepcion')) return 'todo';
+  return 'mis-solicitudes';
+}
+
+/** ¿Esta persona trabaja con las ÓRDENES, o solo con sus solicitudes? */
+export function trabajaConOrdenes(me: Sesion): boolean {
+  return alcanceDeModulos(me?.modules) === 'todo';
+}
 
 /** Super Admin ve TODO, no solo lo suyo. Se decide por el módulo 'admin' (que solo
  *  sale del rol comodín); quien no tiene rol de Producción conserva el criterio

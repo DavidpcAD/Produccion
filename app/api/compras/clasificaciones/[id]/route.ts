@@ -6,9 +6,12 @@ import { guardCompras, esRechazo } from "@/lib/compras/guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// `exigeTodo`: El catálogo de clasificaciones lo edita el ingeniero. Quien solo pide
+// material no tiene pantalla para esto, pero el proxy dejaba pasar la llamada.
+
 // Editar una clasificación existente (nombre y/o partida). Mismo XOR que crear.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const g = await guardCompras();
+  const g = await guardCompras({ exigeTodo: true });
   if (esRechazo(g)) return g;
 
   try {

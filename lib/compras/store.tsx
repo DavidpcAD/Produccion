@@ -8,7 +8,8 @@ import type {
   NotaCreditoLinea, MotivoNC,
 } from "./types";
 import * as seed from "./seed";
-import { nextNumero, nowISO, numeroOrden, ordenEstaCompleta, PERSONA_POR_ROL, todayISO } from "./helpers";
+import { nextNumero, nowISO, numeroOrden, ordenEstaCompleta, PERSONA_POR_ROL, todayISO, trabajaConOrdenes } from "./helpers";
+import { useSession } from "@/hooks/useSession";
 import { api, USE_API as USE_API_BUILD } from "./api";
 import type { EstadoBcOrden, SincronizacionBc } from "./api";
 
@@ -200,6 +201,9 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   const USE_API = useApi ?? USE_API_BUILD;
   const [role, setRole] = useState<Role | null>(null);
   const [usuario, setUsuario] = useState<string | null>(null);
+  // Sesión real (módulos del rol). El `role`/`usuario` de arriba salen de
+  // localStorage y el usuario los puede cambiar; esto viene firmado del servidor.
+  const sesion = useSession();
   const [data, setData] = useState<Persisted>(() => datosIniciales(USE_API));
   const [borrador, setBorrador] = useState<StoreShape["borrador"]>([]);
   const [planContexto, setPlanContexto] = useState<StoreShape["planContexto"]>(null);
@@ -342,8 +346,12 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   // dicen "lanzado" o "pendiente de aprobación"; si el estado de acá no calza con el
   // de allá, el servidor lo corrige y se recarga (ver /api/compras/ordenes/sincronizar-bc).
   // Sin esto una orden podía figurar lanzada meses con el pedido Abierto en BC.
+  // Quien solo pide material no lleva órdenes: el servidor le responde 403 a esta
+  // sincronización (es de Proveeduría), así que ni se pide. Sin esto quedaba un
+  // 403 en la consola al entrar y otro cada cinco minutos, para siempre.
+  const sincronizaBc = trabajaConOrdenes(sesion);
   useEffect(() => {
-    if (!USE_API || !hydrated || cargando) return;
+    if (!USE_API || !hydrated || cargando || !sincronizaBc) return;
     let cancel = false;
     let busy = false;
     const tick = async () => {
@@ -360,7 +368,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     tick();
     const id = setInterval(tick, 5 * 60_000);
     return () => { cancel = true; clearInterval(id); };
-  }, [USE_API, hydrated, cargando, usuario, role]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [USE_API, hydrated, cargando, usuario, role, sincronizaBc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Al cambiar de menú dentro de compras (el store persiste entre navegaciones, así
   // que sin esto los datos quedarían viejos hasta el próximo tick). Pero SOLO si ya
