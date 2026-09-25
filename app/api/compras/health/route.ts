@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { health } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -12,6 +13,6 @@ export async function GET() {
   try {
     return NextResponse.json(await health());
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

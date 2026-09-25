@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import {
@@ -55,7 +56,7 @@ export async function PATCH(
     );
     return NextResponse.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = mensajeParaCliente(err);
     const hint = (err as { statusHint?: number }).statusHint;
     console.error('/api/desembolsos/desembolsos/[idCaso]/[idHito] PATCH error:', err);
     const status = hint ?? (esErrorCliente(message) ? 400 : 500);

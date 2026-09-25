@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcOrdenTotales } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -16,6 +17,6 @@ export async function GET(req: NextRequest) {
   try {
     return NextResponse.json({ totales: await bcOrdenTotales(orderNo) });
   } catch (e: any) {
-    return NextResponse.json({ totales: null, error: String(e?.message ?? e) });
+    return NextResponse.json({ totales: null, error: mensajeParaCliente(e) });
   }
 }

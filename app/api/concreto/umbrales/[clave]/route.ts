@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorConfig, actualizarUmbral } from '@/lib/concreto/config';
@@ -54,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cl
     if (err instanceof ErrorConfig) {
       return NextResponse.json({ error: err.message, codigo: err.codigo }, { status: err.status });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/umbrales/[clave] PATCH error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

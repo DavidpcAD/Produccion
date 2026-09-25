@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorGraph, ErrorGraphDeps, quitarRol } from '@/lib/concreto/graph-usuarios';
 
@@ -38,7 +39,7 @@ export async function DELETE(
       if (err.status === 404) return NextResponse.json({ error: 'Asignación no encontrada' }, { status: 404 });
       return NextResponse.json({ error: `Error al consultar Microsoft Graph: ${err.message}` }, { status: 500 });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('quitar-rol error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

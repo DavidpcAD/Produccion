@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { etapasDeUsuario } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -16,6 +17,6 @@ export async function GET(req: NextRequest) {
   try {
     return NextResponse.json({ etapaIds: await etapasDeUsuario(username) });
   } catch (e: any) {
-    return NextResponse.json({ etapaIds: [], error: String(e?.message ?? e) });
+    return NextResponse.json({ etapaIds: [], error: mensajeParaCliente(e) });
   }
 }

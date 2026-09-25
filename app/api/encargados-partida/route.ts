@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
@@ -29,7 +30,7 @@ export async function GET() {
     `);
     directos = res.recordset;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     if (/Invalid object name|EncargadoPartida/i.test(msg)) {
       tablaFaltante = true;
     } else {
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ idEncargadoPartida }, { status: 201 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     // Índice único sobre idSubPartida → la subpartida ya tiene encargado.
     if (/duplicate key|UNIQUE KEY|ux_EncargadoPartida_subpartida/i.test(msg)) {
       return NextResponse.json({ error: 'Esa subpartida ya tiene un encargado. Quitalo primero para reasignar.' }, { status: 409 });
@@ -154,7 +155,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/encargados-partida DELETE error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { bindObra } from '@/lib/obras';
@@ -100,7 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     return NextResponse.json({ ok: true, bcSync, bcError });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/obras/[id] PATCH error:', err);
     if (/duplicate|UNIQUE/i.test(msg)) {
       return NextResponse.json({ error: 'Ya existe una obra con ese número' }, { status: 409 });
@@ -120,7 +121,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     await db.request().input('id', sql.BigInt, id).query('DELETE FROM dbo.Obra WHERE idObra = @id');
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/obras/[id] DELETE error:', err);
     if (/REFERENCE|FK_|conflicted/i.test(msg)) {
       return NextResponse.json({ error: 'No se puede eliminar: la obra está referenciada por otros registros.' }, { status: 409 });

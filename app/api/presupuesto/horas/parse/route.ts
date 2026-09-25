@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { parsePresupuestoHoras, sugerirCodigo } from '@/lib/presupuesto-horas-parse';
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     const buf = Buffer.from(await file.arrayBuffer());
     parsed = parsePresupuestoHoras(buf);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     return NextResponse.json({ error: `No se pudo leer el Excel: ${msg}` }, { status: 400 });
   }
 

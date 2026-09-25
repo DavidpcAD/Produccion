@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { normalizarBloques, validarBloques } from '@/lib/cuadrillas';
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
       console.error('/api/cuadrillas POST unique violation:', err);
       return NextResponse.json({ error: 'Una o más subpartidas ya están asignadas a otra cuadrilla en ese proyecto. Quitalas y volvé a intentar.' }, { status: 409 });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/cuadrillas POST error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

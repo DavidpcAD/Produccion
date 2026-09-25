@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
@@ -99,7 +100,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       otrasMembresias: otrasRes.recordset,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/cuadrillas/[id] GET error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -248,7 +249,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       console.error('/api/cuadrillas/[id] PUT unique violation:', err);
       return NextResponse.json({ error: 'Una o más subpartidas ya están asignadas a otra cuadrilla en ese proyecto. Quitalas y volvé a intentar.' }, { status: 409 });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/cuadrillas/[id] PUT error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { procesarIngesta } from '@/lib/concreto/ingesta';
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       forzarReingesta = fr === '1' || fr === 'true';
     }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/batches/ingestar parse body error:', err);
     return NextResponse.json({ error: `No se pudo leer el body: ${msg}` }, { status: 400 });
   }
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(resultado.body, { status: resultado.status });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/batches/ingestar POST error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

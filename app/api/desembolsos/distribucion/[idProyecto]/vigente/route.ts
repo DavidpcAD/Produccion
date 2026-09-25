@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import {
@@ -38,7 +39,7 @@ export async function PATCH(
     const data = await editarDistribucionVigente(db, idProyecto, body, session.cedula ?? 'desembolsos');
     return NextResponse.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = mensajeParaCliente(err);
     console.error('/api/desembolsos/distribucion/[idProyecto]/vigente PATCH error:', err);
     return NextResponse.json({ error: message }, { status: esErrorCliente(message) ? 400 : 500 });
   }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
     const obras = new Set(resueltas.map((r) => r.idObra)).size;
     return NextResponse.json({ ok: true, guardadas, obras });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/presupuesto/horas POST error:', err);
     return NextResponse.json({ error: `No se pudo guardar: ${msg}` }, { status: 500 });
   }

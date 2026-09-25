@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { parsePlantilla, parseDescompuesto } from '@/lib/presupuesto-parse';
 
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ...out, avisos });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     return NextResponse.json({ error: `No se pudo leer el Excel: ${msg}` }, { status: 400 });
   }
 }

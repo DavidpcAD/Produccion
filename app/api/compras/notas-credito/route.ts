@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { createNotasCredito, listNotasCredito } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -16,7 +17,7 @@ export async function GET() {
   try {
     return NextResponse.json({ notas: await listNotasCredito() });
   } catch (e: any) {
-    return NextResponse.json({ notas: [], error: String(e?.message ?? e) });
+    return NextResponse.json({ notas: [], error: mensajeParaCliente(e) });
   }
 }
 
@@ -31,6 +32,6 @@ export async function POST(req: Request) {
     const n = await createNotasCredito({ ...body, usuario: g.usuario, rol: g.rol });
     return NextResponse.json({ ok: true, creadas: n });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { updateSubcontrato } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -17,6 +18,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     await updateSubcontrato({ id: Number((await params).id), ...body });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 400 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 400 });
   }
 }

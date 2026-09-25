@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorFotos, crearFoto, fotosEnvConfigurada, listarFotos } from '@/lib/concreto/fotos';
@@ -43,7 +44,7 @@ export async function GET(
     if (err instanceof ErrorFotos) {
       return NextResponse.json({ error: err.message, codigo: err.codigo }, { status: err.status });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/muestras/[id]/fotos GET error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -103,7 +104,7 @@ export async function POST(
     if (err instanceof ErrorFotos) {
       return NextResponse.json({ error: err.message, codigo: err.codigo }, { status: err.status });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/muestras/[id]/fotos POST error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

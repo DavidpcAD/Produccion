@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorGraph, ErrorGraphDeps, buscarUsuarios, listarUsuariosAsignados } from '@/lib/concreto/graph-usuarios';
 
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
       console.error('/api/concreto/usuarios GET Graph error:', err.message);
       return NextResponse.json({ error: `Error al consultar Microsoft Graph: ${err.message}` }, { status: 500 });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/usuarios GET error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

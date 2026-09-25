@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcPostedReceiptLines } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -23,6 +24,6 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ lineas });
   } catch (e: any) {
-    return NextResponse.json({ lineas: [], error: String(e?.message ?? e) });
+    return NextResponse.json({ lineas: [], error: mensajeParaCliente(e) });
   }
 }

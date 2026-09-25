@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     const data = await upsertHito(db, session.cedula ?? 'desembolsos', crearHitoArgs(body));
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = mensajeParaCliente(err);
     console.error('/api/desembolsos/catalogo-hitos POST error:', err);
     return NextResponse.json({ error: message }, { status: esErrorCliente(message) ? 400 : 500 });
   }

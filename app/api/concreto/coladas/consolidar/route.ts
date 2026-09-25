@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { consolidar } from '@/lib/concreto/coladas-workflow';
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (!detalle) return NextResponse.json({ error: 'Colada no encontrada' }, { status: 404 });
     return NextResponse.json(detalle);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/coladas/consolidar error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

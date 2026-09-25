@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { bindObra } from '@/lib/obras';
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
       await createProject(obraNo);
       body.esBC = true;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = mensajeParaCliente(err);
       console.error('/api/obras POST BC error:', err);
       return NextResponse.json(
         { error: `No se pudo crear en Business Central: ${msg}` },
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
     `);
     return NextResponse.json({ idObra: Number(res.recordset[0].idObra) }, { status: 201 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/obras POST error:', err);
     if (/duplicate|UNIQUE/i.test(msg)) {
       return NextResponse.json({ error: 'Ya existe una obra con ese número' }, { status: 409 });

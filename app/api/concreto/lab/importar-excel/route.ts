@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { importarExcelLab } from '@/lib/concreto/lab-write';
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     const resumen = await importarExcelLab(db, Buffer.from(ab), actor);
     return NextResponse.json(resumen);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/importar-excel POST error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

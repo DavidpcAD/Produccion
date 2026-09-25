@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { listVistas, saveVista } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
     // El dueño/actor sale de la SESIÓN, no del query ni del body.
     return NextResponse.json({ vistas: await listVistas(g.usuario, tabla) });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 
@@ -32,6 +33,6 @@ export async function POST(req: Request) {
     const id = await saveVista({ usuario: g.usuario, tablaKey: String(b.tabla), nombre: String(b.nombre), config: b.config ?? {}, esPredeterminada: !!b.esPredeterminada });
     return NextResponse.json({ id }, { status: 201 });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

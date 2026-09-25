@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { getOrden, setOrdenEstado } from "@/lib/compras/repo";
 import { bcEnviarAAprobacion, bcReabrirPedido } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
@@ -15,7 +16,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!o) return NextResponse.json({ error: "no encontrada" }, { status: 404 });
     return NextResponse.json(o);
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 
@@ -75,12 +76,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       //   · al enviar, "Aprobar y lanzar" vuelve a mandar la solicitud si falta;
       //   · al reabrir/rechazar, el pedido queda en BC como estaba y se puede reintentar.
       const detalle = accion === "enviar"
-        ? `No se pudo dejar ${orderNo} pendiente de aprobación en BC: ${String(e?.message ?? e)}`
-        : `No se pudo reabrir ${orderNo} en BC (la solicitud de aprobación puede seguir abierta): ${String(e?.message ?? e)}`;
+        ? `No se pudo dejar ${orderNo} pendiente de aprobación en BC: ${mensajeParaCliente(e)}`
+        : `No se pudo reabrir ${orderNo} en BC (la solicitud de aprobación puede seguir abierta): ${mensajeParaCliente(e)}`;
       try { await setOrdenEstado(id, estado, usuario, rol, detalle, undefined, "aviso_bc"); } catch { /* el aviso ya viaja en la respuesta */ }
       return NextResponse.json({ ok: true, bcAviso: detalle });
     }
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

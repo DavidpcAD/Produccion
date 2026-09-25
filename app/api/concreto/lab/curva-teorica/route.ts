@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { obtenerCurvaTeorica } from '@/lib/concreto/lab-write';
@@ -14,7 +15,7 @@ export async function GET() {
     const puntos = await obtenerCurvaTeorica(db);
     return NextResponse.json({ puntos });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/curva-teorica GET error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

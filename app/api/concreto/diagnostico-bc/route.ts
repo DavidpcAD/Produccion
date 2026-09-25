@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { getBCToken, bcConfigured } from '@/lib/bc-client';
 import { odataStr } from '@/lib/odata';
@@ -126,7 +127,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ error: `test inválido: "${test}". Use config|token|companies|assembly.` }, { status: 400 });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/diagnostico-bc GET error:', err);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }

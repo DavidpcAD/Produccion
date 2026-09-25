@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import type { PlantaListadoItem } from '@/lib/concreto/tipos';
@@ -26,7 +27,7 @@ export async function GET() {
     }));
     return NextResponse.json({ data });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/plantas GET error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

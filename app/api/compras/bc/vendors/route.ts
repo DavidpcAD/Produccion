@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcVendors } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -12,6 +13,6 @@ export async function GET() {
   try {
     return NextResponse.json({ proveedores: await bcVendors() });
   } catch (e: any) {
-    return NextResponse.json({ proveedores: [], error: String(e?.message ?? e) }, { status: 200 });
+    return NextResponse.json({ proveedores: [], error: mensajeParaCliente(e) }, { status: 200 });
   }
 }

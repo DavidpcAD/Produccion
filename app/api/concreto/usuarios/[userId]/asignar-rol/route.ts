@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorGraph, ErrorGraphDeps, asignarRol } from '@/lib/concreto/graph-usuarios';
 import { ROLES_APP, type RolApp } from '@/lib/concreto/tipos-deps';
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ use
       }
       return NextResponse.json({ error: `Error al consultar Microsoft Graph: ${err.message}` }, { status: 500 });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('asignar-rol error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

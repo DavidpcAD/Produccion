@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { listarObras } from '@/lib/concreto/coladas-workflow';
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ obras, total: obras.length });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/obras error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

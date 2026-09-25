@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
       `);
     return NextResponse.json({ data: res.recordset });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     // Si falta la columna idProyecto (migración no corrida), no bloquear nada.
     if (/idProyecto|Invalid column/i.test(msg)) return NextResponse.json({ data: [] });
     console.error('/api/cuadrillas/subpartidas-ocupadas error:', err);

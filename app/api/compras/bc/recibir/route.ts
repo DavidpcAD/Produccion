@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcRecibir } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -16,6 +17,6 @@ export async function POST(req: Request) {
     const receiptNo = await bcRecibir(orderNo, lineas ?? [], postingDate ?? "");
     return NextResponse.json({ ok: true, receiptNo });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 502 });
+    return NextResponse.json({ ok: false, error: mensajeParaCliente(e) }, { status: 502 });
   }
 }

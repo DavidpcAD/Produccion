@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcResyncPedidoLines, bcReleasePedidoVerificado, bcEstadoPedido, bcPedidoTieneRecepciones, bcAssignItemCharges, bcAddChargeLine, bcItemCharges, resolverItemChargeNo, bcCompletarProyectoTarea, mensajeConsumoIncompleto, bcLineasProyectoSinTarea, mensajeProyectoSinTarea, bcQuitarObraDeLineas, mensajeObraNoQuitada } from "@/lib/compras/bc";
 import { frenarLanzamiento } from "@/lib/compras/freno-lanzamiento";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
         const chargeNo = resolverItemChargeNo(cg, catalogoCargos);
         if (!chargeNo) { if (!cargoError) cargoError = "El cargo no tiene tipo (Item Charge) y no se pudo deducir por la descripción. Elegí el tipo y reintentá."; continue; }
         try { await bcAddChargeLine(orderNo, chargeNo, cg.descripcion || "CARGO / TRANSPORTE", cg.cantidad || 1, cg.precio); }
-        catch (e: any) { if (!cargoError) cargoError = `cargo ${chargeNo}: ${String(e?.message ?? e)}`; }
+        catch (e: any) { if (!cargoError) cargoError = `cargo ${chargeNo}: ${mensajeParaCliente(e)}`; }
       }
     }
     // Reasignar cargos si el método no es "por importe" (Amount ya es automático).
@@ -173,6 +174,6 @@ export async function POST(req: Request) {
   } catch (e: any) {
     // Incluye el "No se encontró el pedido … en BC" del resync: mismo tratamiento.
     if (orderNo) return respuestaDelFallo(orderNo, e);
-    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 502 });
+    return NextResponse.json({ ok: false, error: mensajeParaCliente(e) }, { status: 502 });
   }
 }

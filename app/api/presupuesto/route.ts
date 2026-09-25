@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { getDb, sql } from '@/lib/db';
@@ -135,7 +136,7 @@ export async function POST(req: NextRequest) {
     await logAudit({ idColAccion: session.idCol, accion: 'SUBIR_PRESUPUESTO', entidad: 'Obra', idEntidad: 0, detalleNuevo: { worksNo, version: resultado.version, lineas: lineasVersion.length, materiales: materiales.length, areaProrrateada, tasas: resultado.tasas, tasasBC: resultado.tasasBC ?? resultado.tasasError, tareasProyecto: resultado.tareasProyecto ?? resultado.tareasProyectoError }, ip });
     return NextResponse.json({ ok: true, ...resultado });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/presupuesto POST error:', err);
     return NextResponse.json({ error: `Error subiendo a Business Central: ${msg}`, parcial: resultado }, { status: 502 });
   }

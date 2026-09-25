@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcItems, bcItemsBloqueados } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -19,6 +20,6 @@ export async function GET() {
     const [items, bloqueados] = await Promise.all([bcItems(), bcItemsBloqueados()]);
     return NextResponse.json({ items, bloqueados: bloqueados ? [...bloqueados] : [] });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

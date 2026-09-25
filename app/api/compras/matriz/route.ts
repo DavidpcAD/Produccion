@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { listWbs, listObras, matrizCeldas } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -14,6 +15,6 @@ export async function GET() {
     const [wbs, obras, celdas] = await Promise.all([listWbs(), listObras(), matrizCeldas()]);
     return NextResponse.json({ ...wbs, obras, celdas });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

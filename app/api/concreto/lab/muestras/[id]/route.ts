@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { obtenerMuestra } from '@/lib/concreto/lab';
@@ -22,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!muestra) return NextResponse.json({ error: 'Muestra no encontrada' }, { status: 404 });
     return NextResponse.json(muestra);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/muestras/[id] GET error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -76,7 +77,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (err instanceof ErrorLab) {
       return NextResponse.json({ error: err.message, codigo: err.codigo }, { status: err.status });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/muestras/[id] PATCH error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -102,7 +103,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (err instanceof ErrorLab) {
       return NextResponse.json({ error: err.message, codigo: err.codigo }, { status: err.status });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/muestras/[id] DELETE error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

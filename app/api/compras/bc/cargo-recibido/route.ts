@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcPostChargeOnReceipts } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -19,6 +20,6 @@ export async function POST(req: NextRequest) {
     const resultado = await bcPostChargeOnReceipts(body);
     return NextResponse.json({ ok: true, resultado });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 400 });
+    return NextResponse.json({ ok: false, error: mensajeParaCliente(e) }, { status: 400 });
   }
 }

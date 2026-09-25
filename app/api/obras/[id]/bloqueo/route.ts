@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { setObraBlocked, bcConfigured } from '@/lib/bc-client';
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await setObraBlocked(numeroObra, blocked, postventaNo);
         bcSync = true;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = mensajeParaCliente(err);
         console.error('/api/obras/[id]/bloqueo BC error:', err);
         return NextResponse.json({ error: `No se pudo ${blocked ? 'bloquear' : 'desbloquear'} en Business Central: ${msg}` }, { status: 502 });
       }
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ ok: true, bcSync, estado: blocked ? 'Blocked' : 'Open' });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/obras/[id]/bloqueo error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

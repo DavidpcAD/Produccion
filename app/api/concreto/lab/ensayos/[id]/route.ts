@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { actualizarEnsayo, borrarEnsayo, ErrorLab } from '@/lib/concreto/lab-write';
@@ -44,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (err instanceof ErrorLab) {
       return NextResponse.json({ error: err.message, codigo: err.codigo }, { status: err.status });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/ensayos/[id] PATCH error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -70,7 +71,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (err instanceof ErrorLab) {
       return NextResponse.json({ error: err.message, codigo: err.codigo }, { status: err.status });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/lab/ensayos/[id] DELETE error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

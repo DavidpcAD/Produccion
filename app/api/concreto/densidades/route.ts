@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorConfig, crearDensidad, listarDensidades } from '@/lib/concreto/config';
@@ -14,7 +15,7 @@ export async function GET() {
     const data = await listarDensidades(db);
     return NextResponse.json({ data });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/densidades GET error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (err instanceof ErrorConfig) {
       return NextResponse.json({ error: err.message, codigo: err.codigo }, { status: err.status });
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = mensajeParaCliente(err);
     console.error('/api/concreto/densidades POST error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
