@@ -152,7 +152,7 @@ export function MarcajeEstadoZonas({ idColaborador, canEdit = false }: { idColab
             return (
               <div key={z.idZona} className="flex items-center gap-3 px-3 py-2.5 rounded-ds border border-ds-gray-200">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-ds-ink truncate">{z.zona}</p>
+                  <p className="text-sm font-semibold text-ds-ink break-words">{z.zona}</p>
                   <p className="text-xs text-ds-gray-400">
                     PIN {z.pin} · {m.hint}
                     {z.equiposCompatibles > 0 && ` (${z.equiposConCara}/${z.equiposCompatibles} relojes)`}

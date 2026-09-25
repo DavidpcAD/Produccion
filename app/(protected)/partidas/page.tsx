@@ -720,7 +720,7 @@ export default function PartidasPage() {
                   <span className="font-mono text-body-sm font-semibold text-ds-gray-500 shrink-0 min-w-[84px] whitespace-nowrap">
                     {sec.codigo}
                   </span>
-                  <span className="text-label font-semibold text-ds-ink truncate flex-1 min-w-0">
+                  <span className="text-label font-semibold text-ds-ink break-words flex-1 min-w-0">
                     {sec.nombre}
                   </span>
                   <span className="text-body-sm text-ds-gray-400 shrink-0 hidden sm:block whitespace-nowrap">
@@ -761,7 +761,7 @@ export default function PartidasPage() {
                           <Icon name="chevron-right" size="sm" color="currentColor" />
                         </span>
                         <span className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1.5 rounded-ds bg-ds-ink text-ds-surface text-[10px] font-bold font-mono shrink-0">{etapa.codigo}</span>
-                        <span className="text-sm font-semibold text-ds-ink truncate">{etapa.nombre}</span>
+                        <span className="text-sm font-semibold text-ds-ink break-words">{etapa.nombre}</span>
                         {etapa.bcTaskNo && (
                           <span className="rounded border border-ds-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-300 shrink-0 hidden sm:inline" title={`Capítulo ${etapa.bcTaskNo} de la obra en Business Central`}>
                             BC {etapa.bcTaskNo}
@@ -808,7 +808,7 @@ export default function PartidasPage() {
                                 <Icon name="chevron-right" size="sm" color="currentColor" />
                               </span>
                               <span className="font-mono text-[10px] font-semibold text-ds-gray-400 shrink-0 rounded border border-ds-gray-200 px-1.5 py-0.5">{partida.codigo}</span>
-                              <span className="text-sm text-ds-ink truncate">{partida.nombre}</span>
+                              <span className="text-sm text-ds-ink break-words">{partida.nombre}</span>
                             </button>
                             <span className={NIVEL}>Partida</span>
                             {subs.length > 0 && (
@@ -849,7 +849,7 @@ export default function PartidasPage() {
                                     <span className="font-mono text-[10px] text-ds-gray-300 shrink-0 pt-1">{s.codigo}</span>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={'text-[13px] truncate ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
+                                        <span className={'text-[13px] break-words ' + (s.activo ? 'text-ds-ink' : 'text-ds-gray-400 line-through')}>{s.nombre}</span>
                                         {s.esCritica && <Badge variant="red">Crítica</Badge>}
                                         {!s.activo && <Badge variant="gray">Inactiva</Badge>}
                                       </div>
@@ -1178,7 +1178,7 @@ export default function PartidasPage() {
                       <div className="pl-3 text-ds-gray-500">
                         {[...d.gruposCreados.map(g => `${termGrupo}: ${g}`), ...d.partidasCreadas.map(p => `Partida: ${p}`),
                           ...(d.subpartidasCreadas ?? []).map(sp => `Subpartida: ${sp}`)]
-                          .slice(0, 12).map(t => <div key={t} className="truncate">{t}</div>)}
+                          .slice(0, 12).map(t => <div key={t} className="break-words">{t}</div>)}
                         {nuevosDeBC(d) > 12 && (
                           <div className="text-ds-gray-400">…y {nuevosDeBC(d) - 12} más</div>
                         )}

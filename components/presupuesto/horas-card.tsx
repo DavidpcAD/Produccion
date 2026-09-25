@@ -190,7 +190,7 @@ export function PresupuestoHorasCard() {
                 <tr key={f.fila} className={'border-b border-ds-gray-100 align-top ' + (f.estado.tone === 'bad' ? 'bg-ds-red/5' : '')}>
                   <td className="py-2 px-3">
                     <span className="font-mono text-xs text-ds-ink">{f.codigoObra || '—'}</span>
-                    {f.obraNombre && <span className="block text-ds-gray-400 text-xs truncate max-w-[140px]">{f.obraNombre}</span>}
+                    {f.obraNombre && <span className="block text-ds-gray-400 text-xs break-words max-w-[140px]">{f.obraNombre}</span>}
                   </td>
                   <td className="py-2 px-3">
                     <Combobox
@@ -201,7 +201,7 @@ export function PresupuestoHorasCard() {
                       emptyText="Sin coincidencias"
                     />
                     {f.nombreOriginal && (
-                      <span className="block text-ds-gray-400 text-xs mt-1 truncate max-w-[260px]">
+                      <span className="block text-ds-gray-400 text-xs mt-1 break-words max-w-[260px]">
                         Excel: <span className="text-ds-gray-500">{f.nombreOriginal}</span>
                       </span>
                     )}

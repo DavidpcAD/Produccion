@@ -141,8 +141,8 @@ export default function ConcretoUsuariosPage() {
             <li key={u.oid} className="rounded-ds-lg border border-ds-gray-200 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="font-semibold text-ds-ink truncate">{u.nombre || '(sin nombre)'}</p>
-                  <p className="text-sm text-ds-gray-400 truncate">{u.email || u.oid}</p>
+                  <p className="font-semibold text-ds-ink break-words">{u.nombre || '(sin nombre)'}</p>
+                  <p className="text-sm text-ds-gray-400 break-words">{u.email || u.oid}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end">
                   {u.roles.length === 0 && <span className="text-sm text-ds-gray-300">Sin roles</span>}

@@ -188,7 +188,7 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
       <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-brand-soft border-b border-brand/30">
         <div className="flex items-center gap-2 min-w-0">
           <Icon name="check" size="sm" color="currentColor" />
-          <span className="font-bold text-ds-ink text-sm truncate">{r.tipo === 'general' ? 'General' : 'Descompuesto'} subido a Business Central</span>
+          <span className="font-bold text-ds-ink text-sm break-words">{r.tipo === 'general' ? 'General' : 'Descompuesto'} subido a Business Central</span>
         </div>
         <span className="text-xs text-ds-gray-500 shrink-0">Obra <span className="font-mono font-semibold text-ds-ink">{r.worksNo}</span></span>
       </div>
@@ -230,7 +230,7 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
               {Object.entries(r.obraCampos).map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3 border-b border-ds-gray-100 py-0.5">
-                  <span className="text-ds-gray-400 truncate">{k}</span>
+                  <span className="text-ds-gray-400 break-words">{k}</span>
                   <span className="font-mono text-ds-gray-600 shrink-0">{v.toLocaleString('es-CR', { maximumFractionDigits: 2 })}</span>
                 </div>
               ))}
@@ -615,7 +615,7 @@ export default function PresupuestoPage() {
             {plantillas.map(pl => (
               <div key={pl.idPlantilla} className="py-2.5 flex items-center gap-3">
                 <span className={'text-xs px-2 py-0.5 rounded-full shrink-0 ' + (pl.tipo === 'general' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{pl.tipo === 'general' ? 'General' : 'Descompuesto'}</span>
-                <span className="text-sm text-ds-ink font-medium truncate flex-1">{pl.nombre}</span>
+                <span className="text-sm text-ds-ink font-medium flex-1 min-w-0 break-words">{pl.nombre}</span>
                 <span className="text-ds-gray-400 text-xs shrink-0 hidden sm:block">{pl.archivo}</span>
                 <Button size="sm" variant="outline" onClick={() => usarPlantilla(pl.idPlantilla)}>Usar</Button>
                 <button onClick={() => borrarPlantilla(pl.idPlantilla)} className="text-ds-gray-300 hover:text-ds-red p-1" title="Borrar plantilla"><Icon name="delete" size="sm" color="currentColor" /></button>
@@ -648,7 +648,7 @@ export default function PresupuestoPage() {
                 Descompuesto <span className="opacity-70 font-normal">({descompuesto.lineas.length})</span>
               </button>
             )}
-            <span className="ml-auto text-ds-gray-400 text-xs font-mono truncate max-w-[240px]">{vistaActiva === 'general' ? plantilla?.archivo : descompuesto?.archivo}</span>
+            <span className="ml-auto text-ds-gray-400 text-xs font-mono max-w-[240px] break-words">{vistaActiva === 'general' ? plantilla?.archivo : descompuesto?.archivo}</span>
           </div>
 
           {/* Vista General (plantilla: Venta / Costo / Indirectos) */}
@@ -693,7 +693,7 @@ export default function PresupuestoPage() {
                             <tr key={i} className="border-b border-ds-gray-100">
                               <td className="py-1.5 px-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
                               <td className="py-1.5 px-3"><span className={'text-xs px-2 py-0.5 rounded-full ' + (l.taskType === 'Total' ? 'bg-black text-white' : 'bg-ds-gray-100 text-ds-gray-500')}>{l.taskType === 'Total' ? 'Capítulo' : 'Partida'}</span></td>
-                              <td className="py-1.5 px-3 truncate max-w-[360px]">{l.description}</td>
+                              <td className="py-1.5 px-3 min-w-[240px] max-w-[360px] break-words">{l.description}</td>
                               <td className="py-1 px-3">
                                 <div className="flex justify-end">
                                   {l.taskType === 'Total' ? (
@@ -743,7 +743,7 @@ export default function PresupuestoPage() {
                       <tr key={i} className="border-b border-ds-gray-100">
                         <td className="py-1.5 px-3 font-mono text-xs text-ds-gray-500">{l.taskNo}</td>
                         <td className="py-1.5 px-3 font-mono text-xs">{l.no}</td>
-                        <td className="py-1.5 px-3 truncate max-w-[280px]">{l.description}</td>
+                        <td className="py-1.5 px-3 min-w-[200px] max-w-[280px] break-words">{l.description}</td>
                         <td className="py-1.5 px-3 text-right">{crc.format(l.unitCost ?? 0)}</td>
                       </tr>
                     ))}
@@ -832,7 +832,7 @@ export default function PresupuestoPage() {
                             {d.taskType === 'Total' ? 'Capítulo' : 'Partida'}
                           </span>
                           <span className="font-mono text-xs font-semibold text-ds-ink shrink-0">{d.taskNo}</span>
-                          <span className="text-ds-gray-600 truncate">{d.description}</span>
+                          <span className="text-ds-gray-600 min-w-0 break-words">{d.description}</span>
                           {d.ubicacion && d.taskType === 'Posting' && (
                             <span className="text-ds-gray-400 text-xs shrink-0">→ iría en {d.ubicacion}</span>
                           )}

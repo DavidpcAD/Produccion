@@ -81,7 +81,7 @@ function BarrasHorizontales({ datos }: { datos: { nombre: string; monto: number 
     <div className="space-y-2">
       {datos.map((d) => (
         <div key={d.nombre} className="flex items-center gap-3">
-          <span className="w-28 shrink-0 text-xs text-ds-gray-500 truncate">{d.nombre}</span>
+          <span className="w-28 shrink-0 text-xs text-ds-gray-500 break-words">{d.nombre}</span>
           <div className="flex-1 h-5 bg-ds-gray-100 rounded-ds overflow-hidden">
             <div className="h-full bg-brand rounded-ds" style={{ width: `${(Math.abs(d.monto) / max) * 100}%` }} />
           </div>

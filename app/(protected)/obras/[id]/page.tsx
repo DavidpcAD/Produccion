@@ -393,7 +393,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
           </div>
         }
         subtitle={
-          <span className="truncate">
+          <span className="break-words">
             {obra.nombreMostrado || 'Sin nombre'}
             {obra.proyectoNombre ? <span className="text-ds-gray-300"> · {obra.proyectoNombre}</span> : null}
           </span>

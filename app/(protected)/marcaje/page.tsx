@@ -164,8 +164,8 @@ export default function MarcajePage() {
                           className="w-4 h-4 shrink-0 accent-black cursor-pointer" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-ds-ink truncate">{c.nombre}</p>
-                        <p className="text-xs text-ds-gray-400 truncate">{c.cedula}{c.puesto ? ` · ${c.puesto}` : ''}</p>
+                        <p className="text-sm font-semibold text-ds-ink break-words">{c.nombre}</p>
+                        <p className="text-xs text-ds-gray-400 break-words">{c.cedula}{c.puesto ? ` · ${c.puesto}` : ''}</p>
                       </div>
                       {c.enZona
                         ? <Badge variant={m?.variant ?? 'green'} dot>{m?.label ?? 'En el dispositivo'}</Badge>

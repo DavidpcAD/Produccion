@@ -205,7 +205,7 @@ function TabActividades({ puede }: { puede: boolean }) {
                 <span className="font-mono text-xs font-semibold text-ds-gray-400 shrink-0 w-8">
                   {a.orden}
                 </span>
-                <span className="text-sm text-ds-ink flex-1 truncate">{a.nombre}</span>
+                <span className="text-sm text-ds-ink flex-1 break-words">{a.nombre}</span>
                 <Badge variant={a.activo ? 'green' : 'gray'}>{a.activo ? 'Activa' : 'Inactiva'}</Badge>
                 {puede && (
                   <div className="flex items-center gap-2 shrink-0">
@@ -364,11 +364,11 @@ function TabUmbrales({ puede }: { puede: boolean }) {
             {items.map((u) => (
               <li key={u.clave} className="px-5 py-3 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-mono text-xs font-semibold text-ds-gray-500 truncate">
+                  <p className="font-mono text-xs font-semibold text-ds-gray-500 break-words">
                     {u.clave}
                   </p>
                   {u.descripcion && (
-                    <p className="text-xs text-ds-gray-400 truncate">{u.descripcion}</p>
+                    <p className="text-xs text-ds-gray-400 break-words">{u.descripcion}</p>
                   )}
                 </div>
                 <span className="text-sm text-ds-gray-500 shrink-0 hidden sm:block">
@@ -606,8 +606,8 @@ function TabDensidades({ puede }: { puede: boolean }) {
             {items.map((d) => (
               <li key={d.clave} className="px-5 py-3 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-ds-ink truncate">{d.nombre}</p>
-                  <p className="font-mono text-xs text-ds-gray-400 truncate">
+                  <p className="text-sm text-ds-ink break-words">{d.nombre}</p>
+                  <p className="font-mono text-xs text-ds-gray-400 break-words">
                     {d.clave}
                     {d.codigo_bc ? ` · BC ${d.codigo_bc}` : ''}
                   </p>

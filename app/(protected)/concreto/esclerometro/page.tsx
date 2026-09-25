@@ -104,7 +104,7 @@ export default function EsclerometroPage() {
           <div className="max-w-[200px]">
             <div className="text-xs font-semibold">{r.obra_works_no}</div>
             {r.obra_display_name && (
-              <div className="truncate text-xs text-ds-gray-400">{r.obra_display_name}</div>
+              <div className="break-words text-xs text-ds-gray-400">{r.obra_display_name}</div>
             )}
           </div>
         );

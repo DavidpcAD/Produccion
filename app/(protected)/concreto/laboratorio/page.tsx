@@ -89,8 +89,8 @@ export default function LaboratorioPage() {
         if (!m.obra_works_no) return <span className="text-ds-gray-300">—</span>;
         return (
           <div className="min-w-0">
-            <p className="text-ds-ink truncate">{m.obra_works_no}</p>
-            {m.obra_display_name && <p className="text-xs text-ds-gray-400 truncate">{m.obra_display_name}</p>}
+            <p className="text-ds-ink break-words">{m.obra_works_no}</p>
+            {m.obra_display_name && <p className="text-xs text-ds-gray-400 break-words">{m.obra_display_name}</p>}
           </div>
         );
       },

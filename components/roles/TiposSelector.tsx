@@ -27,7 +27,7 @@ export function TiposSelector({ roles, selectedRoles, tiposByRol, onChange }: {
       <div className="space-y-2">
         {conTipos.map(r => (
           <div key={r.IDRol} className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-ds-ink w-36 sm:w-44 shrink-0 truncate">{r.NombreRol}</span>
+            <span className="text-sm font-semibold text-ds-ink w-36 sm:w-44 shrink-0 break-words">{r.NombreRol}</span>
             <div className="flex-1 min-w-0">
               <Combobox value={tiposByRol[r.IDRol] ?? ''} onChange={v => onChange(r.IDRol, v)}
                 placeholder="Sin tipo"

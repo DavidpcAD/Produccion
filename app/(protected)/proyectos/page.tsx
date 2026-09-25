@@ -102,21 +102,32 @@ export default function ProyectosPage() {
               key={p.IDProyecto}
               variants={listItem}
               onClick={() => router.push(`/proyectos/${p.IDProyecto}`)}
-              className={'group bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 text-left hover:border-black hover:shadow-ds-03 transition-all duration-200 hover:-translate-y-0.5 ' + (p.Activo ? '' : 'opacity-60')}
+              className={'group bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 text-left flex flex-col h-full hover:border-black hover:shadow-ds-03 transition-all duration-200 hover:-translate-y-0.5 ' + (p.Activo ? '' : 'opacity-60')}
             >
-              <div className="flex items-start justify-between mb-3 gap-2">
+              {/* Las etiquetas iban arriba a la derecha, al lado del ícono. Con el
+                  menú abierto la tarjeta se angosta, "Producción" y "Ciudad del Valle"
+                  se apilan en dos renglones y empujan el título hacia abajo: en la
+                  misma fila unas tarjetas tenían el nombre seis píxeles más abajo que
+                  otras. Ahora el ícono y el nombre mandan la altura de arriba (siempre
+                  la misma) y las etiquetas bajan a su propio renglón, donde pueden
+                  envolverse sin mover nada. El pie queda clavado abajo con mt-auto, así
+                  que las tarjetas de una fila cierran parejas aunque el nombre ocupe
+                  dos líneas. */}
+              <div className="flex items-start gap-3 mb-3">
                 <div className="w-10 h-10 rounded-ds bg-black flex items-center justify-center shrink-0 shadow-ds-02">
                   <Icon name="folder" size="md" color="currentColor" className="text-brand" />
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  {p.EsProductivo && <Badge variant="green">Producción</Badge>}
-                  {!p.Activo && <Badge variant="red">Inactivo</Badge>}
-                  {p.Estado && <Badge variant={estadoVariant(p.Estado)}>{p.Estado}</Badge>}
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-ds-ink break-words text-label">{p.Nombre}</h3>
+                  <p className="text-xs text-ds-gray-400 font-mono">{p.CodigoBC}</p>
                 </div>
               </div>
-              <h3 className="font-bold text-ds-ink mb-1 line-clamp-2 text-label">{p.Nombre}</h3>
-              <p className="text-xs text-ds-gray-400 mb-4 font-mono">{p.CodigoBC}</p>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 flex-wrap mb-4 empty:mb-0">
+                {p.EsProductivo && <Badge variant="green">Producción</Badge>}
+                {!p.Activo && <Badge variant="red">Inactivo</Badge>}
+                {p.Estado && <Badge variant={estadoVariant(p.Estado)}>{p.Estado}</Badge>}
+              </div>
+              <div className="flex items-center justify-between mt-auto">
                 <div className="flex items-center gap-1.5 text-xs text-ds-gray-400 font-medium">
                   <Icon name="user" size="sm" color="currentColor" />
                   {p.TotalPersonas} personas

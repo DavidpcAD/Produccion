@@ -124,9 +124,9 @@ export default function ReporteH4Page() {
         const partes = c.getValue().split(/ · | — /);
         return (
           <div className="min-w-0">
-            <p className="font-semibold text-ds-ink truncate">{partes[0]}</p>
+            <p className="font-semibold text-ds-ink break-words">{partes[0]}</p>
             {partes.length > 1 && (
-              <p className="text-xs text-ds-gray-400 truncate">{partes.slice(1).join(' · ')}</p>
+              <p className="text-xs text-ds-gray-400 break-words">{partes.slice(1).join(' · ')}</p>
             )}
           </div>
         );

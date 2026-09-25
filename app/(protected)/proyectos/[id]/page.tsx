@@ -256,7 +256,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
               <button key={o.IDObra} onClick={() => router.push(`/obras/${o.IDObra}`)}
                 className={'w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-ds-gray-100/60 transition-colors ' + (o.Estado === 'Blocked' ? 'opacity-60' : '')}>
                 <span className="font-mono text-xs font-semibold text-ds-gray-500 shrink-0">{o.NumeroObra}</span>
-                <span className="text-sm text-ds-ink flex-1 min-w-0 truncate">{o.Nombre || '—'}</span>
+                <span className="text-sm text-ds-ink flex-1 min-w-0 break-words">{o.Nombre || '—'}</span>
                 {o.AreaCosteo && <span className="hidden sm:inline text-xs text-ds-gray-400 shrink-0">{o.AreaCosteo}</span>}
                 {o.Estado && (
                   <Badge variant={o.Estado === 'Open' || o.Estado === 'Activo' ? 'green' : 'gray'}>
@@ -282,7 +282,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
             <div className="px-5 py-3 bg-ds-gray-100 border-b border-ds-gray-200 flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-brand shrink-0" />
               <span className="font-bold text-ds-ink text-sm">{taskNo !== 'Sin tarea' ? `Tarea ${taskNo}` : 'Sin tarea'}</span>
-              <span className="text-ds-gray-400 text-sm flex-1 min-w-0 truncate">{desc}</span>
+              <span className="text-ds-gray-400 text-sm flex-1 min-w-0 break-words">{desc}</span>
               <Badge variant="gray" className="ml-auto shrink-0">{members.length} personas</Badge>
             </div>
             <div className="divide-y divide-ds-gray-100">
