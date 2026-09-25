@@ -107,6 +107,20 @@ export function getRouteLevel(pathname: string): number {
   if (pathname.startsWith('/proyectos') || pathname.startsWith('/cuadrillas')) return 2;
   if (pathname.startsWith('/encargados')) return 2;
   if (pathname.startsWith('/auditoria')) return 2;
+  // Pantallas que el Sidebar ya mostraba con `minLevel` pero que acá caían al
+  // default 1: quien no las ve en el menú igual entraba escribiendo la URL.
+  // Los números son EXACTAMENTE los de SIDEBAR_ITEMS (components/layout/Sidebar.tsx);
+  // si cambia uno, cambian los dos.
+  if (pathname.startsWith('/partidas')) return 4;
+  if (pathname.startsWith('/presupuesto')) return 2;
+  if (pathname.startsWith('/concreto')) return 2;
+  if (pathname.startsWith('/desembolsos')) return 2;
+  if (pathname.startsWith('/utilidades')) return 2;
+  if (pathname.startsWith('/avance')) return 2;
+  if (pathname.startsWith('/marcaje')) return 2;
+  // Reporte H4 son las marcas de TODO el personal (entradas, salidas, anomalías).
+  // Acá va también la API porque sus rutas no traen chequeo propio de nivel.
+  if (pathname.startsWith('/reporte-h4') || pathname.startsWith('/api/reporte-h4')) return 2;
   if (pathname.startsWith('/usuarios')) return 1;
   return 1;
 }

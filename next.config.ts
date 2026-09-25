@@ -48,7 +48,12 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https://*.blob.core.windows.net",
-      "connect-src 'self' https://login.microsoftonline.com https://api.businesscentral.dynamics.com",
+      // El websocket de Fast Refresh de `next dev` vive en ws://127.0.0.1:<puerto>,
+      // que `'self'` no cubre: en desarrollo la consola se llenaba de "violates
+      // the following Content Security Policy directive" y el refresco en caliente
+      // quedaba a medias. Se abre ws: SOLO en desarrollo; en producción no hay
+      // websocket que valga y la directiva queda igual de cerrada que antes.
+      `connect-src 'self' https://login.microsoftonline.com https://api.businesscentral.dynamics.com${process.env.NODE_ENV === 'development' ? ' ws://localhost:* ws://127.0.0.1:*' : ''}`,
       // Nada de <object>/<embed>: no se usan y son vector clásico de inyección.
       "object-src 'none'",
       // Que un HTML inyectado no pueda cambiar la base de las URLs relativas.

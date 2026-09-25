@@ -5,8 +5,44 @@ import { cookies } from 'next/headers';
 import { cargarSesion } from './sesiones';
 import { computeNivelAdmin, computeAllowedModules, rolLabelDeUsuario } from './permissions';
 
-const JWT_SECRET = process.env.JWT_SECRET!;
 const COOKIE_NAME = 'adelante_session';
+
+// ─── El secreto de firma ─────────────────────────────────────────────────────
+// Antes era `process.env.JWT_SECRET!`: el `!` le promete a TypeScript que está,
+// pero en tiempo de ejecución nadie lo comprobaba. Si faltaba, `jwt.sign`
+// reventaba recién al primer login —con un mensaje que no dice qué falta— y si
+// alguien dejaba puesto el placeholder del .env.local.example, la app arrancaba
+// tan campante firmando sesiones con un secreto público: cualquiera con ese
+// texto se fabrica un token de Super Admin.
+//
+// Ahora se verifica al arrancar y se falla de una, con el nombre de la variable
+// en el mensaje. Un secreto corto NO tumba el arranque (no sé cuál está puesto
+// en producción y no es este cambio el que debe sacar a nadie del aire): queda
+// como error en el log, para cambiarlo con calma.
+const LARGO_MINIMO = 32;
+const PLACEHOLDERS = ['cambia-esto-por-un-secreto-largo-aleatorio', 'changeme', 'secret'];
+
+function leerSecreto(): string {
+  const s = process.env.JWT_SECRET ?? '';
+  if (!s) {
+    throw new Error(
+      'Falta la variable de entorno JWT_SECRET: sin ella no se pueden firmar ni verificar las sesiones.',
+    );
+  }
+  if (PLACEHOLDERS.includes(s.trim().toLowerCase())) {
+    throw new Error(
+      'JWT_SECRET tiene todavía el valor de ejemplo. Es público: cualquiera podría firmarse una sesión de Super Admin. Poné uno aleatorio.',
+    );
+  }
+  if (s.length < LARGO_MINIMO) {
+    console.error(
+      `JWT_SECRET tiene ${s.length} caracteres; se recomiendan al menos ${LARGO_MINIMO} aleatorios. Un secreto corto se rompe por fuerza bruta y con él se firman sesiones de cualquier usuario.`,
+    );
+  }
+  return s;
+}
+
+const JWT_SECRET = leerSecreto();
 
 export interface JWTPayload {
   /** = idColaborador en el modelo nuevo (dbo.Colaborador). Se mantiene el

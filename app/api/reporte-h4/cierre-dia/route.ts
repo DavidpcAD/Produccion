@@ -12,6 +12,12 @@ export async function GET(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
+  // Son las marcas de todo el personal: mismo piso que el resto del Reporte H4
+  // (nivel 2, el `minLevel` del Sidebar). El proxy ya lo filtra, pero acá es
+  // donde vale — el proxy es una comprobación optimista, no la autorización.
+  if (session.nivelAdmin < 2) {
+    return NextResponse.json({ error: 'Prohibido' }, { status: 403 });
+  }
 
   const raw = new URL(req.url).searchParams.get('fecha');
   const fecha = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
