@@ -41,7 +41,7 @@ const weightClass: Record<ComboWeight, string> = {
 function OptionLabel({ opt }: { opt: ComboOption }) {
   if (!opt.parts?.length) return <span className="text-ds-ink">{opt.label}</span>;
   return (
-    <span className="truncate">
+    <span className="min-w-0 break-words">
       {opt.parts.map((p, i) => (
         <span key={i} className={weightClass[p.weight ?? 'normal']}>
           {i > 0 && <span className="text-ds-gray-300 font-light"> · </span>}
@@ -140,10 +140,14 @@ export function Combobox({
     setOpen(false);
   }
 
-  // Texto del botón en modo multi (labels de los seleccionados).
-  const multiLabel = multiple
-    ? values.map(v => options.find(o => o.value === v)?.label ?? v).join(', ')
-    : '';
+  // Seleccionados en modo multi. Antes se pegaban en UN string y el botón lo
+  // cortaba con «…» ("Valle Barani, Valle Castilla, Valle Ilios, Valle Nova…"):
+  // los nombres comparten prefijo, así que el pedazo visible no dice cuáles
+  // están puestos, que es justo lo que hay que saber. Ahora es una lista y cada
+  // uno se pinta como chip: caben todos, bajando de línea.
+  const multiLabels = multiple
+    ? values.map(v => ({ value: v, label: options.find(o => o.value === v)?.label ?? v }))
+    : [];
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') { e.preventDefault(); setHighlight(h => Math.min(h + 1, filtered.length - 1)); }
@@ -176,16 +180,21 @@ export function Combobox({
           disabled={disabled}
           onClick={() => !disabled && setOpen(o => !o)}
           className={`
-            w-full h-12 rounded-ds-xl bg-ds-surface text-body-sm pl-5 pr-10 text-left transition-all duration-150
-            flex items-center border-2 shadow-ds-01
+            w-full min-h-12 rounded-ds-xl bg-ds-surface text-body-sm pl-5 pr-10 py-2 text-left transition-all duration-150
+            flex items-center flex-wrap gap-1.5 border-2 shadow-ds-01
             focus:outline-none focus:border-black focus:shadow-none
             disabled:bg-ds-gray-100 disabled:cursor-not-allowed disabled:border-transparent disabled:shadow-none
             ${open ? 'border-black shadow-none' : 'border-transparent'}
           `}
         >
           {multiple
-            ? (values.length
-                ? <span className="truncate text-ds-ink">{multiLabel}</span>
+            ? (multiLabels.length
+                ? multiLabels.map(m => (
+                    <span key={m.value}
+                      className="inline-flex items-center rounded-full bg-ds-gray-100 px-2 py-0.5 text-body-sm text-ds-ink break-words">
+                      {m.label}
+                    </span>
+                  ))
                 : <span className="text-ds-gray-300">{placeholder}</span>)
             : (selected
                 ? <OptionLabel opt={selected} />

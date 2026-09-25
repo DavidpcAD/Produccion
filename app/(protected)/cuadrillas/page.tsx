@@ -166,7 +166,7 @@ function ObrasPicker({ obras, tipos, selected, onChange }: {
                 {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
               </span>
               <span className="text-sm text-ds-ink font-semibold shrink-0 w-20">{o.numeroObra}</span>
-              <span className="text-xs text-ds-gray-400 truncate">{o.nombreMostrado ?? ''}</span>
+              <span className="text-xs text-ds-gray-400 flex-1 min-w-0 break-words">{o.nombreMostrado ?? ''}</span>
             </button>
           );
         })}
@@ -292,9 +292,9 @@ function SubpartidasPicker({ tipos, catalogos, cargandoTipos, onCargarTipo, subs
                 {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
               </span>
               <span className="text-sm text-ds-ink font-semibold shrink-0 w-16">{sp.codigo}</span>
-              <span className="text-xs text-ds-gray-400 truncate flex-1">{sp.nombre}</span>
+              <span className="text-xs text-ds-gray-400 flex-1 min-w-0 break-words">{sp.nombre}</span>
               {tambienEn ? (
-                <span className="text-[10px] font-semibold text-ds-gray-400 shrink-0 truncate max-w-[9rem] bg-ds-gray-200/60 rounded-full px-2 py-0.5">{tambienEn}</span>
+                <span className="text-[10px] font-semibold text-ds-gray-400 shrink-0 max-w-[12rem] break-words bg-ds-gray-200/60 rounded-full px-2 py-0.5">{tambienEn}</span>
               ) : sp.partidaCodigo ? (
                 <span className="text-[10px] text-ds-gray-300 shrink-0">{sp.partidaCodigo}</span>
               ) : null}
@@ -767,7 +767,7 @@ export default function CuadrillasPage() {
                       <div className="w-7 h-7 rounded-ds bg-black flex items-center justify-center shrink-0">
                         <Icon name="list" size="sm" color="currentColor" className="text-brand" />
                       </div>
-                      <h2 className="font-bold text-ds-ink text-label flex-1 min-w-0 truncate">{row.p.codigo} · {row.p.nombre}</h2>
+                      <h2 className="font-bold text-ds-ink text-label flex-1 min-w-0 break-words">{row.p.codigo} · {row.p.nombre}</h2>
                       <Icon name="open" size="sm" color="currentColor" className={`text-ds-gray-400 shrink-0 transition-transform ${expanded ? '' : 'rotate-180'}`} />
                     </button>
                     <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 shrink-0 ${row.conEnc === 0 ? 'text-ds-gray-400 bg-ds-gray-200' : completa ? 'text-black bg-brand' : 'text-black bg-brand/40'}`}>
@@ -790,7 +790,7 @@ export default function CuadrillasPage() {
                         {row.subs.map(x => (
                           <div key={x.sub.idSubPartida} className="px-5 py-2.5 flex items-center gap-3">
                             <span className="text-sm font-semibold text-ds-ink shrink-0 w-16">{x.sub.codigo}</span>
-                            <span className="text-xs text-ds-gray-400 truncate flex-1">{x.sub.nombre}</span>
+                            <span className="text-xs text-ds-gray-400 flex-1 min-w-0 break-words">{x.sub.nombre}</span>
                             {x.encargado ? (
                               <ChipEncargado nombre={x.encargado.encargado}
                                 onRemove={isAdmin ? () => handleQuitarEncargado(x.encargado!.idEncargadoPartida) : undefined}
@@ -843,18 +843,25 @@ export default function CuadrillasPage() {
                     <div className="w-8 h-8 rounded-ds bg-black flex items-center justify-center shrink-0">
                       <Icon name="cuadrillas" size="sm" color="currentColor" className="text-brand" />
                     </div>
-                    <p className="font-bold text-ds-ink text-sm truncate">{c.Nombre}</p>
+                    <p className="font-bold text-ds-ink text-sm break-words">{c.Nombre}</p>
                   </div>
                   <Badge variant="green" dot>Activa</Badge>
                 </div>
-                <p className="text-xs font-semibold text-ds-ink mb-1 truncate" title={c.Proyecto || 'Sin proyecto'}>
+                <p className="text-xs font-semibold text-ds-ink mb-1 break-words">
                   <Icon name="folder" size="sm" color="currentColor" className="inline mr-1 text-ds-gray-300" />
                   {c.Proyecto || 'Sin proyecto'}
                 </p>
-                <p className="text-xs text-ds-gray-300 mb-1 truncate" title={c.Encargado || undefined}>Enc: {c.Encargado || '—'}</p>
-                <p className="text-xs text-ds-gray-400 mb-3 truncate" title={c.Obras || 'Sin obras'}>
+                <p className="text-xs text-ds-gray-300 mb-1 break-words">Enc: {c.Encargado || '—'}</p>
+                {/* Cuántas obras, no cuáles. La lista entera —Eléctricos llega a 40
+                    códigos— estiraba la tarjeta cinco veces más que sus vecinas y
+                    reventaba la fila del grid; y cortarla con «…» no sirve, porque los
+                    códigos comparten prefijo (VN-B.22, VN-B.24…) y el pedazo visible no
+                    distingue una obra de otra. El detalle completo está a un clic, en la
+                    pestaña "Casas" del panel, que es donde se trabaja con él. La búsqueda
+                    sigue mirando los códigos (ver coincideBusqueda). */}
+                <p className="text-xs text-ds-gray-400 mb-3 break-words">
                   <Icon name="place" size="sm" color="currentColor" className="inline mr-1 text-ds-gray-300" />
-                  {c.Obras || 'Sin obras'}
+                  {c.TotalObras > 0 ? `${c.TotalObras} ${c.TotalObras === 1 ? 'obra' : 'obras'}` : 'Sin obras'}
                 </p>
                 <div className="space-y-1.5 mt-auto">
                   <div className="flex justify-between text-xs">
@@ -1085,8 +1092,8 @@ export default function CuadrillasPage() {
                       <div className="flex items-center gap-3 px-4 py-2.5 rounded-ds bg-black text-white">
                         <div className="w-9 h-9 rounded-ds bg-brand flex items-center justify-center text-black text-xs font-bold shrink-0 shadow-ds-02">{encIni}</div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold truncate">{encNombre}</p>
-                          <p className="text-xs text-ds-gray-300 truncate">
+                          <p className="text-sm font-semibold break-words">{encNombre}</p>
+                          <p className="text-xs text-ds-gray-300 break-words">
                             {encMiembro ? `${encMiembro.Cedula} · ${encMiembro.Puesto || 'Sin puesto'}` : 'Encargado (no cuenta como miembro)'}
                           </p>
                         </div>
@@ -1104,8 +1111,8 @@ export default function CuadrillasPage() {
                             <div key={m.IDCuadMiembro} className="flex items-center gap-3 px-4 py-2.5">
                               <div className="w-9 h-9 rounded-ds bg-ds-gray-100 flex items-center justify-center text-ds-ink text-xs font-bold shrink-0">{ini}</div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold text-ds-ink truncate">{m.NombreCompleto}</p>
-                                <p className="text-xs text-ds-gray-400 truncate">{m.Cedula} · {m.Puesto || 'Sin puesto'}</p>
+                                <p className="text-sm font-semibold text-ds-ink break-words">{m.NombreCompleto}</p>
+                                <p className="text-xs text-ds-gray-400 break-words">{m.Cedula} · {m.Puesto || 'Sin puesto'}</p>
                               </div>
                               {isAdmin && (
                                 <button
@@ -1197,7 +1204,7 @@ export default function CuadrillasPage() {
                             <Icon name="check" size="sm" color="currentColor" className="text-ds-gray-300" />
                           </span>
                           <span className="text-sm font-semibold text-ds-gray-400 shrink-0 w-14">{s.codigo}</span>
-                          <span className="text-xs text-ds-gray-400 truncate flex-1">{s.nombre}</span>
+                          <span className="text-xs text-ds-gray-400 flex-1 min-w-0 break-words">{s.nombre}</span>
                           <ChipEncargado nombre={taken.encargado}
                             onRemove={isAdmin ? () => handleQuitarEncargado(taken.idEncargadoPartida) : undefined}
                             loading={quitandoId === taken.idEncargadoPartida} />
@@ -1212,7 +1219,7 @@ export default function CuadrillasPage() {
                           {on && <Icon name="check" size="sm" color="currentColor" className="text-ds-ink" />}
                         </span>
                         <span className="text-sm font-semibold text-ds-ink shrink-0 w-14">{s.codigo}</span>
-                        <span className="text-xs text-ds-gray-400 truncate flex-1">{s.nombre}</span>
+                        <span className="text-xs text-ds-gray-400 flex-1 min-w-0 break-words">{s.nombre}</span>
                       </button>
                     );
                   })}
