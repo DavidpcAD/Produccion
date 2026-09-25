@@ -7,7 +7,7 @@ import { Badge, ProgressBar } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { IconChevronDown } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
-import { bcEstadoBadge, money, formatDate, ordenBadge, ordenConsumoDirecto, ordenRecibidoPct, ordenSubtotal, ordenPedidos, ordenEsDirecta, ordenLineaImporte, num, numeroOrden } from "@/lib/compras/helpers";
+import { bcEstadoBadge, money, formatDate, ordenBadge, ordenConsumoDirecto, ordenObras, ordenRecibidoPct, ordenSubtotal, ordenPedidos, ordenEsDirecta, ordenLineaImporte, num, numeroOrden } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
 // Lista de órdenes reutilizable (Proveeduría / Aprobación / Bodega), sobre DataTable
@@ -49,6 +49,18 @@ export function OrdenesLista({
       cell: (c) => {
         const o = c.row.original; const peds = ordenPedidos(o); const dir = ordenEsDirecta(o);
         return <div className="row gap-2 wrap">{dir && <Badge tone="yellow">Directa</Badge>}{peds.slice(0, 2).map((n) => <Badge key={n} tone="gray">{n}</Badge>)}{peds.length > 2 && <span className="ds-muted ds-body-sm">+{peds.length - 2}</span>}</div>;
+      },
+    },
+    // Para QUÉ obra se compró. La lista completa (no un "+2"): son códigos cortos y
+    // la celda los baja de línea; lo que no se ve no se puede leer ni filtrar. Vacío
+    // = compra para inventario, y ahí el destino lo dice la columna de al lado.
+    {
+      id: "obra", header: "Obra", meta: { label: "Obra" },
+      accessorFn: (o) => ordenObras(o).join(" · "),
+      cell: (c) => {
+        const obras = ordenObras(c.row.original);
+        if (!obras.length) return <span className="ds-muted">—</span>;
+        return <span className="row gap-2 wrap">{obras.map((cod) => <span key={cod} className="ds-nowrap">{cod}</span>)}</span>;
       },
     },
     { id: "fecha", header: "Fecha", accessorFn: (o) => o.fecha, meta: { label: "Fecha", date: true }, cell: (c) => formatDate(c.getValue()) },
@@ -177,15 +189,16 @@ export function OrdenesLista({
                   <div className="ds-table-wrap" style={{ boxShadow: "none", borderRadius: 0 }}>
                     <table className="ds-table">
                       <thead>
-                        <tr><th>N.º</th><th>Solicitudes</th><th>Fecha</th><th className="ds-num">Total</th><th>Recibido</th><th>Estado</th>{acciones && <th></th>}</tr>
+                        <tr><th>N.º</th><th>Solicitudes</th><th>Obra</th><th>Fecha</th><th className="ds-num">Total</th><th>Recibido</th><th>Estado</th>{acciones && <th></th>}</tr>
                       </thead>
                       <tbody>
                         {g.ords.map((o) => {
-                          const peds = ordenPedidos(o); const dir = ordenEsDirecta(o); const b = ordenBadge(o.estado);
+                          const peds = ordenPedidos(o); const dir = ordenEsDirecta(o); const b = ordenBadge(o.estado); const obras = ordenObras(o);
                           return (
                             <tr key={o.id} className="is-clickable" onClick={() => router.push(hrefDetalle(o.id))} style={{ cursor: "pointer" }}>
                               <td className="ds-strong">{numeroOrden(o)}</td>
                               <td><div className="row gap-2 wrap">{dir && <Badge tone="yellow">Directa</Badge>}{peds.slice(0, 2).map((n) => <Badge key={n} tone="gray">{n}</Badge>)}{peds.length > 2 && <span className="ds-muted ds-body-sm">+{peds.length - 2}</span>}</div></td>
+                              <td><div className="row gap-2 wrap">{obras.length === 0 ? <span className="ds-muted">—</span> : obras.map((cod) => <span key={cod} className="ds-nowrap">{cod}</span>)}</div></td>
                               <td className="ds-body-sm">{formatDate(o.fecha)}</td>
                               <td className="ds-num ds-strong">{money(ordenSubtotal(o), o.currencyCode)}</td>
                               <td><ProgressBar compact value={ordenRecibidoPct(o)} total={100} /></td>

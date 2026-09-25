@@ -843,6 +843,23 @@ export function ordenLineasSinObra(o: Orden): { lineNo?: number; itemNo: string;
     .map((l) => ({ lineNo: l.lineNo, itemNo: l.articuloId!, obra: l.obra || l.proyecto || undefined }));
 }
 
+/** OBRAS contra las que va la orden, sin repetir y en el orden de las líneas.
+ *
+ *  De dónde sale: la línea trae la obra heredada del pedido origen (`obra`); en una
+ *  COMPRA DIRECTA no hay pedido y la obra viaja como proyecto (`proyecto` = Job No.),
+ *  que es lo que ve BC. Mismo par que usa `ordenLineasSinObra`.
+ *
+ *  Una orden puede juntar VARIAS obras: Proveeduría arma una sola OC con líneas de
+ *  pedidos de obras distintas (9 de 562 órdenes en producción al 25/09/2026, el
+ *  máximo son 8). Por eso devuelve una lista y no un código.
+ *
+ *  Vacío = la orden no va contra ninguna obra: es compra para INVENTARIO (pedido de
+ *  stock), donde el destino es el almacén (ver `ordenAlmacenDestino`).
+ */
+export function ordenObras(o: Orden): string[] {
+  return [...new Set(o.lineas.map((l) => (l.obra || l.proyecto || "").trim()).filter(Boolean))];
+}
+
 // ─── Almacén destino de una ORDEN ───────────────────────────────────────────────
 // El almacén al que entra lo que SÍ va a inventario (las líneas de consumo directo
 // no entran). Si todas comparten uno, va en el encabezado ("Almacén destino: X") y
