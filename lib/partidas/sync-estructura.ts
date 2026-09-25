@@ -49,6 +49,33 @@ export interface ResultadoEstructura {
   subpartidasCreadas: string[];
   /** Capítulos que venían sin ninguna partida: no se crean. */
   capitulosSinPartidas: string[];
+  /** La obra está blindada (`motivoSinSyncBC`): no se escribió nada y este es el porqué. */
+  bloqueado?: string;
+}
+
+// ─── Obras BLINDADAS: su catálogo NO se toca desde afuera ───────────────────────
+// El catálogo de estas obras lo armó el negocio y NO se parece al de BC. Como el
+// sync es aditivo (nunca borra), cada "Traer de BC" volvía a meter las tareas de BC
+// al lado de las buenas y había que borrarlas a mano.
+//
+// F-MUEBLES: la partida es la OBRA de vivienda y la subpartida es el proceso —29:
+// 4 de fabricación, 16 de acabado y 9 de instalación— (regla del negocio del
+// 17/09/2026, `migrations/2026-09-17_muebles_partida_por_obra.sql`). En BC esa obra
+// tiene otra cosa: tres PRODUCTOS (F-SM Puertas Madera, F-TAP Rodapié 18x115,
+// F-INST Instalación de muebles), que se borraron a propósito ese mismo día.
+//
+// Blinda las DOS puertas que escriben catálogo: "Traer de BC" (/api/partidas/sync-bc)
+// y el "crear lo que falta" del Excel de presupuesto (/api/presupuesto/catalogo). El
+// CRUCE del presupuesto no se toca: sigue diciendo qué líneas del Excel no están.
+const OBRAS_BLINDADAS = new Map<string, string>([
+  ['F-MUEBLES', 'En F-MUEBLES la partida es la obra de vivienda y la subpartida es el proceso. '
+    + 'Las tareas de BC (F-SM, F-TAP, F-INST) son productos y se dejaron fuera a propósito: '
+    + 'el catálogo de esta obra se edita a mano en esta pantalla.'],
+]);
+
+/** Por qué NO se sincroniza el catálogo de esta obra, o null si sí se puede. */
+export function motivoSinSyncBC(obra: string): string | null {
+  return OBRAS_BLINDADAS.get(String(obra ?? '').trim().toUpperCase()) ?? null;
 }
 
 /** Nombre lindo de la obra, para el grupo "general" (el de las partidas sin capítulo). */
@@ -228,6 +255,10 @@ export async function sincronizarEstructura(
     partidasCreadas: [], partidasActualizadas: 0, subpartidasCreadas: [],
     capitulosSinPartidas: [],
   };
+  // Obra blindada: se sale ANTES de tocar nada y se dice por qué. Vale para las dos
+  // puertas que llaman acá (Traer de BC y el "crear" del Excel de presupuesto).
+  const blindada = motivoSinSyncBC(obra);
+  if (blindada) return { ...res, bloqueado: blindada };
   if (lineas.length === 0) return res;
 
   const { capitulos, hijos, sueltas, deducidos } = armarJerarquia(lineas, tipo.deduceCapitulo);

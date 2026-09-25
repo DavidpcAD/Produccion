@@ -4,6 +4,7 @@ import { logAudit } from '@/lib/audit';
 import { getTipoObra, listarTiposObra, type TipoObra } from '@/lib/partidas/tipos-obra';
 import { leerEstructuraBC, type FuenteEstructura } from '@/lib/partidas/estructura-bc';
 import {
+  motivoSinSyncBC,
   obrasDelTipo,
   sincronizarEstructura,
   type ResultadoEstructura,
@@ -33,6 +34,10 @@ export const dynamic = 'force-dynamic';
  *
  * OJO: lee el ENTORNO de BC del proceso (BC_BASE_URL / BC_ENVIRONMENT). En
  * producción es BC Production; en local, el Sandbox.
+ *
+ * Hay obras BLINDADAS (`motivoSinSyncBC`, hoy F-MUEBLES): su catálogo no se parece
+ * al de BC y se saltan, diciendo por qué. Si la obra pedida es una de esas, la
+ * llamada se rechaza con ese motivo en vez de fingir que no había nada que traer.
  *
  * Es aditivo e idempotente. Solo Super Admin (nivel 4).
  */
@@ -82,6 +87,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Obras blindadas: se sacan de la tanda y se reportan aparte. Si la persona pidió
+  // JUSTO una de esas, se le contesta el motivo (error) en vez de un "sin cambios"
+  // que no explica nada. Ni siquiera se le pregunta a BC: no hay para qué.
+  const bloqueadas = obras
+    .map((obra) => ({ obra, motivo: motivoSinSyncBC(obra) }))
+    .filter((b): b is { obra: string; motivo: string } => b.motivo !== null);
+  obras = obras.filter((o) => !motivoSinSyncBC(o));
+  if (obras.length === 0) {
+    return NextResponse.json({ error: `${bloqueadas[0].obra}: ${bloqueadas[0].motivo}` }, { status: 409 });
+  }
+
   try {
     const resultados: Resultado[] = [];
     for (const obra of obras) resultados.push(await sincronizarObra(tipo, obra, dryRun));
@@ -102,7 +118,8 @@ export async function POST(req: NextRequest) {
         tipo: tipo.codigo,
         ...totales,
         truncado: truncado ? `Se revisaron las primeras ${TOPE} obras.` : undefined,
-        avisos: resultados.map((r) => r.aviso).filter(Boolean),
+        bloqueadas,
+        avisos: [...bloqueadas.map((b) => `${b.obra}: ${b.motivo}`), ...resultados.map((r) => r.aviso).filter(Boolean)],
         detalle: resultados,
       });
     }
@@ -121,7 +138,8 @@ export async function POST(req: NextRequest) {
       tipo: tipo.codigo,
       ...totales,
       truncado: truncado ? `Se procesaron las primeras ${TOPE} obras.` : undefined,
-      avisos: resultados.map((r) => r.aviso).filter(Boolean),
+      bloqueadas,
+      avisos: [...bloqueadas.map((b) => `${b.obra}: ${b.motivo}`), ...resultados.map((r) => r.aviso).filter(Boolean)],
       detalle: resultados,
     });
   } catch (err: unknown) {

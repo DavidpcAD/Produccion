@@ -47,6 +47,8 @@ interface ResumenBC {
   obrasProcesadas: number; gruposCreados: number; partidasCreadas: number;
   subpartidasCreadas: number; gruposActualizados: number; partidasActualizadas: number;
   avisos: string[];
+  /** Obras que NO se traen de BC porque su catálogo es de la app (ver motivoSinSyncBC). */
+  bloqueadas: { obra: string; motivo: string }[];
   detalle: {
     obra: string; fuente: string; compania?: string | null; version?: string | null;
     gruposCreados: string[]; partidasCreadas: string[]; subpartidasCreadas: string[];
@@ -520,6 +522,7 @@ export default function PartidasPage() {
       gruposActualizados: suma('gruposActualizados'),
       partidasActualizadas: suma('partidasActualizadas'),
       avisos: partes.flatMap(p => (p.d?.avisos ?? []) as string[]),
+      bloqueadas: partes.flatMap(p => (p.d?.bloqueadas ?? []) as ResumenBC['bloqueadas']),
       detalle: partes.flatMap(p => (p.d?.detalle ?? []) as ResumenBC['detalle']),
     };
   }
@@ -1144,12 +1147,22 @@ export default function PartidasPage() {
           )}
           {bcPreview && (
             <div className="rounded-ds border border-ds-gray-200 bg-ds-gray-100/60 p-3 space-y-2">
+              {/* Obras cuyo catálogo es de la app: no se traen de BC. Va acá y no solo
+                  en un toast, que se va solo antes de que lo lean. */}
+              {bcPreview.bloqueadas.map(b => (
+                <p key={b.obra} className="text-body-sm text-ds-ink">
+                  <span className="font-mono text-xs font-semibold">{b.obra}</span> no se trae de BC.{' '}
+                  <span className="text-ds-gray-500">{b.motivo}</span>
+                </p>
+              ))}
+              {bcPreview.obrasProcesadas > 0 && (
               <p className="text-body-sm text-ds-ink">
                 {bcPreview.gruposCreados + bcPreview.partidasCreadas + (bcPreview.subpartidasCreadas ?? 0) === 0
                   ? `Nada nuevo: lo de BC ya está en el catálogo (${plural(bcPreview.obrasProcesadas, 'obra revisada', 'obras revisadas')}).`
                   : <>Traería <span className="font-semibold">{plural(bcPreview.gruposCreados, termGrupoLow, termGrupoPlural)}</span> y <span className="font-semibold">{plural(bcPreview.partidasCreadas, 'partida', 'partidas')}</span> nuevas de {plural(bcPreview.obrasProcesadas, 'obra', 'obras')}
                     {bcPreview.subpartidasCreadas ? <>, más <span className="font-semibold">{plural(bcPreview.subpartidasCreadas, 'subpartida', 'subpartidas')}</span> igual que su partida</> : null}.</>}
               </p>
+              )}
               {bcPreview.detalle.some(d => nuevosDeBC(d) > 0) && (
                 <ul className="max-h-48 overflow-y-auto space-y-1.5 text-body-sm">
                   {bcPreview.detalle.filter(d => nuevosDeBC(d) > 0).map(d => (
@@ -1174,9 +1187,11 @@ export default function PartidasPage() {
                   ))}
                 </ul>
               )}
-              <p className="text-body-sm text-ds-gray-400">
-                También refrescaría el nombre de {plural(bcPreview.gruposActualizados, `${termGrupoLow} que ya está`, `${termGrupoPlural} que ya están`)} y {plural(bcPreview.partidasActualizadas, 'partida que ya está', 'partidas que ya están')}.
-              </p>
+              {bcPreview.obrasProcesadas > 0 && (
+                <p className="text-body-sm text-ds-gray-400">
+                  También refrescaría el nombre de {plural(bcPreview.gruposActualizados, `${termGrupoLow} que ya está`, `${termGrupoPlural} que ya están`)} y {plural(bcPreview.partidasActualizadas, 'partida que ya está', 'partidas que ya están')}.
+                </p>
+              )}
             </div>
           )}
         </div>
