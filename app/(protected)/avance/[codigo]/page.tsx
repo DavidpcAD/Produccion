@@ -440,7 +440,7 @@ function NCDialog({
         </p>
         <Combobox label="Causa" value={causa} onChange={setCausa} options={opciones} placeholder="Seleccionar causa…" emptyText="Sin causas" />
         <div>
-          <label className="mb-1 block text-sm font-medium text-ds-ink">Nota (opcional)</label>
+          <label className="mb-1 block text-sm font-semibold text-ds-ink">Nota (opcional)</label>
           <textarea
             value={nota}
             onChange={(e) => setNota(e.target.value)}

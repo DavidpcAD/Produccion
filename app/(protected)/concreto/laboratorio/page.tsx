@@ -299,7 +299,7 @@ function ModalCrearMuestra({
         <DatePicker label="Fecha de colado *" value={fechaColado} onChange={setFechaColado} />
 
         <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium text-ds-ink">{"f'c objetivo (kg/cm²) *"}</label>
+          <label className="text-sm font-semibold text-ds-ink">{"f'c objetivo (kg/cm²) *"}</label>
           <div className="flex flex-wrap items-center gap-1.5">
             {FC_COMUNES.map((f) => (
               <button
@@ -346,7 +346,7 @@ function ModalCrearMuestra({
         <Input label="ID Casa / ubicación" value={casa} onChange={(e) => setCasa(e.target.value)} />
 
         <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium text-ds-ink">Edades a probar (días)</label>
+          <label className="text-sm font-semibold text-ds-ink">Edades a probar (días)</label>
           <div className="flex flex-wrap gap-1.5">
             {EDADES.map((e) => (
               <button
@@ -367,7 +367,7 @@ function ModalCrearMuestra({
         </div>
 
         <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium text-ds-ink">Notas</label>
+          <label className="text-sm font-semibold text-ds-ink">Notas</label>
           <textarea
             value={notas}
             onChange={(e) => setNotas(e.target.value)}

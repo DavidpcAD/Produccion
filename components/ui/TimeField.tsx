@@ -54,7 +54,7 @@ export function TimeField({ label, value, onChange, disabled }: TimeFieldProps) 
 
   return (
     <div className="flex flex-col gap-1.5">
-      {label && <label htmlFor={inputId} className="text-sm font-medium text-ds-ink">{label}</label>}
+      {label && <label htmlFor={inputId} className="text-sm font-semibold text-ds-ink">{label}</label>}
       <div className="relative">
         <input
           id={inputId}

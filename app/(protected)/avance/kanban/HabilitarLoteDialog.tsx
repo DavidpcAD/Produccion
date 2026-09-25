@@ -72,7 +72,7 @@ export function HabilitarLoteDialog({ open, pending, onClose, onConfirmar }: Pro
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-ds-ink">Códigos de obra</label>
+          <label className="mb-1.5 block text-sm font-semibold text-ds-ink">Códigos de obra</label>
           <textarea
             rows={5}
             value={texto}

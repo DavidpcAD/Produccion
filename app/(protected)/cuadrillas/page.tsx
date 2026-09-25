@@ -112,7 +112,7 @@ function ObrasPicker({ obras, tipos, selected, onChange }: {
           <Icon name="place" size="sm" color="currentColor" className="text-brand" />
         </div>
         <div className="flex-1 min-w-0">
-          <label className="text-sm font-bold text-ds-ink">Obras <span className="text-ds-red">*</span></label>
+          <label className="text-sm font-semibold text-ds-ink">Obras <span className="text-ds-red">*</span></label>
           <p className="text-xs text-ds-gray-400">Elegí el tipo de obra y marcá en cuáles trabaja esta cuadrilla.</p>
         </div>
         {filtered.length > 0 && (
@@ -225,7 +225,7 @@ function SubpartidasPicker({ tipos, catalogos, cargandoTipos, onCargarTipo, subs
           <Icon name="list" size="sm" color="currentColor" className="text-brand" />
         </div>
         <div className="flex-1 min-w-0">
-          <label className="text-sm font-bold text-ds-ink">Subpartidas <span className="text-ds-red">*</span></label>
+          <label className="text-sm font-semibold text-ds-ink">Subpartidas <span className="text-ds-red">*</span></label>
           <p className="text-xs text-ds-gray-400">Elegí tipo de obra → {termGrupo.toLowerCase()} → partida, y marcá las que ejecuta.</p>
         </div>
         {selected.length > 0 && (
@@ -1184,7 +1184,7 @@ export default function CuadrillasPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-bold text-ds-ink">Subpartidas <span className="font-normal text-ds-gray-400">· marcá las que toma</span></label>
+                  <label className="text-sm font-semibold text-ds-ink">Subpartidas <span className="font-normal text-ds-gray-400">· marcá las que toma</span></label>
                   {libres.length > 0 && (
                     <button type="button" onClick={() => setAsignarSubs(allLibres ? [] : libres.map(s => s.idSubPartida))}
                       className="text-xs font-semibold text-ds-ink hover:text-ds-gray-400">

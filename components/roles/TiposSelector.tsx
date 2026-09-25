@@ -21,7 +21,7 @@ export function TiposSelector({ roles, selectedRoles, tiposByRol, onChange }: {
   return (
     <div className="rounded-ds-lg border border-ds-gray-200 p-3.5 space-y-2.5">
       <div>
-        <label className="text-sm font-bold text-ds-ink">Tipo de rol</label>
+        <label className="text-sm font-semibold text-ds-ink">Tipo de rol</label>
         <p className="text-xs text-ds-gray-400">Estos roles se ramifican en subtipos. Elegí el que corresponde.</p>
       </div>
       <div className="space-y-2">

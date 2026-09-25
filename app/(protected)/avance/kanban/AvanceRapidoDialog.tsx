@@ -98,7 +98,7 @@ export function AvanceRapidoDialog({ sub, pending, onClose, onConfirmar }: Props
           />
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-ds-ink">Valor exacto</label>
+            <label className="mb-1.5 block text-xs font-semibold text-ds-ink">Valor exacto</label>
             <input
               type="number"
               min={0}

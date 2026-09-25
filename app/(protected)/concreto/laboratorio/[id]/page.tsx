@@ -562,7 +562,7 @@ function ModalEditarMuestra({ muestra, cerrar, onGuardado }: { muestra: MuestraD
         <Input label="Obra (works_no)" value={obra} onChange={(e) => setObra(e.target.value)} />
         <Input label="ID Casa / ubicación" value={casa} onChange={(e) => setCasa(e.target.value)} />
         <div className="sm:col-span-2 space-y-1.5">
-          <label className="text-sm font-medium text-ds-ink">Notas</label>
+          <label className="text-sm font-semibold text-ds-ink">Notas</label>
           <textarea
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
@@ -632,7 +632,7 @@ function ModalAgregarEnsayo({ idMuestra, fechaColado, cerrar, onGuardado }: { id
     >
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <label className="text-sm font-medium text-ds-ink">Edad (días)</label>
+          <label className="text-sm font-semibold text-ds-ink">Edad (días)</label>
           <div className="flex flex-wrap items-center gap-1.5">
             {[3, 7, 14, 28, 56, 90].map((d) => (
               <button
@@ -712,7 +712,7 @@ function ModalEditarEnsayo({ ensayo, cerrar, onGuardado }: { ensayo: EnsayoDetal
         <DatePicker label="Fecha de prueba" value={fechaPrueba} onChange={setFechaPrueba} />
         <Input label="Motivo del ajuste de fecha" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Opcional" />
         <div className="space-y-1.5">
-          <label className="text-sm font-medium text-ds-ink">Notas</label>
+          <label className="text-sm font-semibold text-ds-ink">Notas</label>
           <textarea
             value={notas}
             onChange={(e) => setNotas(e.target.value)}

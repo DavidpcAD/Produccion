@@ -28,7 +28,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-sm font-medium text-ds-ink">
+          <label htmlFor={inputId} className="text-sm font-semibold text-ds-ink">
             {label}
             {props.required && <span className="text-ds-red ml-0.5">*</span>}
           </label>
@@ -86,7 +86,7 @@ export function Select({ label, error, hint, options, placeholder, className = '
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label htmlFor={selectId} className="text-sm font-medium text-ds-ink">
+        <label htmlFor={selectId} className="text-sm font-semibold text-ds-ink">
           {label}
           {props.required && <span className="text-ds-red ml-0.5">*</span>}
         </label>

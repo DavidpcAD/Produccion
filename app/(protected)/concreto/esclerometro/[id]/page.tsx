@@ -411,7 +411,7 @@ export default function EsclerometroDetallePage({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="e-notas" className="text-sm font-medium text-ds-ink">
+              <label htmlFor="e-notas" className="text-sm font-semibold text-ds-ink">
                 Notas
               </label>
               <textarea

@@ -59,7 +59,7 @@ export function CongelarObraDialog({ codigo, causas, pending, onClose, onConfirm
         </p>
 
         <div>
-          <label className="mb-2 block text-xs font-medium text-ds-ink">
+          <label className="mb-2 block text-xs font-semibold text-ds-ink">
             Motivo del congelamiento
           </label>
           <div className="grid grid-cols-1 gap-2">
@@ -91,7 +91,7 @@ export function CongelarObraDialog({ codigo, causas, pending, onClose, onConfirm
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-ds-ink">Nota (opcional)</label>
+          <label className="mb-1.5 block text-xs font-semibold text-ds-ink">Nota (opcional)</label>
           <textarea
             rows={2}
             value={nota}
