@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { getBCToken, bcConfigured } from '@/lib/bc-client';
 import { odataStr } from '@/lib/odata';
 
@@ -54,8 +54,8 @@ function decodeB64Url(s: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   if (session.nivelAdmin < 4) return NextResponse.json({ error: 'Prohibido (solo admin)' }, { status: 403 });
 
   const test = req.nextUrl.searchParams.get('test') ?? 'config';

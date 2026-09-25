@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { consultarKpis } from '@/lib/concreto/batches';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -9,8 +9,8 @@ const MAX_DIAS = 90;
 // GET /api/concreto/batches/kpis?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&id_planta=N
 // KPIs agregados + serie diaria de m³. Rango máximo 90 días.
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const sp = req.nextUrl.searchParams;
   const desde = sp.get('desde') || '';

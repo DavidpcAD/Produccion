@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorEsclerometro, crearEnsayo, listarEnsayos } from '@/lib/concreto/esclerometro';
 import type { CrearEnsayoEsclerometroRequest } from '@/lib/concreto/tipos-esclerometro';
 import { ANGULOS_IMPACTO } from '@/lib/concreto/tipos-esclerometro';
@@ -11,8 +11,8 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // destructivos (martillo Schmidt), con filtros por obra, rango de fecha y
 // búsqueda libre (elemento / casa / equipo).
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const sp = req.nextUrl.searchParams;
   const obra = sp.get('obra_works_no');
@@ -50,8 +50,8 @@ export async function GET(req: NextRequest) {
 // POST /api/concreto/lab/esclerometro — crea el header del ensayo. Los rebotes
 // se agregan luego en el detalle. El número se asigna automático (consecutivo).
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   let body: Record<string, unknown>;
   try {

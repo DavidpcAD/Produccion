@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { obtenerMuestra } from '@/lib/concreto/lab';
 import { actualizarMuestra, borrarMuestra, ErrorLab } from '@/lib/concreto/lab-write';
 import type { ActualizarMuestraParams } from '@/lib/concreto/tipos-lab';
 
 // GET /api/concreto/lab/muestras/[id] — detalle: header + ensayos + mediciones.
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const { id } = await params;
   const idMuestra = Number(id);
@@ -30,8 +30,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 // PATCH /api/concreto/lab/muestras/[id] — editar la muestra (campos parciales).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const { id } = await params;
   const idMuestra = Number(id);
@@ -84,8 +84,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 // DELETE /api/concreto/lab/muestras/[id] — borrar muestra (CASCADE). Solo admin.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   if (session.nivelAdmin < 4) return NextResponse.json({ error: 'Prohibido' }, { status: 403 });
 
   const { id } = await params;

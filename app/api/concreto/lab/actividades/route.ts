@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { listarActividades } from '@/lib/concreto/lab';
 import { ErrorConfig, crearActividad } from '@/lib/concreto/config';
 
 // GET /api/concreto/lab/actividades — catálogo de actividades (para filtros).
 // Con ?incluye_inactivas=true trae también las desactivadas (para configuración).
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const incluyeInactivas = req.nextUrl.searchParams.get('incluye_inactivas') === 'true';
   try {
@@ -24,8 +24,8 @@ export async function GET(req: NextRequest) {
 
 // POST /api/concreto/lab/actividades — crear actividad. Solo config (nivelAdmin >= 4).
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   if (session.nivelAdmin < 4) return NextResponse.json({ error: 'Prohibido' }, { status: 403 });
 
   let body: Record<string, unknown>;

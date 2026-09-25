@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { actualizarEnsayo, borrarEnsayo, ErrorLab } from '@/lib/concreto/lab-write';
 import type { ActualizarEnsayoParams } from '@/lib/concreto/tipos-lab';
 
 // PATCH /api/concreto/lab/ensayos/[id] — editar fecha_prueba / notas del ensayo.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const { id } = await params;
   const idEnsayo = Number(id);
@@ -52,8 +52,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 // DELETE /api/concreto/lab/ensayos/[id] — borrar ensayo. Solo admin.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   if (session.nivelAdmin < 4) return NextResponse.json({ error: 'Prohibido' }, { status: 403 });
 
   const { id } = await params;

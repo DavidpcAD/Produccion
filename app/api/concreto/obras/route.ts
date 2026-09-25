@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { listarObras } from '@/lib/concreto/coladas-workflow';
 
 // GET /api/concreto/obras — lista desde pro_bi.dim_obra para el picker de asignar
 // obra. Params: q (búsqueda), solo_activas (default true), limite (default 200).
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const sp = req.nextUrl.searchParams;
   const q = sp.get('q');

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { procesarIngesta } from '@/lib/concreto/ingesta';
 
 // POST /api/concreto/batches/ingestar — ingesta de un CSV de planta Blend.
@@ -18,8 +18,8 @@ import { procesarIngesta } from '@/lib/concreto/ingesta';
 // El contenido crudo del CSV viaja como UTF-8 plano (NO base64). Los CSV de
 // Blend pesan ~5MB, manejables en el body default.
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   // Actor de auditoría (mismo criterio que el resto del app: oid = idUsuario/idCol,
   // email = cédula/username con el que entró).

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { obtenerCurvaTeorica } from '@/lib/concreto/lab-write';
 
 // GET /api/concreto/lab/curva-teorica — curva teórica de resistencia (ASTM
 // C-150). Lookup compartido: resistencia esperada = F'C × pct_resistencia.
 export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   try {
     const db = await getAdelanteDb();

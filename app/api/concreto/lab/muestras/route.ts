@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { consultarMuestras } from '@/lib/concreto/lab';
 import { crearMuestra, ErrorLab } from '@/lib/concreto/lab-write';
 import type { CrearMuestraParams } from '@/lib/concreto/tipos-lab';
 
 // GET /api/concreto/lab/muestras — listado paginado de muestras de laboratorio.
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const sp = req.nextUrl.searchParams;
   const idActividad = sp.get('id_actividad');
@@ -42,8 +42,8 @@ export async function GET(req: NextRequest) {
 
 // POST /api/concreto/lab/muestras — crear muestra (+ ensayos pre-creados).
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   let body: Record<string, unknown>;
   try {

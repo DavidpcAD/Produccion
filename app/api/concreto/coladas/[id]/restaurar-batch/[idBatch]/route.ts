@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { restaurarBatch } from '@/lib/concreto/coladas-workflow';
 import { obtenerColada } from '@/lib/concreto/coladas';
 
@@ -10,8 +10,8 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; idBatch: string }> },
 ) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const { id, idBatch } = await params;
   const idColada = Number(id);

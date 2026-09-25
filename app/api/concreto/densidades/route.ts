@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorConfig, crearDensidad, listarDensidades } from '@/lib/concreto/config';
 import type { CrearDensidadParams } from '@/lib/concreto/tipos-config';
 
 // GET /api/concreto/densidades — lista de densidades de materiales (cualquier sesión).
 export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   try {
     const db = await getAdelanteDb();
@@ -22,8 +22,8 @@ export async function GET() {
 
 // POST /api/concreto/densidades — crear densidad. Solo config (nivelAdmin >= 4).
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   if (session.nivelAdmin < 4) return NextResponse.json({ error: 'Prohibido' }, { status: 403 });
 
   let body: Record<string, unknown>;

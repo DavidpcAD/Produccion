@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorGraph, ErrorGraphDeps, quitarRol } from '@/lib/concreto/graph-usuarios';
 
 // DELETE /api/concreto/usuarios/[userId]/asignaciones/[assignmentId]
@@ -13,8 +13,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ userId: string; assignmentId: string }> },
 ) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   if (session.nivelAdmin < 4) return NextResponse.json({ error: 'Prohibido (solo admin)' }, { status: 403 });
 
   const { userId, assignmentId } = await params;

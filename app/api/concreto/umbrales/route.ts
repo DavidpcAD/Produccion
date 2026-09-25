@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { listarUmbrales } from '@/lib/concreto/config';
 
 // GET /api/concreto/umbrales — lista de umbrales de alerta (cualquier sesión).
 export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   try {
     const db = await getAdelanteDb();

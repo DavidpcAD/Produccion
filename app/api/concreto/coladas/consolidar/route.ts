@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { consolidar } from '@/lib/concreto/coladas-workflow';
 import { obtenerColada } from '@/lib/concreto/coladas';
 
 // POST /api/concreto/coladas/consolidar — fusiona 2..20 coladas 'sugerida' de
 // la misma planta en la de id más bajo. Body: { ids: number[] }
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   const actor = session.cedula || String(session.idUsuario || session.idCol);
 
   const body = await req.json().catch(() => ({}));

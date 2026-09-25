@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { importarExcelLab } from '@/lib/concreto/lab-write';
 
 // POST /api/concreto/lab/importar-excel — importación / reconciliación del
 // Excel histórico de laboratorio. Recibe el archivo .xlsx como multipart
 // (campo "file"). Idempotente: correr dos veces no duplica nada.
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   let file: File | null = null;
   try {

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { asignarObra } from '@/lib/concreto/coladas-workflow';
 import { obtenerColada } from '@/lib/concreto/coladas';
 
 // POST /api/concreto/coladas/[id]/asignar-obra — set/cambia/quita obra.
 // Body: { obra_works_no: string | null }  (null limpia la obra)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const { id } = await params;
   const idColada = Number(id);

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { consultarBatches } from '@/lib/concreto/batches';
 
 // GET /api/concreto/batches — listado de batches con datos crudos de planta,
 // para análisis de calidad. Filtros: id_colada, id_planta, desde/hasta, q,
 // solo_anomalias + paginación.
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const sp = req.nextUrl.searchParams;
   const idColada = sp.get('id_colada');

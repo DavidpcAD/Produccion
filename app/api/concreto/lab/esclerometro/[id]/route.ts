@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import {
   ErrorEsclerometro,
   actualizarEnsayo,
@@ -20,8 +20,8 @@ function parsearId(raw: string): number | null {
 // GET /api/concreto/lab/esclerometro/[id] — detalle: header + rebotes +
 // promedio calculado.
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const { id: idRaw } = await params;
   const id = parsearId(idRaw);
@@ -41,8 +41,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 // PATCH /api/concreto/lab/esclerometro/[id] — actualiza campos del header.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const { id: idRaw } = await params;
   const id = parsearId(idRaw);
@@ -117,8 +117,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 // DELETE /api/concreto/lab/esclerometro/[id] — solo admin. Borra el ensayo y
 // sus rebotes (CASCADE).
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   if (session.nivelAdmin < 4) {
     return NextResponse.json({ error: 'Solo administradores pueden eliminar' }, { status: 403 });
   }

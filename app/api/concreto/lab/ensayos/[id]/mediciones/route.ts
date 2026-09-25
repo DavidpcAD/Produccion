@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { crearMedicion, ErrorLab } from '@/lib/concreto/lab-write';
 import type { CrearMedicionParams } from '@/lib/concreto/tipos-lab';
 
 // POST /api/concreto/lab/ensayos/[id]/mediciones — agregar una probeta (MPa).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const { id } = await params;
   const idEnsayo = Number(id);

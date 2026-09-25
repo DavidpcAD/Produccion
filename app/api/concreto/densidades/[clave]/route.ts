@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { ErrorConfig, actualizarDensidad } from '@/lib/concreto/config';
 import type { ActualizarDensidadParams } from '@/lib/concreto/tipos-config';
 
 // PATCH /api/concreto/densidades/[clave] — editar densidad. Solo config (nivelAdmin >= 4).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ clave: string }> }) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
   if (session.nivelAdmin < 4) return NextResponse.json({ error: 'Prohibido' }, { status: 403 });
 
   const { clave: claveParam } = await params;

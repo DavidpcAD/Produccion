@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
-import { getSession } from '@/lib/auth';
+import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
 import { consultarColadas } from '@/lib/concreto/coladas';
 import { ESTADOS_COLADA } from '@/lib/concreto/estados';
 import type { EstadoColada } from '@/lib/concreto/tipos';
@@ -9,8 +9,8 @@ import type { EstadoColada } from '@/lib/concreto/tipos';
 // TODO(concreto): login por PIN de laboratorio (pro_lab.pin_acceso) de la app
 // original; hoy basta con sesión válida bajo (protected).
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const session = await guardConcreto();
+  if (esRechazo(session)) return session;
 
   const sp = req.nextUrl.searchParams;
   const estadoRaw = sp.getAll('estado').filter((e): e is EstadoColada =>
