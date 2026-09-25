@@ -15,14 +15,25 @@ const COOKIE_NAME = 'adelante_session';
 // tan campante firmando sesiones con un secreto público: cualquiera con ese
 // texto se fabrica un token de Super Admin.
 //
-// Ahora se verifica al arrancar y se falla de una, con el nombre de la variable
-// en el mensaje. Un secreto corto NO tumba el arranque (no sé cuál está puesto
-// en producción y no es este cambio el que debe sacar a nadie del aire): queda
-// como error en el log, para cambiarlo con calma.
+// Ahora se verifica, pero LA PRIMERA VEZ QUE SE USA, no al evaluar el módulo.
+// Esa diferencia importa: `next build` evalúa los módulos de cada ruta para
+// recolectar su configuración, y el runner del CI no tiene JWT_SECRET porque
+// solo compila —no corre la app—. Validar arriba tumbaba el build entero con
+// "Failed to collect configuration for /api/auth/logout", que es un mensaje que
+// no lleva a ninguna parte. Verificándolo acá, el build pasa y quien se queda
+// sin secreto es el proceso que de verdad iba a firmar una sesión.
+//
+// Falla cerrado: sin secreto, `signToken` tira (el login devuelve 500 con el
+// motivo en el log) y `verifyToken` devuelve null (toda sesión va al login).
+// Un secreto corto NO tumba nada: queda como error en el log, para cambiarlo con
+// calma.
 const LARGO_MINIMO = 32;
 const PLACEHOLDERS = ['cambia-esto-por-un-secreto-largo-aleatorio', 'changeme', 'secret'];
 
-function leerSecreto(): string {
+let secretoOk: string | null = null;
+
+function secreto(): string {
+  if (secretoOk !== null) return secretoOk;
   const s = process.env.JWT_SECRET ?? '';
   if (!s) {
     throw new Error(
@@ -35,14 +46,14 @@ function leerSecreto(): string {
     );
   }
   if (s.length < LARGO_MINIMO) {
+    // Una sola vez por proceso: se memoriza abajo, así no ensucia un log por request.
     console.error(
       `JWT_SECRET tiene ${s.length} caracteres; se recomiendan al menos ${LARGO_MINIMO} aleatorios. Un secreto corto se rompe por fuerza bruta y con él se firman sesiones de cualquier usuario.`,
     );
   }
+  secretoOk = s;
   return s;
 }
-
-const JWT_SECRET = leerSecreto();
 
 export interface JWTPayload {
   /** = idColaborador en el modelo nuevo (dbo.Colaborador). Se mantiene el
@@ -81,12 +92,12 @@ export function signToken(payload: JWTPayload): string {
   // `jti` nuevo en cada firma: identifica esta sesión y nada más. Si el payload
   // viniera con uno viejo se descarta, para no reusar el id de otra sesión.
   const { jti: _viejo, iat: _iat, ...limpio } = payload;
-  return jwt.sign(limpio, JWT_SECRET, { expiresIn: '8h', jwtid: randomUUID() });
+  return jwt.sign(limpio, secreto(), { expiresIn: '8h', jwtid: randomUUID() });
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, secreto()) as JWTPayload;
   } catch {
     return null;
   }
