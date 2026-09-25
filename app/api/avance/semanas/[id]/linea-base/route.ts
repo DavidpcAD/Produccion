@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import type { LineaBaseResultado } from '@/lib/avance/sprints';
@@ -126,6 +127,6 @@ export async function POST(
     };
     return NextResponse.json({ ok: true, ...resultado });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

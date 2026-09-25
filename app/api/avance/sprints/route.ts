@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import type { SprintCatalogoDetalle } from '@/lib/avance/sprints';
@@ -44,7 +45,7 @@ export async function GET() {
     }));
     return NextResponse.json({ sprints });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 
@@ -90,6 +91,6 @@ export async function POST(req: NextRequest) {
       `);
     return NextResponse.json({ ok: true, ...r.recordset[0] }, { status: 201 });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

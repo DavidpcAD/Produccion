@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { resolverUsuarioAppId } from '@/lib/avance/usuario-app';
@@ -254,7 +255,7 @@ export async function POST(
   } catch (err) {
     console.error('/api/avance/obras/[codigo]/sprint POST error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error desconocido' },
+      { error: mensajeParaCliente(err) },
       { status: 500 },
     );
   }

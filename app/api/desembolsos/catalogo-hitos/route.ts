@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error('/api/desembolsos/catalogo-hitos GET error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error desconocido' },
+      { error: mensajeParaCliente(err) },
       { status: 500 },
     );
   }

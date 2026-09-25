@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import {
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
     };
     return NextResponse.json(body);
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
       `);
     return NextResponse.json({ ok: true, IDCreditoPuente: r.recordset[0]?.IDCreditoPuente }, { status: 201 });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 

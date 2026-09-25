@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { enrolarEnZona, H4Error } from '@/lib/h4';
 
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
       const r = await enrolarEnZona(idZona, idColaborador, session.cedula ?? null);
       resultados.push({ idColaborador, ok: true, equipos: r.equipos });
     } catch (e) {
-      const error = e instanceof H4Error ? e.message : (e instanceof Error ? e.message : String(e));
+      const error = e instanceof H4Error ? e.message : (mensajeParaCliente(e));
       resultados.push({ idColaborador, ok: false, error });
     }
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcRecibidoSinFacturar, bcSinFechaDeEntrega } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -27,6 +28,6 @@ export async function GET(req: Request) {
     ]);
     return NextResponse.json({ sinFacturar, sinFecha });
   } catch (e: unknown) {
-    return NextResponse.json({ error: String((e as { message?: string })?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

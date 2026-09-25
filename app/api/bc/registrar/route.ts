@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { bcProductionConfigured, RegistrarNoDisponible, registrarObra } from '@/lib/bc/production-lines';
 
@@ -40,6 +41,6 @@ export async function POST(req: NextRequest) {
     if (e instanceof RegistrarNoDisponible) {
       return NextResponse.json({ error: e.message }, { status: 501 });
     }
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

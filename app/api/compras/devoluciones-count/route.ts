@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { contarDevoluciones } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -21,6 +22,6 @@ export async function GET() {
       : { username: g.session.username, nombre: g.session.nombre };
     return NextResponse.json(await contarDevoluciones(soloDe));
   } catch (e: unknown) {
-    return NextResponse.json({ error: String((e as { message?: string })?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

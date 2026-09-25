@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import type { Causa } from '@/lib/avance/causas';
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error('/api/avance/causas error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error desconocido' },
+      { error: mensajeParaCliente(err) },
       { status: 500 },
     );
   }
@@ -89,6 +90,6 @@ export async function POST(req: NextRequest) {
       `);
     return NextResponse.json({ ok: true, id: r.recordset[0]?.id }, { status: 201 });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

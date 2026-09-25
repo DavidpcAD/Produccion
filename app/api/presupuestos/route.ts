@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { listarPresupuestos } from '@/lib/bc/presupuestos';
 
@@ -15,6 +16,6 @@ export async function GET(req: NextRequest) {
   try {
     return NextResponse.json(await listarPresupuestos(worksNo));
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

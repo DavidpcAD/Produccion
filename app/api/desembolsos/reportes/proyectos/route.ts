@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { listarProyectos } from '@/lib/desembolsos/reportes';
@@ -14,6 +15,6 @@ export async function GET() {
     const db = await getAdelanteDb();
     return NextResponse.json({ proyectos: await listarProyectos(db) });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

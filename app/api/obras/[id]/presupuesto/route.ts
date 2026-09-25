@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { bcConstructionConfigured } from '@/lib/bc-construction';
@@ -56,6 +57,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     });
   } catch (e: unknown) {
     // BC caído / no disponible: no rompemos el detalle de la obra, solo avisamos.
-    return NextResponse.json({ cargado: false, error: String((e as Error)?.message ?? e) }, { status: 200 });
+    return NextResponse.json({ cargado: false, error: mensajeParaCliente(e) }, { status: 200 });
   }
 }

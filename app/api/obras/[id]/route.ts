@@ -95,7 +95,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
       } catch (e) {
         bcSync = false;
-        bcError = e instanceof Error ? e.message : String(e);
+        bcError = mensajeParaCliente(e);
         console.error('/api/obras/[id] PATCH BC sync error:', e);
       }
     }

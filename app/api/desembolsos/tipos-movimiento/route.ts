@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { listarTiposMovimiento } from '@/lib/desembolsos/movimientos';
@@ -18,7 +19,7 @@ export async function GET() {
   } catch (err) {
     console.error('/api/desembolsos/tipos-movimiento GET error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error desconocido' },
+      { error: mensajeParaCliente(err) },
       { status: 500 },
     );
   }

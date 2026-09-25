@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcUltimaCompra, bcItemLastCost, bcItemFichas } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -49,6 +50,6 @@ export async function GET(req: Request) {
     // Sin unidad base no se devuelve precio: un número sin unidad es justo el problema.
     return NextResponse.json({ precio: null, unidad: null, fuente: null });
   } catch (e) {
-    return NextResponse.json({ precio: null, unidad: null, fuente: null, error: e instanceof Error ? e.message : String(e) });
+    return NextResponse.json({ precio: null, unidad: null, fuente: null, error: mensajeParaCliente(e) });
   }
 }

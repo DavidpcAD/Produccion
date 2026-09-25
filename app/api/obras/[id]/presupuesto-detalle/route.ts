@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
@@ -77,7 +78,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     }
     return NextResponse.json({ cargado: false, worksNo, total: 0, grupos: [], partidas: [] });
   } catch (e: unknown) {
-    return NextResponse.json({ cargado: false, error: e instanceof Error ? e.message : 'Error' }, { status: 200 });
+    return NextResponse.json({ cargado: false, error: mensajeParaCliente(e) }, { status: 200 });
   }
 }
 

@@ -43,7 +43,7 @@ async function respuestaDelFallo(orderNo: string, e: unknown) {
       error: `El pedido ${orderNo} está pendiente de aprobación en BC. Aprobalo ahí y reintentá.`,
     }, { status: 502 });
   }
-  return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 502 });
+  return NextResponse.json({ ok: false, error: mensajeParaCliente(e) }, { status: 502 });
 }
 
 // LANZA (Release) un pedido que ya existe en BC, y opcionalmente re-sincroniza sus
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
     let obraQuitada = 0;
     if (Array.isArray(sinObra) && sinObra.length) {
       const q = await bcQuitarObraDeLineas(orderNo, sinObra).catch((e) => ({
-        limpiadas: [], pendientes: [], error: String((e as Error)?.message ?? e),
+        limpiadas: [], pendientes: [], error: mensajeParaCliente(e),
       }));
       obraQuitada = q.limpiadas.length;
       if (q.pendientes.length) {
@@ -138,7 +138,7 @@ export async function POST(req: Request) {
       try {
         cd = await bcCompletarProyectoTarea(orderNo, consumoDirecto);
       } catch (e) {
-        cd = { aplicadas: 0, pendientes: [], error: String((e as Error)?.message ?? e) };
+        cd = { aplicadas: 0, pendientes: [], error: mensajeParaCliente(e) };
       }
       if (cd.pendientes.length || cd.error) {
         const detalle = cd.pendientes.length ? mensajeConsumoIncompleto(cd.pendientes) : `no se pudo dejar el consumo directo puesto en BC: ${cd.error}. El pedido ${orderNo} NO se lanzó.`;

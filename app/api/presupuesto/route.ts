@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
             resultado.tasasBC = 'ok';
           } catch (e) {
             resultado.tasasBC = 'error';
-            resultado.tasasError = e instanceof Error ? e.message : String(e);
+            resultado.tasasError = mensajeParaCliente(e);
           }
         } else {
           // La API de BC todavía no publica Tax Pcnt. / After-sales Tax Pcnt.
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
       await actualizarTareasProyecto(worksNo);
       resultado.tareasProyecto = 'ok';
     } catch (e) {
-      resultado.tareasProyectoError = e instanceof Error ? e.message : String(e);
+      resultado.tareasProyectoError = mensajeParaCliente(e);
     }
 
     // Área prorrateada (m²): al Proyecto (Job) y a la Obra (works) de BC —para que
@@ -121,9 +121,9 @@ export async function POST(req: NextRequest) {
     if (areaProrrateada != null) {
       resultado.areaProrrateada = areaProrrateada;
       try { await setAreaProrrateadaJob(worksNo, areaProrrateada); }
-      catch (e) { resultado.areaJobError = e instanceof Error ? e.message : String(e); }
+      catch (e) { resultado.areaJobError = mensajeParaCliente(e); }
       try { await setAreaProrrateadaWork(worksNo, areaProrrateada); }
-      catch (e) { resultado.areaObraError = e instanceof Error ? e.message : String(e); }
+      catch (e) { resultado.areaObraError = mensajeParaCliente(e); }
       try {
         const db = await getDb();
         await db.request()

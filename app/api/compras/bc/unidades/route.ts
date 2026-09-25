@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mensajeParaCliente } from "@/lib/errores";
 import { bcUnidadesDeItem, bcUnidadesDeItems, bcItemFichas } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
 
@@ -32,6 +33,6 @@ export async function GET(req: Request) {
   } catch (e) {
     // Sin unidades el drawer se queda con la del catálogo: no es motivo para romper
     // la pantalla, así que se responde 200 con la lista vacía y el motivo.
-    return NextResponse.json({ unidades: [], porItem: {}, error: e instanceof Error ? e.message : String(e) }, { status: 200 });
+    return NextResponse.json({ unidades: [], porItem: {}, error: mensajeParaCliente(e) }, { status: 200 });
   }
 }

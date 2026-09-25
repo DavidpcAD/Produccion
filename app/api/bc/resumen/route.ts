@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { bcProductionConfigured } from '@/lib/bc/production-lines';
 import { construirResumen } from '@/lib/bc/integracion';
@@ -21,6 +22,6 @@ export async function GET() {
   try {
     return NextResponse.json(await construirResumen());
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

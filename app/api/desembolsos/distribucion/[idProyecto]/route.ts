@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { distribucionPorProyecto } from '@/lib/desembolsos/distribucion';
@@ -27,7 +28,7 @@ export async function GET(
   } catch (err) {
     console.error('/api/desembolsos/distribucion/[idProyecto] GET error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error desconocido' },
+      { error: mensajeParaCliente(err) },
       { status: 500 },
     );
   }

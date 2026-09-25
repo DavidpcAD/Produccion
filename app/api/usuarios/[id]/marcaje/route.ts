@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { enrolarEnZona, H4Error } from '@/lib/h4';
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const enrolamiento = await enrolarEnZona(idZona, idColaborador, session.cedula ?? null);
     return NextResponse.json({ enrolamiento });
   } catch (e) {
-    const msg = e instanceof H4Error ? e.message : (e instanceof Error ? e.message : String(e));
+    const msg = e instanceof H4Error ? e.message : (mensajeParaCliente(e));
     console.error('/api/usuarios/[id]/marcaje enrolamiento H4 error:', e);
     return NextResponse.json({ error: msg }, { status: e instanceof H4Error ? e.status : 502 });
   }

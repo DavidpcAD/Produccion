@@ -24,7 +24,7 @@ export async function GET() {
   } catch (err) {
     console.error('/api/desembolsos/esquemas GET error:', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Error desconocido' },
+      { error: mensajeParaCliente(err) },
       { status: 500 },
     );
   }

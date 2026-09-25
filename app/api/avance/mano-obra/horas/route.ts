@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import type { HorasObra } from '@/lib/avance/mano-obra';
@@ -26,7 +27,7 @@ export async function GET() {
     `);
     return NextResponse.json({ horas: r.recordset });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 
@@ -76,6 +77,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true, semana_operativa_id: semana, filas: filas.length });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

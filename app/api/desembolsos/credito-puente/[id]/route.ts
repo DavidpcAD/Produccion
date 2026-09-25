@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb, sql } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import {
@@ -57,7 +58,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     };
     return NextResponse.json(body);
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 
@@ -124,7 +125,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 
@@ -154,6 +155,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     }
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

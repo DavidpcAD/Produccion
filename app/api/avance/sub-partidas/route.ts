@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import {
@@ -118,7 +119,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ subPartidas, partidas: partidasRes.recordset });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
 
@@ -236,6 +237,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, id: nuevoId }, { status: 201 });
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 500 });
+    return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }
