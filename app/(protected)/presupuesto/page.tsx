@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { FileInput } from '@/components/ui/FileInput';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { Modal } from '@/components/ui/Modal';
@@ -592,7 +593,7 @@ export default function PresupuestoPage() {
               <span className="text-body-sm font-semibold text-ds-ink">Plantilla general</span>
               <span className="block text-ds-gray-400 text-xs">Venta, Costo e Indirectos — esto arma la versión en BC.</span>
             </div>
-            <input ref={plantillaFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
+            <FileInput ref={plantillaFile} accept=".xlsx,.xls" />
             <Button variant="outline" size="sm" onClick={() => leerUno('plantilla')} loading={leyendoQue === 'plantilla'} disabled={leyendoQue === 'plantilla'} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer plantilla</Button>
           </div>
           <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">
@@ -600,7 +601,7 @@ export default function PresupuestoPage() {
               <span className="text-body-sm font-semibold text-ds-ink">Descompuesto</span>
               <span className="block text-ds-gray-400 text-xs">Materiales por tarea — se suben aparte a BC.</span>
             </div>
-            <input ref={descFile} type="file" accept=".xlsx,.xls" className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
+            <FileInput ref={descFile} accept=".xlsx,.xls" />
             <Button variant="outline" size="sm" onClick={() => leerUno('descompuesto')} loading={leyendoQue === 'descompuesto'} disabled={leyendoQue === 'descompuesto'} icon={<Icon name="open" size="sm" color="currentColor" />}>Leer descompuesto</Button>
           </div>
         </div>

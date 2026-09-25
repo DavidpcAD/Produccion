@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/Badge';
+import { FileInput } from '@/components/ui/FileInput';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { DataTable } from '@/components/ui/DataTable';
@@ -435,12 +436,10 @@ function ModalImportarExcel({
           <code className="mx-1 rounded bg-ds-gray-100 px-1">BASE DATOS</code>). La importación es
           idempotente: correrla de nuevo no duplica muestras.
         </p>
-        <input
+        <FileInput
           ref={inputRef}
-          type="file"
           accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-ds-gray-800"
+          onFile={setArchivo}
         />
 
         {resumen && (

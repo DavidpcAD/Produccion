@@ -2,6 +2,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
+import { FileInput } from '@/components/ui/FileInput';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
 
@@ -155,8 +156,7 @@ export function PresupuestoHorasCard() {
       </div>
 
       <div className="rounded-ds-lg border border-ds-gray-100 p-4 space-y-2">
-        <input ref={fileRef} type="file" accept=".xlsx,.xls"
-          className="block w-full text-sm text-ds-gray-500 file:mr-3 file:rounded-ds file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:text-sm file:font-semibold file:cursor-pointer" />
+        <FileInput ref={fileRef} accept=".xlsx,.xls" />
         <Button variant="outline" size="sm" onClick={leer} loading={leyendo} disabled={leyendo}
           icon={<Icon name="open" size="sm" color="currentColor" />}>Leer Excel</Button>
       </div>
