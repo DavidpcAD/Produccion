@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
+import { AvisoSesion } from '@/components/layout/AvisoSesion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSession } from '@/hooks/useSession';
 import { getInitials, rutaPermitida } from '@/lib/permissions';
@@ -108,6 +109,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
       {/* Contenido */}
       <div className="app-content min-w-0" id="contenido-principal">
+        {/* Sesión terminada: el aviso va acá, fuera de cada pantalla, porque la
+            sesión se cae en cualquiera de ellas, y DENTRO de la columna de
+            contenido, para que empuje la pantalla hacia abajo en vez de taparle
+            el título (y en móvil no se monte con el botón del menú). Mientras la
+            sesión viva no pinta nada. */}
+        <AvisoSesion />
+
         <AnimatePresence mode="wait" initial={false}>
           <motion.main
             key={pathname}

@@ -254,9 +254,57 @@ body {
      70     modales, diálogos y drawers del app  ← components/ui/Modal.tsx
      80-90  internos de compras (.oc-scope: modal-overlay 80, combo__menu 90)
      100    portales de Combobox/DatePicker y los toasts
+     110    .aviso-sesion — el aviso de sesión terminada, sobre absolutamente todo
    Un overlay por debajo de 60 queda TAPADO por el menú abierto en tablet (era el
    caso de los modales en z-50: se veían cortados y grises por el velo del menú).
    ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Aviso de sesión terminada (components/layout/AvisoSesion.tsx) ──
+   Arriba de todo, también de los modales (70) y de los toasts (100): aparece
+   justo cuando el usuario está llenando un formulario, y si queda tapado no
+   sirve de nada. Amarillo del DS con texto negro en los dos temas: es un aviso,
+   no un error de la pantalla. */
+.aviso-sesion {
+  /* En el flujo (empuja la pantalla hacia abajo, no la tapa), pero con z-index
+     propio para quedar por encima de los modales (70) y los toasts (100). */
+  position: relative; z-index: 110; flex-shrink: 0;
+  display: flex; align-items: center; gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  background: var(--ds-color-yellow); color: var(--ds-color-black);
+  box-shadow: var(--ds-shadow-03-big);
+}
+.aviso-sesion__icono { flex-shrink: 0; }
+/* El texto envuelve: no se recorta ni se acorta con puntos suspensivos. */
+.aviso-sesion__texto {
+  flex: 1; min-width: 0;
+  font-size: var(--ds-font-size-body-md); line-height: 1.35;
+}
+.aviso-sesion__texto strong { font-weight: var(--ds-font-weight-semibold); }
+@media (max-width: 760px) {
+  /* En móvil el botón no cabe al lado del texto sin apretarlo todo: queda el
+     ícono con el texto en la primera línea y el botón solo abajo, a la derecha. */
+  .aviso-sesion { flex-wrap: wrap; }
+  .aviso-sesion__texto { flex: 1 1 200px; }
+  .aviso-sesion > button { margin-left: auto; }
+}
+/* Con el menú ENCIMA del contenido —drawer en móvil, menú flotante en tablet—
+   el aviso le queda pintado arriba y le tapa las primeras opciones (Proyectos,
+   Obras). Mientras el menú esté abierto se esconde; vuelve apenas se cierra. Se
+   usa `visibility` y no `display` para que el hueco no desaparezca y la pantalla
+   de atrás no pegue un brinco al abrir y cerrar el menú. */
+.app-shell.nav-open .aviso-sesion { visibility: hidden; }
+@media (min-width: 761px) and (max-width: 1024px) {
+  .app-shell.pinned .aviso-sesion { visibility: hidden; }
+}
+
+/* Los toasts son fijos arriba a la derecha, o sea encima de la barra: mientras
+   el aviso esté puesto, la pila baja su alto exacto (--alto-aviso lo publica el
+   propio aviso, que también pone y quita la clase). En móvil se suma la franja
+   del botón del menú, que es donde arranca el contenido. */
+.con-aviso-sesion .pila-toasts { top: calc(var(--alto-aviso, 56px) + var(--ds-space-4)); }
+@media (max-width: 760px) {
+  .con-aviso-sesion .pila-toasts { top: calc(56px + var(--alto-aviso, 56px) + var(--ds-space-4)); }
+}
 
 /* ── Sidebar (barmenu) — riel binario 72px ↔ 264px, solo por botón, sin hover.
    Columna SIEMPRE oscura (#2a2a2a), no cambia con el tema. ── */

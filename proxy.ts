@@ -11,6 +11,36 @@ import { getRouteLevel, getRouteModule, moduloPublicado, rutaPermitida } from '.
  *  verifica en la ruta (ver lib/compras/guard.ts y lib/concreto/guard.ts). */
 const POR_MODULO = ['/compras', '/api/compras', '/concreto', '/api/concreto'];
 
+const SESION_VENCIDA = 'Tu sesión terminó. Entrá de nuevo.';
+
+/** Una ruta de API NUNCA debe contestar con un redirect.
+ *
+ *  El `fetch` del navegador sigue el redirect solo, reenvía el POST a `/login`
+ *  —que es una página, no una API— y recibe un 405 sin JSON. La pantalla se
+ *  queda con un "no se pudo" genérico y el usuario no se entera de que lo único
+ *  que pasó fue que se le venció la sesión: eso fue el 25/09/2026 con Luis
+ *  Roberto creando una subpartida, y el 26/08/2026 con las órdenes que decían
+ *  "lanzado" sin haber tocado BC.
+ *
+ *  Entonces: a /api/* se le contesta con el estado real y JSON, que es lo que la
+ *  pantalla sabe leer; a las páginas, el redirect de siempre. */
+function rechazar(
+  request: NextRequest,
+  pathname: string,
+  opts: { status: number; error: string; destino: string; sesion?: boolean },
+) {
+  if (pathname.startsWith('/api/')) {
+    const res = NextResponse.json({ error: opts.error }, { status: opts.status });
+    res.headers.set('Cache-Control', 'no-store');
+    // Marca para el cliente: este 401 es la sesión y no un permiso, así que la
+    // app manda al login sin preguntar (ver hooks/useSession.ts). Los 401 que
+    // devuelve cada ruta por su cuenta no la llevan y se siguen manejando ahí.
+    if (opts.sesion) res.headers.set('x-sesion', 'vencida');
+    return res;
+  }
+  return NextResponse.redirect(new URL(opts.destino, request.url));
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -27,12 +57,24 @@ export function proxy(request: NextRequest) {
 
   const token = request.cookies.get('adelante_session')?.value;
   if (!token) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    // Sin cookie puede ser que nunca entró (página → login pelado, sin avisos
+    // raros) o que se le venció, porque la cookie dura lo mismo que el token.
+    // Una llamada a /api/* sale siempre de una pantalla ya abierta: ahí es la
+    // sesión la que se acabó.
+    return rechazar(request, pathname, {
+      status: 401, error: SESION_VENCIDA, sesion: true, destino: '/login',
+    });
   }
 
   const session = verifyToken(token);
   if (!session) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    // Token vencido o revocado: el login lo dice y devuelve a donde estaba.
+    // Solo el pathname, sin el query: ahí viaja el `_rsc` de las navegaciones
+    // de Next y cualquier parámetro que no tiene por qué quedar en un enlace.
+    return rechazar(request, pathname, {
+      status: 401, error: SESION_VENCIDA, sesion: true,
+      destino: `/login?sesion=vencida&volver=${encodeURIComponent(pathname)}`,
+    });
   }
 
   // Órdenes de Compra y Concreto: el acceso va por MÓDULO del rol de Producción,
@@ -57,19 +99,23 @@ export function proxy(request: NextRequest) {
       ? rutaPermitida(pathname, session.modules)
       : session.nivelAdmin >= requiredLevel;
     if (!permitido) {
-      return pathname.startsWith('/api/')
-        ? NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-        : NextResponse.redirect(new URL('/?error=forbidden', request.url));
+      return rechazar(request, pathname, {
+        status: 403, error: 'No autorizado', destino: '/?error=forbidden',
+      });
     }
   } else if (session.nivelAdmin < requiredLevel) {
-    return NextResponse.redirect(new URL('/?error=forbidden', request.url));
+    return rechazar(request, pathname, {
+      status: 403, error: 'No autorizado', destino: '/?error=forbidden',
+    });
   }
 
   // Módulo apagado (Avance de obra, ver AVANCE_OBRA_ACTIVO): la ruta no existe
   // para nadie, ni escribiéndola a mano. Los catálogos bajo /avance
   // (tipos-casa, sprints, sub-partidas, pesos) son de Presupuesto y sí pasan.
   if (!moduloPublicado(getRouteModule(pathname))) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return rechazar(request, pathname, {
+      status: 404, error: 'Módulo no disponible', destino: '/',
+    });
   }
 
   // Antes se devolvían acá `x-user-id` y `x-nivel-admin`. Eran cabeceras de
