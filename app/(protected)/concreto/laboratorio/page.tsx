@@ -149,7 +149,7 @@ export default function LaboratorioPage() {
     <PageShell>
       <PageHeader
         title="Laboratorio de Concreto"
-        subtitle={`${muestras.length} muestras`}
+        subtitle={loading ? 'Cargando…' : `${muestras.length} muestras`}
         actions={
           <>
             <Button variant="outline" onClick={() => setImportAbierto(true)} icon={<Icon name="list" size="sm" color="currentColor" />}>

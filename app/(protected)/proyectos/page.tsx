@@ -54,7 +54,7 @@ export default function ProyectosPage() {
     <PageShell>
       <PageHeader
         title="Proyectos"
-        subtitle={`${activosCount} proyectos activos${filtroProd === 'produccion' ? ' de Producción' : ''}${verTodos && visibles.length > activosCount ? ` · ${visibles.length - activosCount} inactivos` : ''}`}
+        subtitle={loading ? 'Cargando…' : `${activosCount} proyectos activos${filtroProd === 'produccion' ? ' de Producción' : ''}${verTodos && visibles.length > activosCount ? ` · ${visibles.length - activosCount} inactivos` : ''}`}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">

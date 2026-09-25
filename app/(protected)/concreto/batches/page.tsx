@@ -128,7 +128,7 @@ export default function BatchesPage() {
     <PageShell>
       <PageHeader
         title="Batches"
-        subtitle={`${batches.length} batches · datos crudos de planta`}
+        subtitle={loading ? 'Cargando…' : `${batches.length} batches · datos crudos de planta`}
       />
 
       <div className="space-y-3">

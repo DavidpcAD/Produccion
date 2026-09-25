@@ -137,7 +137,7 @@ export default function ColadasPage() {
     <PageShell>
       <PageHeader
         title="Coladas"
-        subtitle={`${coladas.length} coladas`}
+        subtitle={loading ? 'Cargando…' : `${coladas.length} coladas`}
       />
 
       <div className="space-y-3">

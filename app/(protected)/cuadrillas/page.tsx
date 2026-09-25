@@ -707,7 +707,7 @@ export default function CuadrillasPage() {
     <PageShell>
       <PageHeader
         title="Cuadrillas"
-        subtitle={vista === 'cuadrillas' ? `${cuadrillas.length} cuadrillas activas` : `${partidasConEnc} de ${partidas.length} partida(s) con encargados`}
+        subtitle={loading ? 'Cargando…' : vista === 'cuadrillas' ? `${cuadrillas.length} cuadrillas activas` : `${partidasConEnc} de ${partidas.length} partida(s) con encargados`}
         actions={isAdmin && vista === 'cuadrillas' && (
           <Button onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>
             Nueva cuadrilla

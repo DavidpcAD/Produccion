@@ -325,7 +325,7 @@ export default function ObrasPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Obras" subtitle={`${obrasVisibles.length} obras${filtroProd === 'produccion' ? ' de Producción' : ''}`}
+      <PageHeader title="Obras" subtitle={loading ? 'Cargando…' : `${obrasVisibles.length} obras${filtroProd === 'produccion' ? ' de Producción' : ''}`}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <div className="inline-flex rounded-ds border border-ds-gray-200 p-0.5 bg-ds-surface">

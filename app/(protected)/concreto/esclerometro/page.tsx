@@ -158,7 +158,7 @@ export default function EsclerometroPage() {
     <PageShell>
       <PageHeader
         title="Esclerómetro"
-        subtitle={`${ensayos.length} ensayos · martillo Schmidt (no destructivo)`}
+        subtitle={loading ? 'Cargando…' : `${ensayos.length} ensayos · martillo Schmidt (no destructivo)`}
         actions={
           <Button onClick={() => setModalNuevo(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
             Nuevo ensayo
