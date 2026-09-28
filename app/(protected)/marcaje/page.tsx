@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Input } from '@/components/ui/Input';
+import { EstadoVacio } from '@/components/ui/EstadoVacio';
 import { Combobox } from '@/components/ui/Combobox';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -127,7 +128,10 @@ export default function MarcajePage() {
         </div>
 
         {!idZona ? (
-          <p className="text-sm text-ds-gray-400 py-6 text-center">Elegí una zona para ver los colaboradores.</p>
+          <EstadoVacio icono="place" titulo="Elegí una zona">
+            Arriba, en «Zona de marca». Ahí salen los colaboradores que ya están en el
+            dispositivo y los que faltan.
+          </EstadoVacio>
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-3">
@@ -147,7 +151,9 @@ export default function MarcajePage() {
             {loading ? (
               <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-ds" />)}</div>
             ) : filtrados.length === 0 ? (
-              <p className="text-sm text-ds-gray-400 py-6 text-center">Sin colaboradores{q ? ' para esa búsqueda' : ''}.</p>
+              <EstadoVacio icono="user" titulo={q ? 'Sin resultados' : 'Sin colaboradores'}>
+                {q ? 'Probá con otro nombre, cédula o puesto.' : 'Esta zona no tiene colaboradores asignados.'}
+              </EstadoVacio>
             ) : (
               <div className="space-y-1.5">
                 {filtrados.map(c => {
