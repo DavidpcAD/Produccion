@@ -100,10 +100,12 @@ export function Pagination({ page, totalPages, onPageChange, totalItems, pageSiz
           Mostrando {start}–{end} de {totalItems}
         </p>
       ) : <span />}
-      <div className="flex gap-1 items-center">
+      <nav aria-label="Paginación" className="flex gap-1 items-center">
         <button
+          type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
+          aria-label="Página anterior"
           className="p-1.5 rounded-ds border border-ds-gray-200 disabled:opacity-40 hover:bg-ds-gray-100 transition-colors"
         >
           <CaretLeft size={16} weight="bold" />
@@ -113,7 +115,10 @@ export function Pagination({ page, totalPages, onPageChange, totalItems, pageSiz
           return (
             <button
               key={p}
+              type="button"
               onClick={() => onPageChange(p)}
+              aria-label={`Página ${p}`}
+              aria-current={p === page ? 'page' : undefined}
               className={`w-8 h-8 text-sm rounded-ds border font-semibold transition-colors ${
                 p === page
                   ? 'bg-black text-white border-black'
@@ -125,13 +130,15 @@ export function Pagination({ page, totalPages, onPageChange, totalItems, pageSiz
           );
         })}
         <button
+          type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
+          aria-label="Página siguiente"
           className="p-1.5 rounded-ds border border-ds-gray-200 disabled:opacity-40 hover:bg-ds-gray-100 transition-colors"
         >
           <CaretRight size={16} weight="bold" />
         </button>
-      </div>
+      </nav>
     </div>
   );
 }

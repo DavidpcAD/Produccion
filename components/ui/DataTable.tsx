@@ -325,18 +325,28 @@ export function DataTable<T>({
                   return (
                     <th key={h.id} aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : canSort ? 'none' : undefined} className={`px-4 py-3 font-semibold text-white text-xs uppercase tracking-wide ${alignCls(align)}`}>
                       <div className={`flex items-center gap-1.5 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
-                        <button
-                          type="button"
-                          onClick={canSort ? h.column.getToggleSortingHandler() : undefined}
-                          className={`inline-flex items-center gap-1 ${canSort ? 'cursor-pointer hover:text-brand' : 'cursor-default'} transition-colors`}
-                        >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {canSort && (
+                        {/* Solo es botón cuando de verdad ordena. Antes TODAS las
+                            columnas lo eran, así que las que no ordenan —y la de
+                            acciones, cuyo encabezado va vacío— daban una parada de
+                            tabulador que no hace nada y que el lector de pantalla
+                            anuncia como "botón" a secas. */}
+                        {canSort ? (
+                          <button
+                            type="button"
+                            onClick={h.column.getToggleSortingHandler()}
+                            aria-label={`Ordenar por ${(h.column.columnDef.meta?.label as string) || (typeof h.column.columnDef.header === 'string' ? h.column.columnDef.header : h.column.id)}`}
+                            className="inline-flex items-center gap-1 cursor-pointer hover:text-brand transition-colors"
+                          >
+                            {flexRender(h.column.columnDef.header, h.getContext())}
                             <Icon name={sorted === 'asc' ? 'open' : sorted === 'desc' ? 'close' : 'options'}
                               size="sm" color="currentColor"
                               className={sorted ? 'text-brand' : 'text-ds-gray-400'} />
-                          )}
-                        </button>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1">
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                          </span>
+                        )}
                         {canFilter && (
                           <div className="relative" ref={filterOpen === h.column.id ? filterRef : undefined}>
                             <button type="button" aria-expanded={filterOpen === h.column.id} onClick={() => setFilterOpen(o => o === h.column.id ? null : h.column.id)}
