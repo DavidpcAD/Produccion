@@ -54,23 +54,21 @@ export interface ResultadoEstructura {
 }
 
 // ─── Obras BLINDADAS: su catálogo NO se toca desde afuera ───────────────────────
-// El catálogo de estas obras lo armó el negocio y NO se parece al de BC. Como el
-// sync es aditivo (nunca borra), cada "Traer de BC" volvía a meter las tareas de BC
-// al lado de las buenas y había que borrarlas a mano.
-//
-// F-MUEBLES: la partida es la OBRA de vivienda y la subpartida es el proceso —29:
-// 4 de fabricación, 16 de acabado y 9 de instalación— (regla del negocio del
-// 17/09/2026, `migrations/2026-09-17_muebles_partida_por_obra.sql`). En BC esa obra
-// tiene otra cosa: tres PRODUCTOS (F-SM Puertas Madera, F-TAP Rodapié 18x115,
-// F-INST Instalación de muebles), que se borraron a propósito ese mismo día.
+// Para obras cuyo catálogo lo armó el negocio y NO se parece al de BC. Como el sync
+// es aditivo (nunca borra), cada "Traer de BC" le mete al lado las tareas de BC y
+// hay que borrarlas a mano; con el motivo puesto acá ni se le pregunta a BC.
 //
 // Blinda las DOS puertas que escriben catálogo: "Traer de BC" (/api/partidas/sync-bc)
 // y el "crear lo que falta" del Excel de presupuesto (/api/presupuesto/catalogo). El
 // CRUCE del presupuesto no se toca: sigue diciendo qué líneas del Excel no están.
+//
+// HOY NO HAY NINGUNA. Estuvo F-MUEBLES —donde la partida era la obra de vivienda y
+// la subpartida el proceso— hasta el 28/09/2026: el negocio pidió que quede IGUAL que
+// BC (3 tareas: F-INST, F-SM, F-TAP) porque lo que se asigne contra tareas que BC no
+// tiene no llega cuando se envía la información. Ver
+// `migrations/2026-09-28_muebles_como_bc.sql`. Poner las obras como tareas quedó en
+// pausa "hasta que demos la indicación": ese día F-MUEBLES vuelve acá, con su motivo.
 const OBRAS_BLINDADAS = new Map<string, string>([
-  ['F-MUEBLES', 'En F-MUEBLES la partida es la obra de vivienda y la subpartida es el proceso. '
-    + 'Las tareas de BC (F-SM, F-TAP, F-INST) son productos y se dejaron fuera a propósito: '
-    + 'el catálogo de esta obra se edita a mano en esta pantalla.'],
 ]);
 
 /** Por qué NO se sincroniza el catálogo de esta obra, o null si sí se puede. */

@@ -36,8 +36,8 @@ export const dynamic = 'force-dynamic';
  * OJO: lee el ENTORNO de BC del proceso (BC_BASE_URL / BC_ENVIRONMENT). En
  * producción es BC Production; en local, el Sandbox.
  *
- * Hay obras BLINDADAS (`motivoSinSyncBC`, hoy F-MUEBLES): su catálogo no se parece
- * al de BC y se saltan, diciendo por qué. Si la obra pedida es una de esas, la
+ * Puede haber obras BLINDADAS (`motivoSinSyncBC`; hoy ninguna): su catálogo no se
+ * parece al de BC y se saltan, diciendo por qué. Si la obra pedida es una de esas, la
  * llamada se rechaza con ese motivo en vez de fingir que no había nada que traer.
  *
  * Es aditivo e idempotente. Solo Super Admin (nivel 4).
