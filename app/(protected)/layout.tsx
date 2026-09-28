@@ -93,6 +93,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         onCloseDrawer={() => setNavOpen(false)}
         onNavigate={cerrarAlNavegar}
         allowedModules={allowedModules}
+        sesionLista={!!session}
       />
 
       {/* FAB hamburguesa (solo móvil, con el drawer cerrado) */}

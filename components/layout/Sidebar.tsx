@@ -139,9 +139,13 @@ interface SidebarProps {
   /** Módulos que el rol de Producción habilita. null = sin rol de Producción
    *  (se cae al filtro por nivel de siempre, no deja a nadie sin menú). */
   allowedModules?: string[] | null;
+  /** ¿Ya llegó la sesión? `allowedModules` es null en DOS casos que no se
+   *  distinguen desde acá —todavía cargando, o sin rol de Producción—, y sin esto
+   *  el badge preguntaba una vez con la sesión a medias y otra al llegar. */
+  sesionLista?: boolean;
 }
 
-export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, onTogglePinned, onCloseDrawer, onNavigate, allowedModules }: SidebarProps) {
+export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, onTogglePinned, onCloseDrawer, onNavigate, allowedModules, sesionLista }: SidebarProps) {
   const pathname = usePathname();
   const confirm = useConfirm();
   const logoutRef = useRef<HTMLFormElement>(null);
@@ -155,6 +159,9 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
   // Conteo de devoluciones para el badge de la nav (la Sidebar está fuera del store de
   // Compras, así que lo pide por API). Solo si el usuario tiene acceso a Compras.
   useEffect(() => {
+    // Sin sesión todavía no se sabe si esta persona entra a Compras: preguntar
+    // ahora es un viaje a la base que se descarta, y otro apenas llegue.
+    if (!sesionLista) return;
     const canCompras = !allowedModules || modulosDeRuta('/compras/ingenieria/devoluciones').some((m) => allowedModules.includes(m));
     if (!canCompras) return;
     let cancel = false;
@@ -163,7 +170,7 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
       .then((d) => { if (!cancel && d && typeof d.pedidosDevueltos === 'number') setDevol(d); })
       .catch(() => {});
     return () => { cancel = true; };
-  }, [allowedModules]);
+  }, [allowedModules, sesionLista]);
   function toggleTheme() {
     setTheme((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';

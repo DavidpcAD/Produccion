@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mensajeParaCliente } from "@/lib/errores";
 import { contarDevoluciones } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
+import { BADGE_CACHE } from "@/lib/cache-headers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET() {
     const soloDe = g.alcance === "todo"
       ? undefined
       : { username: g.session.username, nombre: g.session.nombre };
-    return NextResponse.json(await contarDevoluciones(soloDe));
+    return NextResponse.json(await contarDevoluciones(soloDe), { headers: BADGE_CACHE });
   } catch (e: unknown) {
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
