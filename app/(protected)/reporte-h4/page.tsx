@@ -98,7 +98,17 @@ export default function ReporteH4Page() {
   const bloqueado = nAnom > 0;
   const pct = kpis.totalPersonal > 0 ? Math.round((kpis.diaCompleto / kpis.totalPersonal) * 100) : 0;
   const promedio = kpis.totalPersonal > 0 ? (kpis.horasTotales / kpis.totalPersonal).toFixed(1) : '0.0';
-  const completos = Math.max(0, kpis.totalPersonal - nAnom);
+  // "Jornada completa" es la jornada CERRADA (kpis.diaCompleto). Antes esto salía
+  // de `totalPersonal - nAnom`, y totalPersonal son TODAS las jornadas del día,
+  // abiertas incluidas: alguien que marcó a las 7 y sigue en la obra contaba como
+  // listo para nómina. Con datos de media mañana el banner decía un número y la
+  // tarjeta "DÍA COMPLETO" decía otro, en la misma pantalla.
+  // Se le restan las anomalías porque el banner promete "y sin anomalías"; es una
+  // aproximación por arriba (una anomalía puede ser de alguien que todavía no
+  // cierra), así que se recorta en cero.
+  const completos = Math.max(0, kpis.diaCompleto - nAnom);
+  // Nadie listo todavía: no hay nada que afirmar, y menos con un ✓ verde.
+  const hayListos = completos > 0;
 
   function cerrarDia() {
     // TODO(reporte-h4): el cierre del día (mutación + procesar a nómina) no está
@@ -216,12 +226,31 @@ export default function ReporteH4Page() {
         />
       </div>
 
-      {/* Banner nómina */}
+      {/* Banner nómina.
+          Solo se pinta en verde cuando de verdad hay gente lista. Con cero decía
+          igual "Listos para procesar a nómina" con un ✓ al lado, que es lo
+          contrario de lo que pasa: a media mañana, con 239 sin marcaje y nadie
+          con la jornada cerrada, la pantalla de quien corre la nómina le daba el
+          visto bueno. */}
       {!loading && (
-        <div className="flex items-center gap-3 rounded-ds-lg border border-brand bg-brand-soft px-5 py-4 text-body-sm text-black">
-          <span className="text-brand shrink-0"><Icon name="check" size="md" color="currentColor" /></span>
-          <span><strong>{completos} trabajadores</strong> con jornada completa y sin anomalías. Listos para procesar a nómina.</span>
-        </div>
+        hayListos ? (
+          <div className="flex items-center gap-3 rounded-ds-lg border border-brand bg-brand-soft px-5 py-4 text-body-sm text-black">
+            <span className="text-brand shrink-0"><Icon name="check" size="md" color="currentColor" /></span>
+            <span><strong>{completos} trabajadores</strong> con jornada completa y sin anomalías. Listos para procesar a nómina.</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 rounded-ds-lg border border-ds-gray-200 bg-ds-gray-100 px-5 py-4 text-body-sm text-ds-ink">
+            <span className="text-ds-gray-400 shrink-0"><Icon name="pendiente" size="md" color="currentColor" /></span>
+            <span>
+              <strong>Todavía no hay nadie listo para nómina.</strong>{' '}
+              {nAnom > 0
+                ? `Hay ${nAnom} anomalía(s) por resolver.`
+                : kpis.sinMarcaje > 0
+                  ? `${fmtNum(kpis.sinMarcaje)} sin marcaje y ninguna jornada cerrada todavía.`
+                  : 'Ninguna jornada cerrada todavía.'}
+            </span>
+          </div>
+        )
       )}
 
       {/* Detalle de anomalía */}
