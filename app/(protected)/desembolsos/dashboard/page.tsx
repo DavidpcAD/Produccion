@@ -277,11 +277,16 @@ export default function DesembolsosDashboardPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ds-gray-200 bg-ds-gray-100">
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500">Caso · Cliente</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500">Modelo · Banco</th>
+              {/* En `table-layout: auto` el ancho lo manda el contenido MÍNIMO, y como el
+                  nombre del cliente rompe por espacios, esta columna se desplomaba a 109 px
+                  —la segunda más angosta— mientras "Avance", que solo dice "Sin formalizar",
+                  se quedaba con 132. Cada nombre caía en tres o cuatro renglones y la fila
+                  medía 79 px. Estas dos llevan piso; las otras ceden. */}
+              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500" style={{ minWidth: 210 }}>Caso · Cliente</th>
+              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500" style={{ minWidth: 180 }}>Modelo · Banco</th>
               <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500">Estado</th>
-              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500">Precio venta</th>
-              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500">Pendiente</th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500 whitespace-nowrap">Precio venta</th>
+              <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500 whitespace-nowrap">Pendiente</th>
               <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500">Avance</th>
               <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-ds-gray-500">Próximo desembolso</th>
             </tr>
@@ -457,10 +462,10 @@ function FilaCaso({ caso, modo, onClick }: { caso: DashboardCaso; modo: Modo; on
           {labelEstado}
         </span>
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-4 py-3 text-right whitespace-nowrap">
         <div className="text-sm font-semibold tabular-nums text-ds-ink">{fmtCorto(caso.PrecioVenta_CRC ?? 0)}</div>
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-4 py-3 text-right whitespace-nowrap">
         <div className="text-sm font-semibold tabular-nums text-ds-ink">{fmtCorto(pendiente)}</div>
         <div className="text-[10px] tabular-nums text-ds-gray-400">de {fmtCorto(caso.MontoBanco_CRC ?? 0)}</div>
       </td>
