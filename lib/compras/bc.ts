@@ -107,12 +107,33 @@ async function getToken(force = false): Promise<string> {
   return tokenCache.token;
 }
 
+// Reloj de toda llamada a BC. Sin esto, si BC se cuelga la ruta de Next se cuelga
+// con el y en pantalla queda un spinner eterno; SQL ya tiene su requestTimeout
+// (45 s) y lib/h4.ts su AbortController, esto le pone lo mismo a BC.
+//
+// Va POR INTENTO, no por el par: con el reintento del 401 de abajo, un limite
+// compartido le daria al segundo intento lo que le sobro al primero.
+const MS_LIMITE_BC = 45_000;
+
 // fetch contra BC con reintento ante 401: el Sandbox a veces resetea el binding
 // S2S y el token cacheado deja de ser aceptado. En ese caso pedimos un token
 // FRESCO y reintentamos una vez. Logueamos ms-diagnostics para ver el motivo real.
-async function bcFetch(url: string, init: RequestInit = {}): Promise<Response> {
+async function bcFetch(url: string, init: RequestInit = {}, msLimite = MS_LIMITE_BC): Promise<Response> {
   const baseHeaders = { ...(init.headers as Record<string, string> | undefined), Accept: "application/json" };
-  const run = (token: string) => fetch(url, { ...init, headers: { ...baseHeaders, Authorization: `Bearer ${token}` } });
+  const run = async (token: string) => {
+    const control = new AbortController();
+    const reloj = setTimeout(() => control.abort(), msLimite);
+    try {
+      return await fetch(url, { ...init, headers: { ...baseHeaders, Authorization: `Bearer ${token}` }, signal: control.signal });
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        throw new Error(`Business Central no respondio en ${Math.round(msLimite / 1000)} s. Proba de nuevo; si sigue, avisa a soporte.`);
+      }
+      throw e;
+    } finally {
+      clearTimeout(reloj);
+    }
+  };
   let res = await run(await getToken());
   if (res.status === 401) {
     console.warn(`BC 401 en ${url} — reintento con token fresco. ms-diagnostics=${res.headers.get("ms-diagnostics") ?? "n/a"}`);
@@ -663,7 +684,9 @@ async function bcMaquinasDeBc(): Promise<BcMaquina[]> {
   let url: string | null = `${odataRoot()}/Maquinaria?company=${encodeURIComponent(cid)}&$select=${campos}&$top=1000`;
   let guard = 0;
   while (url && guard++ < 10) {
-    const res: Response = await bcFetch(url, { cache: "no-store" });
+    // 120 s y no los 45 de siempre: esta página tarda ~60 s por diseño (ver el
+    // comentario de arriba), así que el límite normal la mataría siempre.
+    const res: Response = await bcFetch(url, { cache: "no-store" }, 120_000);
     if (!res.ok) throw new Error(`BC máquinas ${res.status}`);
     const data = (await res.json()) as { value?: Record<string, unknown>[]; "@odata.nextLink"?: string };
     for (const m of data.value ?? []) {
