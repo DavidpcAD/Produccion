@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+import { EstadoVacio } from '@/components/ui/EstadoVacio';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/Confirm';
@@ -43,17 +44,23 @@ export default function DetalleBcPage() {
 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(true);
+  // El motivo del fallo, para poder DECIRLO en pantalla. Antes solo salía en un
+  // toast: se iba a los pocos segundos y abajo del título no quedaba nada.
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [busy, setBusy] = useState<'reportar' | 'registrar' | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
+    setErrorCarga(null);
     try {
       const res = await fetch(`/api/bc/preview?obra=${encodeURIComponent(obra)}`, { credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo cargar');
       setPreview(data);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Error al cargar', 'error');
+      const msg = e instanceof Error ? e.message : 'Error al cargar';
+      setErrorCarga(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -133,6 +140,22 @@ export default function DetalleBcPage() {
       />
 
       {loading && <SkeletonRows rows={6} />}
+
+      {!loading && errorCarga && (
+        <EstadoVacio
+          tono="error"
+          titulo="No se pudo traer el avance de Business Central"
+          accion={<Button variant="outline" size="sm" onClick={cargar}>Reintentar</Button>}
+        >
+          {errorCarga}
+        </EstadoVacio>
+      )}
+
+      {!loading && !errorCarga && !preview && (
+        <EstadoVacio titulo={`La obra ${obra} no tiene avance para comparar`}>
+          Business Central no devolvió partidas para esta obra.
+        </EstadoVacio>
+      )}
 
       {!loading && preview && (
         <>
