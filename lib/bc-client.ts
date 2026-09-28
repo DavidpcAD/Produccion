@@ -1,32 +1,6 @@
+import { fetchConReloj } from './bc-timeout';
 import { odataStr } from './odata';
 
-// ─── Toda llamada a BC lleva reloj ───────────────────────────────────────────
-// Business Central vive del otro lado de internet y ninguno de estos `fetch`
-// tenía tiempo límite: si BC se quedaba colgado, la ruta de Next se colgaba con
-// él hasta que la plataforma la mataba, y en la pantalla quedaba un spinner
-// eterno sin nada que decirle al usuario. La conexión a SQL ya tiene su
-// `requestTimeout` (45 s, lib/db.ts) — esto le pone el mismo reloj a BC, con el
-// mismo patrón que ya usa `lib/h4.ts` para el otro servicio externo.
-//
-// 45 s es holgado a propósito: BC bajo carga tarda. Las llamadas que se sabe que
-// son más lentas pasan su propio `msLimite` (la página `Maquinaria` de
-// lib/compras/bc.ts, por ejemplo, tarda ~60 s y NO se toca acá).
-const MS_LIMITE = 45_000;
-
-async function fetchBC(url: string, init: RequestInit = {}, msLimite = MS_LIMITE): Promise<Response> {
-  const control = new AbortController();
-  const reloj = setTimeout(() => control.abort(), msLimite);
-  try {
-    return await fetch(url, { ...init, signal: control.signal });
-  } catch (e) {
-    if (e instanceof Error && e.name === 'AbortError') {
-      throw new Error(`Business Central no respondió en ${Math.round(msLimite / 1000)} s. Probá de nuevo; si sigue, avisá a soporte.`);
-    }
-    throw new Error(`No se pudo contactar a Business Central: ${e instanceof Error ? e.message : String(e)}`);
-  } finally {
-    clearTimeout(reloj);
-  }
-}
 
 
 let bcToken: { access_token: string; expires_at: number } | null = null;
@@ -37,7 +11,7 @@ export async function getBCToken(): Promise<string> {
   }
 
   const url = `https://login.microsoftonline.com/${process.env.BC_TENANT_ID}/oauth2/v2.0/token`;
-  const res = await fetchBC(url, {
+  const res = await fetchConReloj(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -71,7 +45,7 @@ const BASE = `${BC_ROOT}/api/adelante/project/v1.0/companies(${process.env.BC_CO
 
 export async function getJobs() {
   const token = await getBCToken();
-  const res = await fetchBC(`${BASE}/jobs`, {
+  const res = await fetchConReloj(`${BASE}/jobs`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
@@ -83,7 +57,7 @@ export interface PostventaObra { no: string; description: string }
 /** Obras Postventa (PV-…) desde BC — alimenta el selector al bloquear una obra. */
 export async function getPostventaObras(): Promise<PostventaObra[]> {
   const token = await getBCToken();
-  const res = await fetchBC(`${BASE}/postventaObras`, {
+  const res = await fetchConReloj(`${BASE}/postventaObras`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
@@ -99,7 +73,7 @@ export async function getPostventaObras(): Promise<PostventaObra[]> {
 export async function getJobTasks(jobNo: string) {
   const token = await getBCToken();
   const filter = encodeURIComponent(`jobNo eq '${odataStr(jobNo)}' and jobTaskType eq 'Posting'`);
-  const res = await fetchBC(`${BASE}/jobTasks?$filter=${filter}`, {
+  const res = await fetchConReloj(`${BASE}/jobTasks?$filter=${filter}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
@@ -129,7 +103,7 @@ const ODATA_BASE = `${BC_ROOT}/ODataV4`;
 async function odataAction(action: string, body: unknown): Promise<Record<string, unknown>> {
   const token = await getBCToken();
   const url = `${ODATA_BASE}/${action}?company=${process.env.BC_COMPANY_ID}`;
-  const res = await fetchBC(url, {
+  const res = await fetchConReloj(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -309,13 +283,13 @@ export async function actualizarTareasProyecto(obraNo: string): Promise<void> {
  */
 export async function setAreaProrrateadaJob(obraNo: string, areaProrrateada: number): Promise<void> {
   const token = await getBCToken();
-  const g = await fetchBC(`${BASE}/jobs?$filter=${encodeURIComponent(`no eq '${odataStr(obraNo)}'`)}&$top=1`, {
+  const g = await fetchConReloj(`${BASE}/jobs?$filter=${encodeURIComponent(`no eq '${odataStr(obraNo)}'`)}&$top=1`, {
     headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
   });
   const gd = (await g.json().catch(() => ({}))) as { value?: Array<{ id?: string; '@odata.etag'?: string }> };
   const job = gd.value?.[0];
   if (!job?.id) throw new Error(`El proyecto (Job) de la obra ${obraNo} no existe en BC`);
-  const p = await fetchBC(`${BASE}/jobs(${job.id})`, {
+  const p = await fetchConReloj(`${BASE}/jobs(${job.id})`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,

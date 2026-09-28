@@ -1,4 +1,5 @@
 import { odataStr } from '../odata';
+import { fetchConReloj } from '../bc-timeout';
 import type sqlModule from 'mssql';
 import { sql } from '@/lib/db-adelantedb';
 import { getBCToken, bcConfigured } from '@/lib/bc-client';
@@ -96,7 +97,7 @@ async function llamarBC<T = unknown>(ruta: string, opciones: OpcionesFetchBC = {
     ...opciones.headers,
   };
 
-  const r = await fetch(ruta, {
+  const r = await fetchConReloj(ruta, {
     method: opciones.metodo ?? 'GET',
     headers,
     body: opciones.body !== undefined ? JSON.stringify(opciones.body) : undefined,

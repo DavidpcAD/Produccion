@@ -1,4 +1,5 @@
 import 'server-only';
+import { fetchConReloj } from './bc-timeout';
 import { odataStr } from './odata';
 import { getBCToken } from './bc-client';
 import { TASA_MAX, TASA_MIN } from './presupuesto-tasas';
@@ -39,7 +40,7 @@ export async function bcCompanyName(companyId: string): Promise<string | null> {
   if (!companiasCache) {
     companiasCache = (async () => {
       const token = await getBCToken();
-      const res = await fetch(`${BC_ROOT}/api/v2.0/companies`, {
+      const res = await fetchConReloj(`${BC_ROOT}/api/v2.0/companies`, {
         headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
       });
       if (!res.ok) throw new Error(`BC companies: ${res.status}`);
@@ -88,7 +89,7 @@ export interface DecompLine {
 async function req(path: string, init: RequestInit, company?: string) {
   const token = await getBCToken();
   const raiz = company ? constrDe(company) : CONSTR;
-  const res = await fetch(`${raiz}/${path}`, {
+  const res = await fetchConReloj(`${raiz}/${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json', ...(init.headers ?? {}) },
     cache: 'no-store',
@@ -105,7 +106,7 @@ async function req(path: string, init: RequestInit, company?: string) {
 // systemId + etag del primer registro de un entity-set (para los singletons "bulk").
 async function firstRecord(entity: string): Promise<{ id: string; etag: string }> {
   const token = await getBCToken();
-  const res = await fetch(`${CONSTR}/${entity}?$top=1`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+  const res = await fetchConReloj(`${CONSTR}/${entity}?$top=1`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
   const body = await res.json();
   const rec = body?.value?.[0];
   if (!rec) throw new Error(`BC: no hay registro base en ${entity}`);

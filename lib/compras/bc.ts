@@ -6,6 +6,7 @@
 // de BC_BASE_URL (o de BC_TENANT_ID/BC_ENVIRONMENT).
 
 import { odataStr } from "@/lib/odata";
+import { fetchConReloj, MS_LIMITE_BC } from "../bc-timeout";
 
 type TokenCache = { token: string; exp: number };
 let tokenCache: TokenCache | null = null;
@@ -98,7 +99,7 @@ async function getToken(force = false): Promise<string> {
     scope: "https://api.businesscentral.dynamics.com/.default",
     grant_type: "client_credentials",
   });
-  const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+  const res = await fetchConReloj(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body,
   });
   if (!res.ok) throw new Error(`OAuth BC falló (${res.status}): ${(await res.text()).slice(0, 300)}`);
@@ -107,33 +108,16 @@ async function getToken(force = false): Promise<string> {
   return tokenCache.token;
 }
 
-// Reloj de toda llamada a BC. Sin esto, si BC se cuelga la ruta de Next se cuelga
-// con el y en pantalla queda un spinner eterno; SQL ya tiene su requestTimeout
-// (45 s) y lib/h4.ts su AbortController, esto le pone lo mismo a BC.
-//
-// Va POR INTENTO, no por el par: con el reintento del 401 de abajo, un limite
-// compartido le daria al segundo intento lo que le sobro al primero.
-const MS_LIMITE_BC = 45_000;
 
 // fetch contra BC con reintento ante 401: el Sandbox a veces resetea el binding
 // S2S y el token cacheado deja de ser aceptado. En ese caso pedimos un token
 // FRESCO y reintentamos una vez. Logueamos ms-diagnostics para ver el motivo real.
 async function bcFetch(url: string, init: RequestInit = {}, msLimite = MS_LIMITE_BC): Promise<Response> {
   const baseHeaders = { ...(init.headers as Record<string, string> | undefined), Accept: "application/json" };
-  const run = async (token: string) => {
-    const control = new AbortController();
-    const reloj = setTimeout(() => control.abort(), msLimite);
-    try {
-      return await fetch(url, { ...init, headers: { ...baseHeaders, Authorization: `Bearer ${token}` }, signal: control.signal });
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") {
-        throw new Error(`Business Central no respondio en ${Math.round(msLimite / 1000)} s. Proba de nuevo; si sigue, avisa a soporte.`);
-      }
-      throw e;
-    } finally {
-      clearTimeout(reloj);
-    }
-  };
+  // El reloj va POR INTENTO y no por el par: abajo hay un reintento ante 401 y
+  // con un límite compartido el segundo se quedaría con lo que le sobró al primero.
+  const run = (token: string) =>
+    fetchConReloj(url, { ...init, headers: { ...baseHeaders, Authorization: `Bearer ${token}` } }, msLimite);
   let res = await run(await getToken());
   if (res.status === 401) {
     console.warn(`BC 401 en ${url} — reintento con token fresco. ms-diagnostics=${res.headers.get("ms-diagnostics") ?? "n/a"}`);
@@ -2361,7 +2345,7 @@ export async function bcHealth() {
     const base = `https://api.businesscentral.dynamics.com/v2.0/${t}/${envName}`;
     const probe = async (label: string, url: string) => {
       try {
-        const r = await fetch(url, { cache: "no-store", headers: { Authorization: `Bearer ${tok}`, Accept: "application/json" } });
+        const r = await fetchConReloj(url, { cache: "no-store", headers: { Authorization: `Bearer ${tok}`, Accept: "application/json" } });
         let bodyMsg: string | null = null;
         if (!r.ok) { try { bodyMsg = (await r.text()).slice(0, 200); } catch { /* noop */ } }
         return {
@@ -2376,7 +2360,7 @@ export async function bcHealth() {
     const cidGuid = soloGuid(process.env.BC_COMPANY_ID);
     // Compañías que ve la API ESTÁNDAR (su systemId puede diferir del de la custom).
     try {
-      const rc = await fetch(`${base}/api/v2.0/companies`, { cache: "no-store", headers: { Authorization: `Bearer ${tok}`, Accept: "application/json" } });
+      const rc = await fetchConReloj(`${base}/api/v2.0/companies`, { cache: "no-store", headers: { Authorization: `Bearer ${tok}`, Accept: "application/json" } });
       if (rc.ok) out.diag.stdCompanies = ((await rc.json()).value ?? []).map((c: any) => ({ id: c.id, name: c.name }));
     } catch { /* noop */ }
     const stdCid = out.diag.stdCompanies?.[0]?.id ?? cidGuid;
@@ -2389,7 +2373,7 @@ export async function bcHealth() {
     ]);
   } catch (e: any) { out.diag.tokenError = String(e?.message ?? e); }
   try {
-    out.diag.outboundIp = (await (await fetch("https://api.ipify.org")).text()).trim();
+    out.diag.outboundIp = (await (await fetchConReloj("https://api.ipify.org", {}, 10_000)).text()).trim();
   } catch (e: any) { out.diag.ipError = String(e?.message ?? e); }
   try { out.companies = await bcCompanies(); } catch (e: any) { out.companiesError = String(e?.message ?? e); }
   try { out.companyIdUsado = await getCompanyId(); } catch (e: any) { out.companyError = String(e?.message ?? e); }
