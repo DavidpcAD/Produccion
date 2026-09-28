@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { listStagger, listItem } from '@/components/ui/Motion';
 import { motion } from 'motion/react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { EstadoVacio } from '@/components/ui/EstadoVacio';
 
 interface Proyecto {
   IDProyecto: number;
@@ -87,13 +88,9 @@ export default function ProyectosPage() {
           ))}
         </div>
       ) : visibles.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
-          <Icon name="boleta" size="lg" color="currentColor" className="mb-4" />
-          <p className="text-body font-semibold text-ds-ink">Sin proyectos</p>
-          <p className="text-sm mt-1 text-ds-gray-400">
-            {filtroProd === 'produccion' ? 'Ningún proyecto está marcado como de Producción' : 'Aún no hay proyectos registrados'}
-          </p>
-        </div>
+        <EstadoVacio icono="boleta" titulo="Sin proyectos">
+          {filtroProd === 'produccion' ? 'Ningún proyecto está marcado como de Producción' : 'Aún no hay proyectos registrados'}
+        </EstadoVacio>
       ) : (
         <motion.div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
           initial="hidden" animate="show" variants={listStagger}>

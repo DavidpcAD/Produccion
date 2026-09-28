@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
+import { EstadoVacio } from '@/components/ui/EstadoVacio';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -194,9 +195,7 @@ function TabActividades({ puede }: { puede: boolean }) {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
-          No hay actividades todavía.
-        </div>
+        <EstadoVacio icono="list" titulo="No hay actividades todavía" />
       ) : (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
           <ul className="divide-y divide-ds-gray-100">
@@ -355,9 +354,7 @@ function TabUmbrales({ puede }: { puede: boolean }) {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
-          No hay umbrales configurados.
-        </div>
+        <EstadoVacio icono="options" titulo="No hay umbrales configurados" />
       ) : (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
           <ul className="divide-y divide-ds-gray-100">
@@ -597,9 +594,7 @@ function TabDensidades({ puede }: { puede: boolean }) {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-10 text-center text-ds-gray-400">
-          No hay densidades configuradas.
-        </div>
+        <EstadoVacio icono="calculator" titulo="No hay densidades configuradas" />
       ) : (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
           <ul className="divide-y divide-ds-gray-100">

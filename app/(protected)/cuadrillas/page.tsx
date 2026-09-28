@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { useToast } from '@/components/ui/Toast';
+import { EstadoVacio } from '@/components/ui/EstadoVacio';
 import { useConfirm } from '@/components/ui/Confirm';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
@@ -750,11 +751,9 @@ export default function CuadrillasPage() {
             )}
 
             {partidasView.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
-                <Icon name="user" size="lg" color="currentColor" className="mb-4" />
-                <p className="text-body font-semibold text-ds-ink">{q ? 'Sin resultados' : 'Sin partidas'}</p>
-                <p className="text-sm mt-1 text-ds-gray-400">{q ? 'Probá con otro término de búsqueda.' : 'No hay partidas activas en el catálogo.'}</p>
-              </div>
+              <EstadoVacio icono="user" titulo={q ? 'Sin resultados' : 'Sin partidas'}>
+                {q ? 'Probá con otro término de búsqueda.' : 'No hay partidas activas en el catálogo.'}
+              </EstadoVacio>
             ) : partidasView.map(row => {
               const expanded = expandedPart.has(row.p.idPartida);
               const completa = row.total > 0 && row.conEnc === row.total;
@@ -815,15 +814,17 @@ export default function CuadrillasPage() {
       {vista === 'cuadrillas' && (loading ? (
         <SkeletonCards count={6} />
       ) : cuadrillasFiltradas.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-ds-gray-300">
-          <Icon name="cuadrillas" size="lg" color="currentColor" className="mb-4" />
-          <p className="text-body font-semibold text-ds-ink">{q ? 'Sin resultados' : 'Sin cuadrillas'}</p>
-          {isAdmin && !q && (
-            <Button className="mt-4" onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>
+        <EstadoVacio
+          icono="cuadrillas"
+          titulo={q ? 'Sin resultados' : 'Sin cuadrillas'}
+          accion={isAdmin && !q ? (
+            <Button onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>
               Crear primera cuadrilla
             </Button>
-          )}
-        </div>
+          ) : undefined}
+        >
+          {q ? 'Probá con otro término de búsqueda.' : 'Todavía no hay ninguna cuadrilla armada.'}
+        </EstadoVacio>
       ) : (
         <motion.div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
           initial="hidden" animate="show" variants={listStagger}>
