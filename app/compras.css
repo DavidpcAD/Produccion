@@ -2400,6 +2400,17 @@
   display: flex; flex-direction: column; gap: var(--ds-space-3);
   padding: 0 var(--ds-space-6) var(--ds-space-5);
 }
+/* Las acciones del lote van acá, FUERA del cuerpo que scrollea: el usuario las
+   quiere al final —después del monto, de la lista y del aviso de irreversible— y
+   al ir en el pie quedan al final sin irse de la vista, aunque la selección tenga
+   veinte órdenes. Es el mismo pie que la hoja de detalle (.oc-det__pie) usa para
+   Rechazar y Aprobar, así que abrir una orden sola o un lote deja el botón en el
+   mismo lugar de la pantalla. */
+.oc-scope .oc-sel__pie {
+  display: flex; flex-direction: column; gap: var(--ds-space-3);
+  padding: var(--ds-space-4) var(--ds-space-6) var(--ds-space-5);
+  border-top: 1.5px solid var(--ds-color-gray-100);
+}
 .oc-scope .oc-sel__lista-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-space-3); }
 
 @media (max-width: 900px) {
@@ -2434,6 +2445,7 @@
   /* En celular el riel ya es la hoja de abajo: la selección se muestra ahí. */
   .oc-scope .oc-sel__head { padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
   .oc-scope .oc-sel__cuerpo { padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
+  .oc-scope .oc-sel__pie { padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
 }
 
 /* ---- Piezas que se ven igual en los dos tamaños ---- */
@@ -2679,6 +2691,7 @@
 .oc-scope .oc-det__tabs,
 .oc-scope .oc-det__pie,
 .oc-scope .oc-sel__head,
+.oc-scope .oc-sel__pie,
 .oc-scope .oc-prov-panel__head,
 .oc-scope .oc-prov-panel__id { flex-shrink: 0; }
 

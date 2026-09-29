@@ -505,35 +505,6 @@ export default function AprobacionPage() {
                     </span>
                   </div>
 
-                  {/* En PC el botón abre el modal, que es donde se leen cuántas son y
-                      cuánto suman antes de soltarlas. */}
-                  <div className="oc-sel__aprobar-pc">
-                    <Button block disabled={lote} onClick={() => setConfirmLote(true)}>
-                      {lote ? "Lanzando en Business Central…" : `Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
-                    </Button>
-                  </div>
-
-                  {/* En celular se DESLIZA, igual que una orden sola: el gesto ya es la
-                      confirmación (un roce no aprueba nada) y todo lo que diría el modal
-                      —cuántas, el monto y el aviso de irreversible— está acá arriba, en
-                      esta misma hoja. Un modal encima sería preguntar dos veces por algo
-                      que ya se está leyendo. El número va en la perilla para que lo que
-                      se desliza diga cuántas órdenes se van. */}
-                  <div className="oc-sel__aprobar-movil">
-                    <AprobarControl
-                      oneWay
-                      busy={lote}
-                      busyLabel={`Lanzando ${seleccionadas.length} en Business Central…`}
-                      slideLabel={`APROBAR ${seleccionadas.length}`}
-                      onApprove={() => { void aprobarSeleccionadas(); }}
-                    />
-                  </div>
-                  <Button block variant="outline" disabled={lote} onClick={pedirRechazoLote}>Rechazar seleccionadas</Button>
-              <button type="button" className="link-btn oc-sel__limpiar" disabled={lote}
-                onClick={() => { setSel(new Set()); setRielModo("orden"); }}>
-                Limpiar selección
-              </button>
-
                   <div className="oc-sel__lista-head">
                     <span className="oc-det__rot">Órdenes seleccionadas</span>
                     <button type="button" className="link-btn" aria-expanded={verSeleccion} onClick={() => setVerSeleccion((v) => !v)}>
@@ -575,6 +546,13 @@ export default function AprobacionPage() {
                     </ul>
                   )}
 
+                  {/* Soltar todas queda con la lista, que es sobre lo que actúa, y no
+                      entre los dos botones que sí lanzan algo. */}
+                  <button type="button" className="link-btn oc-sel__limpiar" disabled={lote}
+                    onClick={() => { setSel(new Set()); setRielModo("orden"); }}>
+                    Limpiar selección
+                  </button>
+
                   <div className="oc-aviso oc-aviso--info">
                     <span className="oc-aviso__ic"><Icon name="info" size="sm" color="currentColor" /></span>
                     <span className="oc-aviso__txt">
@@ -582,6 +560,40 @@ export default function AprobacionPage() {
                       Al aprobar, se enviará el pedido a Business Central (ERP) y esta acción no se puede revertir.
                     </span>
                   </div>
+                </div>
+
+                {/* Aprobar y rechazar al final, anclados al pie: es el mismo lugar donde
+                    el riel los pone cuando se abre una orden sola, y así se leen después
+                    de lo que se va a aprobar —el monto, qué arrastra el lote, cuáles son
+                    y el aviso de irreversible— en vez de antes. Al ir fuera del cuerpo
+                    que hace scroll, no se van de la vista aunque la selección tenga
+                    veinte órdenes. */}
+                <div className="oc-sel__pie">
+                  {/* En PC el botón abre el modal, que es donde se leen cuántas son y
+                      cuánto suman antes de soltarlas. */}
+                  <div className="oc-sel__aprobar-pc">
+                    <Button block disabled={lote} onClick={() => setConfirmLote(true)}>
+                      {lote ? "Lanzando en Business Central…" : `Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
+                    </Button>
+                  </div>
+
+                  {/* En celular se DESLIZA, igual que una orden sola: el gesto ya es la
+                      confirmación (un roce no aprueba nada) y todo lo que diría el modal
+                      —cuántas, el monto y el aviso de irreversible— está arriba, en esta
+                      misma hoja. Un modal encima sería preguntar dos veces por algo que
+                      ya se está leyendo. El número va en la perilla para que lo que se
+                      desliza diga cuántas órdenes se van. */}
+                  <div className="oc-sel__aprobar-movil">
+                    <AprobarControl
+                      oneWay
+                      busy={lote}
+                      busyLabel={`Lanzando ${seleccionadas.length} en Business Central…`}
+                      slideLabel={`APROBAR ${seleccionadas.length}`}
+                      onApprove={() => { void aprobarSeleccionadas(); }}
+                    />
+                  </div>
+
+                  <Button block variant="outline" disabled={lote} onClick={pedirRechazoLote}>Rechazar seleccionadas</Button>
                 </div>
               </section>
           ) : abierta ? (
