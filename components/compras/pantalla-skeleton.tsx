@@ -1,6 +1,41 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, Skeleton } from "@/components/compras/ui";
+
+// Cuando la espera se estira, decirlo. Un esqueleto quieto por veinte segundos se
+// lee como "la app es lenta"; casi siempre es que el servidor se está reiniciando
+// por una publicación, y con eso basta: esperar un momento y recargar.
+function AvisoLento() {
+  const [seg, setSeg] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSeg((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  if (seg < 8) return null;
+  const mucho = seg >= 20;
+  return (
+    <div className={`oc-espera${mucho ? " is-mucho" : ""}`} role="status">
+      <span className="oc-espera__punto" aria-hidden />
+      <span className="oc-espera__txt">
+        {mucho ? (
+          <>
+            <span className="ds-strong">Esto no debería tardar tanto.</span>{" "}
+            Puede que el equipo de TI esté publicando una actualización: el sistema se
+            reinicia unos segundos. Esperá un momento y recargá.
+          </>
+        ) : (
+          <>Está tardando más de lo normal. Seguimos cargando…</>
+        )}
+      </span>
+      {mucho && (
+        <button type="button" className="oc-espera__btn" onClick={() => window.location.reload()}>
+          Recargar
+        </button>
+      )}
+    </div>
+  );
+}
 
 // Esqueleto de una pantalla de Compras mientras llegan los datos.
 //
@@ -31,6 +66,7 @@ export function PantallaSkeleton({
       <div className="px-4 py-6 sm:px-6 md:px-8" role="status" aria-label="Cargando…">
         <div className="oc-bandeja">
           <div className="oc-bandeja__lista">
+            <AvisoLento />
             <div className="oc-bandeja__head" style={{ display: "grid", gap: 10 }}>
               <Skeleton width="min(420px, 80%)" height={30} />
               <Skeleton width="min(620px, 100%)" height={13} radius="var(--ds-radius-sm)" />
@@ -91,6 +127,7 @@ export function PantallaSkeleton({
       )}
 
       <main className="page page--wide">
+        <AvisoLento />
         <div className="page__head">
           <div className="page__title" style={{ flex: 1, minWidth: 0, display: "grid", gap: 10 }}>
             <Skeleton width="min(320px, 70%)" height={26} />

@@ -94,7 +94,7 @@ export default function AprobacionTodasPage() {
 
   return (
     <AppShell role="aprobacion">
-      <div className={`oc-bandeja${provAbierto ? " tiene-prov" : ""}`}>
+      <div className={`oc-bandeja${provAbierto ? " tiene-central" : ""}`}>
         <main className="oc-bandeja__lista">
           <header className="oc-bandeja__head">
             <h1 className="ds-heading">Todas las órdenes</h1>
@@ -172,7 +172,7 @@ export default function AprobacionTodasPage() {
         </main>
 
         {provAbierto && (
-          <aside className="oc-riel oc-riel--prov is-abierto">
+          <aside className="oc-riel oc-riel--central is-abierto">
             <ProveedorPanel
               key={provAbierto}
               codigo={provAbierto}

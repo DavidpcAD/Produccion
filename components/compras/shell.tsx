@@ -118,7 +118,9 @@ export function AppShell({ role, children }: { role: Role; children: React.React
         <div className="empty">
           <p style={{ margin: 0, fontWeight: 600 }}>No se pudieron cargar los datos de Compras.</p>
           <p className="ds-muted ds-body-sm" style={{ marginTop: 4 }}>
-            Preferimos no mostrarte nada antes que datos equivocados. Reintentá; si sigue fallando, avisá a TI ({errorCarga}).
+            Si acabamos de publicar una actualización, el servidor se reinicia unos segundos: esperá un
+            momento y reintentá. Preferimos no mostrarte nada antes que datos equivocados; si sigue
+            fallando, avisá a TI ({errorCarga}).
           </p>
           <button className="btn" style={{ marginTop: 12 }} onClick={() => { void reintentarCarga(); }} disabled={cargando}>
             {cargando ? "Reintentando…" : "Reintentar"}
