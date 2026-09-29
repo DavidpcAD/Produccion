@@ -22,13 +22,15 @@ type Tab = "resumen" | "lineas" | "obra" | "historial";
 // lee acá mismo y la lista sigue a la vista. El detalle COMPLETO (facturas, imprimir,
 // abrir en BC) sigue viviendo en su propia pantalla, enlazada abajo.
 export function AprobacionDetalle({
-  orden, aprobando, onCerrar, onAprobar, onRechazar, onVerProveedor,
+  orden, aprobando = false, onCerrar, onAprobar, onRechazar, onVerProveedor,
 }: {
   orden: Orden;
-  aprobando: boolean;
+  aprobando?: boolean;
   onCerrar: () => void;
-  onAprobar: () => void;
-  onRechazar: () => void;
+  /** Sin estos dos el riel es de consulta (Todas las órdenes): se ve todo, pero no
+   *  se aprueba ni se rechaza desde ahí. */
+  onAprobar?: () => void;
+  onRechazar?: () => void;
   /** Abre el panel del proveedor (al lado del riel), con su historial de compras. */
   onVerProveedor: (codigo: string) => void;
 }) {
@@ -184,7 +186,9 @@ export function AprobacionDetalle({
               </div>
             )}
 
-            {pendiente && (
+            {/* Solo donde se puede aprobar: en la consulta de Todas las órdenes, avisar
+                de algo que no se puede hacer desde ahí es ruido. */}
+            {pendiente && onAprobar && (
               <div className="oc-aviso oc-aviso--info">
                 <span className="oc-aviso__ic"><Icon name="info" size="sm" color="currentColor" /></span>
                 <span className="oc-aviso__txt">
@@ -322,7 +326,7 @@ export function AprobacionDetalle({
       </div>
 
       <footer className="oc-det__pie">
-        {pendiente && (
+        {pendiente && onAprobar && onRechazar && (
           <AprobarControl
             busy={aprobando}
             approveLabel={sinLanzarBc ? "Volver a lanzar en BC" : "Aprobar y enviar a BC"}

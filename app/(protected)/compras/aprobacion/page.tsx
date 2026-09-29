@@ -7,13 +7,14 @@ import { Button, Input, Modal, Select, Textarea, useToast } from "@/components/c
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
 import { AprobarControl } from "@/components/compras/aprobar-control";
+import { OrdenFila } from "@/components/compras/orden-fila";
 import { IconChevronDown } from "@/components/compras/icons";
 import { Icon } from "@/components/ds/Icon/Icon";
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
 import {
-  bcEstadoBadge, formatDate, money, num, numeroOrden, numeroOrdenPlano, ordenAlmacenDestino, ordenConsumoDirecto,
-  ordenDevueltaPorBc, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas, ordenTotalConIva,
+  bcEstadoBadge, money, numeroOrden, numeroOrdenPlano, ordenConsumoDirecto,
+  ordenDevueltaPorBc, ordenTotalConIva,
 } from "@/lib/compras/helpers";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
 import type { Movimiento, Orden } from "@/lib/compras/types";
@@ -76,7 +77,7 @@ function requiereAtencion(o: Orden, movs: Movimiento[], bcEstados: Record<string
 }
 
 export default function AprobacionPage() {
-  const { ordenes, proveedores, pedidos, movimientos, bcEstados, setOrdenEstado, devolverOrden } = useStore();
+  const { ordenes, proveedores, movimientos, bcEstados, setOrdenEstado, devolverOrden } = useStore();
   const toast = useToast();
   // Lo que uno está mirando vive en el URL. Así "Ver la orden completa" y el botón
   // de atrás del navegador devuelven la pantalla igual: la misma ficha, la misma
@@ -91,7 +92,6 @@ export default function AprobacionPage() {
   const [orden, setOrden] = useState<Orden_>("recientes");
   const [sel, setSel] = useState<Set<string>>(() => new Set((sp.get("sel") ?? "").split(",").filter(Boolean)));
   const [abiertaId, setAbiertaId] = useState<string | null>(() => sp.get("orden"));
-  const [lineasAbiertas, setLineasAbiertas] = useState<Set<string>>(new Set());
   const [verSeleccion, setVerSeleccion] = useState(false);
   const [aprobandoId, setAprobandoId] = useState<string | null>(null);
   const [lote, setLote] = useState(false);
@@ -186,9 +186,8 @@ export default function AprobacionPage() {
     setProvAbierto((actual) => (actual ? codigoProveedor(o) : null));
   };
 
-  const cambiarVista = (v: Vista) => { setVista(v); setSel(new Set()); setAbiertaId(null); setLineasAbiertas(new Set()); setVerSeleccion(false); };
+  const cambiarVista = (v: Vista) => { setVista(v); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false); };
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const toggleLineas = (id: string) => setLineasAbiertas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const sacarDeSeleccion = (id: string) => setSel((s) => { const n = new Set(s); n.delete(id); return n; });
 
   // Crea y lanza el pedido en BC; solo pasa a "lanzado" si BC de verdad lo hizo
@@ -357,129 +356,12 @@ export default function AprobacionPage() {
               </div>
             )}
 
-            {lista.map((o) => {
-              const articulos = o.lineas.filter((l) => l.tipo === "articulo");
-              const cd = ordenConsumoDirecto(o);
-              const alm = ordenAlmacenDestino(o);
-              const maquinas = ordenMaquinas(o, pedidos);
-              const sinLanzarBc = ordenDevueltaPorBc(o, movimientos);
-              const verLineas = lineasAbiertas.has(o.id);
-              const datos = [
-                `${articulos.length} ${articulos.length === 1 ? "línea" : "líneas"}`,
-                alm.codigo ?? (alm.mixto ? "Varios almacenes" : null),
-                maquinas.length > 0 ? maquinas.join(", ") : null,
-              ].filter(Boolean) as string[];
-              return (
-                <article key={o.id} className={`oc-fila${abiertaId === o.id ? " is-abierta" : ""}`}>
-                  <div className="oc-fila__top">
-                    {esPendiente && (
-                      <input type="checkbox" className="ds-cbx oc-fila__cbx" checked={sel.has(o.id)} onChange={() => toggleSel(o.id)}
-                        aria-label={`Seleccionar ${numeroOrdenPlano(o)} para aprobar en lote`} />
-                    )}
-                    <button type="button" className="oc-fila__abrir" onClick={() => abrirOrden(o)}
-                      aria-pressed={abiertaId === o.id}>
-                      <span className="oc-fila__id">
-                        <span className="oc-fila__linea1">
-                          <span className="oc-fila__num">{numeroOrdenPlano(o)}</span>
-                          <span className="oc-fila__fecha">{formatDate(o.fecha)}</span>
-                        </span>
-                        <span className="oc-fila__prov">
-                          <span className="oc-fila__prov-nom">
-                            {o.proveedorNombre ?? proveedores.find((p) => p.id === o.proveedorId)?.nombre}
-                          </span>
-                          <span className="oc-fila__prov-cod">
-                            {o.proveedorNo ?? proveedores.find((p) => p.id === o.proveedorId)?.code}
-                          </span>
-                        </span>
-                        <span className="oc-fila__datos">
-                          {datos.map((d) => <span key={d}>{d}</span>)}
-                        </span>
-                      </span>
-                      <span className="oc-fila__marcas">
-                        {cd.hay && (
-                          <span className="ds-badge ds-badge--yellow oc-marca"
-                            title={`Se consume contra ${cd.destinos.join(" · ")}. El material NO entra a inventario: el costo va a la obra.`}>
-                            <Icon name="alert" size="sm" color="currentColor" />
-                            Consumo directo{cd.parcial ? " (parcial)" : ""}
-                          </span>
-                        )}
-                        {sinLanzarBc && (
-                          <span className="ds-badge ds-badge--red oc-marca"
-                            title={`El pedido ${o.bcNumber} quedó sin lanzar en Business Central.`}>
-                            <Icon name="traslado" size="sm" color="currentColor" />
-                            Sin lanzar en BC
-                          </span>
-                        )}
-                      </span>
-                      <span className="oc-fila__total">{money(ordenTotalConIva(o), o.currencyCode)}</span>
-                    </button>
-                    <button type="button" className={`oc-fila__chev${verLineas ? " is-open" : ""}`} onClick={() => toggleLineas(o.id)}
-                      aria-expanded={verLineas} aria-label={verLineas ? `Ocultar las líneas de ${numeroOrdenPlano(o)}` : `Ver las líneas de ${numeroOrdenPlano(o)}`}>
-                      <span className="oc-fila__chev-txt">
-                        {verLineas ? "Ocultar las líneas" : `Ver ${articulos.length === 1 ? "la línea" : `las ${articulos.length} líneas`}`}
-                      </span>
-                      <IconChevronDown size={18} />
-                    </button>
-                    {/* Solo en celular: la tabla de líneas no cabe en 375px, así que el
-                        chevron de arriba se esconde y este dice que la tarjeta abre la
-                        hoja (las líneas se leen en la pestaña "Líneas" del detalle).
-                        aria-hidden + tabIndex -1: `oc-fila__abrir` ya expone la acción,
-                        y anunciarla dos veces solo ensucia el lector de pantalla. */}
-                    <button type="button" className="oc-fila__ir" onClick={() => abrirOrden(o)} aria-hidden tabIndex={-1}>
-                      <IconChevronDown size={18} />
-                    </button>
-                  </div>
-
-                  {verLineas && (
-                    <div className="oc-fila__lista">
-                      {o.lineas.map((l) => (
-                        <div key={l.id} className="oc-det__linea">
-                          <div className="oc-det__linea-tit">
-                            <span className="ds-wrap ds-strong">{l.descripcion}</span>
-                            {l.tipo === "cargo" && <span className="ds-badge ds-badge--yellow">Cargo</span>}
-                          </div>
-                          {l.pedidoNumero && <span className="oc-det__linea-cod">{l.pedidoNumero}</span>}
-                          <div className="oc-det__linea-nums">
-                            <span className="ds-nowrap">{num.format(l.cantidad)} {l.unidad} × {money(l.precioUnitario, o.currencyCode)}</span>
-                            <span className="ds-strong ds-nowrap">{money(ordenLineaImporte(l), o.currencyCode)}</span>
-                          </div>
-                          <div className="oc-det__linea-dest">
-                            {ordenLineaEsConsumoDirecto(l)
-                              ? `${l.obra || l.proyecto} · tarea ${l.taskNo} · consumo directo`
-                              : (l.almacen || l.obra || "Sin destino")}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {verLineas && (
-                    <div className="ds-table-wrap oc-fila__lineas">
-                      <table className="ds-table">
-                        <thead>
-                          <tr><th>Descripción</th><th>Destino</th><th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Importe</th></tr>
-                        </thead>
-                        <tbody>
-                          {o.lineas.map((l) => (
-                            <tr key={l.id}>
-                              <td className="ds-cell-texto">{l.descripcion}{l.pedidoNumero && <div className="ds-body-sm ds-muted">{l.pedidoNumero}</div>}</td>
-                              <td className="ds-muted ds-body-sm">
-                                {ordenLineaEsConsumoDirecto(l)
-                                  ? <span title={`Consumo directo contra ${l.proyecto} · tarea ${l.taskNo}: no entra a inventario`}>{l.obra || l.proyecto} · CD</span>
-                                  : (l.almacen || l.obra || "—")}
-                              </td>
-                              <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
-                              <td className="ds-num">{money(l.precioUnitario, o.currencyCode)}</td>
-                              <td className="ds-num ds-strong">{money(ordenLineaImporte(l), o.currencyCode)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </article>
-              );
-            })}
+            {lista.map((o) => (
+              <OrdenFila key={o.id} orden={o} abierta={abiertaId === o.id}
+                marcada={esPendiente ? sel.has(o.id) : undefined}
+                onMarcar={esPendiente ? () => toggleSel(o.id) : undefined}
+                onAbrir={() => abrirOrden(o)} />
+            ))}
           </div>
 
           {seleccionadas.length > 0 && (
