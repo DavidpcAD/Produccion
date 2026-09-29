@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
 import { Button, Input, Modal, Select, Textarea, useToast } from "@/components/compras/ui";
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
@@ -77,12 +78,19 @@ function requiereAtencion(o: Orden, movs: Movimiento[], bcEstados: Record<string
 export default function AprobacionPage() {
   const { ordenes, proveedores, pedidos, movimientos, bcEstados, setOrdenEstado, devolverOrden } = useStore();
   const toast = useToast();
-  const [vista, setVista] = useState<Vista>("pendientes");
+  // Lo que uno está mirando vive en el URL. Así "Ver la orden completa" y el botón
+  // de atrás del navegador devuelven la pantalla igual: la misma ficha, la misma
+  // orden abierta, el mismo proveedor y lo que ya había marcado para el lote.
+  const sp = useSearchParams();
+  const [vista, setVista] = useState<Vista>(() => {
+    const v = sp.get("vista");
+    return v && v in VISTA ? (v as Vista) : "pendientes";
+  });
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   const [busca, setBusca] = useState("");
   const [orden, setOrden] = useState<Orden_>("recientes");
-  const [sel, setSel] = useState<Set<string>>(new Set());
-  const [abiertaId, setAbiertaId] = useState<string | null>(null);
+  const [sel, setSel] = useState<Set<string>>(() => new Set((sp.get("sel") ?? "").split(",").filter(Boolean)));
+  const [abiertaId, setAbiertaId] = useState<string | null>(() => sp.get("orden"));
   const [lineasAbiertas, setLineasAbiertas] = useState<Set<string>>(new Set());
   const [verSeleccion, setVerSeleccion] = useState(false);
   const [aprobandoId, setAprobandoId] = useState<string | null>(null);
@@ -92,7 +100,7 @@ export default function AprobacionPage() {
   const [rechObj, setRechObj] = useState<{ ids: string[]; titulo: string; proveedor?: string; monto: string } | null>(null);
   const [panelSel, setPanelSel] = useState(false);
   // Proveedor abierto al lado del riel (su código PROV-…), con su historial de compras.
-  const [provAbierto, setProvAbierto] = useState<string | null>(null);
+  const [provAbierto, setProvAbierto] = useState<string | null>(() => sp.get("prov"));
   const [confirmLote, setConfirmLote] = useState(false);
   const [resultado, setResultado] = useState<{ ok: number; fallos: string[] } | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -130,6 +138,16 @@ export default function AprobacionPage() {
     };
     return deVista[vista].filter((o) => !q || coincideBusqueda(texto(o), q)).sort(cmp);
   }, [deVista, vista, busca, orden, proveedores]);
+
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (vista !== "pendientes") p.set("vista", vista);
+    if (abiertaId) p.set("orden", abiertaId);
+    if (provAbierto) p.set("prov", provAbierto);
+    if (sel.size) p.set("sel", [...sel].join(","));
+    const q = p.toString();
+    window.history.replaceState(null, "", q ? `?${q}` : window.location.pathname);
+  }, [vista, abiertaId, provAbierto, sel]);
 
   const meta = VISTA[vista];
   // Aprobar y rechazar solo aplican a las pendientes (las tres vistas de la cola). En
