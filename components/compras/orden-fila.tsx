@@ -33,8 +33,9 @@ export function OrdenFila({
   const maquinas = ordenMaquinas(orden, pedidos);
   const sinLanzarBc = ordenDevueltaPorBc(orden, movimientos);
   const prov = proveedores.find((p) => p.id === orden.proveedorId);
+  // La fecha NO va acá: ya se muestra arriba, al lado del número. Repetirla en esta
+  // línea la sacaba dos veces en la misma tarjeta.
   const datos = [
-    formatDate(orden.fecha),
     `${articulos.length} ${articulos.length === 1 ? "línea" : "líneas"}`,
     alm.codigo ?? (alm.mixto ? "Varios almacenes" : null),
     maquinas.length > 0 ? maquinas.join(", ") : null,

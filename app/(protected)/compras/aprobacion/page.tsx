@@ -6,7 +6,6 @@ import { AppShell } from "@/components/compras/shell";
 import { Button, Input, Modal, Select, Textarea, useToast } from "@/components/compras/ui";
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
-import { AprobarControl } from "@/components/compras/aprobar-control";
 import { OrdenFila } from "@/components/compras/orden-fila";
 import { IconChevronDown } from "@/components/compras/icons";
 import { Icon } from "@/components/ds/Icon/Icon";
@@ -198,7 +197,7 @@ export default function AprobacionPage() {
   const toggleSel = (id: string) => setSel((s) => {
     const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id);
     // Con dos o más, el riel pasa a mostrar el lote; al bajar de dos vuelve la orden.
-    setRielModo(n.size > 1 ? "seleccion" : "orden");
+    setRielModo(n.size ? "seleccion" : "orden");
     return n;
   });
   const sacarDeSeleccion = (id: string) => setSel((s) => { const n = new Set(s); n.delete(id); return n; });
@@ -377,47 +376,6 @@ export default function AprobacionPage() {
             ))}
           </div>
 
-          {seleccionadas.length > 0 && (
-            <div className="oc-lote-caja">
-              {verSeleccion && (
-                <ul className="oc-lote__detalle">
-                  {seleccionadas.map((o) => (
-                    <li key={o.id}>
-                      <span className="ds-strong">{numeroOrdenPlano(o)}</span>
-                      <span className="ds-muted">{o.proveedorNombre ?? proveedores.find((p) => p.id === o.proveedorId)?.nombre}</span>
-                      <span className="oc-lote__detalle-monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="oc-lote" role="region" aria-label="Órdenes seleccionadas para aprobar">
-                <button type="button" className={`oc-lote__ver${verSeleccion ? " is-open" : ""}`}
-                  aria-expanded={verSeleccion} onClick={() => setVerSeleccion((v) => !v)}
-                  aria-label={verSeleccion ? "Ocultar las órdenes seleccionadas" : "Ver cuáles órdenes están seleccionadas"}>
-                  <IconChevronDown size={18} />
-                </button>
-                <button type="button" className="oc-lote__info" onClick={() => { setVerSeleccion(true); setRielModo("seleccion"); }}
-                  title="Ver en el panel lo que se va a aprobar">
-                  <span className="oc-lote__n">
-                    {seleccionadas.length} {seleccionadas.length === 1 ? "orden seleccionada" : "órdenes seleccionadas"}
-                  </span>
-                  <span className="oc-lote__monto">Monto total: {montoLote}</span>
-                </button>
-                <div className="oc-lote__acciones">
-                  <button type="button" className="link-btn" onClick={() => { setSel(new Set()); setVerSeleccion(false); }} disabled={lote}>
-                    Limpiar selección
-                  </button>
-                  <div className="oc-lote__aprobar">
-                    <AprobarControl oneWay busy={lote || aprobandoId !== null}
-                      busyLabel={`Lanzando ${seleccionadas.length} en Business Central…`}
-                      approveLabel={`Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
-                      slideLabel="APROBAR" onApprove={() => setConfirmLote(true)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Celular: la barra del lote no cabe, así que la selección vive en una
               pastilla flotante que abre un panel. Siempre accesible mientras haya
               órdenes marcadas. */}
@@ -480,6 +438,10 @@ export default function AprobacionPage() {
                     {lote ? "Lanzando en Business Central…" : `Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
                   </Button>
                   <Button block variant="outline" disabled={lote} onClick={pedirRechazoLote}>Rechazar seleccionadas</Button>
+              <button type="button" className="link-btn oc-sel__limpiar" disabled={lote}
+                onClick={() => { setSel(new Set()); setRielModo("orden"); }}>
+                Limpiar selección
+              </button>
 
                   <div className="oc-sel__lista-head">
                     <span className="oc-det__rot">Órdenes seleccionadas</span>
