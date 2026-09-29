@@ -76,7 +76,7 @@ function requiereAtencion(o: Orden, movs: Movimiento[], bcEstados: Record<string
 }
 
 export default function AprobacionPage() {
-  const { ordenes, proveedores, movimientos, bcEstados, setOrdenEstado, devolverOrden } = useStore();
+  const { ordenes, proveedores, movimientos, bcEstados, cargandoExtra, setOrdenEstado, devolverOrden } = useStore();
   const toast = useToast();
   // Lo que uno está mirando vive en el URL. Así "Ver la orden completa" y el botón
   // de atrás del navegador devuelven la pantalla igual: la misma ficha, la misma
@@ -306,7 +306,10 @@ export default function AprobacionPage() {
                   className={`oc-ficha${vista === v ? " is-active" : ""}`} onClick={() => cambiarVista(v)}>
                   <span className="oc-ficha__largo">{VISTA[v].label}</span>
                   <span className="oc-ficha__corto">{VISTA[v].corto}</span>
-                  {" "}({deVista[v].length})
+                  {/* "Requieren atención" y "Sin lanzar en BC" se calculan con la
+                      bitácora, y los otros estados con las órdenes que todavía bajan:
+                      hasta que llegue, un número sería mentira. */}
+                  {" "}({cargandoExtra && v !== "pendientes" ? "…" : deVista[v].length})
                 </button>
               ))}
               {/* Un estado que no es de la cola (se eligió en Filtros): se muestra como

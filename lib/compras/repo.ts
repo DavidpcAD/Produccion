@@ -588,10 +588,22 @@ const COLS_ORDEN_DET = `d.idOrdenCompraDet, d.idOrdenCompra, d.idPedidoCompraDet
   d.unitOfMeasureCode, d.locationCode, d.directUnitCost, d.vatPct, d.lineDiscountPct,
   d.jobNo, d.taskNo, d.chargeNo, d.chargeMethod`;
 
-export async function listOrdenes(): Promise<Orden[]> {
+/** Todas las órdenes vivas, o solo las de ciertos estados.
+ *
+ *  El filtro existe para la primera carga de Aprobación: en producción son 634
+ *  órdenes con 2 049 líneas (~2,7 MB) para mostrar las 7 pendientes. Con el filtro
+ *  esa primera petición baja a lo que de verdad se ve, y el resto llega después. */
+export async function listOrdenes(opts?: { estados?: string[] }): Promise<Orden[]> {
   await ensureEstados();
   const pool = await getPool();
-  const h = await pool.request().query(`SELECT ${COLS_ORDEN} FROM dbo.OrdenCompra WHERE esEliminada = 0 ORDER BY idOrdenCompra DESC`);
+  // Los ids salen del mapa que acaba de llenar `ensureEstados`, así que el IN va con
+  // números nuestros, no con texto de afuera.
+  const ids = (opts?.estados ?? [])
+    .map((c) => estadoNombreToId?.get(NOMBRE_POR_CODIGO[c] ?? c) ?? null)
+    .filter((x): x is number => typeof x === "number");
+  const soloEstados = opts?.estados?.length ? ` AND idEstado IN (${ids.join(",") || "-1"})` : "";
+  const soloEstadosDet = opts?.estados?.length ? ` AND oc.idEstado IN (${ids.join(",") || "-1"})` : "";
+  const h = await pool.request().query(`SELECT ${COLS_ORDEN} FROM dbo.OrdenCompra WHERE esEliminada = 0${soloEstados} ORDER BY idOrdenCompra DESC`);
   const d = await pool.request().query(`SELECT ${COLS_ORDEN_DET},
              -- Consumo inmediato: la TAREA (Job Task) puede venir en NULL si la orden se
              -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
@@ -623,7 +635,7 @@ export async function listOrdenes(): Promise<Orden[]> {
              -- (GomEqp Machine No.) al lanzar el pedido.
              pc.maquinaNo AS maquinaOrigen
       FROM dbo.OrdenCompraDet d
-      JOIN dbo.OrdenCompra oc ON oc.idOrdenCompra = d.idOrdenCompra AND oc.esEliminada = 0
+      JOIN dbo.OrdenCompra oc ON oc.idOrdenCompra = d.idOrdenCompra AND oc.esEliminada = 0${soloEstadosDet}
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
       ORDER BY d.idOrdenCompraDet`);

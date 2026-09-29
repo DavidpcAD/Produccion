@@ -8,6 +8,7 @@ import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
 import { OrdenFila } from "@/components/compras/orden-fila";
 import { OrdenesLista } from "@/components/compras/ordenes-lista";
+import { PantallaSkeleton } from "@/components/compras/pantalla-skeleton";
 import { Icon } from "@/components/ds/Icon/Icon";
 import { useStore } from "@/lib/compras/store";
 import { numeroOrdenPlano, ordenTotalConIva } from "@/lib/compras/helpers";
@@ -36,7 +37,7 @@ const ORDENES: { v: Orden_; label: string }[] = [
 ];
 
 export default function AprobacionTodasPage() {
-  const { ordenes, proveedores } = useStore();
+  const { ordenes, proveedores, cargandoExtra } = useStore();
   const sp = useSearchParams();
   const [vista, setVista] = useState<Vista>(() => {
     const v = sp.get("vista");
@@ -91,6 +92,11 @@ export default function AprobacionTodasPage() {
   };
   const cambiarVista = (v: Vista) => { setVista(v); setAbiertaId(null); setProvAbierto(null); };
   const hayFiltro = busca.trim().length > 0;
+
+  // La primera carga trae solo la cola de pendientes, para que Aprobación pinte ya.
+  // Esta pantalla es justamente TODAS: mostrar 7 de 628 mientras baja el resto se
+  // leería como que no hay más, así que acá sí se espera.
+  if (cargandoExtra) return <AppShell role="aprobacion"><PantallaSkeleton forma="bandeja" /></AppShell>;
 
   return (
     <AppShell role="aprobacion">

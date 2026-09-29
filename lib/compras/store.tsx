@@ -62,6 +62,11 @@ interface StoreShape {
   usuario: string | null;
   setUsuario: (u: string | null) => void;
   cargando: boolean;
+  /** Aprobación pinta con la cola de pendientes y el resto del módulo entra después.
+   *  Mientras esto sea true, lo que se calcula con lo que falta —contadores de otros
+   *  estados, "sin lanzar en BC", recepciones— todavía no es definitivo: la pantalla
+   *  lo dice en vez de afirmar un número que va a cambiar. */
+  cargandoExtra: boolean;
   hydrated: boolean; // ya se leyó el rol/usuario de localStorage (evita rebotar al login al recargar)
   // Falló la carga inicial (modo API): hay que decírselo al usuario, no fingir que no hay datos.
   errorCarga: string | null;
@@ -213,6 +218,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   // Motivo real por el que no hay datos, para poder DECIRLO en pantalla en vez de mostrar
   // una lista vacía (o, peor, la semilla) como si fuera la verdad.
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const [cargandoExtra, setCargandoExtra] = useState(false);
   // Notas de crédito (aparte del bootstrap para no romper la carga si la tabla no existe).
   const [notasCredito, setNotasCredito] = useState<NotaCreditoLinea[]>([]);
   // Bitácora completa por documento, pedida por las pantallas de detalle. Va aparte de
@@ -225,39 +231,6 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   // los datos": eso es `cargando`. Antes se prendía recién cuando el bootstrap
   // terminaba, así que la pantalla no podía pintar NADA —ni el esqueleto— hasta que
   // la base contestara.
-  useEffect(() => {
-    const r = localStorage.getItem("adelante_oc_role") as Role | null;
-    if (r) setRole(r);
-    const u = localStorage.getItem("adelante_oc_usuario");
-    if (u) setUsuario(u);
-    if (!USE_API) {
-      try {
-        const raw = localStorage.getItem(LS_KEY);
-        if (raw) setData({ ...freshData(), ...JSON.parse(raw) } as Persisted); // merge: rellena llaves nuevas
-      } catch { /* ignore */ }
-    }
-    setHydrated(true);
-    if (USE_API) {
-      cargarDesdeApi()
-        .catch((e) => { console.error("bootstrap", e); setErrorCarga(String(e?.message ?? e)); })
-        .finally(() => { setCargando(false); });
-    }
-  }, []);
-
-  // persistencia local solo en modo mock
-  useEffect(() => {
-    if (!hydrated || USE_API) return;
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
-  }, [data, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    if (role) localStorage.setItem("adelante_oc_role", role);
-    else localStorage.removeItem("adelante_oc_role");
-    if (usuario) localStorage.setItem("adelante_oc_usuario", usuario);
-    else localStorage.removeItem("adelante_oc_usuario");
-  }, [role, usuario, hydrated]);
-
   // Última carga buena y petición en vuelo. Sin esto, abrir el menú de Compras
   // disparaba un bootstrap COMPLETO por cada clic (y otro más si el temporizador
   // caía en el medio): la misma lista de pedidos, órdenes, recepciones y bitácora
@@ -285,6 +258,71 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     if (Date.now() - ultimaCarga.current < maxEdadMs) return;
     return cargarDesdeApi();
   }
+
+  /** Primera carga de la sesión. En Aprobación se pide antes la COLA —las órdenes
+   *  pendientes— y con eso ya se pinta: en producción son 7 de 634 órdenes, ~30 KB
+   *  contra ~5 MB. El módulo completo entra enseguida, de fondo. Si la cola falla,
+   *  se cae a la carga entera de siempre. */
+  async function cargaInicial(): Promise<void> {
+    const rol = typeof window !== "undefined" ? localStorage.getItem("adelante_oc_role") : null;
+    if (rol === "aprobacion") {
+      try {
+        const cola = await api.bootstrapCola();
+        if (cola.parcial && cola.ordenes) {
+          setErrorCarga(null);
+          setData((d) => ({ ...d, ordenes: cola.ordenes! }));
+          setCargandoExtra(true);
+          // Sin `await`: la pantalla ya se usa mientras baja el resto. `ultimaCarga`
+          // se marca solo cuando llega TODO, para que el refresco de fondo lo
+          // reintente si esto falló.
+          api.bootstrap()
+            .then((b) => {
+              ultimaCarga.current = Date.now();
+              setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+              setCargandoExtra(false);
+            })
+            .catch((e) => console.error("bootstrap completo", e));
+          return;
+        }
+      } catch (e) {
+        console.error("bootstrap cola", e); // se sigue con la carga entera
+      }
+    }
+    await cargarDesdeApi();
+  }
+
+  useEffect(() => {
+    const r = localStorage.getItem("adelante_oc_role") as Role | null;
+    if (r) setRole(r);
+    const u = localStorage.getItem("adelante_oc_usuario");
+    if (u) setUsuario(u);
+    if (!USE_API) {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) setData({ ...freshData(), ...JSON.parse(raw) } as Persisted); // merge: rellena llaves nuevas
+      } catch { /* ignore */ }
+    }
+    setHydrated(true);
+    if (USE_API) {
+      cargaInicial()
+        .catch((e) => { console.error("bootstrap", e); setErrorCarga(String(e?.message ?? e)); })
+        .finally(() => { setCargando(false); });
+    }
+  }, []);
+
+  // persistencia local solo en modo mock
+  useEffect(() => {
+    if (!hydrated || USE_API) return;
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  }, [data, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (role) localStorage.setItem("adelante_oc_role", role);
+    else localStorage.removeItem("adelante_oc_role");
+    if (usuario) localStorage.setItem("adelante_oc_usuario", usuario);
+    else localStorage.removeItem("adelante_oc_usuario");
+  }, [role, usuario, hydrated]);
 
   const refreshFromApi = cargarDesdeApi;
 
@@ -843,7 +881,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     };
 
     return {
-      role, setRole, usuario, setUsuario, cargando, hydrated, errorCarga, reintentarCarga,
+      role, setRole, usuario, setUsuario, cargando, cargandoExtra, hydrated, errorCarga, reintentarCarga,
       proveedores: seed.proveedores, articulos: seed.articulos, obras: seed.obras,
       maquinas: seed.maquinas, almacenes: seed.almacenes,
       pedidos: data.pedidos, ordenes: data.ordenes, recepciones: data.recepciones, movimientos, cargarMovimientos,
@@ -856,7 +894,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
       planContexto, setPlanContexto,
       borrador, setBorrador,
     };
-  }, [role, usuario, data, movimientos, borrador, planContexto, cargando, errorCarga, bcEstados]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [role, usuario, data, movimientos, borrador, planContexto, cargando, cargandoExtra, errorCarga, bcEstados]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <StoreCtx.Provider value={api2}>{children}</StoreCtx.Provider>;
 }

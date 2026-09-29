@@ -32,6 +32,10 @@ export interface SincronizacionBc {
 
 export const api = {
   bootstrap: (): Promise<Bootstrap> => fetch("/api/compras/bootstrap").then(jsonOrThrow),
+  /** Primera carga de Aprobación: solo la cola de pendientes, para pintar ya. Si el
+   *  servidor no la pudo recortar (alcance "mis solicitudes"), viene sin `parcial`. */
+  bootstrapCola: (): Promise<{ ordenes?: Orden[]; parcial?: boolean }> =>
+    fetch("/api/compras/bootstrap?parte=cola").then(jsonOrThrow),
 
   createPedido: (body: unknown): Promise<{ idPedidoCompra: number }> =>
     fetch("/api/compras/pedidos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
