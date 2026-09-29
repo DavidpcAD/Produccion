@@ -98,7 +98,10 @@ export default function AprobacionPage() {
   // El rechazo vale para UNA orden o para toda la selección: mismo diálogo, mismo
   // motivo, y se devuelven una por una (BC no debe recibirlas en paralelo).
   const [rechObj, setRechObj] = useState<{ ids: string[]; titulo: string; proveedor?: string; monto: string } | null>(null);
-  const [panelSel, setPanelSel] = useState(false);
+  // Qué muestra el riel: la orden que se está revisando, o LO QUE SE VA A APROBAR.
+  // Con dos o más marcadas, enseñar una sola orden al lado del botón "Aprobar 5"
+  // es contradictorio: el panel pasa solo a la selección.
+  const [rielModo, setRielModo] = useState<"orden" | "seleccion">("orden");
   // Proveedor abierto al lado del riel (su código PROV-…), con su historial de compras.
   const [provAbierto, setProvAbierto] = useState<string | null>(() => sp.get("prov"));
   const [confirmLote, setConfirmLote] = useState(false);
@@ -158,6 +161,10 @@ export default function AprobacionPage() {
     () => (esPendiente ? lista.filter((o) => sel.has(o.id)) : []),
     [esPendiente, lista, sel],
   );
+  // El riel enseña la selección cuando la persona lo pidió (la pastilla en celular)
+  // o cuando hay dos o más marcadas y todavía no eligió mirar una orden.
+  const verLote = seleccionadas.length > 0 && rielModo === "seleccion";
+
   // Monto del lote. Si hay monedas distintas NO se suman en un número: se muestra el
   // total de cada una (sumar colones con dólares sería inventar una cifra).
   const montoLote = useMemo(() => {
@@ -183,11 +190,17 @@ export default function AprobacionPage() {
   const codigoProveedor = (o: Orden) => o.proveedorNo ?? proveedores.find((p) => p.id === o.proveedorId)?.code ?? null;
   const abrirOrden = (o: Orden) => {
     setAbiertaId(o.id);
+    setRielModo("orden");
     setProvAbierto((actual) => (actual ? codigoProveedor(o) : null));
   };
 
   const cambiarVista = (v: Vista) => { setVista(v); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false); };
-  const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const toggleSel = (id: string) => setSel((s) => {
+    const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id);
+    // Con dos o más, el riel pasa a mostrar el lote; al bajar de dos vuelve la orden.
+    setRielModo(n.size > 1 ? "seleccion" : "orden");
+    return n;
+  });
   const sacarDeSeleccion = (id: string) => setSel((s) => { const n = new Set(s); n.delete(id); return n; });
 
   // Crea y lanza el pedido en BC; solo pasa a "lanzado" si BC de verdad lo hizo
@@ -213,7 +226,7 @@ export default function AprobacionPage() {
       const r = await aprobarYLanzar(o, setOrdenEstado);
       if (r.ok) ok++; else fallos.push(numeroOrdenPlano(o));
     }
-    setLote(false); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false); setPanelSel(false);
+    setLote(false); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false); 
     // Un toast se va solo y esto no se puede deshacer: el resultado se queda hasta
     // que la persona lo lee, y dice por nombre cuáles quedaron con problema.
     setResultado({ ok, fallos });
@@ -244,7 +257,7 @@ export default function AprobacionPage() {
       : `${ok} órdenes devueltas a proveeduría`;
     const cola = [fallos.length ? `${fallos.length} no se pudieron devolver` : "", avisos[0] ? `⚠️ ${avisos[0]}` : ""].filter(Boolean).join(" · ");
     toast(cola ? `${cuerpo} · ${cola}` : cuerpo, fallos.length || avisos.length ? "error" : "info");
-    setRechObj(null); setMotivo(""); setPanelSel(false);
+    setRechObj(null); setMotivo(""); 
   }
   const pedirRechazoLote = () => {
     if (!seleccionadas.length) return;
@@ -383,12 +396,13 @@ export default function AprobacionPage() {
                   aria-label={verSeleccion ? "Ocultar las órdenes seleccionadas" : "Ver cuáles órdenes están seleccionadas"}>
                   <IconChevronDown size={18} />
                 </button>
-                <div className="oc-lote__info">
+                <button type="button" className="oc-lote__info" onClick={() => { setVerSeleccion(true); setRielModo("seleccion"); }}
+                  title="Ver en el panel lo que se va a aprobar">
                   <span className="oc-lote__n">
                     {seleccionadas.length} {seleccionadas.length === 1 ? "orden seleccionada" : "órdenes seleccionadas"}
                   </span>
                   <span className="oc-lote__monto">Monto total: {montoLote}</span>
-                </div>
+                </button>
                 <div className="oc-lote__acciones">
                   <button type="button" className="link-btn" onClick={() => { setSel(new Set()); setVerSeleccion(false); }} disabled={lote}>
                     Limpiar selección
@@ -408,7 +422,7 @@ export default function AprobacionPage() {
               pastilla flotante que abre un panel. Siempre accesible mientras haya
               órdenes marcadas. */}
           {seleccionadas.length > 0 && (
-            <button type="button" className="oc-pastilla" onClick={() => { setVerSeleccion(true); setPanelSel(true); }} aria-expanded={panelSel}>
+            <button type="button" className="oc-pastilla" onClick={() => { setVerSeleccion(true); setRielModo("seleccion"); }} aria-expanded={verLote}>
               <span className="oc-pastilla__n">{seleccionadas.length}</span>
               <span className="oc-pastilla__txt">Revisar selección</span>
               <span className="oc-pastilla__chev" aria-hidden><IconChevronDown size={18} /></span>
@@ -429,8 +443,91 @@ export default function AprobacionPage() {
           </aside>
         )}
 
-        <aside className={`oc-riel${abierta ? " is-abierto" : ""}`}>
-          {abierta ? (
+        <aside className={`oc-riel${abierta || verLote ? " is-abierto" : ""}`}>
+          {verLote ? (
+    <section className="oc-sel" aria-label="Órdenes seleccionadas">
+                <header className="oc-sel__head">
+                  <h2 className="oc-sel__tit">
+                    {seleccionadas.length} {seleccionadas.length === 1 ? "orden seleccionada" : "órdenes seleccionadas"}
+                  </h2>
+                  <button type="button" className="oc-det__cerrar" onClick={() => setRielModo("orden")} aria-label="Volver a la orden">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+                      <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </header>
+
+                <div className="oc-sel__cuerpo">
+                  <div className="oc-sel__total">
+                    <span className="oc-det__rot">Monto total</span>
+                    <span className="oc-sel__total-num">{montoLote}</span>
+                  </div>
+
+                  {/* Los dos datos que cambian el peso de apretar el botón. Se muestran
+                      aunque estén en cero: "0 sin lanzar en BC" también es información. */}
+                  <div className="oc-sel__avisos">
+                    <span className={`oc-sel__aviso${resumenLote.cd > 0 ? " is-on" : ""}`}>
+                      <Icon name="alert" size="sm" color="currentColor" />
+                      {resumenLote.cd} con consumo directo
+                    </span>
+                    <span className={`oc-sel__aviso oc-sel__aviso--bc${resumenLote.sinBc > 0 ? " is-on" : ""}`}>
+                      <Icon name="traslado" size="sm" color="currentColor" />
+                      {resumenLote.sinBc} sin lanzar en BC
+                    </span>
+                  </div>
+
+                  <Button block disabled={lote} onClick={() => setConfirmLote(true)}>
+                    {lote ? "Lanzando en Business Central…" : `Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
+                  </Button>
+                  <Button block variant="outline" disabled={lote} onClick={pedirRechazoLote}>Rechazar seleccionadas</Button>
+
+                  <div className="oc-sel__lista-head">
+                    <span className="oc-det__rot">Órdenes seleccionadas</span>
+                    <button type="button" className="link-btn" aria-expanded={verSeleccion} onClick={() => setVerSeleccion((v) => !v)}>
+                      {verSeleccion ? "Ver menos" : "Ver más"}
+                    </button>
+                  </div>
+                  {verSeleccion && (
+                    <ul className="oc-sel__lista">
+                      {seleccionadas.map((o) => {
+                        const cd = ordenConsumoDirecto(o);
+                        return (
+                          <li key={o.id} className="oc-sel__item">
+                            <div className="oc-sel__item-top">
+                              <span className="ds-strong">{numeroOrdenPlano(o)}</span>
+                              <span className="oc-sel__item-monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
+                              <button type="button" className="oc-sel__quitar" onClick={() => sacarDeSeleccion(o.id)}
+                                aria-label={`Quitar ${numeroOrdenPlano(o)} de la selección`}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                                  <path d="M6 6l12 12M18 6L6 18" />
+                                </svg>
+                              </button>
+                            </div>
+                            <span className="oc-sel__item-prov ds-wrap">
+                              {o.proveedorNombre ?? proveedores.find((p) => p.id === o.proveedorId)?.nombre}
+                            </span>
+                            {cd.hay && (
+                              <span className="ds-badge ds-badge--yellow oc-marca">
+                                <Icon name="alert" size="sm" color="currentColor" />
+                                Consumo directo{cd.parcial ? " (parcial)" : ""}
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
+                  <div className="oc-aviso oc-aviso--info">
+                    <span className="oc-aviso__ic"><Icon name="info" size="sm" color="currentColor" /></span>
+                    <span className="oc-aviso__txt">
+                      <span className="oc-aviso__tit">Aprobación irreversible</span>
+                      Al aprobar, se enviará el pedido a Business Central (ERP) y esta acción no se puede revertir.
+                    </span>
+                  </div>
+                </div>
+              </section>
+          ) : abierta ? (
             <AprobacionDetalle
               key={abierta.id}
               orden={abierta}
@@ -461,94 +558,6 @@ export default function AprobacionPage() {
 
         {(abierta || provAbierto) && <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setAbiertaId(null); }} aria-hidden />}
       </div>
-
-      {panelSel && seleccionadas.length > 0 && (
-        <>
-          <div className="oc-sel__velo" onClick={() => setPanelSel(false)} aria-hidden />
-          <aside className="oc-sel" aria-label="Órdenes seleccionadas">
-            <header className="oc-sel__head">
-              <h2 className="oc-sel__tit">
-                {seleccionadas.length} {seleccionadas.length === 1 ? "orden seleccionada" : "órdenes seleccionadas"}
-              </h2>
-              <button type="button" className="oc-det__cerrar" onClick={() => setPanelSel(false)} aria-label="Cerrar la selección">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </header>
-
-            <div className="oc-sel__cuerpo">
-              <div className="oc-sel__total">
-                <span className="oc-det__rot">Monto total</span>
-                <span className="oc-sel__total-num">{montoLote}</span>
-              </div>
-
-              {/* Los dos datos que cambian el peso de apretar el botón. Se muestran
-                  aunque estén en cero: "0 sin lanzar en BC" también es información. */}
-              <div className="oc-sel__avisos">
-                <span className={`oc-sel__aviso${resumenLote.cd > 0 ? " is-on" : ""}`}>
-                  <Icon name="alert" size="sm" color="currentColor" />
-                  {resumenLote.cd} con consumo directo
-                </span>
-                <span className={`oc-sel__aviso oc-sel__aviso--bc${resumenLote.sinBc > 0 ? " is-on" : ""}`}>
-                  <Icon name="traslado" size="sm" color="currentColor" />
-                  {resumenLote.sinBc} sin lanzar en BC
-                </span>
-              </div>
-
-              <Button block disabled={lote} onClick={() => setConfirmLote(true)}>
-                {lote ? "Lanzando en Business Central…" : `Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
-              </Button>
-              <Button block variant="outline" disabled={lote} onClick={pedirRechazoLote}>Rechazar seleccionadas</Button>
-
-              <div className="oc-sel__lista-head">
-                <span className="oc-det__rot">Órdenes seleccionadas</span>
-                <button type="button" className="link-btn" aria-expanded={verSeleccion} onClick={() => setVerSeleccion((v) => !v)}>
-                  {verSeleccion ? "Ver menos" : "Ver más"}
-                </button>
-              </div>
-              {verSeleccion && (
-                <ul className="oc-sel__lista">
-                  {seleccionadas.map((o) => {
-                    const cd = ordenConsumoDirecto(o);
-                    return (
-                      <li key={o.id} className="oc-sel__item">
-                        <div className="oc-sel__item-top">
-                          <span className="ds-strong">{numeroOrdenPlano(o)}</span>
-                          <span className="oc-sel__item-monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
-                          <button type="button" className="oc-sel__quitar" onClick={() => sacarDeSeleccion(o.id)}
-                            aria-label={`Quitar ${numeroOrdenPlano(o)} de la selección`}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-                              <path d="M6 6l12 12M18 6L6 18" />
-                            </svg>
-                          </button>
-                        </div>
-                        <span className="oc-sel__item-prov ds-wrap">
-                          {o.proveedorNombre ?? proveedores.find((p) => p.id === o.proveedorId)?.nombre}
-                        </span>
-                        {cd.hay && (
-                          <span className="ds-badge ds-badge--yellow oc-marca">
-                            <Icon name="alert" size="sm" color="currentColor" />
-                            Consumo directo{cd.parcial ? " (parcial)" : ""}
-                          </span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-
-              <div className="oc-aviso oc-aviso--info">
-                <span className="oc-aviso__ic"><Icon name="info" size="sm" color="currentColor" /></span>
-                <span className="oc-aviso__txt">
-                  <span className="oc-aviso__tit">Aprobación irreversible</span>
-                  Al aprobar, se enviará el pedido a Business Central (ERP) y esta acción no se puede revertir.
-                </span>
-              </div>
-            </div>
-          </aside>
-        </>
-      )}
 
       {confirmLote && (
         <Modal title={`¿Aprobar ${seleccionadas.length === 1 ? "esta orden" : `estas ${seleccionadas.length} órdenes`}?`}

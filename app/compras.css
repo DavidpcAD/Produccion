@@ -2359,7 +2359,22 @@
    tapa la lista), así que se resume en una pastilla flotante que abre un panel:
    monto, qué arrastra el lote, aprobar, rechazar y qué órdenes son.
    ========================================================================== */
-.oc-scope .oc-pastilla, .oc-scope .oc-sel, .oc-scope .oc-sel__velo { display: none; }
+.oc-scope .oc-pastilla { display: none; }
+
+/* La selección vive DENTRO del riel, igual que el detalle de una orden: con dos o
+   más marcadas el panel muestra lo que se va a aprobar, no una orden suelta. */
+.oc-scope .oc-sel { display: flex; flex-direction: column; width: 100%; min-height: 0; overflow: hidden; }
+.oc-scope .oc-sel__head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-3);
+  padding: var(--ds-space-5) var(--ds-space-6) var(--ds-space-3);
+}
+.oc-scope .oc-sel__tit { margin: 0; font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold); line-height: 1.25; }
+.oc-scope .oc-sel__cuerpo {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--ds-space-3);
+  padding: 0 var(--ds-space-6) var(--ds-space-5);
+}
+.oc-scope .oc-sel__lista-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-space-3); }
 
 @media (max-width: 900px) {
   .oc-scope .oc-lote-caja { display: none; }
@@ -2382,25 +2397,9 @@
 
   /* El panel: por encima de la hoja de detalle (70) para que abrir uno no deje al
      otro a medias debajo. */
-  .oc-scope .oc-sel__velo { display: block; position: fixed; inset: 0; z-index: 71; background: #0006; }
-  .oc-scope .oc-sel {
-    display: flex; flex-direction: column; position: fixed; z-index: 72;
-    top: 72px; right: 12px; bottom: 12px; left: auto;
-    width: min(400px, calc(100vw - 24px));
-    background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-100);
-    border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-03-big); overflow: hidden;
-  }
-  .oc-scope .oc-sel__head {
-    display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-3);
-    padding: var(--ds-space-4) var(--ds-space-4) var(--ds-space-3);
-  }
-  .oc-scope .oc-sel__tit { margin: 0; font-size: var(--ds-font-size-body-md); font-weight: var(--ds-font-weight-semibold); line-height: 1.25; }
-  .oc-scope .oc-sel__cuerpo {
-    flex: 1 1 auto; min-height: 0; overflow-y: auto;
-    display: flex; flex-direction: column; gap: var(--ds-space-3);
-    padding: 0 var(--ds-space-4) var(--ds-space-4);
-  }
-  .oc-scope .oc-sel__lista-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-space-3); }
+  /* En celular el riel ya es la hoja de abajo: la selección se muestra ahí. */
+  .oc-scope .oc-sel__head { padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
+  .oc-scope .oc-sel__cuerpo { padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
 }
 
 /* ---- Piezas que se ven igual en los dos tamaños ---- */
@@ -2631,3 +2630,8 @@
 .oc-scope .oc-com__rol { color: var(--ds-color-green-200); font-weight: var(--ds-font-weight-semibold); }
 .oc-scope .oc-com__fecha { margin-left: auto; color: var(--ds-color-gray-400); }
 .oc-scope .oc-com__txt { font-size: var(--ds-font-size-body-sm); line-height: 1.5; }
+
+/* La barra del lote: el bloque de texto abre en el riel lo que se va a aprobar. */
+.oc-scope .oc-lote__info { border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 0; border-radius: var(--ds-radius-md); }
+.oc-scope .oc-lote__info:hover .oc-lote__n { text-decoration: underline; text-underline-offset: 3px; }
+.oc-scope .oc-lote__info:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 3px; }
