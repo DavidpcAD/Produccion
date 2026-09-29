@@ -51,6 +51,9 @@ const MOTIVOS_RECHAZO = [
   "Se pidió por error",
 ];
 
+const BUSCAR_LARGO = "Buscar por N.º de orden, proveedor, material, obra, quién la pidió o N.º de factura…";
+const BUSCAR_CORTO = "Buscar orden, proveedor u obra…";
+
 type Orden_ = "recientes" | "antiguas" | "mayor" | "menor";
 const ORDENES: { v: Orden_; label: string }[] = [
   { v: "recientes", label: "Más recientes" },
@@ -88,6 +91,18 @@ export default function AprobacionPage() {
   });
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   const [busca, setBusca] = useState("");
+  // El texto largo anuncia TODO lo que se puede buscar y en PC entra completo. En
+  // celular el campo mide ~300px y lo cortaba a media palabra ("…proveedor, mat"),
+  // que se lee como un error. Arranca con el largo —el mismo que pinta el servidor,
+  // si no la hidratación no calza— y se acorta al montar si la pantalla es angosta.
+  const [pistaBuscar, setPistaBuscar] = useState(BUSCAR_LARGO);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const aplicar = () => setPistaBuscar(mq.matches ? BUSCAR_CORTO : BUSCAR_LARGO);
+    aplicar();
+    mq.addEventListener("change", aplicar);
+    return () => mq.removeEventListener("change", aplicar);
+  }, []);
   const [orden, setOrden] = useState<Orden_>("recientes");
   const [sel, setSel] = useState<Set<string>>(() => new Set((sp.get("sel") ?? "").split(",").filter(Boolean)));
   const [abiertaId, setAbiertaId] = useState<string | null>(() => sp.get("orden"));
@@ -165,6 +180,11 @@ export default function AprobacionPage() {
   // El riel enseña la selección cuando la persona lo pidió (la pastilla en celular)
   // o cuando hay dos o más marcadas y todavía no eligió mirar una orden.
   const verLote = seleccionadas.length > 0 && rielModo === "seleccion";
+  // ¿El riel es la columna de al lado y no una hoja que tapa la lista? Mismo corte que
+  // el CSS (min-width: 901px). Se consulta al tocar, nunca al render: en el servidor no
+  // hay window y devolver algo distinto ahí rompería la hidratación.
+  const rielAlLado = () =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 901px)").matches;
 
   // Monto del lote. Si hay monedas distintas NO se suman en un número: se muestra el
   // total de cada una (sumar colones con dólares sería inventar una cifra).
@@ -197,12 +217,16 @@ export default function AprobacionPage() {
   };
 
   const cambiarVista = (v: Vista) => { setVista(v); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false); };
-  const toggleSel = (id: string) => setSel((s) => {
-    const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id);
-    // Con dos o más, el riel pasa a mostrar el lote; al bajar de dos vuelve la orden.
-    setRielModo(n.size ? "seleccion" : "orden");
-    return n;
-  });
+  const toggleSel = (id: string) => {
+    const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id);
+    setSel(n);
+    // El riel pasa al lote apenas hay algo marcado, pero SOLO donde es una columna al
+    // lado (≥901px, ver oc-riel en compras.css). En celular el riel es una hoja con
+    // velo: abrirla al marcar la primera orden tapa la lista y deja sin poder marcar
+    // la segunda, que es justo lo que se estaba haciendo. Ahí la selección se abre
+    // desde la pastilla flotante. Al quedar en cero vuelve a "orden" en los dos casos.
+    setRielModo(n.size && rielAlLado() ? "seleccion" : "orden");
+  };
   const sacarDeSeleccion = (id: string) => setSel((s) => { const n = new Set(s); n.delete(id); return n; });
 
   // Crea y lanza el pedido en BC; solo pasa a "lanzado" si BC de verdad lo hizo
@@ -336,7 +360,7 @@ export default function AprobacionPage() {
             <span className="oc-buscar__ic" aria-hidden><Icon name="search" size="md" color="currentColor" /></span>
             <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)}
               className="oc-buscar__campo" aria-label="Buscar órdenes"
-              placeholder="Buscar por N.º de orden, proveedor, material, obra, quién la pidió o N.º de factura…" />
+              placeholder={pistaBuscar} />
             {busca && (
               <button type="button" className="oc-buscar__limpiar" onClick={() => setBusca("")} aria-label="Limpiar la búsqueda">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
@@ -421,6 +445,7 @@ export default function AprobacionPage() {
               <AprobacionDetalle
                 key={central.id}
                 orden={central}
+                tabInicial="lineas"
                 onCerrar={() => setOrdenCentral(null)}
                 onVerProveedor={(c) => { setOrdenCentral(null); setProvAbierto(c); }}
               />
@@ -431,6 +456,11 @@ export default function AprobacionPage() {
         <aside className={`oc-riel${abierta || verLote ? " is-abierto" : ""}`}>
           {verLote ? (
     <section className="oc-sel" aria-label="Órdenes seleccionadas">
+                {/* El mismo agarre que la hoja de detalle: en celular las dos suben
+                    desde abajo, así que tienen que cerrarse con el mismo gesto. En PC
+                    el riel es una columna fija y el CSS lo esconde. */}
+                <button type="button" className="oc-det__agarre" onClick={() => setRielModo("orden")}
+                  aria-label="Cerrar la selección" />
                 <header className="oc-sel__head">
                   <h2 className="oc-sel__tit">
                     {seleccionadas.length} {seleccionadas.length === 1 ? "orden seleccionada" : "órdenes seleccionadas"}
@@ -482,7 +512,8 @@ export default function AprobacionPage() {
                         const cd = ordenConsumoDirecto(o);
                         return (
                           <li key={o.id} className={`oc-sel__item${ordenCentral === o.id ? " is-abierta" : ""}`}>
-                            <button type="button" className="oc-sel__item-abrir" onClick={() => setOrdenCentral(o.id)}
+                            <button type="button" className="oc-sel__item-abrir"
+                              onClick={() => { setProvAbierto(null); setOrdenCentral(o.id); }}
                               title={`Ver ${numeroOrdenPlano(o)} sin soltar la selección`}>
                               <span className="oc-sel__item-top">
                                 <span className="ds-strong">{numeroOrdenPlano(o)}</span>

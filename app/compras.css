@@ -2136,6 +2136,17 @@
   /* Sobre el contenido pero DEBAJO del riel: tocar afuera lo cierra. */
   .oc-scope .oc-riel__velo { display: block; position: fixed; inset: 0; z-index: 69; background: #0006; }
 
+  /* En PC el riel central es una COLUMNA aparte, al lado de la selección. Acá los dos
+     son la misma hoja de abajo, y con el mismo z-index la selección —que va después en
+     el HTML— le ganaba: tocar una orden de la selección abría su detalle DETRÁS y solo
+     asomaba el borde de arriba, o sea el toque parecía no hacer nada. La hoja de la
+     orden se pone encima, con su propio velo para tapar la de atrás; cerrarla con la ×
+     devuelve la selección, que nunca se soltó.
+     El velo propio va como box-shadow y no como ::before: un hijo con z-index -1 se
+     pinta ENCIMA del fondo de su padre (y solo debajo de su contenido), así que
+     grisaba la hoja entera. La sombra se pinta por fuera de la caja. */
+  .oc-scope .oc-riel--central { z-index: 72; box-shadow: 0 0 0 100vmax #0006; }
+
   /* La hoja se agarra por arriba: es el gesto que la gente ya espera, y deja el
      botón de cerrar como respaldo en la esquina (que queda lejos del pulgar). */
   .oc-scope .oc-det__agarre {
@@ -2378,6 +2389,14 @@
 
 @media (max-width: 900px) {
   .oc-scope .oc-lote-caja { display: none; }
+
+  /* La pastilla flota fija sobre la lista y al final del scroll tapaba la última
+     tarjeta. Se reserva su alto (52) + los dos márgenes, y solo cuando de verdad
+     está: `:has(+ .oc-pastilla)` la busca como hermana siguiente, así que sin
+     selección no queda un hueco muerto al final. */
+  .oc-scope .oc-bandeja__filas:has(+ .oc-pastilla) {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
 
   .oc-scope .oc-pastilla {
     position: fixed; z-index: 46;

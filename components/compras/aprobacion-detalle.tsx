@@ -22,10 +22,13 @@ type Tab = "resumen" | "lineas" | "obra" | "historial";
 // lee acá mismo y la lista sigue a la vista. El detalle COMPLETO (facturas, imprimir,
 // abrir en BC) sigue viviendo en su propia pantalla, enlazada abajo.
 export function AprobacionDetalle({
-  orden, aprobando = false, onCerrar, onAprobar, onRechazar, onVerProveedor,
+  orden, aprobando = false, tabInicial = "resumen", onCerrar, onAprobar, onRechazar, onVerProveedor,
 }: {
   orden: Orden;
   aprobando?: boolean;
+  /** Con qué pestaña abre. Desde la selección se entra por "lineas": lo que se quiere
+   *  ver de una orden que está por aprobarse es qué se compra y en cuánto. */
+  tabInicial?: Tab;
   onCerrar: () => void;
   /** Sin estos dos el riel es de consulta (Todas las órdenes): se ve todo, pero no
    *  se aprueba ni se rechaza desde ahí. */
@@ -35,7 +38,7 @@ export function AprobacionDetalle({
   onVerProveedor: (codigo: string) => void;
 }) {
   const { proveedores, pedidos, movimientos, bcEstados, cargarMovimientos } = useStore();
-  const [tab, setTab] = useState<Tab>("resumen");
+  const [tab, setTab] = useState<Tab>(tabInicial);
   const marco = useRef<HTMLElement>(null);
 
   useEffect(() => { void cargarMovimientos([{ entidad: "orden", id: orden.id }]); }, [orden.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -232,6 +235,10 @@ export function AprobacionDetalle({
 
         {tab === "lineas" && (
           <div className="oc-det__lista">
+            <div className="oc-det__total">
+              <span className="oc-det__rot">Total de la orden · IVA incluido</span>
+              <span className="oc-det__total-num">{money(ordenTotalConIva(orden), orden.currencyCode)}</span>
+            </div>
             {orden.lineas.map((l, i) => (
               <div key={l.id} className="oc-det__linea">
                 <div className="oc-det__linea-tit">
