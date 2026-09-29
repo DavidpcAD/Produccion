@@ -2338,3 +2338,139 @@
 }
 
 /* ---- El riel deja de ser columna y sube desde abajo ---- */
+
+/* ==========================================================================
+   APROBACIÓN · CELULAR — la selección múltiple
+   En PC la selección vive en la barra de abajo. En celular esa barra no cabe (y
+   tapa la lista), así que se resume en una pastilla flotante que abre un panel:
+   monto, qué arrastra el lote, aprobar, rechazar y qué órdenes son.
+   ========================================================================== */
+.oc-scope .oc-pastilla, .oc-scope .oc-sel, .oc-scope .oc-sel__velo { display: none; }
+
+@media (max-width: 900px) {
+  .oc-scope .oc-lote-caja { display: none; }
+
+  .oc-scope .oc-pastilla {
+    position: fixed; z-index: 46;
+    right: var(--ds-space-4); bottom: calc(var(--ds-space-4) + env(safe-area-inset-bottom, 0px));
+    display: inline-flex; align-items: center; gap: var(--ds-space-2);
+    height: 52px; padding: 0 18px 0 8px; border: 0; border-radius: 999px; cursor: pointer;
+    background: var(--ds-color-green-100); color: var(--ds-color-black);
+    font-family: inherit; font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold);
+    box-shadow: var(--ds-shadow-03-big);
+  }
+  .oc-scope .oc-pastilla__n {
+    display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px;
+    border-radius: 50%; background: var(--ds-color-black); color: var(--ds-color-white);
+    font-variant-numeric: tabular-nums;
+  }
+  .oc-scope .oc-pastilla__chev { display: inline-grid; transform: rotate(-90deg); }
+
+  /* El panel: por encima de la hoja de detalle (70) para que abrir uno no deje al
+     otro a medias debajo. */
+  .oc-scope .oc-sel__velo { display: block; position: fixed; inset: 0; z-index: 71; background: #0006; }
+  .oc-scope .oc-sel {
+    display: flex; flex-direction: column; position: fixed; z-index: 72;
+    top: 72px; right: 12px; bottom: 12px; left: auto;
+    width: min(400px, calc(100vw - 24px));
+    background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-100);
+    border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-03-big); overflow: hidden;
+  }
+  .oc-scope .oc-sel__head {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-3);
+    padding: var(--ds-space-4) var(--ds-space-4) var(--ds-space-3);
+  }
+  .oc-scope .oc-sel__tit { margin: 0; font-size: var(--ds-font-size-body-md); font-weight: var(--ds-font-weight-semibold); line-height: 1.25; }
+  .oc-scope .oc-sel__cuerpo {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column; gap: var(--ds-space-3);
+    padding: 0 var(--ds-space-4) var(--ds-space-4);
+  }
+  .oc-scope .oc-sel__lista-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-space-3); }
+}
+
+/* ---- Piezas que se ven igual en los dos tamaños ---- */
+.oc-scope .oc-sel__total { display: flex; flex-direction: column; gap: 2px; }
+.oc-scope .oc-sel__total-num {
+  font-size: var(--ds-font-size-heading); font-weight: var(--ds-font-weight-semibold);
+  font-variant-numeric: tabular-nums; line-height: 1.1; overflow-wrap: break-word;
+}
+.oc-scope .oc-sel__avisos {
+  display: flex; flex-direction: column; gap: var(--ds-space-2);
+  padding: var(--ds-space-3); border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-color-gray-100) 55%, var(--ds-tint-base));
+}
+.oc-scope .oc-sel__aviso {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-gray-400);
+}
+/* En cero es dato, no alarma: el color solo entra cuando hay algo que mirar. */
+.oc-scope .oc-sel__aviso.is-on { color: #8a7400; }
+.oc-scope .oc-sel__aviso--bc.is-on { color: var(--ds-color-red-200); }
+
+.oc-scope .oc-sel__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ds-space-3); }
+.oc-scope .oc-sel__item { display: flex; flex-direction: column; gap: 3px; padding-bottom: var(--ds-space-3); border-bottom: 1px solid var(--ds-color-gray-100); }
+.oc-scope .oc-sel__item:last-child { border-bottom: 0; padding-bottom: 0; }
+.oc-scope .oc-sel__item-top { display: flex; align-items: center; gap: var(--ds-space-2); }
+.oc-scope .oc-sel__item-monto { margin-left: auto; font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.oc-scope .oc-sel__item-prov { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); line-height: 1.4; }
+.oc-scope .oc-sel__quitar {
+  flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px;
+  border: 0; border-radius: 50%; background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+.oc-scope .oc-sel__quitar:hover { background: color-mix(in srgb, var(--ds-color-red-100) 22%, var(--ds-tint-base)); color: var(--ds-color-red-200); }
+
+/* ---- Confirmación de aprobar en lote ---- */
+.oc-scope .oc-confirmar { display: flex; flex-direction: column; align-items: center; gap: var(--ds-space-3); text-align: center; }
+.oc-scope .oc-confirmar__ic {
+  display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
+  background: color-mix(in srgb, var(--ds-color-yellow) 20%, var(--ds-tint-base)); color: #8a7400;
+}
+.oc-scope .oc-confirmar__txt { margin: 0; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: var(--ds-color-gray-400); }
+.oc-scope .oc-confirmar__total {
+  width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: var(--ds-space-4); border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-color-gray-100) 55%, var(--ds-tint-base));
+}
+.oc-scope .oc-confirmar__nota { margin: 0; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: #8a7400; }
+
+/* ---- Resultado: no se va solo, porque esto no se puede deshacer ---- */
+.oc-scope .oc-resultado { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; padding: var(--ds-space-6); background: #0009; }
+.oc-scope .oc-resultado__caja {
+  width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: var(--ds-space-3);
+  padding: var(--ds-space-6); border-radius: var(--ds-radius-lg); background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-03-big); text-align: center;
+}
+.oc-scope .oc-resultado__ic {
+  display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%;
+  background: color-mix(in srgb, var(--ds-color-green-100) 30%, var(--ds-tint-base)); color: var(--ds-color-green-200);
+}
+.oc-scope .oc-resultado__ic.is-mixto { background: color-mix(in srgb, var(--ds-color-yellow) 20%, var(--ds-tint-base)); color: #8a7400; }
+.oc-scope .oc-resultado__tit { margin: 0; font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold); line-height: 1.25; }
+.oc-scope .oc-resultado__txt { margin: 0; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: var(--ds-color-gray-400); }
+.oc-scope .oc-resultado__fallos { display: block; margin-top: 6px; color: var(--ds-color-red-200); font-weight: var(--ds-font-weight-semibold); }
+
+:root[data-theme="dark"] .oc-scope .oc-sel__aviso.is-on,
+:root[data-theme="dark"] .oc-scope .oc-confirmar__ic,
+:root[data-theme="dark"] .oc-scope .oc-confirmar__nota,
+:root[data-theme="dark"] .oc-scope .oc-resultado__ic.is-mixto { color: var(--ds-color-yellow); }
+
+/* El rótulo largo de la ficha no entra en celular ("Requieren atención" empuja a
+   las demás fuera de la pantalla): ahí va el corto. */
+.oc-scope .oc-ficha__corto { display: none; }
+@media (max-width: 720px) {
+  .oc-scope .oc-ficha__largo { display: none; }
+  .oc-scope .oc-ficha__corto { display: inline; }
+}
+
+/* La orden marcada se tiñe: con la lista larga, el check solo no alcanza para ver
+   de un vistazo qué entra en el lote. */
+.oc-scope .oc-fila:has(.oc-fila__cbx:checked) {
+  border-color: var(--ds-color-green-200);
+  background: color-mix(in srgb, var(--ds-color-green-100) 10%, var(--ds-surface));
+}
+/* El distintivo es una pastilla, no una franja: dentro de una columna flex se
+   estiraba a todo el ancho de la fila. */
+.oc-scope .oc-sel__item .ds-badge, .oc-scope .oc-fila__marcas .ds-badge { align-self: flex-start; }

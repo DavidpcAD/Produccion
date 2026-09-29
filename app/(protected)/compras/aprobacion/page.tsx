@@ -28,13 +28,14 @@ import type { EstadoBcOrden } from "@/lib/compras/api";
 type Vista = "pendientes" | "atencion" | "sin_bc" | "lanzado" | "abierto" | "completado";
 const FICHAS: Vista[] = ["pendientes", "atencion", "sin_bc"];
 const OTROS_ESTADOS: Vista[] = ["lanzado", "abierto", "completado"];
-const VISTA: Record<Vista, { label: string; vacio: string; ayuda: string }> = {
-  pendientes: { label: "Pendientes", vacio: "No hay órdenes pendientes de aprobación.", ayuda: "Proveeduría ya las envió: falta aprobarlas o rechazarlas." },
-  atencion: { label: "Requieren atención", vacio: "Ninguna pendiente tiene problemas con Business Central.", ayuda: "Pendientes con algo trabado en Business Central: el último intento de lanzar falló, BC dice otra cosa, o el pedido quedó sin lanzar." },
-  sin_bc: { label: "Sin lanzar en BC", vacio: "Ninguna orden quedó sin lanzar en Business Central.", ayuda: "Ya se aprobaron, pero el pedido quedó sin lanzar en BC: Bodega no puede recibir contra él." },
-  lanzado: { label: "Lanzadas", vacio: "Todavía no hay órdenes lanzadas.", ayuda: "Ya están en Business Central y el proveedor las tiene." },
-  abierto: { label: "En proveeduría", vacio: "No hay órdenes abiertas en proveeduría.", ayuda: "Todavía se están armando: aún no llegaron a aprobación." },
-  completado: { label: "Completadas", vacio: "Todavía no hay órdenes completadas.", ayuda: "Recibidas y facturadas." },
+// `corto`: el rótulo que entra en celular, donde las fichas se arrastran de lado.
+const VISTA: Record<Vista, { label: string; corto: string; vacio: string; ayuda: string }> = {
+  pendientes: { label: "Pendientes", corto: "Pendientes", vacio: "No hay órdenes pendientes de aprobación.", ayuda: "Proveeduría ya las envió: falta aprobarlas o rechazarlas." },
+  atencion: { label: "Requieren atención", corto: "Atención", vacio: "Ninguna pendiente tiene problemas con Business Central.", ayuda: "Pendientes con algo trabado en Business Central: el último intento de lanzar falló, BC dice otra cosa, o el pedido quedó sin lanzar." },
+  sin_bc: { label: "Sin lanzar en BC", corto: "Sin lanzar", vacio: "Ninguna orden quedó sin lanzar en Business Central.", ayuda: "Ya se aprobaron, pero el pedido quedó sin lanzar en BC: Bodega no puede recibir contra él." },
+  lanzado: { label: "Lanzadas", corto: "Lanzadas", vacio: "Todavía no hay órdenes lanzadas.", ayuda: "Ya están en Business Central y el proveedor las tiene." },
+  abierto: { label: "En proveeduría", corto: "Proveeduría", vacio: "No hay órdenes abiertas en proveeduría.", ayuda: "Todavía se están armando: aún no llegaron a aprobación." },
+  completado: { label: "Completadas", corto: "Completadas", vacio: "Todavía no hay órdenes completadas.", ayuda: "Recibidas y facturadas." },
 };
 
 // Atajos del diálogo de rechazo: lo que más se devuelve. Rellenan el campo y se
@@ -85,7 +86,12 @@ export default function AprobacionPage() {
   const [verSeleccion, setVerSeleccion] = useState(false);
   const [aprobandoId, setAprobandoId] = useState<string | null>(null);
   const [lote, setLote] = useState(false);
-  const [rechObj, setRechObj] = useState<{ id: string; numero: string; proveedor?: string; monto: string } | null>(null);
+  // El rechazo vale para UNA orden o para toda la selección: mismo diálogo, mismo
+  // motivo, y se devuelven una por una (BC no debe recibirlas en paralelo).
+  const [rechObj, setRechObj] = useState<{ ids: string[]; titulo: string; proveedor?: string; monto: string } | null>(null);
+  const [panelSel, setPanelSel] = useState(false);
+  const [confirmLote, setConfirmLote] = useState(false);
+  const [resultado, setResultado] = useState<{ ok: number; fallos: string[] } | null>(null);
   const [motivo, setMotivo] = useState("");
 
   // Las de cada vista, sin buscador: sirve para el contador de la ficha y para
@@ -142,6 +148,13 @@ export default function AprobacionPage() {
     return [...porMoneda].map(([m, v]) => money(v, m)).join(" · ");
   }, [seleccionadas]);
 
+  // Lo que cambia el peso de aprobar en lote: cuántas van contra la obra y cuántas
+  // arrastran un pedido sin lanzar en BC.
+  const resumenLote = useMemo(() => ({
+    cd: seleccionadas.filter((o) => ordenConsumoDirecto(o).hay).length,
+    sinBc: seleccionadas.filter((o) => ordenDevueltaPorBc(o, movimientos)).length,
+  }), [seleccionadas, movimientos]);
+
   const cambiarVista = (v: Vista) => { setVista(v); setSel(new Set()); setAbiertaId(null); setLineasAbiertas(new Set()); setVerSeleccion(false); };
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const toggleLineas = (id: string) => setLineasAbiertas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -163,28 +176,55 @@ export default function AprobacionPage() {
   // En LOTE: una por una (BC no debe recibir todo en paralelo).
   async function aprobarSeleccionadas() {
     if (!seleccionadas.length || lote || aprobandoId) return;
+    setConfirmLote(false);
     setLote(true);
     let ok = 0; const fallos: string[] = [];
     for (const o of seleccionadas) {
       const r = await aprobarYLanzar(o, setOrdenEstado);
-      if (r.ok) ok++; else fallos.push(numeroOrden(o));
+      if (r.ok) ok++; else fallos.push(numeroOrdenPlano(o));
     }
-    setLote(false); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false);
-    toast(`Aprobadas y lanzadas: ${ok}${fallos.length ? ` · con problema: ${fallos.join(", ")} (revisá cada una)` : ""}`, fallos.length ? "info" : "success");
+    setLote(false); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false); setPanelSel(false);
+    // Un toast se va solo y esto no se puede deshacer: el resultado se queda hasta
+    // que la persona lo lee, y dice por nombre cuáles quedaron con problema.
+    setResultado({ ok, fallos });
   }
   // Rechazar: el motivo es OBLIGATORIO y vuelve a Proveeduría con la nota.
   async function confirmarRechazo() {
-    if (!rechObj) return;
+    if (!rechObj || lote) return;
     if (!motivo.trim()) { toast("Escribí el motivo del rechazo.", "error"); return; }
-    const r = await devolverOrden(rechObj.id, motivo.trim());
-    // Si BC no se pudo poner al día (reabrir + cancelar la solicitud del workflow) se
-    // dice: si no, el pedido queda "Pendiente de aprobación" en BC y nadie sabría por qué.
-    if (r?.bcAviso) toast(`Orden ${rechObj.numero} devuelta a proveeduría · ⚠️ ${r.bcAviso}`, "error");
-    else toast(`Orden ${rechObj.numero} devuelta a proveeduría`, "info");
-    sacarDeSeleccion(rechObj.id);
-    if (abiertaId === rechObj.id) setAbiertaId(null);
-    setRechObj(null); setMotivo("");
+    setLote(true);
+    let ok = 0; const fallos: string[] = []; const avisos: string[] = [];
+    for (const id of rechObj.ids) {
+      try {
+        const r = await devolverOrden(id, motivo.trim());
+        ok++;
+        // Si BC no se pudo poner al día (reabrir + cancelar la solicitud del workflow)
+        // se dice: si no, el pedido queda "Pendiente de aprobación" allá y nadie sabría
+        // por qué.
+        if (r?.bcAviso) avisos.push(r.bcAviso);
+        sacarDeSeleccion(id);
+        if (abiertaId === id) setAbiertaId(null);
+      } catch {
+        fallos.push(id);
+      }
+    }
+    setLote(false);
+    const cuerpo = ok === 1 && rechObj.ids.length === 1
+      ? `Orden ${rechObj.titulo} devuelta a proveeduría`
+      : `${ok} órdenes devueltas a proveeduría`;
+    const cola = [fallos.length ? `${fallos.length} no se pudieron devolver` : "", avisos[0] ? `⚠️ ${avisos[0]}` : ""].filter(Boolean).join(" · ");
+    toast(cola ? `${cuerpo} · ${cola}` : cuerpo, fallos.length || avisos.length ? "error" : "info");
+    setRechObj(null); setMotivo(""); setPanelSel(false);
   }
+  const pedirRechazoLote = () => {
+    if (!seleccionadas.length) return;
+    setMotivo("");
+    setRechObj({
+      ids: seleccionadas.map((o) => o.id),
+      titulo: `${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`,
+      monto: montoLote,
+    });
+  };
 
   const hayFiltro = busca.trim().length > 0 || OTROS_ESTADOS.includes(vista);
 
@@ -213,7 +253,9 @@ export default function AprobacionPage() {
               {FICHAS.map((v) => (
                 <button key={v} type="button" aria-pressed={vista === v} title={VISTA[v].ayuda}
                   className={`oc-ficha${vista === v ? " is-active" : ""}`} onClick={() => cambiarVista(v)}>
-                  {VISTA[v].label} ({deVista[v].length})
+                  <span className="oc-ficha__largo">{VISTA[v].label}</span>
+                  <span className="oc-ficha__corto">{VISTA[v].corto}</span>
+                  {" "}({deVista[v].length})
                 </button>
               ))}
               {/* Un estado que no es de la cola (se eligió en Filtros): se muestra como
@@ -416,11 +458,22 @@ export default function AprobacionPage() {
                     <AprobarControl oneWay busy={lote || aprobandoId !== null}
                       busyLabel={`Lanzando ${seleccionadas.length} en Business Central…`}
                       approveLabel={`Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
-                      slideLabel="APROBAR" onApprove={aprobarSeleccionadas} />
+                      slideLabel="APROBAR" onApprove={() => setConfirmLote(true)} />
                   </div>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Celular: la barra del lote no cabe, así que la selección vive en una
+              pastilla flotante que abre un panel. Siempre accesible mientras haya
+              órdenes marcadas. */}
+          {seleccionadas.length > 0 && (
+            <button type="button" className="oc-pastilla" onClick={() => { setVerSeleccion(true); setPanelSel(true); }} aria-expanded={panelSel}>
+              <span className="oc-pastilla__n">{seleccionadas.length}</span>
+              <span className="oc-pastilla__txt">Revisar selección</span>
+              <span className="oc-pastilla__chev" aria-hidden><IconChevronDown size={18} /></span>
+            </button>
           )}
         </main>
 
@@ -435,8 +488,8 @@ export default function AprobacionPage() {
               onRechazar={() => {
                 setMotivo("");
                 setRechObj({
-                  id: abierta.id,
-                  numero: numeroOrdenPlano(abierta),
+                  ids: [abierta.id],
+                  titulo: numeroOrdenPlano(abierta),
                   proveedor: abierta.proveedorNombre ?? proveedores.find((p) => p.id === abierta.proveedorId)?.nombre,
                   monto: money(ordenTotalConIva(abierta), abierta.currencyCode),
                 });
@@ -456,8 +509,141 @@ export default function AprobacionPage() {
         {abierta && <div className="oc-riel__velo" onClick={() => setAbiertaId(null)} aria-hidden />}
       </div>
 
+      {panelSel && seleccionadas.length > 0 && (
+        <>
+          <div className="oc-sel__velo" onClick={() => setPanelSel(false)} aria-hidden />
+          <aside className="oc-sel" aria-label="Órdenes seleccionadas">
+            <header className="oc-sel__head">
+              <h2 className="oc-sel__tit">
+                {seleccionadas.length} {seleccionadas.length === 1 ? "orden seleccionada" : "órdenes seleccionadas"}
+              </h2>
+              <button type="button" className="oc-det__cerrar" onClick={() => setPanelSel(false)} aria-label="Cerrar la selección">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </header>
+
+            <div className="oc-sel__cuerpo">
+              <div className="oc-sel__total">
+                <span className="oc-det__rot">Monto total</span>
+                <span className="oc-sel__total-num">{montoLote}</span>
+              </div>
+
+              {/* Los dos datos que cambian el peso de apretar el botón. Se muestran
+                  aunque estén en cero: "0 sin lanzar en BC" también es información. */}
+              <div className="oc-sel__avisos">
+                <span className={`oc-sel__aviso${resumenLote.cd > 0 ? " is-on" : ""}`}>
+                  <Icon name="alert" size="sm" color="currentColor" />
+                  {resumenLote.cd} con consumo directo
+                </span>
+                <span className={`oc-sel__aviso oc-sel__aviso--bc${resumenLote.sinBc > 0 ? " is-on" : ""}`}>
+                  <Icon name="traslado" size="sm" color="currentColor" />
+                  {resumenLote.sinBc} sin lanzar en BC
+                </span>
+              </div>
+
+              <Button block disabled={lote} onClick={() => setConfirmLote(true)}>
+                {lote ? "Lanzando en Business Central…" : `Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
+              </Button>
+              <Button block variant="outline" disabled={lote} onClick={pedirRechazoLote}>Rechazar seleccionadas</Button>
+
+              <div className="oc-sel__lista-head">
+                <span className="oc-det__rot">Órdenes seleccionadas</span>
+                <button type="button" className="link-btn" aria-expanded={verSeleccion} onClick={() => setVerSeleccion((v) => !v)}>
+                  {verSeleccion ? "Ver menos" : "Ver más"}
+                </button>
+              </div>
+              {verSeleccion && (
+                <ul className="oc-sel__lista">
+                  {seleccionadas.map((o) => {
+                    const cd = ordenConsumoDirecto(o);
+                    return (
+                      <li key={o.id} className="oc-sel__item">
+                        <div className="oc-sel__item-top">
+                          <span className="ds-strong">{numeroOrdenPlano(o)}</span>
+                          <span className="oc-sel__item-monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
+                          <button type="button" className="oc-sel__quitar" onClick={() => sacarDeSeleccion(o.id)}
+                            aria-label={`Quitar ${numeroOrdenPlano(o)} de la selección`}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                              <path d="M6 6l12 12M18 6L6 18" />
+                            </svg>
+                          </button>
+                        </div>
+                        <span className="oc-sel__item-prov ds-wrap">
+                          {o.proveedorNombre ?? proveedores.find((p) => p.id === o.proveedorId)?.nombre}
+                        </span>
+                        {cd.hay && (
+                          <span className="ds-badge ds-badge--yellow oc-marca">
+                            <Icon name="alert" size="sm" color="currentColor" />
+                            Consumo directo{cd.parcial ? " (parcial)" : ""}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              <div className="oc-aviso oc-aviso--info">
+                <span className="oc-aviso__ic"><Icon name="info" size="sm" color="currentColor" /></span>
+                <span className="oc-aviso__txt">
+                  <span className="oc-aviso__tit">Aprobación irreversible</span>
+                  Al aprobar, se enviará el pedido a Business Central (ERP) y esta acción no se puede revertir.
+                </span>
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
+
+      {confirmLote && (
+        <Modal title={`¿Aprobar ${seleccionadas.length === 1 ? "esta orden" : `estas ${seleccionadas.length} órdenes`}?`}
+          onClose={() => setConfirmLote(false)}
+          footer={<>
+            <Button variant="outline" onClick={() => setConfirmLote(false)}>Cancelar</Button>
+            <Button disabled={lote} onClick={aprobarSeleccionadas}>{lote ? "Enviando…" : "Aprobar y enviar"}</Button>
+          </>}>
+          <div className="oc-confirmar">
+            <span className="oc-confirmar__ic"><Icon name="alert" size="lg" color="currentColor" /></span>
+            <p className="oc-confirmar__txt">
+              Se enviarán a Business Central (ERP) y esta acción no se puede revertir.
+            </p>
+            <div className="oc-confirmar__total">
+              <span className="oc-det__rot">Monto total</span>
+              <span className="oc-sel__total-num">{montoLote}</span>
+            </div>
+            {resumenLote.cd > 0 && (
+              <p className="oc-confirmar__nota">
+                {resumenLote.cd} {resumenLote.cd === 1 ? "va" : "van"} contra la obra (consumo directo): el material no entra a inventario.
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {resultado && (
+        <div className="oc-resultado" role="status" aria-live="polite">
+          <div className="oc-resultado__caja">
+            <span className={`oc-resultado__ic${resultado.fallos.length ? " is-mixto" : ""}`}>
+              <Icon name={resultado.fallos.length ? "alert" : "check"} size="lg" color="currentColor" />
+            </span>
+            <p className="oc-resultado__tit">
+              {resultado.ok} {resultado.ok === 1 ? "orden aprobada" : "órdenes aprobadas"}
+            </p>
+            <p className="oc-resultado__txt">
+              {resultado.ok > 0 ? "Se enviaron correctamente a Business Central." : "No se envió ninguna a Business Central."}
+              {resultado.fallos.length > 0 && (
+                <> <span className="oc-resultado__fallos">Quedaron con problema: {resultado.fallos.join(", ")}. Revisá cada una.</span></>
+              )}
+            </p>
+            <Button block onClick={() => setResultado(null)}>Listo</Button>
+          </div>
+        </div>
+      )}
+
       {rechObj && (
-        <Modal title={`Rechazar ${rechObj.numero}`} onClose={() => setRechObj(null)}
+        <Modal title={`Rechazar ${rechObj.titulo}`} onClose={() => setRechObj(null)}
           footer={<>
             <Button variant="outline" onClick={() => setRechObj(null)}>Cancelar</Button>
             <Button variant="red" onClick={confirmarRechazo} disabled={!motivo.trim()}>Rechazar y devolver</Button>
