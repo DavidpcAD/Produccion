@@ -523,7 +523,7 @@ export default function AprobacionPage() {
               codigo={provAbierto}
               ordenActualId={abierta?.id}
               onVolver={() => setProvAbierto(null)}
-              onCerrar={() => setProvAbierto(null)}
+              onCerrar={() => { setProvAbierto(null); setAbiertaId(null); }}
               onAbrirOrden={(id) => setAbiertaId(id)}
             />
           </aside>

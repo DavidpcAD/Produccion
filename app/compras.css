@@ -2606,28 +2606,3 @@
 }
 .oc-scope .oc-det__linea-cd-tit { display: inline-flex; align-items: center; gap: 6px; font-weight: var(--ds-font-weight-semibold); color: #8a7400; }
 :root[data-theme="dark"] .oc-scope .oc-det__linea-cd-tit { color: var(--ds-color-yellow); }
-
-/* El chevron del proveedor reemplaza al "Ver sus N órdenes": la tarjeta entera
-   abre el panel, así que el rótulo era decir dos veces lo mismo. */
-.oc-scope .oc-det__prov-ir { flex-shrink: 0; align-self: center; display: inline-grid; color: var(--ds-color-gray-300); transition: color .12s ease; }
-.oc-scope .oc-det__prov:hover .oc-det__prov-ir { color: var(--ds-color-green-200); }
-.oc-scope .oc-det__prov:disabled { cursor: default; }
-.oc-scope .oc-det__prov:disabled .oc-det__prov-ir { display: none; }
-
-/* "Volver" solo cuando el panel del proveedor ocupa el lugar de la orden. Con las
-   tres columnas a la vista no hay a dónde volver: la orden está al lado. */
-@media (min-width: 1500px) { .oc-scope .oc-prov-panel__volver { display: none; } }
-@media (min-width: 1500px) { .oc-scope .oc-prov-panel__head { justify-content: flex-end; } }
-
-/* ---- Comentarios de la orden: qué dejó dicho cada etapa ---- */
-.oc-scope .oc-com { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ds-space-2); }
-.oc-scope .oc-com__item {
-  display: flex; flex-direction: column; gap: 3px;
-  padding: var(--ds-space-3); border-radius: var(--ds-radius-md);
-  border-left: 3px solid var(--ds-color-gray-200);
-  background: color-mix(in srgb, var(--ds-color-gray-100) 45%, var(--ds-tint-base));
-}
-.oc-scope .oc-com__quien { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: var(--ds-font-size-body-sm); line-height: 1.35; }
-.oc-scope .oc-com__rol { color: var(--ds-color-green-200); font-weight: var(--ds-font-weight-semibold); }
-.oc-scope .oc-com__fecha { margin-left: auto; color: var(--ds-color-gray-400); }
-.oc-scope .oc-com__txt { font-size: var(--ds-font-size-body-sm); line-height: 1.5; }
