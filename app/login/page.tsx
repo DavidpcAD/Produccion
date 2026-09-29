@@ -17,6 +17,76 @@ interface DevUser {
   roles: string;
 }
 
+// Mientras el servidor no contesta, decir en qué va y por qué puede tardar.
+// Antes el botón giraba callado y, si la espera se estiraba, lo único que llegaba
+// era un toast de "Error del servidor": eso se lee como "la app está mala". Casi
+// siempre es la base despertando después de un rato sin uso, o una actualización
+// publicándose, y con saberlo alcanza para esperar en vez de recargar diez veces.
+function AvisoEspera() {
+  const [seg, setSeg] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSeg(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  if (seg < 6) return null;
+  const mucho = seg >= 15;
+  return (
+    <div
+      role="status"
+      className={`flex items-start gap-2.5 rounded-ds-lg px-3.5 py-3 text-body-sm leading-relaxed ${
+        mucho ? 'bg-ds-yellow/15 text-ds-yellow-ink' : 'bg-ds-gray-100 text-ds-gray-400'
+      }`}
+    >
+      <span className="mt-0.5 shrink-0">
+        <Icon name={mucho ? 'alert' : 'info'} size="sm" color="currentColor" />
+      </span>
+      <span>
+        {mucho ? (
+          <>
+            <span className="font-bold">Seguimos esperando al servidor.</span>{' '}
+            Puede estar despertando después de un rato sin uso, o el equipo de TI
+            publicando una actualización. Suele destrabarse en menos de un minuto.
+          </>
+        ) : (
+          <>Verificando… la primera entrada del día puede tardar unos segundos.</>
+        )}
+      </span>
+    </div>
+  );
+}
+
+// Lo que no contestó el servidor queda a la vista, no en un toast que se va a los
+// tres segundos: dice qué pasó, que se arregla solo y deja el botón para reintentar
+// sin volver a escribir la contraseña.
+function FalloServidor({ tipo, onReintentar }: { tipo: 'servidor' | 'red'; onReintentar: () => void }) {
+  return (
+    <div role="alert" className="flex flex-col gap-2.5 rounded-ds-lg bg-ds-yellow/15 px-3.5 py-3 text-body-sm leading-relaxed text-ds-yellow-ink">
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5 shrink-0"><Icon name="alert" size="sm" color="currentColor" /></span>
+        <span>
+          {tipo === 'red' ? (
+            <>
+              <span className="font-bold">No pudimos conectar con el servidor.</span>{' '}
+              Puede que se esté publicando una actualización —se reinicia unos segundos
+              y vuelve solo— o que se haya caído tu conexión.
+            </>
+          ) : (
+            <>
+              <span className="font-bold">El servidor no pudo atender la entrada.</span>{' '}
+              No es tu usuario ni tu contraseña. Casi siempre es la base de datos
+              despertando, o una actualización publicándose: esperá unos segundos.
+            </>
+          )}
+        </span>
+      </div>
+      <button type="button" onClick={onReintentar}
+        className="self-start rounded-ds bg-ds-yellow-ink/10 px-3 py-1.5 font-bold hover:bg-ds-yellow-ink/20">
+        Probar de nuevo
+      </button>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -25,6 +95,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Un fallo del servidor (o de la red) no es un error de credenciales y no se
+  // borra al segundo: se queda hasta el próximo intento.
+  const [fallo, setFallo] = useState<'servidor' | 'red' | null>(null);
 
   // Dev-login (solo aparece si el endpoint /api/auth/dev-users responde)
   const [devUsers, setDevUsers] = useState<DevUser[]>([]);
@@ -73,8 +146,9 @@ export default function LoginPage() {
     }
   }
 
-  async function handleCredentials(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCredentials(e?: React.FormEvent) {
+    e?.preventDefault();
+    setFallo(null);
     setLoading(true);
     try {
       const res = await fetch('/api/auth/login', {
@@ -82,10 +156,22 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cedula, password }),
       });
-      const data = await res.json();
-      if (!res.ok) { toast(data.error || 'Credenciales inválidas', 'error'); return; }
+      // Cuando se está publicando una actualización, el servidor puede contestar
+      // una página de error que no es JSON. Leerla a la fuerza tiraba una excepción
+      // que nadie atrapaba: el botón dejaba de girar y no aparecía ningún mensaje.
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // 500 no es "credenciales inválidas": decirle eso al usuario lo manda a
+        // probar contraseñas contra un servidor que no está contestando.
+        if (res.status >= 500) setFallo('servidor');
+        else toast(data?.error || 'Credenciales inválidas', 'error');
+        return;
+      }
       toast('¡Bienvenido!', 'success');
       router.push(volverA);
+    } catch {
+      // El fetch no llegó: sin red, o el servidor cortó en medio del reinicio.
+      setFallo('red');
     } finally {
       setLoading(false);
     }
@@ -192,6 +278,8 @@ export default function LoginPage() {
                   Iniciar sesión
                 </Button>
               </div>
+              {loading && <AvisoEspera />}
+              {!loading && fallo && <FalloServidor tipo={fallo} onReintentar={() => { void handleCredentials(); }} />}
             </form>
 
             {/* Acceso de desarrollo — sin contraseña. Solo visible en local. */}
