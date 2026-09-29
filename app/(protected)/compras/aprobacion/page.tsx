@@ -91,7 +91,9 @@ export default function AprobacionPage() {
   const [orden, setOrden] = useState<Orden_>("recientes");
   const [sel, setSel] = useState<Set<string>>(() => new Set((sp.get("sel") ?? "").split(",").filter(Boolean)));
   const [abiertaId, setAbiertaId] = useState<string | null>(() => sp.get("orden"));
-  const [verSeleccion, setVerSeleccion] = useState(false);
+  // Desplegada de entrada: el panel ES la selección, esconder cuáles órdenes son
+  // obligaba a un clic de más antes de aprobar algo que no se puede deshacer.
+  const [verSeleccion, setVerSeleccion] = useState(true);
   const [aprobandoId, setAprobandoId] = useState<string | null>(null);
   const [lote, setLote] = useState(false);
   // El rechazo vale para UNA orden o para toda la selección: mismo diálogo, mismo
@@ -103,6 +105,10 @@ export default function AprobacionPage() {
   const [rielModo, setRielModo] = useState<"orden" | "seleccion">("orden");
   // Proveedor abierto al lado del riel (su código PROV-…), con su historial de compras.
   const [provAbierto, setProvAbierto] = useState<string | null>(() => sp.get("prov"));
+  // Una orden que se abrió DESDE la selección, para verla sin soltar el lote. Comparte
+  // columna con el proveedor: es el panel de consulta, el riel sigue siendo lo que se
+  // está por aprobar.
+  const [ordenCentral, setOrdenCentral] = useState<string | null>(() => sp.get("det"));
   const [confirmLote, setConfirmLote] = useState(false);
   const [resultado, setResultado] = useState<{ ok: number; fallos: string[] } | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -146,16 +152,18 @@ export default function AprobacionPage() {
     if (vista !== "pendientes") p.set("vista", vista);
     if (abiertaId) p.set("orden", abiertaId);
     if (provAbierto) p.set("prov", provAbierto);
+    if (ordenCentral) p.set("det", ordenCentral);
     if (sel.size) p.set("sel", [...sel].join(","));
     const q = p.toString();
     window.history.replaceState(null, "", q ? `?${q}` : window.location.pathname);
-  }, [vista, abiertaId, provAbierto, sel]);
+  }, [vista, abiertaId, provAbierto, ordenCentral, sel]);
 
   const meta = VISTA[vista];
   // Aprobar y rechazar solo aplican a las pendientes (las tres vistas de la cola). En
   // los otros estados la bandeja es de consulta.
   const esPendiente = FICHAS.includes(vista);
   const abierta = ordenes.find((o) => o.id === abiertaId) ?? null;
+  const central = ordenes.find((o) => o.id === ordenCentral) ?? null;
   const seleccionadas = useMemo(
     () => (esPendiente ? lista.filter((o) => sel.has(o.id)) : []),
     [esPendiente, lista, sel],
@@ -190,6 +198,7 @@ export default function AprobacionPage() {
   const abrirOrden = (o: Orden) => {
     setAbiertaId(o.id);
     setRielModo("orden");
+    setOrdenCentral(null);
     setProvAbierto((actual) => (actual ? codigoProveedor(o) : null));
   };
 
@@ -272,7 +281,7 @@ export default function AprobacionPage() {
 
   return (
     <AppShell role="aprobacion">
-      <div className={`oc-bandeja${provAbierto ? " tiene-prov" : ""}`}>
+      <div className={`oc-bandeja${provAbierto || ordenCentral ? " tiene-central" : ""}`}>
         <main className="oc-bandeja__lista">
           <header className="oc-bandeja__head">
             <h1 className="ds-heading">Aprobación de órdenes de compra</h1>
@@ -388,16 +397,26 @@ export default function AprobacionPage() {
           )}
         </main>
 
-        {provAbierto && (
-          <aside className="oc-riel oc-riel--prov is-abierto">
-            <ProveedorPanel
-              key={provAbierto}
-              codigo={provAbierto}
-              ordenActualId={abierta?.id}
-              onVolver={() => setProvAbierto(null)}
-              onCerrar={() => setProvAbierto(null)}
-              onAbrirOrden={(id) => setAbiertaId(id)}
-            />
+        {(provAbierto || ordenCentral) && (
+          <aside className="oc-riel oc-riel--central is-abierto">
+            {provAbierto ? (
+              <ProveedorPanel
+                key={provAbierto}
+                codigo={provAbierto}
+                ordenActualId={abierta?.id}
+                onVolver={() => setProvAbierto(null)}
+                onCerrar={() => setProvAbierto(null)}
+                onAbrirOrden={(id) => { setOrdenCentral(null); setAbiertaId(id); setRielModo("orden"); }}
+              />
+            ) : central ? (
+              // De consulta: los botones del lote viven en el riel, al lado.
+              <AprobacionDetalle
+                key={central.id}
+                orden={central}
+                onCerrar={() => setOrdenCentral(null)}
+                onVerProveedor={(c) => { setOrdenCentral(null); setProvAbierto(c); }}
+              />
+            ) : null}
           </aside>
         )}
 
@@ -454,26 +473,29 @@ export default function AprobacionPage() {
                       {seleccionadas.map((o) => {
                         const cd = ordenConsumoDirecto(o);
                         return (
-                          <li key={o.id} className="oc-sel__item">
-                            <div className="oc-sel__item-top">
-                              <span className="ds-strong">{numeroOrdenPlano(o)}</span>
-                              <span className="oc-sel__item-monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
-                              <button type="button" className="oc-sel__quitar" onClick={() => sacarDeSeleccion(o.id)}
-                                aria-label={`Quitar ${numeroOrdenPlano(o)} de la selección`}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-                                  <path d="M6 6l12 12M18 6L6 18" />
-                                </svg>
-                              </button>
-                            </div>
-                            <span className="oc-sel__item-prov ds-wrap">
-                              {o.proveedorNombre ?? proveedores.find((p) => p.id === o.proveedorId)?.nombre}
-                            </span>
-                            {cd.hay && (
-                              <span className="ds-badge ds-badge--yellow oc-marca">
-                                <Icon name="alert" size="sm" color="currentColor" />
-                                Consumo directo{cd.parcial ? " (parcial)" : ""}
+                          <li key={o.id} className={`oc-sel__item${ordenCentral === o.id ? " is-abierta" : ""}`}>
+                            <button type="button" className="oc-sel__item-abrir" onClick={() => setOrdenCentral(o.id)}
+                              title={`Ver ${numeroOrdenPlano(o)} sin soltar la selección`}>
+                              <span className="oc-sel__item-top">
+                                <span className="ds-strong">{numeroOrdenPlano(o)}</span>
+                                <span className="oc-sel__item-monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
                               </span>
-                            )}
+                              <span className="oc-sel__item-prov ds-wrap">
+                                {o.proveedorNombre ?? proveedores.find((p) => p.id === o.proveedorId)?.nombre}
+                              </span>
+                              {cd.hay && (
+                                <span className="ds-badge ds-badge--yellow oc-marca">
+                                  <Icon name="alert" size="sm" color="currentColor" />
+                                  Consumo directo{cd.parcial ? " (parcial)" : ""}
+                                </span>
+                              )}
+                            </button>
+                            <button type="button" className="oc-sel__quitar" onClick={() => sacarDeSeleccion(o.id)}
+                              aria-label={`Quitar ${numeroOrdenPlano(o)} de la selección`}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                                <path d="M6 6l12 12M18 6L6 18" />
+                              </svg>
+                            </button>
                           </li>
                         );
                       })}
@@ -518,7 +540,7 @@ export default function AprobacionPage() {
           )}
         </aside>
 
-        {(abierta || provAbierto) && <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setAbiertaId(null); }} aria-hidden />}
+        {(abierta || provAbierto || ordenCentral || verLote) && <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setOrdenCentral(null); setAbiertaId(null); setRielModo("orden"); }} aria-hidden />}
       </div>
 
       {confirmLote && (

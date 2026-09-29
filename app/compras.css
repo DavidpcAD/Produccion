@@ -2575,11 +2575,11 @@
 /* ---- La tercera columna. Si no hay lugar para las tres, el proveedor ocupa el
    lugar del riel y se vuelve a la orden con "Volver". ---- */
 @media (min-width: 1500px) {
-  .oc-scope .oc-bandeja.tiene-prov { grid-template-columns: minmax(0, 1fr) 380px 480px; }
+  .oc-scope .oc-bandeja.tiene-central { grid-template-columns: minmax(0, 1fr) 380px 480px; }
 }
 @media (min-width: 901px) and (max-width: 1499px) {
-  .oc-scope .oc-bandeja.tiene-prov { grid-template-columns: minmax(0, 1fr) 440px; }
-  .oc-scope .oc-bandeja.tiene-prov .oc-riel:not(.oc-riel--prov) { display: none; }
+  .oc-scope .oc-bandeja.tiene-central { grid-template-columns: minmax(0, 1fr) 440px; }
+  .oc-scope .oc-bandeja.tiene-central .oc-riel:not(.oc-riel--central) { display: none; }
 }
 
 /* ---- Una línea de la orden: número, nombre con su código, la plata en rejilla y,
@@ -2647,3 +2647,17 @@
 .oc-scope .oc-sel__head,
 .oc-scope .oc-prov-panel__head,
 .oc-scope .oc-prov-panel__id { flex-shrink: 0; }
+
+/* Una orden de la selección se toca para verla en el panel del medio, sin soltar el
+   lote; la X queda aparte para no sacarla sin querer. */
+.oc-scope .oc-sel__item { flex-direction: row; align-items: flex-start; gap: var(--ds-space-2); }
+.oc-scope .oc-sel__item-abrir {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px;
+  padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  border-radius: var(--ds-radius-md);
+}
+.oc-scope .oc-sel__item-abrir:hover .ds-strong { text-decoration: underline; text-underline-offset: 3px; }
+.oc-scope .oc-sel__item-abrir:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 3px; }
+.oc-scope .oc-sel__item.is-abierta .oc-sel__item-abrir .ds-strong { color: var(--ds-color-green-200); }
+.oc-scope .oc-sel__item-top { display: flex; align-items: baseline; gap: var(--ds-space-2); width: 100%; }
+.oc-scope .oc-sel__quitar { align-self: center; }
