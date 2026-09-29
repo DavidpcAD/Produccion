@@ -8,7 +8,6 @@ import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
 import { OrdenFila } from "@/components/compras/orden-fila";
 import { OrdenesLista } from "@/components/compras/ordenes-lista";
-import { PantallaSkeleton } from "@/components/compras/pantalla-skeleton";
 import { Icon } from "@/components/ds/Icon/Icon";
 import { useStore } from "@/lib/compras/store";
 import { ordenTotalConIva, textoBuscableOrden } from "@/lib/compras/helpers";
@@ -87,11 +86,6 @@ export default function AprobacionTodasPage() {
   const cambiarVista = (v: Vista) => { setVista(v); setAbiertaId(null); setProvAbierto(null); };
   const hayFiltro = busca.trim().length > 0;
 
-  // La primera carga trae solo la cola de pendientes, para que Aprobación pinte ya.
-  // Esta pantalla es justamente TODAS: mostrar 7 de 628 mientras baja el resto se
-  // leería como que no hay más, así que acá sí se espera.
-  if (cargandoExtra) return <AppShell role="aprobacion"><PantallaSkeleton forma="bandeja" /></AppShell>;
-
   return (
     <AppShell role="aprobacion">
       <div className={`oc-bandeja${provAbierto ? " tiene-central" : ""}`}>
@@ -105,6 +99,19 @@ export default function AprobacionTodasPage() {
             <p className="oc-bandeja__conteo">{deVista[vista].length} {deVista[vista].length === 1 ? "orden" : "órdenes"}</p>
           </header>
 
+          {/* La primera carga trae solo la cola de pendientes, para pintar ya. Esta
+              pantalla es justamente TODAS, así que mientras baja el resto lo dice:
+              antes se quedaba en blanco esperando los 5 MB. */}
+          {cargandoExtra && (
+            <div className="oc-espera" role="status">
+              <span className="oc-espera__punto" aria-hidden />
+              <span className="oc-espera__txt">
+                Ya están las pendientes. Las demás siguen bajando: los contadores y la lista
+                se completan en unos segundos.
+              </span>
+            </div>
+          )}
+
           <div className="oc-barra">
             <div className="oc-fichas" role="group" aria-label="Filtrar por estado">
               {FICHAS.map((v) => (
@@ -112,7 +119,8 @@ export default function AprobacionTodasPage() {
                   className={`oc-ficha${vista === v ? " is-active" : ""}`} onClick={() => cambiarVista(v)}>
                   <span className="oc-ficha__largo">{VISTA[v].label}</span>
                   <span className="oc-ficha__corto">{VISTA[v].corto}</span>
-                  {" "}({deVista[v].length})
+                  {/* Hasta que baje el resto, un número sería mentira. */}
+                  {" "}({cargandoExtra && v !== "pendiente_aprobacion" ? "…" : deVista[v].length})
                 </button>
               ))}
             </div>

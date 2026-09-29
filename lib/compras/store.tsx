@@ -264,8 +264,13 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
    *  contra ~5 MB. El módulo completo entra enseguida, de fondo. Si la cola falla,
    *  se cae a la carga entera de siempre. */
   async function cargaInicial(): Promise<void> {
-    const rol = typeof window !== "undefined" ? localStorage.getItem("adelante_oc_role") : null;
-    if (rol === "aprobacion") {
+    // Se decide por la RUTA, no por el rol guardado: `adelante_oc_role` tiene el de la
+    // ÚLTIMA pantalla visitada, así que entrando a Aprobación desde otra parte de
+    // Compras —o en el primer ingreso, cuando está vacío— la cola no se usaba y se
+    // bajaban los 5 MB igual. La ruta sí dice dónde estamos parados.
+    const enAprobacion = typeof window !== "undefined"
+      && window.location.pathname.startsWith("/compras/aprobacion");
+    if (enAprobacion) {
       try {
         const cola = await api.bootstrapCola();
         if (cola.parcial && cola.ordenes) {
