@@ -102,7 +102,11 @@ export function AppShell({ role, children }: { role: Role; children: React.React
 
   if (!hydrated || cargando || current !== role) {
     // El Resumen no es una lista: su esqueleto lleva paneles, no filas de tabla.
-    const forma = pathname.endsWith("/resumen") ? "paneles" : "tabla";
+    // Las dos bandejas de Aprobación (la cola y Todas las órdenes) no son una tabla:
+    // son lista de tarjetas + riel al lado. El detalle de UNA orden sí sigue siendo
+    // la pantalla de siempre.
+    const esBandeja = pathname === "/compras/aprobacion" || pathname === "/compras/aprobacion/todas";
+    const forma = pathname.endsWith("/resumen") ? "paneles" : esBandeja ? "bandeja" : "tabla";
     return <PantallaSkeleton tiles={TILES_POR_ROL[role]} forma={forma} conTabs={ROLE_META[role].nav.length > 1 && role !== "ingenieria" && role !== "aprobacion"} />;
   }
 

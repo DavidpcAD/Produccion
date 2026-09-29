@@ -20,11 +20,66 @@ export function PantallaSkeleton({
   filas?: number;
   /** La fila de pestañas del módulo (Proveeduría, Bodega…). Ingeniería no la lleva. */
   conTabs?: boolean;
-  /** Qué va DEBAJO de las tarjetas: la tabla de una lista o los paneles del Resumen.
-   *  Con la forma equivocada el esqueleto deja de servir: promete una tabla y aparece
-   *  un tablero, que es el salto que se quería evitar. */
-  forma?: "tabla" | "paneles";
+  /** Qué va DEBAJO de las tarjetas: la tabla de una lista, los paneles del Resumen o
+   *  la bandeja de Aprobación (lista de tarjetas + riel al lado). Con la forma
+   *  equivocada el esqueleto deja de servir: promete una cosa y aparece otra, que es
+   *  justo el salto que se quería evitar. */
+  forma?: "tabla" | "paneles" | "bandeja";
 }) {
+  if (forma === "bandeja") {
+    return (
+      <div className="px-4 py-6 sm:px-6 md:px-8" role="status" aria-label="Cargando…">
+        <div className="oc-bandeja">
+          <div className="oc-bandeja__lista">
+            <div className="oc-bandeja__head" style={{ display: "grid", gap: 10 }}>
+              <Skeleton width="min(420px, 80%)" height={30} />
+              <Skeleton width="min(620px, 100%)" height={13} radius="var(--ds-radius-sm)" />
+            </div>
+
+            {/* Fichas de estado + Filtros y orden, en su misma fila. */}
+            <div className="oc-barra">
+              <div className="oc-fichas">
+                {[124, 168, 140].map((w, i) => (
+                  <Skeleton key={i} width={w} height={40} pill />
+                ))}
+              </div>
+              <div className="oc-barra__acciones">
+                <Skeleton width={104} height={44} pill />
+                <Skeleton width={180} height={48} pill />
+              </div>
+            </div>
+
+            <div className="oc-bandeja__filas">
+              {Array.from({ length: filas }).map((_, f) => (
+                <article key={f} className="oc-fila">
+                  <div className="oc-fila__top">
+                    <Skeleton width={20} height={20} radius="var(--ds-radius-sm)" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
+                      <Skeleton width={`${34 - (f % 3) * 4}%`} height={14} radius="var(--ds-radius-sm)" />
+                      <Skeleton width={`${62 - (f % 4) * 6}%`} height={12} radius="var(--ds-radius-sm)" />
+                      <Skeleton width={`${44 - (f % 3) * 5}%`} height={10} radius="var(--ds-radius-sm)" />
+                    </div>
+                    <Skeleton width={128} height={18} radius="var(--ds-radius-sm)" style={{ flexShrink: 0 }} />
+                    <Skeleton width={26} height={26} radius="var(--ds-radius-md)" style={{ flexShrink: 0 }} />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          {/* El riel de la derecha: mientras no hay orden elegida, es el mismo hueco. */}
+          <aside className="oc-riel">
+            <div className="oc-riel__vacio" style={{ gap: 12 }}>
+              <Skeleton width={160} height={16} radius="var(--ds-radius-sm)" />
+              <Skeleton width="min(260px, 80%)" height={12} radius="var(--ds-radius-sm)" />
+              <Skeleton width="min(220px, 70%)" height={12} radius="var(--ds-radius-sm)" />
+            </div>
+          </aside>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-6 sm:px-6 md:px-8" role="status" aria-label="Cargando…">
       {conTabs && (
