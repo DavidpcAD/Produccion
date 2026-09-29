@@ -82,7 +82,7 @@ export function AprobacionDetalle({
       return !!orden.proveedorId && o.proveedorId === orden.proveedorId;
     });
     return [...suyas].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [ordenes, proveedores, orden.proveedorId, orden.proveedorNo]);
+  }, [ordenes, proveedores, orden]);
   const conFactura = delProveedor.filter((o) => recepciones.some((r) => r.ordenId === o.id && r.numeroFactura)).length;
 
   const tabs: { k: Tab; label: string }[] = [
