@@ -153,7 +153,7 @@ export function ProveedorPanel({
                     <span className="oc-prov-orden__monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
                   </span>
                   <span className="oc-prov-orden__meta">
-                    <span>{o.lineas.filter((l) => l.tipo === "articulo").length} líneas</span>
+                    <span>{(() => { const n = o.lineas.filter((l) => l.tipo === "articulo").length; return `${n} ${n === 1 ? "línea" : "líneas"}`; })()}</span>
                     {alm.codigo && <span>{alm.codigo}</span>}
                     {alm.mixto && <span>Varios almacenes</span>}
                   </span>

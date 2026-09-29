@@ -158,6 +158,16 @@ export default function AprobacionPage() {
     sinBc: seleccionadas.filter((o) => ordenDevueltaPorBc(o, movimientos)).length,
   }), [seleccionadas, movimientos]);
 
+  // Abrir una orden desde la lista: si el panel del proveedor está abierto, TIENE que
+  // seguirla. Si no, uno cambia de orden y sigue mirando el historial del proveedor
+  // anterior creyendo que es el de esta. Sin código de proveedor se cierra: mostrar el
+  // que estaba es peor que no mostrar nada.
+  const codigoProveedor = (o: Orden) => o.proveedorNo ?? proveedores.find((p) => p.id === o.proveedorId)?.code ?? null;
+  const abrirOrden = (o: Orden) => {
+    setAbiertaId(o.id);
+    setProvAbierto((actual) => (actual ? codigoProveedor(o) : null));
+  };
+
   const cambiarVista = (v: Vista) => { setVista(v); setSel(new Set()); setAbiertaId(null); setLineasAbiertas(new Set()); setVerSeleccion(false); };
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const toggleLineas = (id: string) => setLineasAbiertas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -348,7 +358,7 @@ export default function AprobacionPage() {
                       <input type="checkbox" className="ds-cbx oc-fila__cbx" checked={sel.has(o.id)} onChange={() => toggleSel(o.id)}
                         aria-label={`Seleccionar ${numeroOrdenPlano(o)} para aprobar en lote`} />
                     )}
-                    <button type="button" className="oc-fila__abrir" onClick={() => setAbiertaId(o.id)}
+                    <button type="button" className="oc-fila__abrir" onClick={() => abrirOrden(o)}
                       aria-pressed={abiertaId === o.id}>
                       <span className="oc-fila__id">
                         <span className="oc-fila__linea1">
@@ -397,7 +407,7 @@ export default function AprobacionPage() {
                         hoja (las líneas se leen en la pestaña "Líneas" del detalle).
                         aria-hidden + tabIndex -1: `oc-fila__abrir` ya expone la acción,
                         y anunciarla dos veces solo ensucia el lector de pantalla. */}
-                    <button type="button" className="oc-fila__ir" onClick={() => setAbiertaId(o.id)} aria-hidden tabIndex={-1}>
+                    <button type="button" className="oc-fila__ir" onClick={() => abrirOrden(o)} aria-hidden tabIndex={-1}>
                       <IconChevronDown size={18} />
                     </button>
                   </div>
