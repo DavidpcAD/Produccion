@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Badge } from "@/components/compras/ui";
+import { Badge, Modal } from "@/components/compras/ui";
 import { Icon, IconName } from "@/components/ds/Icon/Icon";
 import { Timeline } from "@/components/compras/timeline";
 import { AprobarControl } from "@/components/compras/aprobar-control";
@@ -30,8 +30,9 @@ export function AprobacionDetalle({
   onAprobar: () => void;
   onRechazar: () => void;
 }) {
-  const { proveedores, pedidos, movimientos, bcEstados } = useStore();
+  const { proveedores, pedidos, movimientos, bcEstados, ordenes, recepciones } = useStore();
   const [tab, setTab] = useState<Tab>("resumen");
+  const [verProveedor, setVerProveedor] = useState(false);
   const marco = useRef<HTMLElement>(null);
 
   // En pantallas donde el riel no llega a lo alto de la ventana, al abrir una orden los
@@ -68,6 +69,21 @@ export function AprobacionDetalle({
   // Lo último que contestó BC. Si la orden ya dice "sin lanzar", repetirlo es ruido.
   const enBc = bcEstados[orden.id] && !(sinLanzarBc && bcEstados[orden.id] !== "lanzado")
     ? bcEstadoBadge(orden.estado, bcEstados[orden.id]) : null;
+
+  const delProveedor = useMemo(() => {
+    // Manda el CÓDIGO del proveedor (PROV-…), no el id: hay órdenes que traen el
+    // código y el nombre pero no el id —lo dejan vacío—, y comparar ids vacíos
+    // hacía que TODAS esas órdenes parecieran del mismo proveedor.
+    const codigoDe = (o: Orden) => o.proveedorNo ?? proveedores.find((p) => p.id === o.proveedorId)?.code;
+    const cod = codigoDe(orden);
+    const suyas = ordenes.filter((o) => {
+      const c = codigoDe(o);
+      if (cod && c) return c === cod;
+      return !!orden.proveedorId && o.proveedorId === orden.proveedorId;
+    });
+    return [...suyas].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }, [ordenes, proveedores, orden.proveedorId, orden.proveedorNo]);
+  const conFactura = delProveedor.filter((o) => recepciones.some((r) => r.ordenId === o.id && r.numeroFactura)).length;
 
   const tabs: { k: Tab; label: string }[] = [
     { k: "resumen", label: "Resumen" },
@@ -113,14 +129,16 @@ export function AprobacionDetalle({
       <div className="oc-det__cuerpo" role="tabpanel" id="oc-det-panel" aria-labelledby={`oc-det-tab-${tab}`}>
         {tab === "resumen" && (
           <>
-            <div className="oc-det__prov">
+            <button type="button" className="oc-det__prov" onClick={() => setVerProveedor(true)}
+              title={`Ver todas las órdenes de compra hechas a ${provNombre ?? provCodigo ?? "este proveedor"}`}>
               <span className="oc-det__ic"><Icon name="user" size="md" color="currentColor" /></span>
               <span className="oc-det__dato-txt">
                 <span className="oc-det__rot">Proveedor</span>
                 <span className="oc-det__prov-cod">{provCodigo ?? "—"}</span>
                 <span className="oc-det__prov-nom ds-wrap">{provNombre ?? "Sin proveedor"}</span>
+                <span className="oc-det__prov-ver">{delProveedor.length === 1 ? "Ver su orden" : `Ver sus ${delProveedor.length} órdenes`} ↗</span>
               </span>
-            </div>
+            </button>
 
             <div className="oc-det__datos">
               <Dato icon="reloj" rotulo="Fecha" valor={formatDate(orden.fecha)} />
@@ -244,6 +262,50 @@ export function AprobacionDetalle({
 
         {tab === "historial" && <Timeline entidad="orden" idEntidad={orden.id} />}
       </div>
+
+      {verProveedor && (
+        <Modal wide title={provNombre ?? provCodigo ?? "Proveedor"} onClose={() => setVerProveedor(false)}>
+          <div className="oc-prov">
+            <p className="oc-prov__resumen">
+              {delProveedor.length} {delProveedor.length === 1 ? "orden de compra" : "órdenes de compra"} a este proveedor ·{" "}
+              {conFactura} con factura registrada.
+            </p>
+            <div className="oc-prov__lista">
+              {delProveedor.map((o) => {
+                const recs = recepciones.filter((r) => r.ordenId === o.id);
+                const eb = ordenBadge(o.estado);
+                return (
+                  <div key={o.id} className={`oc-prov__item${o.id === orden.id ? " is-esta" : ""}`}>
+                    <div className="oc-prov__top">
+                      <Link href={`/compras/aprobacion/${o.id}`} className="oc-prov__num">{numeroOrdenPlano(o)}</Link>
+                      <Badge tone={eb.tone}>{eb.label}</Badge>
+                      {o.id === orden.id && <Badge tone="ink">La que estás viendo</Badge>}
+                      <span className="oc-prov__fecha">{formatDate(o.fecha)}</span>
+                      <span className="oc-prov__monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
+                    </div>
+                    {recs.length === 0 ? (
+                      <span className="oc-prov__sin">Sin recibir todavía · no tiene factura registrada.</span>
+                    ) : (
+                      <ul className="oc-prov__facturas">
+                        {recs.map((r) => (
+                          <li key={r.id}>
+                            <span className="oc-prov__fac-no">
+                              {r.numeroFactura || "Recibido · factura en revisión"}
+                            </span>
+                            {r.fechaFactura && <span className="oc-prov__fecha">{formatDate(r.fechaFactura)}</span>}
+                            <Badge tone={r.parcial ? "yellow" : "green"}>{r.parcial ? "Entrega parcial" : "Entrega completa"}</Badge>
+                            <span className="oc-prov__monto">{money(r.total, o.currencyCode)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <footer className="oc-det__pie">
         {pendiente && (

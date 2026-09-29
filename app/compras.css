@@ -1828,7 +1828,7 @@
 /* A sangre: el AppShell del módulo envuelve la página en px-4/sm:px-6/md:px-8 + py-6.
    Acá se le resta para que el riel llegue pegado al borde y ocupe todo el alto. */
 .oc-scope .oc-bandeja {
-  display: grid; grid-template-columns: minmax(0, 1fr) 420px; align-items: stretch;
+  display: grid; grid-template-columns: minmax(0, 1fr) 480px; align-items: stretch;
   min-height: 100dvh; margin: calc(-1 * var(--ds-space-6)) -16px;
 }
 @media (min-width: 640px) { .oc-scope .oc-bandeja { margin-left: calc(-1 * var(--ds-space-6)); margin-right: calc(-1 * var(--ds-space-6)); } }
@@ -2339,7 +2339,7 @@
    sigue siendo el diseño de escritorio, pero el riel adelgaza y el distintivo baja a
    su propio renglón en vez de comerle el ancho al nombre del proveedor. */
 @media (min-width: 901px) and (max-width: 1279px) {
-  .oc-scope .oc-bandeja { grid-template-columns: minmax(0, 1fr) 360px; }
+  .oc-scope .oc-bandeja { grid-template-columns: minmax(0, 1fr) 400px; }
   .oc-scope .oc-fila__abrir { flex-wrap: wrap; row-gap: var(--ds-space-2); }
   /* 200px de base: con 260 el monto no entraba al lado y se caía al renglón de
      abajo, que es justo lo que se quería evitar. */
@@ -2498,3 +2498,36 @@
   .oc-scope .oc-fila__lista { display: none; }
   .oc-scope .oc-fila__chev-txt { display: none; }
 }
+
+/* ---- El bloque del proveedor abre su historial de compras ---- */
+.oc-scope .oc-det__prov {
+  width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.oc-scope .oc-det__prov:hover { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 7%, var(--ds-tint-base)); }
+.oc-scope .oc-det__prov:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 2px; }
+.oc-scope .oc-det__prov-ver { margin-top: 3px; font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-green-200); }
+
+/* ---- Historial de compras a un proveedor: cada orden con su(s) factura(s) ---- */
+.oc-scope .oc-prov { display: flex; flex-direction: column; gap: var(--ds-space-4); }
+.oc-scope .oc-prov__resumen { margin: 0; font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
+.oc-scope .oc-prov__lista { display: flex; flex-direction: column; gap: var(--ds-space-3); max-height: 60vh; overflow-y: auto; }
+.oc-scope .oc-prov__item {
+  display: flex; flex-direction: column; gap: var(--ds-space-2);
+  padding: var(--ds-space-3); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-md);
+}
+.oc-scope .oc-prov__item.is-esta { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 8%, var(--ds-tint-base)); }
+.oc-scope .oc-prov__top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); }
+.oc-scope .oc-prov__num { font-weight: var(--ds-font-weight-semibold); color: inherit; text-decoration: none; }
+.oc-scope .oc-prov__num:hover { color: var(--ds-color-green-200); text-decoration: underline; text-underline-offset: 3px; }
+.oc-scope .oc-prov__fecha { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
+.oc-scope .oc-prov__monto { margin-left: auto; font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.oc-scope .oc-prov__sin { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
+.oc-scope .oc-prov__facturas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.oc-scope .oc-prov__facturas li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2);
+  padding: 8px var(--ds-space-3); border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-color-gray-100) 45%, var(--ds-tint-base));
+  font-size: var(--ds-font-size-body-sm);
+}
+.oc-scope .oc-prov__fac-no { font-weight: var(--ds-font-weight-semibold); }
