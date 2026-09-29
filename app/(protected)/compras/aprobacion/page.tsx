@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Button, Input, Modal, Select, Textarea, useToast } from "@/components/compras/ui";
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
+import { ProveedorPanel } from "@/components/compras/proveedor-panel";
 import { AprobarControl } from "@/components/compras/aprobar-control";
 import { IconChevronDown } from "@/components/compras/icons";
 import { Icon } from "@/components/ds/Icon/Icon";
@@ -90,6 +91,8 @@ export default function AprobacionPage() {
   // motivo, y se devuelven una por una (BC no debe recibirlas en paralelo).
   const [rechObj, setRechObj] = useState<{ ids: string[]; titulo: string; proveedor?: string; monto: string } | null>(null);
   const [panelSel, setPanelSel] = useState(false);
+  // Proveedor abierto al lado del riel (su código PROV-…), con su historial de compras.
+  const [provAbierto, setProvAbierto] = useState<string | null>(null);
   const [confirmLote, setConfirmLote] = useState(false);
   const [resultado, setResultado] = useState<{ ok: number; fallos: string[] } | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -230,7 +233,7 @@ export default function AprobacionPage() {
 
   return (
     <AppShell role="aprobacion">
-      <div className="oc-bandeja">
+      <div className={`oc-bandeja${provAbierto ? " tiene-prov" : ""}`}>
         <main className="oc-bandeja__lista">
           <header className="oc-bandeja__head">
             <h1 className="ds-heading">Aprobación de órdenes de compra</h1>
@@ -503,6 +506,19 @@ export default function AprobacionPage() {
           )}
         </main>
 
+        {provAbierto && (
+          <aside className="oc-riel oc-riel--prov is-abierto">
+            <ProveedorPanel
+              key={provAbierto}
+              codigo={provAbierto}
+              ordenActualId={abierta?.id}
+              onVolver={() => setProvAbierto(null)}
+              onCerrar={() => { setProvAbierto(null); setAbiertaId(null); }}
+              onAbrirOrden={(id) => setAbiertaId(id)}
+            />
+          </aside>
+        )}
+
         <aside className={`oc-riel${abierta ? " is-abierto" : ""}`}>
           {abierta ? (
             <AprobacionDetalle
@@ -511,6 +527,7 @@ export default function AprobacionPage() {
               aprobando={lote || aprobandoId === abierta.id}
               onCerrar={() => setAbiertaId(null)}
               onAprobar={() => aprobar(abierta)}
+              onVerProveedor={(c) => setProvAbierto(c)}
               onRechazar={() => {
                 setMotivo("");
                 setRechObj({
@@ -532,7 +549,7 @@ export default function AprobacionPage() {
           )}
         </aside>
 
-        {abierta && <div className="oc-riel__velo" onClick={() => setAbiertaId(null)} aria-hidden />}
+        {(abierta || provAbierto) && <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setAbiertaId(null); }} aria-hidden />}
       </div>
 
       {panelSel && seleccionadas.length > 0 && (

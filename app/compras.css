@@ -2531,3 +2531,78 @@
   font-size: var(--ds-font-size-body-sm);
 }
 .oc-scope .oc-prov__fac-no { font-weight: var(--ds-font-weight-semibold); }
+
+/* ==========================================================================
+   PROVEEDOR — el panel que se abre desde la orden, entre la lista y el riel
+   ========================================================================== */
+.oc-scope .oc-prov-panel__head { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-3); padding: var(--ds-space-3) var(--ds-space-5) 0; }
+.oc-scope .oc-prov-panel__volver {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px 6px 6px; margin-left: -6px;
+  border: 0; border-radius: var(--ds-radius-md); background: none; cursor: pointer; font-family: inherit;
+  font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-gray-500);
+  transition: background-color .12s ease, color .12s ease;
+}
+.oc-scope .oc-prov-panel__volver:hover { background: var(--ds-color-gray-100); color: var(--ds-text); }
+.oc-scope .oc-prov-panel__id { display: flex; flex-direction: column; gap: var(--ds-space-3); padding: var(--ds-space-2) var(--ds-space-5) var(--ds-space-4); }
+.oc-scope .oc-prov-panel__id .oc-det__rotulo { margin: 0; font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold); color: var(--ds-text); text-transform: none; letter-spacing: 0; }
+.oc-scope .oc-prov-panel__ficha { cursor: default; }
+.oc-scope .oc-prov-panel__ficha:hover { border-color: var(--ds-color-gray-100); background: none; }
+.oc-scope .oc-prov-panel__kpis { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-2); }
+.oc-scope .oc-prov-panel__kpi {
+  display: flex; align-items: center; gap: var(--ds-space-2); min-width: 0;
+  padding: var(--ds-space-3); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-md);
+}
+.oc-scope .oc-prov-panel__kpi-val { font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); line-height: 1.25; font-variant-numeric: tabular-nums; }
+.oc-scope .oc-prov-panel__info { display: flex; flex-direction: column; gap: 1px; padding-bottom: var(--ds-space-2); border-bottom: 1px solid var(--ds-color-gray-100); }
+.oc-scope .oc-prov-panel__info:last-child { border-bottom: 0; }
+
+/* Una orden del proveedor: se toca y se abre en el riel de al lado. */
+.oc-scope .oc-prov-orden {
+  display: flex; flex-direction: column; gap: 5px; width: 100%; text-align: left; cursor: pointer;
+  padding: var(--ds-space-3); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-md);
+  background: none; font: inherit; color: inherit;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.oc-scope .oc-prov-orden:hover { border-color: var(--ds-color-gray-300); }
+.oc-scope .oc-prov-orden:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 2px; }
+.oc-scope .oc-prov-orden.is-esta { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 8%, var(--ds-tint-base)); }
+.oc-scope .oc-prov-orden__top { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ds-space-2); }
+.oc-scope .oc-prov-orden__fecha { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
+.oc-scope .oc-prov-orden__monto { margin-left: auto; font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.oc-scope .oc-prov-orden__meta { display: flex; flex-wrap: wrap; align-items: center; font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); }
+.oc-scope .oc-prov-orden__meta > span + span { margin-left: 9px; padding-left: 9px; border-left: 1px solid var(--ds-color-gray-200); }
+.oc-scope .oc-prov-orden__chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* ---- La tercera columna. Si no hay lugar para las tres, el proveedor ocupa el
+   lugar del riel y se vuelve a la orden con "Volver". ---- */
+@media (min-width: 1500px) {
+  .oc-scope .oc-bandeja.tiene-prov { grid-template-columns: minmax(0, 1fr) 380px 480px; }
+}
+@media (min-width: 901px) and (max-width: 1499px) {
+  .oc-scope .oc-bandeja.tiene-prov { grid-template-columns: minmax(0, 1fr) 440px; }
+  .oc-scope .oc-bandeja.tiene-prov .oc-riel:not(.oc-riel--prov) { display: none; }
+}
+
+/* ---- Una línea de la orden: número, nombre con su código, la plata en rejilla y,
+   cuando aplica, contra qué obra se consume. ---- */
+.oc-scope .oc-det__linea-tit { align-items: flex-start; }
+.oc-scope .oc-det__linea-n {
+  flex-shrink: 0; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px;
+  border-radius: 50%; background: var(--ds-color-gray-100); color: var(--ds-color-gray-500);
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums;
+}
+.oc-scope .oc-det__linea-nom { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.oc-scope .oc-det__linea-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ds-space-2);
+  padding-top: var(--ds-space-2); margin-top: 2px; border-top: 1px solid var(--ds-color-gray-100);
+}
+.oc-scope .oc-det__linea-grid > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.oc-scope .oc-det__linea-val { font-size: var(--ds-font-size-label); line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.oc-scope .oc-det__linea-cd {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-color-yellow) 12%, var(--ds-tint-base));
+  font-size: var(--ds-font-size-body-sm); line-height: 1.45; color: var(--ds-text);
+}
+.oc-scope .oc-det__linea-cd-tit { display: inline-flex; align-items: center; gap: 6px; font-weight: var(--ds-font-weight-semibold); color: #8a7400; }
+:root[data-theme="dark"] .oc-scope .oc-det__linea-cd-tit { color: var(--ds-color-yellow); }

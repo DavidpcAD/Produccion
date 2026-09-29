@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Badge, Modal } from "@/components/compras/ui";
+import { Badge } from "@/components/compras/ui";
 import { Icon, IconName } from "@/components/ds/Icon/Icon";
 import { Timeline } from "@/components/compras/timeline";
 import { AprobarControl } from "@/components/compras/aprobar-control";
@@ -22,17 +22,18 @@ type Tab = "resumen" | "lineas" | "obra" | "historial";
 // lee acá mismo y la lista sigue a la vista. El detalle COMPLETO (facturas, imprimir,
 // abrir en BC) sigue viviendo en su propia pantalla, enlazada abajo.
 export function AprobacionDetalle({
-  orden, aprobando, onCerrar, onAprobar, onRechazar,
+  orden, aprobando, onCerrar, onAprobar, onRechazar, onVerProveedor,
 }: {
   orden: Orden;
   aprobando: boolean;
   onCerrar: () => void;
   onAprobar: () => void;
   onRechazar: () => void;
+  /** Abre el panel del proveedor (al lado del riel), con su historial de compras. */
+  onVerProveedor: (codigo: string) => void;
 }) {
-  const { proveedores, pedidos, movimientos, bcEstados, ordenes, recepciones } = useStore();
+  const { proveedores, pedidos, movimientos, bcEstados, ordenes } = useStore();
   const [tab, setTab] = useState<Tab>("resumen");
-  const [verProveedor, setVerProveedor] = useState(false);
   const marco = useRef<HTMLElement>(null);
 
   // En pantallas donde el riel no llega a lo alto de la ventana, al abrir una orden los
@@ -83,7 +84,6 @@ export function AprobacionDetalle({
     });
     return [...suyas].sort((a, b) => b.fecha.localeCompare(a.fecha));
   }, [ordenes, proveedores, orden]);
-  const conFactura = delProveedor.filter((o) => recepciones.some((r) => r.ordenId === o.id && r.numeroFactura)).length;
 
   const tabs: { k: Tab; label: string }[] = [
     { k: "resumen", label: "Resumen" },
@@ -129,7 +129,8 @@ export function AprobacionDetalle({
       <div className="oc-det__cuerpo" role="tabpanel" id="oc-det-panel" aria-labelledby={`oc-det-tab-${tab}`}>
         {tab === "resumen" && (
           <>
-            <button type="button" className="oc-det__prov" onClick={() => setVerProveedor(true)}
+            <button type="button" className="oc-det__prov" disabled={!provCodigo}
+              onClick={() => provCodigo && onVerProveedor(provCodigo)}
               title={`Ver todas las órdenes de compra hechas a ${provNombre ?? provCodigo ?? "este proveedor"}`}>
               <span className="oc-det__ic"><Icon name="user" size="md" color="currentColor" /></span>
               <span className="oc-det__dato-txt">
@@ -190,27 +191,47 @@ export function AprobacionDetalle({
 
         {tab === "lineas" && (
           <div className="oc-det__lista">
-            {orden.lineas.map((l) => (
+            {orden.lineas.map((l, i) => (
               <div key={l.id} className="oc-det__linea">
                 <div className="oc-det__linea-tit">
-                  <span className="ds-wrap ds-strong">{l.descripcion}</span>
+                  <span className="oc-det__linea-n" aria-hidden>{i + 1}</span>
+                  <span className="oc-det__linea-nom">
+                    <span className="ds-wrap ds-strong">{l.descripcion}</span>
+                    {(l.articuloId || l.variantCode) && (
+                      <span className="oc-det__linea-cod">
+                        {[l.articuloId, l.variantCode && `Variante ${l.variantCode}`].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </span>
                   {l.tipo === "cargo" && <Badge tone="yellow">Cargo</Badge>}
                 </div>
-                {(l.articuloId || l.variantCode) && (
-                  <span className="oc-det__linea-cod">
-                    {[l.articuloId, l.variantCode && `Variante ${l.variantCode}`].filter(Boolean).join(" · ")}
-                  </span>
-                )}
                 {l.notaPedido && <span className="oc-det__linea-nota ds-wrap">“{l.notaPedido}”</span>}
-                <div className="oc-det__linea-nums">
-                  <span className="ds-nowrap">{num.format(l.cantidad)} {l.unidad} × {money(l.precioUnitario, orden.currencyCode)}</span>
-                  <span className="ds-strong ds-nowrap">{money(ordenLineaImporte(l), orden.currencyCode)}</span>
+                <div className="oc-det__linea-grid">
+                  <span>
+                    <span className="oc-det__rot">Cantidad</span>
+                    <span className="oc-det__linea-val">{num.format(l.cantidad)} {l.unidad}</span>
+                  </span>
+                  <span>
+                    <span className="oc-det__rot">Precio unitario</span>
+                    <span className="oc-det__linea-val">{money(l.precioUnitario, orden.currencyCode)}</span>
+                  </span>
+                  <span>
+                    <span className="oc-det__rot">Total</span>
+                    <span className="oc-det__linea-val ds-strong">{money(ordenLineaImporte(l), orden.currencyCode)}</span>
+                  </span>
                 </div>
-                <div className="oc-det__linea-dest">
-                  {ordenLineaEsConsumoDirecto(l)
-                    ? <>{l.obra || l.proyecto} · tarea {l.taskNo} <Badge tone="ink">Consumo directo</Badge></>
-                    : <>{l.almacen || "Sin almacén"}{l.obra ? ` · obra ${l.obra}` : ""}</>}
-                </div>
+                {ordenLineaEsConsumoDirecto(l) ? (
+                  <div className="oc-det__linea-cd">
+                    <span className="oc-det__linea-cd-tit">
+                      <Icon name="alert" size="sm" color="currentColor" /> Consumo directo
+                    </span>
+                    <span>Proyecto: {l.proyecto} · Tarea: {l.taskNo}{l.obra && l.obra !== l.proyecto ? ` · Obra: ${l.obra}` : ""}</span>
+                  </div>
+                ) : (
+                  <div className="oc-det__linea-dest">
+                    Almacén {l.almacen || "—"}{l.obra ? ` · la pidió la obra ${l.obra}` : ""}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -262,50 +283,6 @@ export function AprobacionDetalle({
 
         {tab === "historial" && <Timeline entidad="orden" idEntidad={orden.id} />}
       </div>
-
-      {verProveedor && (
-        <Modal wide title={provNombre ?? provCodigo ?? "Proveedor"} onClose={() => setVerProveedor(false)}>
-          <div className="oc-prov">
-            <p className="oc-prov__resumen">
-              {delProveedor.length} {delProveedor.length === 1 ? "orden de compra" : "órdenes de compra"} a este proveedor ·{" "}
-              {conFactura} con factura registrada.
-            </p>
-            <div className="oc-prov__lista">
-              {delProveedor.map((o) => {
-                const recs = recepciones.filter((r) => r.ordenId === o.id);
-                const eb = ordenBadge(o.estado);
-                return (
-                  <div key={o.id} className={`oc-prov__item${o.id === orden.id ? " is-esta" : ""}`}>
-                    <div className="oc-prov__top">
-                      <Link href={`/compras/aprobacion/${o.id}`} className="oc-prov__num">{numeroOrdenPlano(o)}</Link>
-                      <Badge tone={eb.tone}>{eb.label}</Badge>
-                      {o.id === orden.id && <Badge tone="ink">La que estás viendo</Badge>}
-                      <span className="oc-prov__fecha">{formatDate(o.fecha)}</span>
-                      <span className="oc-prov__monto">{money(ordenTotalConIva(o), o.currencyCode)}</span>
-                    </div>
-                    {recs.length === 0 ? (
-                      <span className="oc-prov__sin">Sin recibir todavía · no tiene factura registrada.</span>
-                    ) : (
-                      <ul className="oc-prov__facturas">
-                        {recs.map((r) => (
-                          <li key={r.id}>
-                            <span className="oc-prov__fac-no">
-                              {r.numeroFactura || "Recibido · factura en revisión"}
-                            </span>
-                            {r.fechaFactura && <span className="oc-prov__fecha">{formatDate(r.fechaFactura)}</span>}
-                            <Badge tone={r.parcial ? "yellow" : "green"}>{r.parcial ? "Entrega parcial" : "Entrega completa"}</Badge>
-                            <span className="oc-prov__monto">{money(r.total, o.currencyCode)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </Modal>
-      )}
 
       <footer className="oc-det__pie">
         {pendiente && (
