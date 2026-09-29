@@ -995,6 +995,15 @@ export function numeroOrden(o: { numero: string; bcNumber?: string }): string {
   return o.bcNumber || etiquetaInterna(o.numero);
 }
 
+// El mismo número, pero SIN el rótulo "Interno N" cuando la orden todavía no existe
+// en BC: se muestra su número interno tal cual. Es lo que se ve en la bandeja de
+// Aprobación, donde el rótulo estorbaba. Ojo: ese CP-… no se puede buscar en BC
+// —la orden no está allá todavía—, por eso el resto del app sigue usando
+// `numeroOrden`, que sí lo aclara.
+export function numeroOrdenPlano(o: { numero: string; bcNumber?: string }): string {
+  return o.bcNumber || o.numero;
+}
+
 // Rótulo de una orden que todavía NO existe en Business Central.
 //
 // El `numero` interno de la app es una serie aparte, pero con el MISMO prefijo y el

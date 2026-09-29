@@ -1816,3 +1816,525 @@
   .oc-scope .rank__cuerpo { grid-template-columns: 1fr auto; grid-template-areas: "nombre valor"; }
   .oc-scope .rank__pista { display: none; }
 }
+
+/* ==========================================================================
+   APROBACIÓN — bandeja: la lista a la izquierda, el riel de revisión a la derecha
+   Aprobar es irreversible (el pedido se lanza en BC y le llega al proveedor), así
+   que lo que hay que mirar antes se lee SIN salir de la lista: se elige una orden
+   y el riel de al lado la abre entera. En pantallas angostas ese riel sube desde
+   abajo como hoja.
+   ========================================================================== */
+
+/* A sangre: el AppShell del módulo envuelve la página en px-4/sm:px-6/md:px-8 + py-6.
+   Acá se le resta para que el riel llegue pegado al borde y ocupe todo el alto. */
+.oc-scope .oc-bandeja {
+  display: grid; grid-template-columns: minmax(0, 1fr) 420px; align-items: stretch;
+  min-height: 100dvh; margin: calc(-1 * var(--ds-space-6)) -16px;
+}
+@media (min-width: 640px) { .oc-scope .oc-bandeja { margin-left: calc(-1 * var(--ds-space-6)); margin-right: calc(-1 * var(--ds-space-6)); } }
+@media (min-width: 768px) { .oc-scope .oc-bandeja { margin-left: -32px; margin-right: -32px; } }
+
+.oc-scope .oc-bandeja__lista { min-width: 0; display: flex; flex-direction: column; padding: var(--ds-space-6) var(--ds-space-6) 0; }
+.oc-scope .oc-bandeja__head { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--ds-space-5); }
+/* El conteo de la cola reemplaza al párrafo en celular (ver el bloque de 720px). */
+.oc-scope .oc-bandeja__conteo { display: none; }
+
+/* ---- Barra: fichas a la izquierda, filtros y orden a la derecha ---- */
+.oc-scope .oc-barra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-3); margin-bottom: var(--ds-space-4); }
+.oc-scope .oc-fichas { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+.oc-scope .oc-ficha {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-family: inherit;
+  padding: 8px 16px; border-radius: 999px;
+  border: 1.5px solid var(--ds-color-gray-100); background: var(--ds-surface);
+  font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-gray-400);
+  transition: border-color .12s ease, color .12s ease, background-color .12s ease;
+}
+.oc-scope .oc-ficha:hover { border-color: var(--ds-color-gray-300); color: var(--ds-text); }
+.oc-scope .oc-ficha:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 2px; }
+.oc-scope .oc-ficha.is-active {
+  background: color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-tint-base));
+  border-color: var(--ds-color-green-200); color: var(--ds-color-green-200);
+}
+
+.oc-scope .oc-barra__acciones { display: flex; align-items: center; gap: var(--ds-space-2); margin-left: auto; }
+.oc-scope .oc-btn-filtros {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-family: inherit;
+  height: 44px; padding: 0 16px; border-radius: var(--ds-radius-xl);
+  border: 1.5px solid var(--ds-color-gray-100); background: var(--ds-surface);
+  font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); color: var(--ds-text);
+  transition: border-color .12s ease;
+}
+.oc-scope .oc-btn-filtros:hover, .oc-scope .oc-btn-filtros.is-open { border-color: var(--ds-color-gray-300); }
+.oc-scope .oc-btn-filtros__punto {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--ds-color-green-200);
+}
+.oc-scope .oc-barra__orden { width: 190px; }
+
+.oc-scope .oc-filtros {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ds-space-3);
+  padding: var(--ds-space-4); margin-bottom: var(--ds-space-4);
+  border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-lg); background: var(--ds-surface);
+}
+.oc-scope .oc-filtros__campo { display: flex; flex-direction: column; gap: 5px; flex: 1 1 260px; min-width: 200px; }
+.oc-scope .oc-filtros__campo--corto { flex: 0 1 230px; }
+.oc-scope .oc-filtros__rot { font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-gray-400); }
+.oc-scope .oc-filtros__todas {
+  display: inline-flex; align-items: center; gap: var(--ds-space-2); cursor: pointer; height: 48px;
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-gray-400);
+}
+
+/* ---- La orden en la lista ---- */
+.oc-scope .oc-bandeja__filas { display: flex; flex-direction: column; gap: var(--ds-space-3); }
+.oc-scope .oc-fila {
+  background: var(--ds-surface); border: 1.5px solid var(--ds-color-gray-100);
+  border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-01); overflow: hidden;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+/* La que está abierta en el riel: se marca para no perderla de vista en la lista. */
+.oc-scope .oc-fila.is-abierta {
+  border-color: var(--ds-color-green-200);
+  background: color-mix(in srgb, var(--ds-color-green-100) 8%, var(--ds-surface));
+}
+.oc-scope .oc-fila__top { display: flex; align-items: center; gap: var(--ds-space-3); padding: var(--ds-space-4); }
+.oc-scope .oc-fila__cbx { flex-shrink: 0; }
+
+.oc-scope .oc-fila__abrir {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--ds-space-4);
+  padding: 0; margin: 0; border: 0; background: none; font: inherit; color: inherit;
+  text-align: left; cursor: pointer; border-radius: var(--ds-radius-md);
+}
+.oc-scope .oc-fila__abrir:hover .oc-fila__num { text-decoration: underline; text-underline-offset: 3px; }
+.oc-scope .oc-fila__abrir:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 4px; }
+.oc-scope .oc-fila__id { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.oc-scope .oc-fila__linea1 { display: flex; align-items: baseline; gap: var(--ds-space-3); min-width: 0; }
+.oc-scope .oc-fila__num { font-size: var(--ds-font-size-body-md); font-weight: var(--ds-font-weight-semibold); line-height: 1.25; }
+.oc-scope .oc-fila__fecha { flex-shrink: 0; font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); line-height: 1.35; }
+/* El NOMBRE primero y el código después: el nombre es lo que la gente reconoce de un
+   proveedor. En PC van en el mismo renglón separados por un punto; en celular, uno
+   debajo del otro (de ahí que el punto sea un ::before y no texto del HTML). */
+.oc-scope .oc-fila__prov { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; min-width: 0; font-size: var(--ds-font-size-label); line-height: 1.35; }
+.oc-scope .oc-fila__prov-cod { color: var(--ds-color-gray-400); }
+.oc-scope .oc-fila__prov-cod::before { content: "·"; margin-right: 6px; }
+/* Chevron de "abrir": solo en celular (ver el bloque de 720px). */
+.oc-scope .oc-fila__ir { display: none; }
+/* Fecha · líneas · almacén · máquina, separados por una línea fina (no por puntos:
+   los códigos ya traen guiones y se leían como uno solo). */
+.oc-scope .oc-fila__datos { display: flex; flex-wrap: wrap; align-items: center; font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); line-height: 1.5; }
+.oc-scope .oc-fila__datos > span + span { margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--ds-color-gray-200); }
+/* Ancho fijo para que los distintivos y los montos queden en columna entre filas. */
+.oc-scope .oc-fila__marcas { flex: 0 0 auto; width: 186px; display: flex; flex-wrap: wrap; gap: 6px; }
+.oc-scope .oc-fila__total {
+  flex: 0 0 auto; width: 170px; text-align: right; overflow-wrap: break-word;
+  font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold);
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+/* Distintivo con ícono: el punto del badge del DS sobra cuando hay señal propia. */
+.oc-scope .ds-badge.oc-marca { gap: 5px; }
+.oc-scope .ds-badge.oc-marca::before { display: none; }
+
+.oc-scope .oc-fila__chev {
+  flex-shrink: 0; display: grid; place-items: center; width: 34px; height: 34px;
+  border: 0; border-radius: var(--ds-radius-md); background: none; cursor: pointer; color: var(--ds-color-gray-400);
+  transition: background-color .12s ease, color .12s ease;
+}
+.oc-scope .oc-fila__chev:hover { background: var(--ds-color-gray-100); color: var(--ds-text); }
+.oc-scope .oc-fila__chev svg { transition: transform .24s cubic-bezier(.34, 1.4, .5, 1); }
+.oc-scope .oc-fila__chev.is-open svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .oc-scope .oc-fila__chev svg { transition: none; } }
+.oc-scope .oc-fila__lineas { box-shadow: none; border-top: 1.5px solid var(--ds-color-gray-100); border-radius: 0; }
+
+.oc-scope .oc-vacio {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+  padding: var(--ds-space-10) var(--ds-space-6);
+  border: 1.5px dashed var(--ds-color-gray-100); border-radius: var(--ds-radius-lg);
+}
+
+/* ---- Barra del lote: pegada abajo de la lista mientras haya órdenes marcadas ---- */
+.oc-scope .oc-lote-caja {
+  position: sticky; bottom: 0; z-index: 46;
+  margin: var(--ds-space-4) calc(-1 * var(--ds-space-6)) 0;
+  background: var(--ds-surface); border-top: 1.5px solid var(--ds-color-gray-100);
+  border-radius: var(--ds-radius-lg) var(--ds-radius-lg) 0 0;
+  box-shadow: 0 -6px 22px rgba(0, 0, 0, .10); overflow: hidden;
+}
+.oc-scope .oc-lote { display: flex; align-items: center; gap: var(--ds-space-4); padding: var(--ds-space-3) var(--ds-space-6); }
+.oc-scope .oc-lote__ver {
+  flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px;
+  border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-md);
+  background: none; cursor: pointer; color: var(--ds-color-gray-400);
+  transition: border-color .12s ease, color .12s ease;
+}
+.oc-scope .oc-lote__ver:hover { border-color: var(--ds-color-gray-300); color: var(--ds-text); }
+/* Cerrado apunta hacia ARRIBA: lo que se despliega sale por encima de la barra. */
+.oc-scope .oc-lote__ver svg { transform: rotate(180deg); transition: transform .24s cubic-bezier(.34, 1.4, .5, 1); }
+.oc-scope .oc-lote__ver.is-open svg { transform: none; }
+.oc-scope .oc-lote__info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.oc-scope .oc-lote__n { font-weight: var(--ds-font-weight-semibold); }
+.oc-scope .oc-lote__monto { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); font-variant-numeric: tabular-nums; }
+.oc-scope .oc-lote__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-4); margin-left: auto; }
+.oc-scope .oc-lote__aprobar { min-width: 210px; }
+.oc-scope .oc-lote__detalle {
+  list-style: none; margin: 0; padding: var(--ds-space-3) var(--ds-space-6);
+  max-height: 208px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px;
+  border-bottom: 1.5px solid var(--ds-color-gray-100);
+}
+.oc-scope .oc-lote__detalle li { display: flex; align-items: baseline; gap: var(--ds-space-3); font-size: var(--ds-font-size-body-sm); }
+.oc-scope .oc-lote__detalle-monto { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---- El riel de revisión ---- */
+.oc-scope .oc-riel {
+  position: sticky; top: 0; align-self: start; height: 100dvh; display: flex;
+  background: var(--ds-surface); border-left: 1.5px solid var(--ds-color-gray-100);
+}
+.oc-scope .oc-riel__vacio {
+  width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--ds-space-2); padding: var(--ds-space-6); text-align: center;
+}
+.oc-scope .oc-riel__velo { display: none; }
+
+.oc-scope .oc-det { display: flex; flex-direction: column; width: 100%; min-height: 0; overflow: hidden; }
+/* Solo cuando el riel se vuelve hoja (ver el bloque de 1100px): en PC es una columna
+   fija a la derecha y no hay nada que agarrar. */
+.oc-scope .oc-det__agarre { display: none; }
+.oc-scope .oc-det__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ds-space-3); padding: var(--ds-space-5) var(--ds-space-6) var(--ds-space-3); }
+.oc-scope .oc-det__id { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.oc-scope .oc-det__rotulo { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); text-transform: uppercase; letter-spacing: var(--ds-letter-spacing-wide); }
+.oc-scope .oc-det__num-fila { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); }
+.oc-scope .oc-det__num { margin: 0; font-size: var(--ds-font-size-subtitle-lg); font-weight: var(--ds-font-weight-semibold); line-height: 1.2; }
+.oc-scope .oc-det__cerrar {
+  flex-shrink: 0; display: grid; place-items: center; width: 34px; height: 34px;
+  border: 0; border-radius: var(--ds-radius-md); background: none; cursor: pointer; color: var(--ds-color-gray-400);
+  transition: background-color .12s ease, color .12s ease;
+}
+.oc-scope .oc-det__cerrar:hover { background: var(--ds-color-gray-100); color: var(--ds-text); }
+
+.oc-scope .oc-det__tabs { display: flex; gap: var(--ds-space-4); padding: 0 var(--ds-space-6); border-bottom: 1.5px solid var(--ds-color-gray-100); overflow-x: auto; }
+.oc-scope .oc-det__tab {
+  border: 0; border-bottom: 2.5px solid transparent; margin-bottom: -1.5px; background: none;
+  padding: 10px 0; cursor: pointer; font-family: inherit; white-space: nowrap;
+  font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-gray-400); transition: color .12s ease, border-color .12s ease;
+}
+.oc-scope .oc-det__tab:hover { color: var(--ds-text); }
+.oc-scope .oc-det__tab.is-active { color: var(--ds-color-green-200); border-bottom-color: var(--ds-color-green-200); }
+
+.oc-scope .oc-det__cuerpo {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--ds-space-4); padding: var(--ds-space-5) var(--ds-space-6);
+}
+.oc-scope .oc-det__ic {
+  display: grid; place-items: center; flex-shrink: 0; width: 38px; height: 38px;
+  border-radius: var(--ds-radius-md); background: var(--ds-color-gray-100); color: var(--ds-color-gray-500);
+}
+.oc-scope .oc-det__ic--sm { width: 32px; height: 32px; }
+.oc-scope .oc-det__prov { display: flex; align-items: center; gap: var(--ds-space-3); padding: var(--ds-space-3); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-md); }
+.oc-scope .oc-det__dato { display: flex; align-items: center; gap: var(--ds-space-3); min-width: 0; }
+.oc-scope .oc-det__dato-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.oc-scope .oc-det__rot { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); line-height: 1.35; }
+.oc-scope .oc-det__dato-val { font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); line-height: 1.35; }
+.oc-scope .oc-det__prov-cod { font-size: var(--ds-font-size-body-md); font-weight: var(--ds-font-weight-semibold); line-height: 1.3; }
+.oc-scope .oc-det__prov-nom { font-size: var(--ds-font-size-body-sm); line-height: 1.4; }
+.oc-scope .oc-det__datos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ds-space-4) var(--ds-space-3); }
+
+/* Avisos: lo que cambia la decisión de aprobar. El acento pinta ícono y título; el
+   cuerpo se queda en el color de texto para que se lea. */
+.oc-scope .oc-aviso { display: flex; gap: 10px; padding: var(--ds-space-3) var(--ds-space-4); border: 1.5px solid; border-radius: var(--ds-radius-md); }
+.oc-scope .oc-aviso__ic { flex-shrink: 0; display: grid; place-items: center; height: 20px; color: var(--oc-aviso-acento); }
+.oc-scope .oc-aviso__txt { display: flex; flex-direction: column; gap: 3px; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: var(--ds-text); }
+.oc-scope .oc-aviso__tit { font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); color: var(--oc-aviso-acento); }
+.oc-scope .oc-aviso--amarillo {
+  --oc-aviso-acento: #8a7400;
+  background: color-mix(in srgb, var(--ds-color-yellow) 12%, var(--ds-tint-base));
+  border-color: color-mix(in srgb, var(--ds-color-yellow) 45%, var(--ds-tint-base));
+}
+.oc-scope .oc-aviso--rojo {
+  --oc-aviso-acento: var(--ds-color-red-200);
+  background: color-mix(in srgb, var(--ds-color-red-100) 10%, var(--ds-tint-base));
+  border-color: color-mix(in srgb, var(--ds-color-red-100) 40%, var(--ds-tint-base));
+}
+.oc-scope .oc-aviso--info {
+  --oc-aviso-acento: var(--ds-text);
+  background: color-mix(in srgb, var(--ds-color-gray-100) 55%, var(--ds-tint-base));
+  border-color: var(--ds-color-gray-200);
+}
+
+.oc-scope .oc-det__total { display: flex; flex-direction: column; gap: 2px; padding: var(--ds-space-4); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-md); }
+.oc-scope .oc-det__total-num {
+  font-size: var(--ds-font-size-heading); font-weight: var(--ds-font-weight-semibold);
+  font-variant-numeric: tabular-nums; line-height: 1.15; overflow-wrap: break-word;
+}
+
+.oc-scope .oc-det__lista { display: flex; flex-direction: column; gap: var(--ds-space-3); }
+.oc-scope .oc-det__linea { display: flex; flex-direction: column; gap: 3px; padding: var(--ds-space-3); border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-md); }
+.oc-scope .oc-det__linea-tit { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ds-space-2); line-height: 1.35; }
+.oc-scope .oc-det__linea-cod, .oc-scope .oc-det__linea-dest { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); line-height: 1.4; }
+.oc-scope .oc-det__linea-nota { font-size: var(--ds-font-size-body-sm); font-style: italic; line-height: 1.4; }
+.oc-scope .oc-det__linea-nums { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--ds-space-2); font-size: var(--ds-font-size-body-sm); font-variant-numeric: tabular-nums; }
+.oc-scope .oc-det__grupo { display: flex; flex-direction: column; gap: var(--ds-space-2); }
+.oc-scope .oc-det__obra-fila { display: flex; flex-direction: column; gap: 1px; padding-bottom: var(--ds-space-2); border-bottom: 1px solid var(--ds-color-gray-100); line-height: 1.4; }
+.oc-scope .oc-det__obra-fila:last-child { border-bottom: 0; padding-bottom: 0; }
+.oc-scope .oc-det__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.oc-scope .oc-det__pie { display: flex; flex-direction: column; gap: var(--ds-space-3); padding: var(--ds-space-4) var(--ds-space-6) var(--ds-space-5); border-top: 1.5px solid var(--ds-color-gray-100); }
+/* Rechazar y Aprobar ocupan el ancho del riel, con el peso del diseño: la acción
+   destructiva es secundaria (rojo suave) y la primaria manda. */
+.oc-scope .oc-det__pie .oc-aprobar__pc { display: grid; grid-template-columns: 1fr 1.55fr; gap: var(--ds-space-3); }
+.oc-scope .oc-det__pie .oc-aprobar__pc .ds-btn { width: 100%; }
+.oc-scope .oc-det__pie .oc-aprobar__pc .ds-btn--white {
+  background: color-mix(in srgb, var(--ds-color-red-100) 16%, var(--ds-tint-base));
+  color: var(--ds-color-red-200);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ds-color-red-100) 55%, var(--ds-tint-base));
+}
+.oc-scope .oc-det__pie .oc-aprobar__pc .ds-btn--white:hover {
+  background: color-mix(in srgb, var(--ds-color-red-100) 26%, var(--ds-tint-base));
+}
+.oc-scope .oc-det__completa { text-align: center; text-decoration: none; font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-gray-400); }
+.oc-scope .oc-det__completa:hover { color: var(--ds-color-green-200); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ==========================  Control de aprobar  ========================== */
+.oc-scope .oc-aprobar__pc { display: flex; align-items: center; justify-content: flex-end; gap: var(--ds-space-3); }
+.oc-scope .oc-aprobar__movil { display: none; flex-direction: column; gap: var(--ds-space-2); }
+
+/* El deslizador del DS trae `touch-action:none`: si se deja así, el dedo que
+   cae encima al hacer scroll deja la lista clavada. `pan-y` devuelve el scroll
+   vertical al navegador y el arrastre horizontal sigue llegando al control. */
+.oc-scope .oc-aprobar__movil .ds-stc { touch-action: pan-y; }
+
+.oc-scope .oc-aprobar__rechazar {
+  align-self: center; border: 0; background: none; cursor: pointer; font-family: inherit;
+  padding: var(--ds-space-2) var(--ds-space-4);
+  font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-red-200); text-decoration: underline; text-underline-offset: 3px;
+}
+
+.oc-scope .oc-aprobar__espera {
+  display: flex; align-items: center; justify-content: center; gap: var(--ds-space-3);
+  min-height: 52px; padding: var(--ds-space-2) var(--ds-space-4);
+  border-radius: 26px; background: var(--ds-color-black); color: var(--ds-color-white);
+  font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold);
+}
+.oc-scope .oc-aprobar__spinner {
+  width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--ds-color-white) 35%, transparent);
+  border-top-color: var(--ds-color-green-100);
+  animation: oc-aprobar-giro .7s linear infinite;
+}
+@keyframes oc-aprobar-giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .oc-scope .oc-aprobar__spinner { animation-duration: 2.4s; } }
+
+/* ---- Sin lugar para las dos columnas de la derecha ---- */
+@media (max-width: 900px) {
+  .oc-scope .oc-bandeja { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .oc-scope .oc-riel {
+    position: fixed; inset: auto 0 0 0; z-index: 70; display: none;
+    top: auto; height: auto; max-height: 88dvh;
+    border-left: 0; border-top: 1.5px solid var(--ds-color-gray-100);
+    border-radius: var(--ds-radius-lg) var(--ds-radius-lg) 0 0;
+  }
+  .oc-scope .oc-riel.is-abierto { display: flex; }
+  /* Sobre el contenido pero DEBAJO del riel: tocar afuera lo cierra. */
+  .oc-scope .oc-riel__velo { display: block; position: fixed; inset: 0; z-index: 69; background: #0006; }
+
+  /* La hoja se agarra por arriba: es el gesto que la gente ya espera, y deja el
+     botón de cerrar como respaldo en la esquina (que queda lejos del pulgar). */
+  .oc-scope .oc-det__agarre {
+    display: block; flex-shrink: 0; width: 100%; padding: 10px 0 2px;
+    border: 0; background: none; cursor: pointer;
+  }
+  .oc-scope .oc-det__agarre::before {
+    content: ""; display: block; width: 40px; height: 4px; margin: 0 auto;
+    border-radius: 999px; background: var(--ds-color-gray-200);
+  }
+  .oc-scope .oc-det__agarre:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: -4px; border-radius: var(--ds-radius-md); }
+  /* Con el agarre arriba, la cabecera ya no necesita tanto aire. */
+  .oc-scope .oc-det__head { padding-top: var(--ds-space-3); }
+}
+
+/* ---- Celular: la fila se apila y el deslizador reemplaza a los botones ---- */
+@media (max-width: 720px) {
+  .oc-scope .oc-bandeja__lista { padding: var(--ds-space-5) var(--ds-space-4) 0; }
+  .oc-scope .oc-lote-caja { margin-left: calc(-1 * var(--ds-space-4)); margin-right: calc(-1 * var(--ds-space-4)); }
+  .oc-scope .oc-lote, .oc-scope .oc-lote__detalle { padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
+  .oc-scope .oc-barra__acciones { width: 100%; margin-left: 0; }
+  .oc-scope .oc-barra__orden { flex: 1 1 auto; width: auto; }
+
+  /* Encabezado corto: el título en una línea y el conteo de la cola debajo. */
+  .oc-scope .oc-bandeja__head { gap: 2px; margin-bottom: var(--ds-space-4); }
+  .oc-scope .oc-bandeja__head .ds-heading { font-size: var(--ds-font-size-subtitle-lg); line-height: 1.2; }
+  .oc-scope .oc-bandeja__intro { display: none; }
+  .oc-scope .oc-bandeja__conteo {
+    display: block; margin: 0;
+    font-size: var(--ds-font-size-label); color: var(--ds-color-gray-400);
+  }
+
+  /* Las fichas no se parten en varias filas: se arrastran de lado. Sangran hasta el
+     borde para que se vea que hay más a la derecha. */
+  .oc-scope .oc-fichas {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    margin: 0 calc(-1 * var(--ds-space-4)); padding: 2px var(--ds-space-4);
+  }
+  .oc-scope .oc-fichas::-webkit-scrollbar { display: none; }
+  .oc-scope .oc-ficha { flex: 0 0 auto; }
+
+  /* La tarjeta de la orden: N.º y fecha arriba, el proveedor, la plata en grande,
+     los distintivos y al final el resumen de líneas. El chevron de la derecha dice
+     que la tarjeta entera abre la hoja. */
+  .oc-scope .oc-fila__top { align-items: flex-start; gap: var(--ds-space-3); }
+  .oc-scope .oc-fila__cbx { margin-top: 3px; }
+  .oc-scope .oc-fila__abrir { flex-direction: column; align-items: stretch; gap: 5px; }
+  /* `contents` disuelve el bloque de identificación para poder meter la plata y los
+     distintivos ENTRE sus renglones, sin tener que cambiar el orden del HTML (que en
+     PC sigue siendo identificación | distintivos | monto, en tres columnas). */
+  .oc-scope .oc-fila__id { display: contents; }
+  .oc-scope .oc-fila__linea1 { order: 1; justify-content: space-between; }
+  .oc-scope .oc-fila__prov { order: 2; flex-direction: column; gap: 0; }
+  .oc-scope .oc-fila__prov-cod { font-size: var(--ds-font-size-body-sm); }
+  .oc-scope .oc-fila__prov-cod::before { content: none; }
+  .oc-scope .oc-fila__total {
+    order: 3; width: auto; text-align: left; margin: 3px 0;
+    font-size: var(--ds-font-size-subtitle-lg);
+  }
+  .oc-scope .oc-fila__marcas { order: 4; width: auto; }
+  .oc-scope .oc-fila__datos { order: 5; }
+
+  /* La tabla de líneas tiene 5 columnas: en 375px no se lee. Acá se esconde junto
+     con su chevron, y las líneas se leen en la pestaña "Líneas" de la hoja. */
+  .oc-scope .oc-fila__chev, .oc-scope .oc-fila__lineas { display: none; }
+  .oc-scope .oc-fila__ir {
+    flex-shrink: 0; align-self: center; display: grid; place-items: center;
+    width: 28px; height: 28px; padding: 0;
+    border: 0; background: none; cursor: pointer; color: var(--ds-color-gray-300);
+  }
+  .oc-scope .oc-fila__ir svg { transform: rotate(-90deg); }
+
+  /* La hoja usa el mismo margen que la lista: 24px a cada lado en 375px es mucho. */
+  .oc-scope .oc-det__head, .oc-scope .oc-det__tabs,
+  .oc-scope .oc-det__cuerpo, .oc-scope .oc-det__pie {
+    padding-left: var(--ds-space-4); padding-right: var(--ds-space-4);
+  }
+  .oc-scope .oc-det__tabs { gap: var(--ds-space-3); }
+}
+
+@media (max-width: 640px) {
+  .oc-scope .oc-aprobar__pc { display: none; }
+  .oc-scope .oc-det__pie .oc-aprobar__pc { display: none; }
+  .oc-scope .oc-aprobar__movil { display: flex; }
+  .oc-scope .oc-lote { flex-wrap: wrap; }
+  .oc-scope .oc-lote__acciones { width: 100%; margin-left: 0; gap: var(--ds-space-2); flex-direction: column-reverse; align-items: stretch; }
+  .oc-scope .oc-lote__aprobar { min-width: 0; }
+}
+
+/* La rejilla 2×2 de datos de la hoja aguanta el celular de referencia (375px); solo
+   en los muy angostos "Cantidad de líneas" y "Almacén destino" se pisan y se apilan. */
+@media (max-width: 340px) {
+  .oc-scope .oc-det__datos { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   APROBACIÓN · PC — la vista de escritorio del diseño.
+   Esta pantalla se está haciendo en dos frentes a la vez (celular y PC) sobre los
+   mismos archivos, así que TODO lo de escritorio vive acá dentro y nada de lo de
+   celular se toca: es la única forma de que los dos diseños convivan sin pisarse.
+   ========================================================================== */
+@media (min-width: 901px) {
+  .oc-scope .oc-bandeja__lista { padding-top: var(--ds-space-10); }
+
+  /* ---- La fila, como el diseño: el número solo, el proveedor, y abajo la línea
+     de datos que arranca con la fecha. `contents` disuelve el contenedor de
+     "número + fecha" para poder bajar la fecha al tercer renglón sin tocar el
+     HTML, que es compartido con la vista de celular. ---- */
+  .oc-scope .oc-fila__linea1 { display: contents; }
+  .oc-scope .oc-fila__id {
+    display: grid; align-items: baseline; gap: 3px 0;
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-areas:
+      "num   num"
+      "prov  prov"
+      "fecha datos";
+  }
+  .oc-scope .oc-fila__num { grid-area: num; }
+  .oc-scope .oc-fila__prov { grid-area: prov; color: var(--ds-color-gray-500); }
+  .oc-scope .oc-fila__fecha { grid-area: fecha; }
+  .oc-scope .oc-fila__datos { grid-area: datos; }
+  /* La fecha es un dato más de esa línea, así que lleva la misma raya fina. */
+  .oc-scope .oc-fila__datos > span:first-child {
+    margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--ds-color-gray-200);
+  }
+  /* Código primero y nombre después: por el código es que se busca una orden. */
+  .oc-scope .oc-fila__prov-cod { order: -1; }
+  .oc-scope .oc-fila__prov-cod::before { content: none; }
+  /* El "·" se queda pegado al código: si el nombre del proveedor es largo y baja de
+     renglón, el separador no queda colgando solo al principio de la línea. */
+  .oc-scope .oc-fila__prov-cod::after { content: " ·"; color: var(--ds-color-gray-400); }
+
+  .oc-scope .oc-fila__top { padding: var(--ds-space-4) var(--ds-space-5); }
+  /* El monto es una cifra, no una frase: no se parte en dos renglones. */
+  .oc-scope .oc-fila__total {
+    width: 180px; white-space: nowrap; overflow-wrap: normal;
+    font-size: var(--ds-font-size-body-md);
+  }
+}
+
+/* ---- Las líneas abiertas dentro de una fila: es un vistazo, no una tabla de
+   gestión. El encabezado negro del resto del módulo pesaba más que la orden
+   misma y partía la tarjeta en dos. ---- */
+.oc-scope .oc-fila__lineas { background: var(--ds-surface); }
+.oc-scope .oc-fila__lineas .ds-table thead th {
+  background: color-mix(in srgb, var(--ds-color-gray-100) 60%, var(--ds-tint-base));
+  color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm);
+  padding: 9px var(--ds-space-4); border-radius: 0;
+  border-bottom: 1px solid var(--ds-color-gray-100);
+}
+.oc-scope .oc-fila__lineas .ds-table tbody tr:first-child td { padding-top: var(--ds-space-3); }
+
+/* ---- Diálogo de rechazo: se está devolviendo plata y trabajo, así que dice QUÉ
+   se rechaza, pide el motivo con nombre propio y ofrece los de siempre. ---- */
+.oc-scope .oc-rechazo { display: flex; flex-direction: column; gap: var(--ds-space-4); }
+.oc-scope .oc-rechazo__ctx {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4); border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-color-gray-100) 55%, var(--ds-tint-base));
+}
+.oc-scope .oc-rechazo__ctx-prov { font-weight: var(--ds-font-weight-semibold); }
+.oc-scope .oc-rechazo__ctx-monto { font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.oc-scope .oc-rechazo__ayuda { margin: 0; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: var(--ds-color-gray-400); }
+.oc-scope .oc-rechazo__campo { gap: 6px; }
+.oc-scope .oc-rechazo__rapidos { display: flex; flex-direction: column; gap: var(--ds-space-2); }
+.oc-scope .oc-rechazo__rot { font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-gray-400); }
+.oc-scope .oc-rechazo__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.oc-scope .oc-rechazo__chip {
+  padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: inherit;
+  border: 1.5px solid var(--ds-color-gray-100); background: var(--ds-surface);
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-gray-500);
+  transition: border-color .12s ease, color .12s ease;
+}
+.oc-scope .oc-rechazo__chip:hover { border-color: var(--ds-color-red-100); color: var(--ds-color-red-200); }
+.oc-scope .oc-rechazo__chip:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 2px; }
+
+/* ---- Oscuro: dos acentos que en claro se leen bien y en oscuro se apagan.
+   El módulo redefine los --ds-color-* dentro de :root[data-theme=dark] .oc-scope
+   (ver arriba), así que los ajustes puntuales van con el mismo selector. ---- */
+:root[data-theme="dark"] .oc-scope .oc-aviso--amarillo { --oc-aviso-acento: var(--ds-color-yellow); }
+:root[data-theme="dark"] .oc-scope .oc-det__pie .oc-aprobar__pc .ds-btn--white {
+  color: var(--ds-color-red-100);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ds-color-red-100) 45%, var(--ds-tint-base));
+}
+
+/* PC angosto (una ventana de ~1000px, que es lo normal con el navegador a medias):
+   sigue siendo el diseño de escritorio, pero el riel adelgaza y el distintivo baja a
+   su propio renglón en vez de comerle el ancho al nombre del proveedor. */
+@media (min-width: 901px) and (max-width: 1279px) {
+  .oc-scope .oc-bandeja { grid-template-columns: minmax(0, 1fr) 360px; }
+  .oc-scope .oc-fila__abrir { flex-wrap: wrap; row-gap: var(--ds-space-2); }
+  /* 200px de base: con 260 el monto no entraba al lado y se caía al renglón de
+     abajo, que es justo lo que se quería evitar. */
+  .oc-scope .oc-fila__id { flex: 1 1 200px; }
+  .oc-scope .oc-fila__total { order: 2; width: auto; min-width: 130px; margin-left: auto; }
+  .oc-scope .oc-fila__marcas { order: 3; width: auto; }
+  .oc-scope .oc-det__cuerpo, .oc-scope .oc-det__head, .oc-scope .oc-det__tabs, .oc-scope .oc-det__pie {
+    padding-left: var(--ds-space-4); padding-right: var(--ds-space-4);
+  }
+}
+
+/* ---- El riel deja de ser columna y sube desde abajo ---- */

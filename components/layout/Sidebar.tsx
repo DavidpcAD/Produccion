@@ -31,6 +31,9 @@ interface NavItemDef {
   icon: IconName;
   minLevel?: number;
   section?: string;
+  /** Rutas que también cuentan como "dentro" de esta sección (submenú abierto y
+   *  encabezado marcado) aunque no cuelguen del prefijo de `section`. */
+  sectionAlt?: string[];
   exact?: boolean;
   children?: { href: string; label: string; exact?: boolean }[];
 }
@@ -85,6 +88,9 @@ const navItems: NavItemDef[] = [
   {
     href: '/compras/ingenieria', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4,
     section: '/compras/ingenieria',
+    // Aprobación cuelga de /compras/aprobacion, no del prefijo de la sección: sin
+    // esto, entrar ahí no abría el submenú ni marcaba el encabezado.
+    sectionAlt: ['/compras/aprobacion'],
     children: [
       { href: '/compras/ingenieria/resumen', label: 'Resumen' },
       { href: '/compras/ingenieria', label: 'Mis solicitudes', exact: true },
@@ -94,9 +100,13 @@ const navItems: NavItemDef[] = [
       { href: '/compras/ingenieria/clasificaciones', label: 'Clasificaciones' },
       { href: '/compras/ingenieria/plantillas', label: 'Plantillas' },
       { href: '/compras/ingenieria/inventarios', label: 'Inventarios' },
+      // Aprobación de órdenes (solo Super Admin: el filtro por módulo de los hijos
+      // la esconde para el resto). Vive acá y no como entrada aparte porque es una
+      // etapa más del mismo flujo de Órdenes de Compra.
+      { href: '/compras/aprobacion', label: 'Aprobación', exact: true },
+      { href: '/compras/aprobacion/todas', label: 'Todas las órdenes' },
     ],
   },
-  { href: '/compras/aprobacion', label: 'Aprobación OC', icon: 'rol',    minLevel: 4 },
   // Recepción del material de las órdenes ya creadas ("Órdenes por recibir" /
   // "Recibidas"). Lo usa Fábrica de Maderas, que pide su material y lo recibe; el
   // resto de las pestañas de esa pantalla (notas de crédito, cargos, archivo) son
@@ -191,6 +201,10 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
   };
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+  // ¿La ruta actual cae dentro de esta sección? Casi siempre es el prefijo de
+  // `section`; `sectionAlt` suma los hijos que cuelgan de otra rama (Aprobación).
+  const enSeccion = (it: NavItemDef) =>
+    !!it.section && [it.section, ...(it.sectionAlt ?? [])].some((s) => pathname.startsWith(s));
   // Los submenús (y labels) están "expandidos" con pin (desktop) o con el drawer (móvil).
   const expanded = pinned || navOpen;
 
@@ -199,7 +213,7 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
   // sin afectar a los demás — se pueden tener varios abiertos a la vez. Arranca
   // con la sección activa abierta (el submenú de donde estás). Nada de esto
   // aplica al riel colapsado (solo iconos).
-  const activeSection = navItems.find((it) => it.section && pathname.startsWith(it.section))?.section ?? null;
+  const activeSection = navItems.find(enSeccion)?.section ?? null;
   const [openSections, setOpenSections] = useState<Set<string>>(
     () => new Set(activeSection ? [activeSection] : []),
   );
@@ -265,7 +279,7 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
           return !item.minLevel || nivelAdmin >= item.minLevel;
         })
         .map((item) => {
-          const sectionActive = item.section ? pathname.startsWith(item.section) : isActive(item.href);
+          const sectionActive = item.section ? enSeccion(item) : isActive(item.href);
           return (
             <div key={item.href}>
               <Link

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useState } from "react";
-import { IconClose, IconChevronDown } from "@/components/compras/icons";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { IconChevronDown } from "@/components/compras/icons";
 import { haptic } from "@/lib/compras/haptic";
 
 // ---------------------------------------------------------------- Button
@@ -260,12 +260,24 @@ export function EmptyState({ icon, title, hint }: {
 export function Modal({ title, onClose, children, footer, wide, full }: {
   title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; full?: boolean;
 }) {
+  // Escape cierra: es lo que todo el mundo intenta primero y hasta ahora no hacía nada.
+  useEffect(() => {
+    const salir = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", salir);
+    return () => window.removeEventListener("keydown", salir);
+  }, [onClose]);
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label={title} className={`modal ${full ? "modal--full" : wide ? "modal--wide" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="row row--between" style={{ marginBottom: 16 }}>
           <h3 className="ds-subtitle-lg">{title}</h3>
-          <button className="modal-close" onClick={onClose} aria-label="Cerrar"><IconClose size={18} /></button>
+          {/* X de verdad: el ícono "close" del DS es una flecha hacia abajo (lo usa
+              como chevron), así que en un modal se leía como "colapsar". */}
+          <button className="modal-close" onClick={onClose} aria-label="Cerrar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </div>
         {children}
         {footer && <div className="row gap-3 mt-6" style={{ justifyContent: "flex-end" }}>{footer}</div>}

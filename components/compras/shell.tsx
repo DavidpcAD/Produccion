@@ -103,7 +103,7 @@ export function AppShell({ role, children }: { role: Role; children: React.React
   if (!hydrated || cargando || current !== role) {
     // El Resumen no es una lista: su esqueleto lleva paneles, no filas de tabla.
     const forma = pathname.endsWith("/resumen") ? "paneles" : "tabla";
-    return <PantallaSkeleton tiles={TILES_POR_ROL[role]} forma={forma} conTabs={ROLE_META[role].nav.length > 1 && role !== "ingenieria"} />;
+    return <PantallaSkeleton tiles={TILES_POR_ROL[role]} forma={forma} conTabs={ROLE_META[role].nav.length > 1 && role !== "ingenieria" && role !== "aprobacion"} />;
   }
 
   // La carga inicial falló (base en pausa, red, 500…). Decirlo, porque la alternativa es
@@ -127,7 +127,10 @@ export function AppShell({ role, children }: { role: Role; children: React.React
   const meta = ROLE_META[role];
   // Ingeniería muestra su navegación como submenú en el sidebar de la base
   // (Órdenes de Compra), así que acá no repetimos los tabs de arriba.
-  const hasNav = meta.nav.length > 1 && role !== 'ingenieria';
+  // Aprobación, igual que Ingeniería, muestra su navegación como submenú del sidebar
+  // de la base (Órdenes de Compra → Aprobación / Todas las órdenes), así que acá no
+  // repetimos los tabs de arriba.
+  const hasNav = meta.nav.length > 1 && role !== 'ingenieria' && role !== 'aprobacion';
   // Cuál item del nav está activo (match más largo por href/alt).
   const activeHref = meta.nav
     .map((n) => {
