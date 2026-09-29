@@ -2636,3 +2636,14 @@
 .oc-scope .oc-lote__info:hover .oc-lote__n { text-decoration: underline; text-underline-offset: 3px; }
 .oc-scope .oc-lote__info:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 3px; }
 .oc-scope .oc-sel__limpiar { align-self: center; padding: var(--ds-space-2); }
+
+/* En una columna flex, lo que no se declara `flex-shrink: 0` se aplasta cuando el
+   contenido de al lado crece: con un proveedor de muchas órdenes, la fila de
+   pestañas quedaba de unos pocos píxeles y no se leía. Solo el cuerpo encoge —
+   para eso tiene scroll propio. */
+.oc-scope .oc-det__head,
+.oc-scope .oc-det__tabs,
+.oc-scope .oc-det__pie,
+.oc-scope .oc-sel__head,
+.oc-scope .oc-prov-panel__head,
+.oc-scope .oc-prov-panel__id { flex-shrink: 0; }
