@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
 import { Button, Modal, Select, Textarea, useToast } from "@/components/compras/ui";
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
+import { AprobarControl } from "@/components/compras/aprobar-control";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
 import { OrdenFila } from "@/components/compras/orden-fila";
 import { IconChevronDown } from "@/components/compras/icons";
@@ -125,6 +126,7 @@ export default function AprobacionPage() {
   // está por aprobar.
   const [ordenCentral, setOrdenCentral] = useState<string | null>(() => sp.get("det"));
   const [confirmLote, setConfirmLote] = useState(false);
+  const [confirmOrden, setConfirmOrden] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{ ok: number; fallos: string[] } | null>(null);
   const [motivo, setMotivo] = useState("");
 
@@ -173,6 +175,7 @@ export default function AprobacionPage() {
   const esPendiente = FICHAS.includes(vista);
   const abierta = ordenes.find((o) => o.id === abiertaId) ?? null;
   const central = ordenes.find((o) => o.id === ordenCentral) ?? null;
+  const unaPorConfirmar = ordenes.find((o) => o.id === confirmOrden) ?? null;
   const seleccionadas = useMemo(
     () => (esPendiente ? lista.filter((o) => sel.has(o.id)) : []),
     [esPendiente, lista, sel],
@@ -228,6 +231,17 @@ export default function AprobacionPage() {
     setRielModo(n.size && rielAlLado() ? "seleccion" : "orden");
   };
   const sacarDeSeleccion = (id: string) => setSel((s) => { const n = new Set(s); n.delete(id); return n; });
+
+  /** Aprobar UNA orden. En PC es un clic, así que pregunta lo mismo que el lote: es
+   *  igual de irreversible, y no tenía sentido que la de N órdenes confirmara y la de
+   *  una no. En celular no pregunta: ahí se DESLIZA y el gesto ya es la confirmación
+   *  —un roce no aprueba nada—, así que un modal encima sería preguntar dos veces. El
+   *  corte es el mismo que enciende el deslizador en compras.css. */
+  const pedirAprobarOrden = (o: Orden) => {
+    const deslizando = typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches;
+    if (deslizando) { void aprobar(o); return; }
+    setConfirmOrden(o.id);
+  };
 
   // Crea y lanza el pedido en BC; solo pasa a "lanzado" si BC de verdad lo hizo
   // (lib/compras/aprobar.ts).
@@ -491,9 +505,29 @@ export default function AprobacionPage() {
                     </span>
                   </div>
 
-                  <Button block disabled={lote} onClick={() => setConfirmLote(true)}>
-                    {lote ? "Lanzando en Business Central…" : `Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
-                  </Button>
+                  {/* En PC el botón abre el modal, que es donde se leen cuántas son y
+                      cuánto suman antes de soltarlas. */}
+                  <div className="oc-sel__aprobar-pc">
+                    <Button block disabled={lote} onClick={() => setConfirmLote(true)}>
+                      {lote ? "Lanzando en Business Central…" : `Aprobar ${seleccionadas.length} ${seleccionadas.length === 1 ? "orden" : "órdenes"}`}
+                    </Button>
+                  </div>
+
+                  {/* En celular se DESLIZA, igual que una orden sola: el gesto ya es la
+                      confirmación (un roce no aprueba nada) y todo lo que diría el modal
+                      —cuántas, el monto y el aviso de irreversible— está acá arriba, en
+                      esta misma hoja. Un modal encima sería preguntar dos veces por algo
+                      que ya se está leyendo. El número va en la perilla para que lo que
+                      se desliza diga cuántas órdenes se van. */}
+                  <div className="oc-sel__aprobar-movil">
+                    <AprobarControl
+                      oneWay
+                      busy={lote}
+                      busyLabel={`Lanzando ${seleccionadas.length} en Business Central…`}
+                      slideLabel={`APROBAR ${seleccionadas.length}`}
+                      onApprove={() => { void aprobarSeleccionadas(); }}
+                    />
+                  </div>
                   <Button block variant="outline" disabled={lote} onClick={pedirRechazoLote}>Rechazar seleccionadas</Button>
               <button type="button" className="link-btn oc-sel__limpiar" disabled={lote}
                 onClick={() => { setSel(new Set()); setRielModo("orden"); }}>
@@ -556,7 +590,7 @@ export default function AprobacionPage() {
               orden={abierta}
               aprobando={lote || aprobandoId === abierta.id}
               onCerrar={() => setAbiertaId(null)}
-              onAprobar={() => aprobar(abierta)}
+              onAprobar={() => pedirAprobarOrden(abierta)}
               onVerProveedor={(c) => setProvAbierto(c)}
               onRechazar={() => {
                 setMotivo("");
@@ -582,30 +616,47 @@ export default function AprobacionPage() {
         {(abierta || provAbierto || ordenCentral || verLote) && <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setOrdenCentral(null); setAbiertaId(null); setRielModo("orden"); }} aria-hidden />}
       </div>
 
-      {confirmLote && (
-        <Modal title={`¿Aprobar ${seleccionadas.length === 1 ? "esta orden" : `estas ${seleccionadas.length} órdenes`}?`}
-          onClose={() => setConfirmLote(false)}
-          footer={<>
-            <Button variant="outline" onClick={() => setConfirmLote(false)}>Cancelar</Button>
-            <Button disabled={lote} onClick={aprobarSeleccionadas}>{lote ? "Enviando…" : "Aprobar y enviar"}</Button>
-          </>}>
-          <div className="oc-confirmar">
-            <span className="oc-confirmar__ic"><Icon name="alert" size="lg" color="currentColor" /></span>
-            <p className="oc-confirmar__txt">
-              Se enviarán a Business Central (ERP) y esta acción no se puede revertir.
-            </p>
-            <div className="oc-confirmar__total">
-              <span className="oc-det__rot">Monto total</span>
-              <span className="oc-sel__total-num">{montoLote}</span>
-            </div>
-            {resumenLote.cd > 0 && (
-              <p className="oc-confirmar__nota">
-                {resumenLote.cd} {resumenLote.cd === 1 ? "va" : "van"} contra la obra (consumo directo): el material no entra a inventario.
+      {/* Un solo diálogo para las dos: aprobar una orden y aprobar el lote son la
+          misma acción irreversible, así que se pregunta igual y se lee igual. */}
+      {(confirmLote || unaPorConfirmar) && (() => {
+        const cuantas = unaPorConfirmar ? 1 : seleccionadas.length;
+        const monto = unaPorConfirmar ? money(ordenTotalConIva(unaPorConfirmar), unaPorConfirmar.currencyCode) : montoLote;
+        const cd = unaPorConfirmar ? (ordenConsumoDirecto(unaPorConfirmar).hay ? 1 : 0) : resumenLote.cd;
+        const cerrar = () => { setConfirmLote(false); setConfirmOrden(null); };
+        const enviar = () => {
+          if (unaPorConfirmar) { const o = unaPorConfirmar; setConfirmOrden(null); void aprobar(o); }
+          else void aprobarSeleccionadas();
+        };
+        return (
+          <Modal title={`¿Aprobar ${cuantas === 1 ? "esta orden" : `estas ${cuantas} órdenes`}?`} onClose={cerrar}
+            footer={<>
+              <Button variant="outline" onClick={cerrar}>Cancelar</Button>
+              <Button disabled={lote || aprobandoId !== null} onClick={enviar}>
+                {lote || aprobandoId ? "Enviando…" : "Aprobar y enviar"}
+              </Button>
+            </>}>
+            <div className="oc-confirmar">
+              <span className="oc-confirmar__ic"><Icon name="alert" size="lg" color="currentColor" /></span>
+              <p className="oc-confirmar__txt">
+                {unaPorConfirmar
+                  ? `${numeroOrdenPlano(unaPorConfirmar)} se enviará a Business Central (ERP) y esta acción no se puede revertir.`
+                  : "Se enviarán a Business Central (ERP) y esta acción no se puede revertir."}
               </p>
-            )}
-          </div>
-        </Modal>
-      )}
+              <div className="oc-confirmar__total">
+                <span className="oc-det__rot">{cuantas === 1 ? "Total de la orden" : "Monto total"}</span>
+                <span className="oc-sel__total-num">{monto}</span>
+              </div>
+              {cd > 0 && (
+                <p className="oc-confirmar__nota">
+                  {cuantas === 1
+                    ? "Va contra la obra (consumo directo): el material no entra a inventario."
+                    : `${cd} ${cd === 1 ? "va" : "van"} contra la obra (consumo directo): el material no entra a inventario.`}
+                </p>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
 
       {resultado && (
         <div className="oc-resultado" role="status" aria-live="polite">

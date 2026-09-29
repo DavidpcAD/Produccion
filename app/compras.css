@@ -2245,6 +2245,15 @@
   .oc-scope .oc-aprobar__pc { display: none; }
   .oc-scope .oc-det__pie .oc-aprobar__pc { display: none; }
   .oc-scope .oc-aprobar__movil { display: flex; }
+  /* El lote se aprueba con el mismo gesto que una orden sola: deslizando. */
+  .oc-scope .oc-sel__aprobar-pc { display: none; }
+  .oc-scope .oc-sel__aprobar-movil { display: block; }
+
+  /* En 375px "Rechazar CP-005476" pedía 229px y tenía 227: se pasaba por DOS píxeles
+     y partía en el guion, dejando "Rechazar CP-" arriba y "005476" abajo. Un N.º de
+     orden cortado en dos se lee como otro número. Un escalón menos de la escala y
+     entra entero; los títulos más largos siguen partiendo, pero entre palabras. */
+  .oc-scope .modal h3 { font-size: var(--ds-font-size-subtitle); }
   .oc-scope .oc-lote { flex-wrap: wrap; }
   .oc-scope .oc-lote__acciones { width: 100%; margin-left: 0; gap: var(--ds-space-2); flex-direction: column-reverse; align-items: stretch; }
   .oc-scope .oc-lote__aprobar { min-width: 0; }
@@ -2375,6 +2384,12 @@
 /* La selección vive DENTRO del riel, igual que el detalle de una orden: con dos o
    más marcadas el panel muestra lo que se va a aprobar, no una orden suelta. */
 .oc-scope .oc-sel { display: flex; flex-direction: column; width: 100%; min-height: 0; overflow: hidden; }
+/* Aprobar el lote: botón + modal en PC, deslizador en celular (el botón se apaga en
+   el bloque de 640px). El deslizador se apaga de 641 para arriba con SU PROPIA media
+   query y no con una regla base: este bloque de .oc-sel está más abajo en el archivo
+   que el de 640px, así que una base con la misma especificidad ganaría por orden y el
+   deslizador no aparecería nunca. */
+@media (min-width: 641px) { .oc-scope .oc-sel__aprobar-movil { display: none; } }
 .oc-scope .oc-sel__head {
   display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-3);
   padding: var(--ds-space-5) var(--ds-space-6) var(--ds-space-3);
