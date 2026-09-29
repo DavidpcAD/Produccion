@@ -1,4 +1,4 @@
-import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Role, TipoSolicitud } from "./types";
+import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Recepcion, Role, TipoSolicitud } from "./types";
 import type { EstadoBcOrden } from "./api";
 import { almacenesQueRecibe } from "../permissions";
 
@@ -1000,6 +1000,35 @@ export function numeroOrden(o: { numero: string; bcNumber?: string }): string {
 // Aprobación, donde el rótulo estorbaba. Ojo: ese CP-… no se puede buscar en BC
 // —la orden no está allá todavía—, por eso el resto del app sigue usando
 // `numeroOrden`, que sí lo aclara.
+/** Todo el texto por el que se puede encontrar una orden: su N.º (el de BC y el
+ *  interno), el proveedor (código y nombre), sus materiales (descripción, código de
+ *  artículo y variante), a dónde van (obra, proyecto, almacén), de qué solicitud
+ *  salieron y QUIÉN las pidió, y las facturas con las que se recibieron.
+ *
+ *  Vive acá y no en cada pantalla porque el buscador de Aprobación y el de Todas las
+ *  órdenes tienen que encontrar lo mismo: si uno halla por factura y el otro no, la
+ *  gente cree que la orden no existe. */
+export function textoBuscableOrden(
+  o: Orden,
+  ctx: {
+    proveedores?: { id: string; code: string; nombre: string }[];
+    pedidos?: Pick<Pedido, "id" | "numero" | "solicitante" | "creadoPorId" | "lineas">[];
+    recepciones?: Pick<Recepcion, "ordenId" | "numeroFactura">[];
+  },
+): string {
+  const prov = ctx.proveedores?.find((p) => p.id === o.proveedorId);
+  const numerosPedido = new Set(o.lineas.map((l) => l.pedidoNumero).filter(Boolean));
+  const origen = (ctx.pedidos ?? []).filter((p) => numerosPedido.has(p.numero));
+  return [
+    numeroOrdenPlano(o), numeroOrden(o), o.numero, o.bcNumber,
+    o.proveedorNo ?? prov?.code, o.proveedorNombre ?? prov?.nombre,
+    ...o.lineas.flatMap((l) => [l.descripcion, l.articuloId, l.variantCode, l.pedidoNumero, l.obra, l.proyecto, l.almacen, l.maquinaNo]),
+    // Quién la pidió: se busca por el nombre de la persona, no por el N.º de solicitud.
+    ...origen.flatMap((p) => [p.solicitante, p.creadoPorId]),
+    ...(ctx.recepciones ?? []).filter((r) => r.ordenId === o.id).map((r) => r.numeroFactura),
+  ].filter(Boolean).join(" ");
+}
+
 export function numeroOrdenPlano(o: { numero: string; bcNumber?: string }): string {
   return o.bcNumber || o.numero;
 }

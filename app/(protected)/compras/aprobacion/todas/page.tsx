@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
-import { Input, Select } from "@/components/compras/ui";
+import { Select } from "@/components/compras/ui";
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
 import { OrdenFila } from "@/components/compras/orden-fila";
@@ -11,7 +11,7 @@ import { OrdenesLista } from "@/components/compras/ordenes-lista";
 import { PantallaSkeleton } from "@/components/compras/pantalla-skeleton";
 import { Icon } from "@/components/ds/Icon/Icon";
 import { useStore } from "@/lib/compras/store";
-import { numeroOrdenPlano, ordenTotalConIva } from "@/lib/compras/helpers";
+import { ordenTotalConIva, textoBuscableOrden } from "@/lib/compras/helpers";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
 import type { Orden } from "@/lib/compras/types";
 
@@ -37,7 +37,7 @@ const ORDENES: { v: Orden_; label: string }[] = [
 ];
 
 export default function AprobacionTodasPage() {
-  const { ordenes, proveedores, cargandoExtra } = useStore();
+  const { ordenes, proveedores, pedidos, recepciones, cargandoExtra } = useStore();
   const sp = useSearchParams();
   const [vista, setVista] = useState<Vista>(() => {
     const v = sp.get("vista");
@@ -67,12 +67,6 @@ export default function AprobacionTodasPage() {
   ) as Record<Vista, Orden[]>, [base]);
 
   const lista = useMemo(() => {
-    const prov = (id: string) => proveedores.find((p) => p.id === id);
-    const texto = (o: Orden) => [
-      numeroOrdenPlano(o), o.numero, o.bcNumber,
-      o.proveedorNo ?? prov(o.proveedorId)?.code, o.proveedorNombre ?? prov(o.proveedorId)?.nombre,
-      ...o.lineas.flatMap((l) => [l.pedidoNumero, l.obra, l.proyecto, l.almacen, l.descripcion]),
-    ].filter(Boolean).join(" ");
     const q = busca.trim();
     const cmp = (a: Orden, b: Orden) => {
       if (orden === "mayor") return ordenTotalConIva(b) - ordenTotalConIva(a);
@@ -80,8 +74,8 @@ export default function AprobacionTodasPage() {
       const d = a.fecha.localeCompare(b.fecha);
       return orden === "antiguas" ? d : -d;
     };
-    return deVista[vista].filter((o) => !q || coincideBusqueda(texto(o), q)).sort(cmp);
-  }, [deVista, vista, busca, orden, proveedores]);
+    return deVista[vista].filter((o) => !q || coincideBusqueda(textoBuscableOrden(o, { proveedores, pedidos, recepciones }), q)).sort(cmp);
+  }, [deVista, vista, busca, orden, proveedores, pedidos, recepciones]);
 
   const meta = VISTA[vista];
   const abierta = ordenes.find((o) => o.id === abiertaId) ?? null;
@@ -136,13 +130,25 @@ export default function AprobacionTodasPage() {
             </div>
           </div>
 
+          {/* Buscador siempre a la vista: encuentra por N.º de orden, proveedor,
+              material, obra, quién la pidió o N.º de factura. Estaba escondido dentro
+              de "Filtros" y nadie lo hallaba. */}
+          <div className="oc-buscar">
+            <span className="oc-buscar__ic" aria-hidden><Icon name="search" size="md" color="currentColor" /></span>
+            <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)}
+              className="oc-buscar__campo" aria-label="Buscar órdenes"
+              placeholder="Buscar por N.º de orden, proveedor, material, obra, quién la pidió o N.º de factura…" />
+            {busca && (
+              <button type="button" className="oc-buscar__limpiar" onClick={() => setBusca("")} aria-label="Limpiar la búsqueda">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            )}
+          </div>
+
           {filtrosAbiertos && (
             <div className="oc-filtros">
-              <label className="oc-filtros__campo">
-                <span className="oc-filtros__rot">Buscar</span>
-                <Input value={busca} onChange={(e) => setBusca(e.target.value)}
-                  placeholder="N.º de orden, proveedor, obra o artículo…" className="ds-form-field__input" />
-              </label>
               {/* La tabla es la única con columnas, vistas y exportar: no se pierde. */}
               <label className="oc-filtros__todas">
                 <input type="checkbox" className="ds-cbx" checked={comoTabla} onChange={(e) => setComoTabla(e.target.checked)} />
