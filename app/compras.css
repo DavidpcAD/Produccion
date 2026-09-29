@@ -2198,9 +2198,23 @@
   .oc-scope .oc-fila__marcas { order: 4; width: auto; }
   .oc-scope .oc-fila__datos { order: 5; }
 
-  /* La tabla de líneas tiene 5 columnas: en 375px no se lee. Acá se esconde junto
-     con su chevron, y las líneas se leen en la pestaña "Líneas" de la hoja. */
-  .oc-scope .oc-fila__chev, .oc-scope .oc-fila__lineas { display: none; }
+  /* La tabla de 5 columnas no se lee en 375px, pero esconder las líneas tampoco
+     sirve: son lo que hay que mirar antes de aprobar. En celular van APILADAS y el
+     botón de abrirlas pasa a ser una fila con rótulo al pie de la tarjeta. */
+  .oc-scope .oc-fila__lineas { display: none; }
+  .oc-scope .oc-fila__lista { display: flex; }
+  .oc-scope .oc-fila__top { flex-wrap: wrap; }
+  .oc-scope .oc-fila__ir { order: 1; }
+  .oc-scope .oc-fila__chev {
+    order: 2; flex: 1 1 100%; width: auto; height: auto; border-radius: 0;
+    display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-2);
+    margin-top: var(--ds-space-1); padding: 10px 0 0;
+    border-top: 1.5px solid var(--ds-color-gray-100);
+    font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold);
+    color: var(--ds-color-gray-500);
+  }
+  .oc-scope .oc-fila__chev:hover { background: none; color: var(--ds-text); }
+  .oc-scope .oc-fila__chev-txt { display: inline; }
   .oc-scope .oc-fila__ir {
     flex-shrink: 0; align-self: center; display: grid; place-items: center;
     width: 28px; height: 28px; padding: 0;
@@ -2474,3 +2488,13 @@
 /* El distintivo es una pastilla, no una franja: dentro de una columna flex se
    estiraba a todo el ancho de la fila. */
 .oc-scope .oc-sel__item .ds-badge, .oc-scope .oc-fila__marcas .ds-badge { align-self: flex-start; }
+
+/* Las líneas de una orden, apiladas: la forma de celular de la tabla de la fila.
+   En PC manda la tabla, que ahí sí se lee — y el apagado va dentro de su propio
+   min-width, porque una regla suelta al final del archivo le gana por orden a la
+   media query de celular aunque esta sea más específica en intención. */
+.oc-scope .oc-fila__lista { flex-direction: column; gap: var(--ds-space-2); padding: var(--ds-space-3) var(--ds-space-4) var(--ds-space-4); }
+@media (min-width: 721px) {
+  .oc-scope .oc-fila__lista { display: none; }
+  .oc-scope .oc-fila__chev-txt { display: none; }
+}

@@ -384,6 +384,9 @@ export default function AprobacionPage() {
                     </button>
                     <button type="button" className={`oc-fila__chev${verLineas ? " is-open" : ""}`} onClick={() => toggleLineas(o.id)}
                       aria-expanded={verLineas} aria-label={verLineas ? `Ocultar las líneas de ${numeroOrdenPlano(o)}` : `Ver las líneas de ${numeroOrdenPlano(o)}`}>
+                      <span className="oc-fila__chev-txt">
+                        {verLineas ? "Ocultar las líneas" : `Ver ${articulos.length === 1 ? "la línea" : `las ${articulos.length} líneas`}`}
+                      </span>
                       <IconChevronDown size={18} />
                     </button>
                     {/* Solo en celular: la tabla de líneas no cabe en 375px, así que el
@@ -395,6 +398,29 @@ export default function AprobacionPage() {
                       <IconChevronDown size={18} />
                     </button>
                   </div>
+
+                  {verLineas && (
+                    <div className="oc-fila__lista">
+                      {o.lineas.map((l) => (
+                        <div key={l.id} className="oc-det__linea">
+                          <div className="oc-det__linea-tit">
+                            <span className="ds-wrap ds-strong">{l.descripcion}</span>
+                            {l.tipo === "cargo" && <span className="ds-badge ds-badge--yellow">Cargo</span>}
+                          </div>
+                          {l.pedidoNumero && <span className="oc-det__linea-cod">{l.pedidoNumero}</span>}
+                          <div className="oc-det__linea-nums">
+                            <span className="ds-nowrap">{num.format(l.cantidad)} {l.unidad} × {money(l.precioUnitario, o.currencyCode)}</span>
+                            <span className="ds-strong ds-nowrap">{money(ordenLineaImporte(l), o.currencyCode)}</span>
+                          </div>
+                          <div className="oc-det__linea-dest">
+                            {ordenLineaEsConsumoDirecto(l)
+                              ? `${l.obra || l.proyecto} · tarea ${l.taskNo} · consumo directo`
+                              : (l.almacen || l.obra || "Sin destino")}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {verLineas && (
                     <div className="ds-table-wrap oc-fila__lineas">
