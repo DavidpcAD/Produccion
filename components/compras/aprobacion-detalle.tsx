@@ -8,9 +8,9 @@ import { Timeline } from "@/components/compras/timeline";
 import { AprobarControl } from "@/components/compras/aprobar-control";
 import { useStore } from "@/lib/compras/store";
 import {
-  bcEstadoBadge, formatDate, money, num, numeroOrden, ordenAlmacenDestino, ordenBadge,
+  bcEstadoBadge, formatDate, formatDateTime, money, num, numeroOrden, ordenAlmacenDestino, ordenBadge,
   ordenConsumoDirecto, ordenDevueltaPorBc, ordenEsDirecta, ordenLineaEsConsumoDirecto,
-  numeroOrdenPlano, ordenLineaImporte, ordenMaquinas, ordenPedidos, ordenTotalConIva,
+  numeroOrdenPlano, ordenLineaImporte, ordenMaquinas, ordenPedidos, ordenTotalConIva, ROL_LABEL,
 } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
@@ -32,9 +32,11 @@ export function AprobacionDetalle({
   /** Abre el panel del proveedor (al lado del riel), con su historial de compras. */
   onVerProveedor: (codigo: string) => void;
 }) {
-  const { proveedores, pedidos, movimientos, bcEstados, ordenes } = useStore();
+  const { proveedores, pedidos, movimientos, bcEstados, cargarMovimientos } = useStore();
   const [tab, setTab] = useState<Tab>("resumen");
   const marco = useRef<HTMLElement>(null);
+
+  useEffect(() => { void cargarMovimientos([{ entidad: "orden", id: orden.id }]); }, [orden.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // En pantallas donde el riel no llega a lo alto de la ventana, al abrir una orden los
   // botones de aprobar/rechazar quedaban abajo del pliegue. `nearest` mueve lo mínimo
@@ -71,19 +73,26 @@ export function AprobacionDetalle({
   const enBc = bcEstados[orden.id] && !(sinLanzarBc && bcEstados[orden.id] !== "lanzado")
     ? bcEstadoBadge(orden.estado, bcEstados[orden.id]) : null;
 
-  const delProveedor = useMemo(() => {
-    // Manda el CÓDIGO del proveedor (PROV-…), no el id: hay órdenes que traen el
-    // código y el nombre pero no el id —lo dejan vacío—, y comparar ids vacíos
-    // hacía que TODAS esas órdenes parecieran del mismo proveedor.
-    const codigoDe = (o: Orden) => o.proveedorNo ?? proveedores.find((p) => p.id === o.proveedorId)?.code;
-    const cod = codigoDe(orden);
-    const suyas = ordenes.filter((o) => {
-      const c = codigoDe(o);
-      if (cod && c) return c === cod;
-      return !!orden.proveedorId && o.proveedorId === orden.proveedorId;
-    });
-    return [...suyas].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  }, [ordenes, proveedores, orden]);
+
+  const comentarios = useMemo(() => {
+    const out: { quien: string; rol: string; fecha?: string; texto: string }[] = [];
+    // 1) El que pidió el material: la nota de su solicitud.
+    for (const n of ordenPedidos(orden)) {
+      const ped = pedidos.find((x) => x.numero === n);
+      if (ped?.notas?.trim()) out.push({ quien: ped.solicitante, rol: `Solicitó · ${n}`, fecha: ped.fecha, texto: ped.notas.trim() });
+    }
+    // 2) y 3) Lo que quedó escrito en la bitácora de la orden (proveeduría al armarla,
+    // aprobación al devolverla o al fallar el lanzamiento).
+    for (const m of movimientos) {
+      if (m.entidad !== "orden" || m.idEntidad !== orden.id) continue;
+      if (!m.detalle?.trim()) continue;
+      out.push({ quien: m.usuario, rol: ROL_LABEL[m.rol] ?? m.rol, fecha: m.fecha, texto: m.detalle.trim() });
+    }
+    // El motivo del último rechazo puede vivir en la orden y no en la bitácora.
+    const suelto = orden.motivoRechazo?.trim() || orden.notas?.trim();
+    if (suelto && !out.some((c) => c.texto === suelto)) out.push({ quien: "Aprobación", rol: "Aprobación", texto: suelto });
+    return out;
+  }, [orden, pedidos, movimientos]);
 
   const tabs: { k: Tab; label: string }[] = [
     { k: "resumen", label: "Resumen" },
@@ -137,7 +146,11 @@ export function AprobacionDetalle({
                 <span className="oc-det__rot">Proveedor</span>
                 <span className="oc-det__prov-cod">{provCodigo ?? "—"}</span>
                 <span className="oc-det__prov-nom ds-wrap">{provNombre ?? "Sin proveedor"}</span>
-                <span className="oc-det__prov-ver">{delProveedor.length === 1 ? "Ver su orden" : `Ver sus ${delProveedor.length} órdenes`} ↗</span>
+              </span>
+              <span className="oc-det__prov-ir" aria-hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
               </span>
             </button>
 
@@ -185,6 +198,30 @@ export function AprobacionDetalle({
             <div className="oc-det__total">
               <span className="oc-det__rot">Total de la orden · IVA incluido</span>
               <span className="oc-det__total-num">{money(ordenTotalConIva(orden), orden.currencyCode)}</span>
+            </div>
+
+            {/* Lo que dejó dicho cada etapa: quien pidió el material, quien armó la
+                compra y quien la aprueba. Es lo que hay que leer antes de decidir. */}
+            <div className="oc-det__grupo">
+              <span className="oc-det__rot">Comentarios</span>
+              {comentarios.length === 0 ? (
+                <span className="oc-det__linea-dest">
+                  Nadie dejó comentarios en esta orden. Los de cada material se leen en la pestaña “Líneas”.
+                </span>
+              ) : (
+                <ul className="oc-com">
+                  {comentarios.map((c, i) => (
+                    <li key={`${c.rol}-${i}`} className="oc-com__item">
+                      <span className="oc-com__quien">
+                        <span className="ds-strong">{c.quien}</span>
+                        <span className="oc-com__rol">{c.rol}</span>
+                        {c.fecha && <span className="oc-com__fecha">{formatDateTime(c.fecha)}</span>}
+                      </span>
+                      <span className="oc-com__txt ds-wrap">{c.texto}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </>
         )}
