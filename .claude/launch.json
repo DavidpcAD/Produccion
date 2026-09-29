@@ -1,6 +1,24 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "produccion-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000, "autoPort": true }
+    {
+      "name": "produccion-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "produccion-dev-api",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "USE_API=1 npm run dev -- -p 3111"
+      ],
+      "port": 3111
+    }
   ]
 }
