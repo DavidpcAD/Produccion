@@ -35,7 +35,7 @@ export const Introduccion: StoryObj = {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 40 }}>
-        <div style={{ width: 52, height: 52, borderRadius: 12, background: '#ADD010', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 0 rgba(0,0,0,0.16)', flexShrink: 0 }}>
+        <div style={{ width: 52, height: 52, borderRadius: 12, background: '#ADD010', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--ds-shadow-03-big)', flexShrink: 0 }}>
           <svg width="26" height="26" fill="none" stroke="black" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
             <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
           </svg>
@@ -112,8 +112,8 @@ export const Introduccion: StoryObj = {
             { t: 'rounded-ds-lg', v: '16px' },
             { t: 'rounded-ds-xl', v: '32px' },
             { t: 'shadow-ds-01',  v: '0 4px 8px rgba(170,175,182,0.25)' },
-            { t: 'shadow-ds-02',  v: '0 6px 0 rgba(0,0,0,0.16)' },
-            { t: 'shadow-ds-03',  v: 'ds-02 + 0 2px 4px rgba(0,0,0,0.16)' },
+            { t: 'shadow-ds-02',  v: '0 0 6px rgba(0,0,0,0.16)' },
+            { t: 'shadow-ds-03',  v: '0 2px 4px rgba(0,0,0,0.16) + ds-02' },
           ].map(r => (
             <tr key={r.t} style={{ borderBottom: '1px solid #EBEBEB' }}>
               <td style={{ padding: '10px 12px' }}><code style={{ background: '#EBEBEB', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>{r.t}</code></td>

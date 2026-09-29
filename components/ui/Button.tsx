@@ -1,5 +1,5 @@
 'use client';
-import { forwardRef, ButtonHTMLAttributes, ReactNode, useRef, useState } from 'react';
+import { forwardRef, ButtonHTMLAttributes, ReactNode, useState } from 'react';
 import { motion } from 'motion/react';
 import { springs } from '@/lib/springs';
 import { haptic } from '@/components/ds/haptic';
@@ -16,7 +16,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  'relative inline-flex items-center justify-center gap-2 font-semibold rounded-ds-lg transition-colors duration-100 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:bg-ds-gray-200 disabled:text-ds-gray-300 disabled:shadow-none disabled:border-transparent';
+  'relative inline-flex items-center justify-center gap-2 font-semibold rounded-ds-lg transition-[box-shadow,background-color,color,border-color] duration-100 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:bg-ds-gray-200 disabled:text-ds-gray-300 disabled:border-transparent';
 
 const variants: Record<Variant, string> = {
   primary:   'bg-brand text-black hover:bg-brand-200 focus-visible:ring-brand shadow-ds-03',
@@ -33,19 +33,30 @@ const sizes: Record<Size, string> = {
   lg: 'px-7 py-3.5 text-body',
 };
 
-// Halo del DS (Figma): color del stroke por variante durante el press.
-const haloColor: Record<Variant, string> = {
-  primary:   'rgb(136, 160, 36)',
-  secondary: 'rgba(0, 0, 0, 0.8)',
-  outline:   'rgba(0, 0, 0, 0.8)',
-  danger:    'rgb(201, 108, 108)',
-  ghost:     'rgb(235, 235, 235)',
+// Halo del press, tal cual .ds-btn--pressed del DS: un box-shadow con spread
+// (8px, 2px en gris), apilado sobre la sombra base. Sin elementos extra.
+const halo: Record<Variant, string> = {
+  primary:   '0 0 0 8px var(--ds-color-green-200)',
+  secondary: '0 0 0 8px var(--ds-color-black-100)',
+  outline:   '0 0 0 8px var(--ds-color-black-100)',
+  danger:    '0 0 0 8px var(--ds-color-red-100)',
+  ghost:     '0 0 0 2px var(--ds-color-gray-100)',
 };
+
+// Variantes con relleno: llevan shadow-ds-03 y el halo se apila encima.
+const elevated: Record<Variant, boolean> = {
+  primary: true, secondary: true, danger: true, outline: false, ghost: false,
+};
+
+// Solo durante el press se pisa el box-shadow de la clase (así el anillo de
+// focus-visible, que también es box-shadow, sigue visible en reposo).
+function pressedShadow(variant: Variant) {
+  return elevated[variant] ? `${halo[variant]}, var(--ds-shadow-03-big)` : halo[variant];
+}
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'md', loading, icon, iconRight, className = '', children, disabled, onPointerDown, ...rest }, ref) => {
     const [pressed, setPressed] = useState(false);
-    const cancelled = useRef(false);
     const off = disabled || loading;
 
     return (
@@ -55,14 +66,18 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
         whileTap={{ scale: off ? 1 : 0.97 }}
         transition={springs.snappy}
-        style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+        style={{
+          WebkitTapHighlightColor: 'transparent',
+          touchAction: 'manipulation',
+          boxShadow: pressed && !off ? pressedShadow(variant) : undefined,
+        }}
         onPointerDown={(e) => {
-          if (!off) { cancelled.current = false; setPressed(true); haptic.select(); }
+          if (!off) { setPressed(true); haptic.select(); }
           onPointerDown?.(e as React.PointerEvent<HTMLButtonElement>);
         }}
         onPointerUp={() => setPressed(false)}
-        onPointerLeave={() => { if (pressed) { cancelled.current = true; setPressed(false); } }}
-        onPointerCancel={() => { cancelled.current = true; setPressed(false); }}
+        onPointerLeave={() => setPressed(false)}
+        onPointerCancel={() => setPressed(false)}
         {...(rest as React.ComponentProps<typeof motion.button>)}
       >
         {loading ? (
@@ -72,18 +87,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ) : null}
         {children}
         {iconRight && !loading && <span className="shrink-0 flex items-center">{iconRight}</span>}
-
-        {!off && (
-          <span
-            aria-hidden
-            style={{
-              position: 'absolute', inset: -6, borderRadius: 20,
-              border: `6px solid ${haloColor[variant]}`, pointerEvents: 'none',
-              opacity: pressed ? 1 : 0,
-              transition: pressed ? 'opacity 80ms ease-out' : 'opacity 180ms ease-out 120ms',
-            }}
-          />
-        )}
       </motion.button>
     );
   }

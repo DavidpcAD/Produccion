@@ -53,10 +53,13 @@ const config: Config = {
         "ds-lg": "16px",
         "ds-xl": "32px",
       },
+      // OJO: config legacy — Tailwind v4 lee @theme de app/globals.css, no esto.
+      // Las sombras del DS viven como @utility allá (leen --ds-shadow-*);
+      // estos valores quedan solo de referencia.
       boxShadow: {
-        "ds-01": "0px 4px 8px 0px rgba(170, 175, 182, 0.25)",
-        "ds-02": "0px 6px 0px 0px rgba(0, 0, 0, 0.16)",
-        "ds-03": "0px 6px 0px 0px rgba(0, 0, 0, 0.16), 0px 2px 4px 0px rgba(0, 0, 0, 0.16)",
+        "ds-01": "0 4px 8px rgba(170, 175, 182, 0.25)",
+        "ds-02": "0 0 6px rgba(0, 0, 0, 0.16)",
+        "ds-03": "0 2px 4px rgba(0, 0, 0, 0.16), 0 0 6px rgba(0, 0, 0, 0.16)",
       },
     },
   },

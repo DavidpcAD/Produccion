@@ -60,10 +60,29 @@
   --radius-ds-lg: 16px;
   --radius-ds-xl: 32px;
 
-  /* Shadows */
-  --shadow-ds-01: 0px 4px 8px 0px rgba(170, 175, 182, 0.25);
-  --shadow-ds-02: 0px 6px 0px 0px rgba(0, 0, 0, 0.16);
-  --shadow-ds-03: 0px 6px 0px 0px rgba(0, 0, 0, 0.16), 0px 2px 4px 0px rgba(0, 0, 0, 0.16);
+  /* Shadows: NO van acá. Ver el bloque @utility de abajo — a diferencia de los
+     colores, Tailwind parte el valor de las sombras al compilar (para soportar
+     shadow-<color>) y lo congela, así que el override de dark no las alcanza. */
+}
+
+/* ── Sombras del DS como utilidades propias ──
+   No pueden vivir en @theme: Tailwind v4 inlinea ahí el valor dentro de
+   --tw-shadow al compilar, así que el remapeo de :root[data-theme="dark"]
+   nunca llegaba y en oscuro se pintaban las sombras claras.
+   Declaradas así leen --ds-shadow-* en tiempo de ejecución (sí theme-aware) y
+   siguen componiendo con ring-* e inset-shadow, porque repiten la misma línea
+   box-shadow que emite Tailwind para cualquier utilidad shadow-*. */
+@utility shadow-ds-01 {
+  --tw-shadow: var(--ds-shadow-01);
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+}
+@utility shadow-ds-02 {
+  --tw-shadow: var(--ds-shadow-02-soft);
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+}
+@utility shadow-ds-03 {
+  --tw-shadow: var(--ds-shadow-03-big);
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
 }
 
 /* ── Adelante Design System tokens (mirror de design-system.css) ── */
