@@ -259,6 +259,20 @@
 /* =====================  ICON  ===================== */
 .oc-scope .ds-icon { display: inline-block; flex-shrink: 0; }  /* DS Icon — usa currentColor */
 
+/* Texto de los distintivos y los acentos de color.
+   En tema CLARO el fondo de estos chips es un tinte muy claro, asi que el texto tiene
+   que ser mas OSCURO que el color de marca: medido, el de marca se quedaba corto
+   —verde 2.61:1, rojo 3.92, amarillo 4.02, y AA pide 4.5 para texto chico—. Estos tres
+   tonos son el color de marca oscurecido lo justo para pasar, calculado contra el fondo
+   mas exigente de cada familia. En tema OSCURO pasa lo contrario (el fondo se va a
+   oscuro y el texto tiene que aclararse): eso lo resuelve el bloque data-theme="dark"
+   que esta debajo del bloque de BADGE. */
+.oc-scope {
+  --oc-amarillo-txt: #756300;                                              /* 5.20:1 sobre el chip, 5.56 sobre el aviso */
+  --oc-verde-txt: color-mix(in srgb, var(--ds-color-green-200) 70%, #000);  /* 4.85:1 sobre el chip */
+  --oc-rojo-txt: color-mix(in srgb, var(--ds-color-red-200) 85%, #000);     /* 5.05:1 sobre el chip, 5.77 sobre el aviso */
+}
+
 /* =====================  BADGE / STATUS  ===================== */
 .oc-scope .ds-badge {
   display: inline-flex; align-items: center; gap: 6px;
@@ -268,9 +282,9 @@
 }
 .oc-scope .ds-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .oc-scope .ds-badge--gray { background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); }
-.oc-scope .ds-badge--green { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
-.oc-scope .ds-badge--yellow { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
-.oc-scope .ds-badge--red { background: color-mix(in srgb, var(--ds-color-red-100) 22%, var(--ds-tint-base)); color: var(--ds-color-red-200); }
+.oc-scope .ds-badge--green { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--oc-verde-txt); }
+.oc-scope .ds-badge--yellow { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: var(--oc-amarillo-txt); }
+.oc-scope .ds-badge--red { background: color-mix(in srgb, var(--ds-color-red-100) 22%, var(--ds-tint-base)); color: var(--oc-rojo-txt); }
 .oc-scope .ds-badge--blueish { background: var(--ds-color-gray-100); color: var(--ds-color-gray-500); }
 /* Subcontrato: chip OSCURO. Es la única solicitud que no pasa por proveeduría, así
    que no debe confundirse con el gris claro de Stock. */
@@ -692,7 +706,7 @@
 .oc-scope .combo__row-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .oc-scope .combo__row-main > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oc-scope .combo__tag { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
-.oc-scope .combo__tag--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
+.oc-scope .combo__tag--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: var(--oc-amarillo-txt); }
 .oc-scope .combo__tag--general { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
 .oc-scope .combo__empty { padding: 10px 12px; color: var(--ds-color-gray-400); font-size: var(--ds-font-size-body-sm); }
 
@@ -756,7 +770,7 @@
 .oc-scope .nsl-plantbtn__label { text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Badge del tipo de plantilla en el campo elegido (General / Bodega) */
 .oc-scope .nsl-typebadge { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
-.oc-scope .nsl-typebadge--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: #8a7400; }
+.oc-scope .nsl-typebadge--bodega { background: color-mix(in srgb, var(--ds-color-yellow) 26%, var(--ds-tint-base)); color: var(--oc-amarillo-txt); }
 .oc-scope .nsl-typebadge--general { background: color-mix(in srgb, var(--ds-color-green-100) 22%, var(--ds-tint-base)); color: var(--ds-color-green-200); }
 /* Tipo de artículo en el buscador de materiales (Servicio / No inventariable). El
    inventario no lleva tag: es el caso normal del catálogo. */
@@ -2076,12 +2090,12 @@
 .oc-scope .oc-aviso__txt { display: flex; flex-direction: column; gap: 3px; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: var(--ds-text); }
 .oc-scope .oc-aviso__tit { font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); color: var(--oc-aviso-acento); }
 .oc-scope .oc-aviso--amarillo {
-  --oc-aviso-acento: #8a7400;
+  --oc-aviso-acento: var(--oc-amarillo-txt);
   background: color-mix(in srgb, var(--ds-color-yellow) 12%, var(--ds-tint-base));
   border-color: color-mix(in srgb, var(--ds-color-yellow) 45%, var(--ds-tint-base));
 }
 .oc-scope .oc-aviso--rojo {
-  --oc-aviso-acento: var(--ds-color-red-200);
+  --oc-aviso-acento: var(--oc-rojo-txt);
   background: color-mix(in srgb, var(--ds-color-red-100) 10%, var(--ds-tint-base));
   border-color: color-mix(in srgb, var(--ds-color-red-100) 40%, var(--ds-tint-base));
 }
@@ -2497,7 +2511,7 @@
   color: var(--ds-color-gray-400);
 }
 /* En cero es dato, no alarma: el color solo entra cuando hay algo que mirar. */
-.oc-scope .oc-sel__aviso.is-on { color: #8a7400; }
+.oc-scope .oc-sel__aviso.is-on { color: var(--oc-amarillo-txt); }
 .oc-scope .oc-sel__aviso--bc.is-on { color: var(--ds-color-red-200); }
 
 .oc-scope .oc-sel__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ds-space-3); }
@@ -2517,7 +2531,7 @@
 .oc-scope .oc-confirmar { display: flex; flex-direction: column; align-items: center; gap: var(--ds-space-3); text-align: center; }
 .oc-scope .oc-confirmar__ic {
   display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
-  background: color-mix(in srgb, var(--ds-color-yellow) 20%, var(--ds-tint-base)); color: #8a7400;
+  background: color-mix(in srgb, var(--ds-color-yellow) 20%, var(--ds-tint-base)); color: var(--oc-amarillo-txt);
 }
 .oc-scope .oc-confirmar__txt { margin: 0; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: var(--ds-color-gray-400); }
 .oc-scope .oc-confirmar__total {
@@ -2525,7 +2539,7 @@
   padding: var(--ds-space-4); border-radius: var(--ds-radius-md);
   background: color-mix(in srgb, var(--ds-color-gray-100) 55%, var(--ds-tint-base));
 }
-.oc-scope .oc-confirmar__nota { margin: 0; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: #8a7400; }
+.oc-scope .oc-confirmar__nota { margin: 0; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: var(--oc-amarillo-txt); }
 
 /* ---- Resultado: no se va solo, porque esto no se puede deshacer ---- */
 .oc-scope .oc-resultado { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; padding: var(--ds-space-6); background: #0009; }
@@ -2536,9 +2550,9 @@
 }
 .oc-scope .oc-resultado__ic {
   display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%;
-  background: color-mix(in srgb, var(--ds-color-green-100) 30%, var(--ds-tint-base)); color: var(--ds-color-green-200);
+  background: color-mix(in srgb, var(--ds-color-green-100) 30%, var(--ds-tint-base)); color: var(--oc-verde-txt);
 }
-.oc-scope .oc-resultado__ic.is-mixto { background: color-mix(in srgb, var(--ds-color-yellow) 20%, var(--ds-tint-base)); color: #8a7400; }
+.oc-scope .oc-resultado__ic.is-mixto { background: color-mix(in srgb, var(--ds-color-yellow) 20%, var(--ds-tint-base)); color: var(--oc-amarillo-txt); }
 .oc-scope .oc-resultado__tit { margin: 0; font-size: var(--ds-font-size-subtitle); font-weight: var(--ds-font-weight-semibold); line-height: 1.25; }
 .oc-scope .oc-resultado__txt { margin: 0; font-size: var(--ds-font-size-body-sm); line-height: 1.5; color: var(--ds-color-gray-400); }
 .oc-scope .oc-resultado__fallos { display: block; margin-top: 6px; color: var(--ds-color-red-200); font-weight: var(--ds-font-weight-semibold); }
@@ -2681,7 +2695,7 @@
   background: color-mix(in srgb, var(--ds-color-yellow) 12%, var(--ds-tint-base));
   font-size: var(--ds-font-size-body-sm); line-height: 1.45; color: var(--ds-text);
 }
-.oc-scope .oc-det__linea-cd-tit { display: inline-flex; align-items: center; gap: 6px; font-weight: var(--ds-font-weight-semibold); color: #8a7400; }
+.oc-scope .oc-det__linea-cd-tit { display: inline-flex; align-items: center; gap: 6px; font-weight: var(--ds-font-weight-semibold); color: var(--oc-amarillo-txt); }
 :root[data-theme="dark"] .oc-scope .oc-det__linea-cd-tit { color: var(--ds-color-yellow); }
 
 /* El chevron del proveedor reemplaza al "Ver sus N órdenes": la tarjeta entera
