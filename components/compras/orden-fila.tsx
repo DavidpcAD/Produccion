@@ -111,10 +111,15 @@ export function OrdenFila({
                 <span className="ds-nowrap">{num.format(l.cantidad)} {l.unidad} × {money(l.precioUnitario, orden.currencyCode)}</span>
                 <span className="ds-strong ds-nowrap">{money(ordenLineaImporte(l), orden.currencyCode)}</span>
               </div>
+              {/* El destino Y la obra. Antes era `almacen || obra`, así que en cuanto
+                  la línea tenía almacén la obra desaparecía — y es justo lo que hay que
+                  mirar para decidir si la compra tiene sentido. Con almacén el costo lo
+                  paga el almacén y la obra NO viaja a BC, pero igual se pidió PARA una
+                  obra: por eso va "la pidió". */}
               <div className="oc-det__linea-dest">
                 {ordenLineaEsConsumoDirecto(l)
                   ? `${l.obra || l.proyecto} · tarea ${l.taskNo} · consumo directo`
-                  : (l.almacen || l.obra || "Sin destino")}
+                  : `${l.almacen || "Sin almacén"}${l.obra ? ` · la pidió la obra ${l.obra}` : ""}`}
               </div>
             </div>
           ))}
@@ -125,7 +130,7 @@ export function OrdenFila({
         <div className="ds-table-wrap oc-fila__lineas">
           <table className="ds-table">
             <thead>
-              <tr><th>Descripción</th><th>Destino</th><th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Importe</th></tr>
+              <tr><th>Descripción</th><th>Destino</th><th>Obra</th><th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Importe</th></tr>
             </thead>
             <tbody>
               {orden.lineas.map((l) => (
@@ -133,9 +138,13 @@ export function OrdenFila({
                   <td className="ds-cell-texto">{l.descripcion}{l.pedidoNumero && <div className="ds-body-sm ds-muted">{l.pedidoNumero}</div>}</td>
                   <td className="ds-muted ds-body-sm">
                     {ordenLineaEsConsumoDirecto(l)
-                      ? <span title={`Consumo directo contra ${l.proyecto} · tarea ${l.taskNo}: no entra a inventario`}>{l.obra || l.proyecto} · CD</span>
-                      : (l.almacen || l.obra || "—")}
+                      ? <span title={`Consumo directo contra ${l.proyecto} · tarea ${l.taskNo}: no entra a inventario`}>Consumo directo · {l.taskNo}</span>
+                      : (l.almacen || "—")}
                   </td>
+                  {/* La obra en su propia columna: distintas líneas de una misma orden
+                      pueden ir a obras distintas, y en columna la diferencia se ve de
+                      un vistazo. Antes la obra se perdía en cuanto había almacén. */}
+                  <td className="ds-muted ds-body-sm">{l.obra || l.proyecto || "—"}</td>
                   <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
                   <td className="ds-num">{money(l.precioUnitario, orden.currencyCode)}</td>
                   <td className="ds-num ds-strong">{money(ordenLineaImporte(l), orden.currencyCode)}</td>

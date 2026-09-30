@@ -276,6 +276,38 @@
    que no debe confundirse con el gris claro de Stock. */
 .oc-scope .ds-badge--ink { background: var(--ds-color-gray-500); color: var(--ds-color-white); }
 
+/* ---- Los mismos distintivos en tema OSCURO ----
+   El fondo de estos chips se calcula con color-mix sobre --ds-tint-base, que en oscuro
+   se va a oscuro; el color del texto, en cambio, estaba fijo para los dos temas. O sea
+   texto oscuro sobre fondo oscuro. Medido con data-theme="dark" (AA pide 4.5:1 para
+   texto chico y 3:1 para un icono): amarillo 1.67, ink 1.68, rojo 2.14, verde 2.95;
+   el unico que pasaba era el gris, con 7.76.
+   Se corrige el TEXTO, no el fondo: el chip se sigue viendo igual de amarillo o rojo.
+   Estas reglas llevan :root[data-theme] adelante, asi que ganan por especificidad y no
+   importa donde queden en el archivo. */
+:root[data-theme="dark"] .oc-scope {
+  /* El rojo de marca no llega ni con el tono mas oscuro: red-100 sobre el fondo del
+     propio chip da 2.99:1. Aclarado al 65% llega a 4.86. No se toca --ds-color-red-200
+     en si porque tambien es FONDO del toast de error y del punto de notificaciones, y
+     ahi lleva texto blanco encima: aclararlo rompia esos dos. */
+  --oc-rojo-chip: color-mix(in srgb, var(--ds-color-red-100) 65%, #fff);
+}
+/* 4.73:1 */
+:root[data-theme="dark"] .oc-scope .ds-badge--yellow,
+:root[data-theme="dark"] .oc-scope .combo__tag--bodega,
+:root[data-theme="dark"] .oc-scope .nsl-typebadge--bodega { color: var(--ds-color-yellow); }
+/* 4.91:1 el chip, 4.09:1 el icono del resultado (que por ser icono pide 3, no 4.5) */
+:root[data-theme="dark"] .oc-scope .ds-badge--green,
+:root[data-theme="dark"] .oc-scope .oc-resultado__ic { color: var(--ds-color-green-100); }
+/* 4.86:1 el chip, 5.67:1 el titulo del aviso */
+:root[data-theme="dark"] .oc-scope .ds-badge--red { color: var(--oc-rojo-chip); }
+:root[data-theme="dark"] .oc-scope .oc-aviso--rojo { --oc-aviso-acento: var(--oc-rojo-chip); }
+/* "ink" es el chip OSCURO del tema claro. En oscuro la rampa de grises se invierte y el
+   chip queda CLARO, asi que el texto blanco desaparece (1.68:1). Con texto negro vuelve
+   a leerse (12.5:1) Y conserva la intencion: destacar contra el gris de Stock, que en
+   oscuro es un chip oscuro. */
+:root[data-theme="dark"] .oc-scope .ds-badge--ink { color: var(--ds-color-black); }
+
 /* Chip que es un enlace (p.ej. la solicitud de origen de una orden): se ve igual,
    pero se puede abrir. */
 .oc-scope .badge-link { display: inline-flex; text-decoration: none; border-radius: 999px; }
