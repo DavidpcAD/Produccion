@@ -321,7 +321,7 @@ function CasoDetalleModal({
                       <td className={td}>{m.AbreviaturaTipo}</td>
                       <td className={`${td} text-right tabular-nums`}>{formatCRC(m.MontoColones)}</td>
                       <td className={`${td} text-right tabular-nums`}>{formatCRC(m.MontoVinculado_CRC)}</td>
-                      <td className={`${td} text-right tabular-nums ${m.MontoSinVincular_CRC > 0.01 ? 'text-ds-yellow' : 'text-ds-gray-400'}`}>
+                      <td className={`${td} text-right tabular-nums ${m.MontoSinVincular_CRC > 0.01 ? 'text-ds-yellow-ink' : 'text-ds-gray-400'}`}>
                         {formatCRC(m.MontoSinVincular_CRC)}
                       </td>
                     </tr>
@@ -351,7 +351,7 @@ function HitoRow({ h }: { h: HitoVinculable }) {
           <span className="inline-flex items-center gap-2">
             {h.ColorHito && <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: h.ColorHito }} />}
             {h.CodigoHito} · {h.NombreHito}
-            {h.EsHuerfano === 1 && <span className="text-[10px] text-ds-yellow">(huérfano)</span>}
+            {h.EsHuerfano === 1 && <span className="text-[10px] text-ds-yellow-ink">(huérfano)</span>}
           </span>
         </td>
         <td className={`${td} text-right tabular-nums`}>{h.PorcentajeHito.toFixed(1)}%</td>

@@ -181,6 +181,30 @@
   --color-ds-gray-300: #6b7280;
   --color-ds-gray-400: #9aa1ad;
   --color-ds-gray-500: #c3c8d1;
+
+  /* Los tres «ink» son TEXTO de color: el color de marca OSCURECIDO para que se
+     lea sobre fondo claro. En oscuro pasa lo contrario y hay que aclararlos, o
+     queda texto oscuro sobre fondo oscuro. Medido en el navegador con
+     data-theme="dark" antes de este cambio: el distintivo verde "Abierta" de
+     /obras daba 3.56:1 (AA pide 4.5 para texto chico) y lo mismo pasaba en los
+     otros 33 usos de green-ink y los 35 de yellow-ink.
+
+     Es el mismo arreglo que ya se le hizo a los distintivos de Compras el
+     2026-09-30 (ver :root[data-theme="dark"] .oc-scope en app/compras.css), con
+     los mismos tonos: amarillo y verde de marca pasan tal cual, y el rojo no
+     llega ni con el tono más oscuro, así que se aclara al 65%. Se corrige el
+     TEXTO, no el fondo, y el tema claro no cambia. */
+  --color-ds-green-ink:  var(--ds-color-green-100);
+  --color-ds-yellow-ink: var(--ds-color-yellow);
+  --color-ds-red-ink:    color-mix(in srgb, var(--ds-color-red-100) 65%, #fff);
+
+  /* Los fondos «soft» de esos dos chips acompañan: son tintes pensados para el
+     tema claro y dejarlos claros con el texto ya aclarado da claro sobre claro.
+     Se mezclan contra la superficie del tema, igual que los chips de Compras.
+     `--color-brand-soft` NO se toca: se usa como fondo de selección con texto
+     negro encima (ver presupuesto), así que aclararlo o oscurecerlo rompe eso. */
+  --color-ds-green-soft: color-mix(in srgb, var(--ds-color-green-100) 18%, #212530);
+  --color-ds-red-soft:   color-mix(in srgb, var(--ds-color-red-100) 18%, #212530);
 }
 
 /* Impresión: forzar tema claro aunque la app esté en dark. */

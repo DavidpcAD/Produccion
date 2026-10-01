@@ -502,7 +502,7 @@ function SubPartidaModal({ partidas, editandoId, onClose, onGuardado }: ModalPro
               ))}
             </div>
             {form.tipos_casa.size === 0 && (
-              <p className="mt-1 text-xs text-ds-yellow">
+              <p className="mt-1 text-xs text-ds-yellow-ink">
                 Elegí al menos un tipo de casa: de ahí salen las columnas donde luego asignás el
                 peso.
               </p>

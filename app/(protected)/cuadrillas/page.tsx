@@ -878,7 +878,7 @@ export default function CuadrillasPage() {
                 <div className="space-y-1.5 mt-auto">
                   <div className="flex justify-between text-xs">
                     <span className="text-ds-gray-400 font-medium">{c.TotalMiembros} / {c.Capacidad} miembros</span>
-                    <span className={`font-semibold ${pct > 80 ? 'text-ds-red' : pct > 60 ? 'text-ds-yellow' : 'text-ds-ink'}`}>{pct}%</span>
+                    <span className={`font-semibold ${pct > 80 ? 'text-ds-red' : pct > 60 ? 'text-ds-yellow-ink' : 'text-ds-ink'}`}>{pct}%</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-ds-gray-100 overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />

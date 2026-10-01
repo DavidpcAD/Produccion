@@ -156,7 +156,7 @@ export default function DesembolsosDashboardPage() {
             </span>
             <span className="text-ds-gray-300">·</span>
             <span>
-              <strong className="text-ds-yellow">{kpis?.CasasReservadas ?? 0}</strong> reservadas
+              <strong className="text-ds-yellow-ink">{kpis?.CasasReservadas ?? 0}</strong> reservadas
             </span>
             <span className="text-ds-gray-300">·</span>
             <span>
@@ -499,7 +499,7 @@ function FilaCaso({ caso, modo, onClick }: { caso: DashboardCaso; modo: Modo; on
           </>
         ) : caso.FechaProyectadaFormalizacion ? (
           <>
-            <div className="text-xs font-medium text-ds-yellow">Formaliz. {caso.FechaProyectadaFormalizacion}</div>
+            <div className="text-xs font-medium text-ds-yellow-ink">Formaliz. {caso.FechaProyectadaFormalizacion}</div>
             <div className="text-[10px] text-ds-gray-400">Confianza: {nombreConfianza(caso.NivelConfianzaFormalizacion)}</div>
           </>
         ) : (
