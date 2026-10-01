@@ -71,9 +71,30 @@ export async function cartera(db: ConnectionPool, f: CarteraFiltro): Promise<Car
            MontoBanco_CRC, PagoCliente_CRC, PagadoReal_CRC, Pendiente_CRC,
            PorcentajeAvance, HitosCubiertos, TotalHitos, ProximoCodigoHito, ProximaFechaDesembolso, TieneSobrecobro
     FROM [pro_app].vw_dashboard_caso
-    WHERE ${conds.join(' AND ')}
-    ORDER BY EsReservado, AbrevBanco, AbreviaturaProyecto, CodigoLote;
+    WHERE ${conds.join(' AND ')};
   `);
+
+  // El orden se arma ACÁ y no en SQL. Medido el 2026-10-01 contra AdelanteSBX,
+  // con las 855 filas de la cartera:
+  //
+  //   mismas 27 columnas + WHERE + ORDER BY ... → 94 s
+  //   mismas 27 columnas + WHERE               →  6 s
+  //
+  // Son 88 segundos de ordenamiento. `EsReservado`, `AbrevBanco`,
+  // `AbreviaturaProyecto` y `CodigoLote` son columnas CALCULADAS de
+  // `vw_dashboard_caso` (su definición son 24 KB de SQL), y ordenar por ellas le
+  // arruina el plan al motor. Ordenar 855 filas en memoria es instantáneo.
+  //
+  // De paso el orden queda mejor: `localeCompare('es')` pone los acentos donde
+  // van, cosa que la intercalación de la base no necesariamente hace.
+  const txt = (v: unknown) => String(v ?? '').trim();
+  r.recordset.sort((a, b) =>
+    (Number(a.EsReservado ?? 0) - Number(b.EsReservado ?? 0)) ||
+    txt(a.AbrevBanco).localeCompare(txt(b.AbrevBanco), 'es', { numeric: true }) ||
+    txt(a.AbreviaturaProyecto).localeCompare(txt(b.AbreviaturaProyecto), 'es', { numeric: true }) ||
+    txt(a.CodigoLote).localeCompare(txt(b.CodigoLote), 'es', { numeric: true }),
+  );
+
   return r.recordset.map((c) => ({
     IDCaso: Number(c.IDCaso),
     CodigoCaso: (c.CodigoCaso as string | null),

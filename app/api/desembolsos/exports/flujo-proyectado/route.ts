@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
   const vista: VistaFlujo = sp.get('vista') === 'netoAD' ? 'netoAD' : 'bruto';
   try {
     const db = await getAdelanteDb();
-    return NextResponse.json(await flujoProyectado(db, {
+    return jsonComprimido(req, await flujoProyectado(db, {
       desde, hasta, vista,
       idBanco: sp.get('idBanco') ? Number(sp.get('idBanco')) : undefined,
       idProyecto: sp.get('idProyecto') ? Number(sp.get('idProyecto')) : undefined,

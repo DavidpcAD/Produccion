@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getAdelanteDb();
     const filas = await liquidacionLote(db, { desde, hasta, idProyecto: sp.get('idProyecto') ? Number(sp.get('idProyecto')) : undefined });
-    return NextResponse.json({ filas, desde, hasta });
+    return jsonComprimido(req, { filas, desde, hasta });
   } catch (e) {
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }

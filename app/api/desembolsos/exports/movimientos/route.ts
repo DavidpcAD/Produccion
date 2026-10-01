@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
       hasta: sp.get('hasta') ?? undefined,
       q: sp.get('q') ?? undefined,
     });
-    return NextResponse.json({ filas });
+    return jsonComprimido(req, { filas });
   } catch (e) {
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
