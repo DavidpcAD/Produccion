@@ -802,7 +802,7 @@ export default function CuadrillasPage() {
                                 onRemove={isAdmin ? () => handleQuitarEncargado(x.encargado!.idEncargadoPartida) : undefined}
                                 loading={quitandoId === x.encargado.idEncargadoPartida} />
                             ) : (
-                              <span className="text-xs text-ds-gray-300 shrink-0">Sin encargado</span>
+                              <span className="text-xs text-ds-gray-400 shrink-0">Sin encargado</span>
                             )}
                           </div>
                         ))}

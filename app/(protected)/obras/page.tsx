@@ -431,7 +431,7 @@ export default function ObrasPage() {
               <div className="rounded-ds border border-ds-gray-200 px-4 py-3 text-sm">
                 <span className="text-ds-gray-400 font-medium">Centro de costo (CC): </span>
                 <span className="text-ds-ink font-semibold">{String(form.numeroObra) || '—'}</span>
-                <span className="text-ds-gray-300"> · se crea automático con el N° de obra</span>
+                <span className="text-ds-gray-400"> · se crea automático con el N° de obra</span>
               </div>
 
               <div className="pt-1">

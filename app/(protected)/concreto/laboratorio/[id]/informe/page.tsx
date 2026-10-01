@@ -151,7 +151,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
                 <span className="font-mono">{data.obra_works_no}</span>
                 {data.obra_display_name && <span className="text-ds-gray-400"> — {data.obra_display_name}</span>}
               </>
-            ) : <span className="italic text-ds-gray-300">sin obra</span>}
+            ) : <span className="italic text-ds-gray-400">sin obra</span>}
           </Dato>
           <Dato label="ID Casa / ubicación">{data.id_casa ?? <span className="italic text-ds-gray-300">—</span>}</Dato>
           <Dato label="Proveedor">{data.proveedor}</Dato>
@@ -191,7 +191,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
                 return (
                   <tr key={e.id} className="border-b border-ds-gray-200">
                     <Td className="font-medium">{e.edad_dias}</Td>
-                    <Td>{e.fecha_prueba ? fmtFecha(e.fecha_prueba) : <span className="italic text-ds-gray-300">pendiente</span>}</Td>
+                    <Td>{e.fecha_prueba ? fmtFecha(e.fecha_prueba) : <span className="italic text-ds-gray-400">pendiente</span>}</Td>
                     <Td className="text-right tabular-nums">{e.cantidad_mediciones}</Td>
                     <Td className="text-right font-mono tabular-nums">{fmt(e.resistencia_mpa_promedio, 1)}</Td>
                     <Td className="text-right font-mono font-semibold tabular-nums">{fmt(kg, 0)}</Td>

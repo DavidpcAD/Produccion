@@ -339,7 +339,7 @@ function HistoricoKanban({
                   </div>
                 );
               })}
-              {obrasDelSprint.length === 0 && <p className="text-xs text-ds-gray-300 px-1">Sin obras.</p>}
+              {obrasDelSprint.length === 0 && <p className="text-xs text-ds-gray-400 px-1">Sin obras.</p>}
             </div>
           </div>
         );

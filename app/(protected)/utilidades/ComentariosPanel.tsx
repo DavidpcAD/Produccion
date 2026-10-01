@@ -126,7 +126,7 @@ export function ComentariosPanel({
       {loading ? (
         <Skeleton className="h-16 w-full" />
       ) : propios.length === 0 ? (
-        <p className="text-xs text-ds-gray-300">Sin comentarios para este período.</p>
+        <p className="text-xs text-ds-gray-400">Sin comentarios para este período.</p>
       ) : (
         <ul className="divide-y divide-ds-gray-100">
           {propios.map((c) => (

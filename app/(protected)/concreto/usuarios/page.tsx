@@ -145,7 +145,7 @@ export default function ConcretoUsuariosPage() {
                   <p className="text-sm text-ds-gray-400 break-words">{u.email || u.oid}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end">
-                  {u.roles.length === 0 && <span className="text-sm text-ds-gray-300">Sin roles</span>}
+                  {u.roles.length === 0 && <span className="text-sm text-ds-gray-400">Sin roles</span>}
                   {u.roles.map((r) => (
                     <button
                       key={r.assignmentId}

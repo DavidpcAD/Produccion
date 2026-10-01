@@ -76,7 +76,7 @@ function KpiCard({
 // Gráfico simple DS-native: barras horizontales con divs (sin librerías).
 function BarrasHorizontales({ datos }: { datos: { nombre: string; monto: number }[] }) {
   const max = Math.max(1, ...datos.map((d) => Math.abs(d.monto)));
-  if (datos.length === 0) return <p className="py-8 text-center text-sm text-ds-gray-300">Sin datos</p>;
+  if (datos.length === 0) return <p className="py-8 text-center text-sm text-ds-gray-400">Sin datos</p>;
   return (
     <div className="space-y-2">
       {datos.map((d) => (
