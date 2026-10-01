@@ -90,8 +90,19 @@ export default function ReporteH4Page() {
     cargar(fecha, true);
     // Refresco automático (como el original) solo cuando se ve el día de hoy.
     if (fecha !== hoyLocal()) return;
-    const id = setInterval(() => cargar(fecha), 30000);
-    return () => clearInterval(id);
+    // …y solo con la pestaña A LA VISTA. Sin esto seguía pidiendo cada 30 s para
+    // siempre con la pantalla de fondo —120 llamadas por hora a H4, que es un
+    // servicio aparte— para pintar algo que nadie está mirando. Al volver a la
+    // pestaña se refresca de una, así que no se ve más viejo que antes. Mismo
+    // criterio que el auto-refresco de Compras (lib/compras/store.tsx).
+    const tick = () => { if (document.visibilityState === 'visible') cargar(fecha); };
+    const id = setInterval(tick, 30000);
+    const alVolver = () => { if (document.visibilityState === 'visible') cargar(fecha); };
+    document.addEventListener('visibilitychange', alVolver);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', alVolver);
+    };
   }, [fecha, cargar]);
 
   const nAnom = anomalias.length;
