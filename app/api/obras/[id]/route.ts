@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { bindObra } from '@/lib/obras';
+import { bindObra, sqlFechaObra } from '@/lib/obras';
 import { bcConfigured, setAreaProrrateadaJob } from '@/lib/bc-client';
 import { bcConstructionConfigured, setAreaProrrateadaWork } from '@/lib/bc-construction';
 import { getTipoObra, tipoObraDeAreaCosteo, TIPO_POR_DEFECTO } from '@/lib/partidas/tipos-obra';
@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     SELECT o.idObra, o.numeroObra, o.nombreMostrado, o.descripcion, o.centroCosto,
            o.areaCosteo, o.tipoObra, o.proyectoPadre, o.idProyecto, pr.nombre AS proyectoNombre,
            o.gerenteProyecto, o.idEncargado, o.ubicacion,
-           o.estado, o.fechaInicio, o.fechaFin, o.areaProrrateadaM2,
+           o.estado, ${sqlFechaObra('o.fechaInicio')} AS fechaInicio, ${sqlFechaObra('o.fechaFin')} AS fechaFin, o.areaProrrateadaM2,
            o.precioNormalMaquinaria, o.precioConcretoMaquinaria, o.origenPrincipal,
            o.esBC, o.esProcore, o.fechaCreacion, o.creadoPor, o.fechaModificacion, o.modificadoPor
     FROM dbo.Obra o LEFT JOIN dbo.Proyecto pr ON pr.idProyecto = o.idProyecto WHERE o.idObra = @id

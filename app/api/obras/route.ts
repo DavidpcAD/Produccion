@@ -3,7 +3,7 @@ import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { bindObra } from '@/lib/obras';
+import { bindObra, sqlFechaObra } from '@/lib/obras';
 import { bcConfigured, createWork, createProject } from '@/lib/bc-client';
 import { getTipoObra, mapaAreaCosteoTipo, TIPO_POR_DEFECTO } from '@/lib/partidas/tipos-obra';
 
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
              o.areaCosteo, o.tipoObra, o.proyectoPadre, o.idProyecto, pr.nombre AS proyectoNombre,
              pr.esProductivo AS proyectoProductivo,
              o.gerenteProyecto, o.idEncargado, o.ubicacion,
-             o.estado, o.fechaInicio, o.fechaFin, o.areaProrrateadaM2,
+             o.estado, ${sqlFechaObra('o.fechaInicio')} AS fechaInicio, ${sqlFechaObra('o.fechaFin')} AS fechaFin, o.areaProrrateadaM2,
              o.precioNormalMaquinaria, o.precioConcretoMaquinaria, o.origenPrincipal,
              o.esBC, o.esProcore`;
   // El JOIN con Proyecto solo existe para `proyectoNombre`/`proyectoProductivo`.

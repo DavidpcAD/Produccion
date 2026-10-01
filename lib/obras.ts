@@ -1,6 +1,13 @@
 import { sql } from './db';
 import type { Request as SqlRequest } from 'mssql';
 
+/** Las fechas de obra que dejó el ETL de Business Central traen `0001-01-01`
+ *  cuando NO hay fecha, y la pantalla las pintaba como «31/12/1» — en SBX son
+ *  205 de las 259 obras. Al LEER se devuelven como NULL, que es lo que
+ *  significan. Mismo corte que usa `bindObra` al escribir (ver `fecha` abajo). */
+export const sqlFechaObra = (col: string) =>
+  `CASE WHEN ${col} < '1753-01-01' THEN NULL ELSE ${col} END`;
+
 /** Vincula los campos editables de dbo.Obra a un request mssql (create/update). */
 export function bindObra(reqObj: SqlRequest, b: Record<string, unknown>): SqlRequest {
   const num = (v: unknown) => (v != null && v !== '' ? Number(v) : null);
