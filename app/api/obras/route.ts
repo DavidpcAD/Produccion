@@ -24,26 +24,42 @@ export async function GET(req: NextRequest) {
     ? `WHERE (o.numeroObra LIKE @like OR o.nombreMostrado LIKE @like OR o.centroCosto LIKE @like)`
     : '';
 
-  const countRes = await db.request()
-    .input('q', sql.NVarChar, q).input('like', sql.NVarChar, `%${q}%`)
-    .query(`SELECT COUNT(*) AS total FROM dbo.Obra o ${where}`);
-  const total = countRes.recordset[0].total;
-
-  const dataRes = await db.request()
-    .input('q', sql.NVarChar, q).input('like', sql.NVarChar, `%${q}%`)
-    .input('offset', sql.Int, offset).input('porPagina', sql.Int, porPagina)
-    .query(`
-      SELECT o.idObra, o.numeroObra, o.nombreMostrado, o.descripcion, o.centroCosto,
+  // `?campos=basico` — lo que necesita un SELECTOR de obras (Cuadrillas,
+  // Presupuesto): identificarla, saber de qué proyecto es y de qué tipo. La lista
+  // completa son 25 columnas por fila y un JOIN con Proyecto; Cuadrillas se
+  // quedaba con 5 de esas 25 (ver el .map de su `load`) y bajaba 152 KB por 259
+  // obras. Las columnas `areaCosteo`/`tipoObra` siguen porque de ellas sale el
+  // tipo efectivo que se calcula más abajo.
+  const soloBasico = searchParams.get('campos') === 'basico';
+  const columnas = soloBasico
+    ? `o.idObra, o.numeroObra, o.nombreMostrado, o.idProyecto,
+             o.areaCosteo, o.tipoObra, o.areaProrrateadaM2`
+    : `o.idObra, o.numeroObra, o.nombreMostrado, o.descripcion, o.centroCosto,
              o.areaCosteo, o.tipoObra, o.proyectoPadre, o.idProyecto, pr.nombre AS proyectoNombre,
              pr.esProductivo AS proyectoProductivo,
              o.gerenteProyecto, o.idEncargado, o.ubicacion,
              o.estado, o.fechaInicio, o.fechaFin, o.areaProrrateadaM2,
              o.precioNormalMaquinaria, o.precioConcretoMaquinaria, o.origenPrincipal,
-             o.esBC, o.esProcore
-      FROM dbo.Obra o LEFT JOIN dbo.Proyecto pr ON pr.idProyecto = o.idProyecto ${where}
+             o.esBC, o.esProcore`;
+  // El JOIN con Proyecto solo existe para `proyectoNombre`/`proyectoProductivo`.
+  const joinProyecto = soloBasico ? '' : 'LEFT JOIN dbo.Proyecto pr ON pr.idProyecto = o.idProyecto';
+
+  // El conteo y la página no dependen uno del otro: van juntos.
+  const [countRes, dataRes] = await Promise.all([
+    db.request()
+      .input('q', sql.NVarChar, q).input('like', sql.NVarChar, `%${q}%`)
+      .query(`SELECT COUNT(*) AS total FROM dbo.Obra o ${where}`),
+    db.request()
+      .input('q', sql.NVarChar, q).input('like', sql.NVarChar, `%${q}%`)
+      .input('offset', sql.Int, offset).input('porPagina', sql.Int, porPagina)
+      .query(`
+      SELECT ${columnas}
+      FROM dbo.Obra o ${joinProyecto} ${where}
       ORDER BY o.numeroObra
       OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
-    `);
+    `),
+  ]);
+  const total = countRes.recordset[0].total;
 
   // Tipo de obra EFECTIVO: manda la columna tipoObra y, si está vacía, se deduce
   // del área de costeo. El mapeo vive en pro_obc (otra base), así que el cruce se

@@ -396,7 +396,7 @@ export default function CuadrillasPage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/cuadrillas').then(r => r.json()),
-      fetch('/api/obras?porPagina=1000').then(r => r.json()),
+      fetch('/api/obras?porPagina=1000&campos=basico').then(r => r.json()),
       // Todos los colaboradores activos (no solo 200): si se corta la lista, los
       // que quedan fuera del corte alfabético no aparecen en el buscador de miembros.
       fetch('/api/usuarios?activo=1&porPagina=5000&campos=basico').then(r => r.json()),

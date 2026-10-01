@@ -390,7 +390,7 @@ export default function PresupuestoPage() {
   }
 
   const load = useCallback(async () => {
-    const o = await fetch('/api/obras?porPagina=1000').then(r => (r.ok ? r.json() : null)).catch(() => null);
+    const o = await fetch('/api/obras?porPagina=1000&campos=basico').then(r => (r.ok ? r.json() : null)).catch(() => null);
     if (o) setObras(o.data ?? []);
   }, []);
   useEffect(() => { load(); }, [load]);
