@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { listarPresupuestos } from '@/lib/bc/presupuestos';
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
   }
   const worksNo = req.nextUrl.searchParams.get('works_no')?.trim() || undefined;
   try {
-    return NextResponse.json(await listarPresupuestos(worksNo));
+    return jsonComprimido(req, await listarPresupuestos(worksNo));
   } catch (e) {
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }

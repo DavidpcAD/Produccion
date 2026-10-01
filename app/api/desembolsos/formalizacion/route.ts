@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
 import { listarCasos, upsertProyeccion, validarProyeccion, mapDbError, type NivelConfianza } from '@/lib/desembolsos/formalizacion';
@@ -6,12 +7,12 @@ import { listarCasos, upsertProyeccion, validarProyeccion, mapDbError, type Nive
 export const dynamic = 'force-dynamic';
 
 // GET /api/desembolsos/formalizacion — casos reservados con proyección activa.
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 1) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   try {
     const db = await getAdelanteDb();
-    return NextResponse.json({ casos: await listarCasos(db) });
+    return jsonComprimido(req, { casos: await listarCasos(db) });
   } catch (e) {
     const { status, error } = mapDbError(e);
     return NextResponse.json({ error }, { status });

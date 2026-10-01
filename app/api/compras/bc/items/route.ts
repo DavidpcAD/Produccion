@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from "@/lib/errores";
 import { bcItems, bcItemsBloqueados } from "@/lib/compras/bc";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
@@ -6,7 +7,7 @@ import { guardCompras, esRechazo } from "@/lib/compras/guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   const g = await guardCompras();
   if (esRechazo(g)) return g;
 
@@ -18,7 +19,7 @@ export async function GET() {
     // el nombre viejo. Con la lista, el drawer puede descartar esas líneas y decir por
     // qué. Ambos vienen del mismo caché de 5 min, así que no cuesta una llamada extra.
     const [items, bloqueados] = await Promise.all([bcItems(), bcItemsBloqueados()]);
-    return NextResponse.json({ items, bloqueados: bloqueados ? [...bloqueados] : [] });
+    return jsonComprimido(req, { items, bloqueados: bloqueados ? [...bloqueados] : [] });
   } catch (e: any) {
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }

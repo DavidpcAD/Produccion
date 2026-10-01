@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from "@/lib/errores";
 import { listWbs, createClasificacion } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
@@ -10,12 +11,12 @@ export const dynamic = "force-dynamic";
 // material no tiene pantalla para esto, pero el proxy dejaba pasar la llamada.
 
 // Árbol del maestro: etapa -> partida -> sub_partida + clasificaciones del ingeniero.
-export async function GET() {
+export async function GET(req: Request) {
   const g = await guardCompras();
   if (esRechazo(g)) return g;
 
   try {
-    return NextResponse.json(await listWbs());
+    return jsonComprimido(req, await listWbs());
   } catch (e: any) {
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }

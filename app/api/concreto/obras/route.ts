@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
       solo_activas,
       limite,
     });
-    return NextResponse.json({ obras, total: obras.length });
+    return jsonComprimido(req, { obras, total: obras.length });
   } catch (err: unknown) {
     const msg = mensajeParaCliente(err);
     console.error('/api/concreto/obras error:', err);
