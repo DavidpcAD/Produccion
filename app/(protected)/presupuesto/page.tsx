@@ -8,6 +8,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/Confirm';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { PresupuestoHorasCard } from '@/components/presupuesto/horas-card';
@@ -259,6 +260,7 @@ function StepHeader({ n, title, hint }: { n: number; title: string; hint?: strin
 export default function PresupuestoPage() {
   const session = useSession();
   const { toast } = useToast();
+  const confirmar = useConfirm();
   const puede = !!session && session.nivelAdmin >= 2;
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -486,7 +488,16 @@ export default function PresupuestoPage() {
     else setDescompuesto({ archivo: d.archivo ?? d.nombre, ...d.datos });
     toast(`Plantilla "${d.nombre}" cargada. Elegí la obra y subí.`, 'success');
   }
-  async function borrarPlantilla(id: number) {
+  async function borrarPlantilla(id: number, nombre: string) {
+    // Una plantilla es trabajo guardado: rehacerla es volver a subir el archivo
+    // y volver a mapear las columnas. No se borra de un toque.
+    const ok = await confirmar({
+      title: 'Borrar plantilla',
+      message: `Se borra "${nombre}". Para volver a tenerla hay que subir el archivo y mapear las columnas de nuevo.`,
+      confirmLabel: 'Borrar',
+      danger: true,
+    });
+    if (!ok) return;
     // Si el borrado falla, la lista se recarga con la plantilla todavía adentro y
     // no se dice por qué. Se avisa.
     const res = await fetch(`/api/presupuesto/plantillas?id=${id}`, { method: 'DELETE' });
@@ -626,7 +637,7 @@ export default function PresupuestoPage() {
                 <span className="text-sm text-ds-ink font-medium flex-1 min-w-0 break-words">{pl.nombre}</span>
                 <span className="text-ds-gray-400 text-xs shrink-0 hidden sm:block">{pl.archivo}</span>
                 <Button size="sm" variant="outline" onClick={() => usarPlantilla(pl.idPlantilla)}>Usar</Button>
-                <button onClick={() => borrarPlantilla(pl.idPlantilla)} className="text-ds-gray-300 hover:text-ds-red p-1" title="Borrar plantilla"><Icon name="delete" size="sm" color="currentColor" /></button>
+                <button onClick={() => borrarPlantilla(pl.idPlantilla, pl.nombre)} className="text-ds-gray-300 hover:text-ds-red p-1" title="Borrar plantilla"><Icon name="delete" size="sm" color="currentColor" /></button>
               </div>
             ))}
           </div>
