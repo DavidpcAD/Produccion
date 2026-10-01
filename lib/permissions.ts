@@ -175,6 +175,18 @@ const NOMBRE_MODULO: Record<Modulo, string> = {
  *  'admin', que agrupa cosas que no se parecen en nada: contestarle
  *  "no abrís Administración" a quien pidió Utilidades no explica nada. */
 const NOMBRE_RUTA: { prefijo: string; nombre: string }[] = [
+  // Dentro de /compras/facturacion conviven dos oficios. Las pestañas de
+  // CONTABILIDAD van primero —gana la coincidencia más específica— porque a un
+  // bodeguero, que SÍ abre "Recibir material", decirle que no lo abre sería
+  // falso: lo que no abre son las notas de crédito.
+  { prefijo: '/compras/facturacion/notas-credito', nombre: 'Órdenes de Compra' },
+  { prefijo: '/compras/facturacion/cargo', nombre: 'Órdenes de Compra' },
+  { prefijo: '/compras/facturacion/todas', nombre: 'Órdenes de Compra' },
+  { prefijo: '/compras/facturacion/archivo', nombre: 'Órdenes de Compra' },
+  // El resto de la recepción la abren DOS módulos con nombres distintos
+  // (ingenieria + recepcion); sin esta línea caía en el genérico "esa pantalla".
+  // Se usa el rótulo del menú.
+  { prefijo: '/compras/facturacion', nombre: 'Recibir material' },
   { prefijo: '/utilidades', nombre: 'Utilidades' },
   { prefijo: '/reporte-h4', nombre: 'el Reporte H4' },
   { prefijo: '/marcaje', nombre: 'Marcaje' },
