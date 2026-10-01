@@ -9,7 +9,11 @@ interface BadgeProps {
 
 const variants: Record<BadgeVariant, string> = {
   green:  'bg-transparent text-ds-green-ink border border-brand',
-  red:    'bg-transparent text-ds-red-200 border border-ds-red',
+  // red usa el token de TEXTO (red-ink), igual que green y yellow acá abajo. Antes
+  // usaba --ds-color-red-200, que es un color de RELLENO: 4.0 de contraste en el
+  // tema claro y 3.05 en el oscuro. red-ink es el rojo pensado para leerse y
+  // además se aclara solo en oscuro (ver :root[data-theme="dark"] en globals.css).
+  red:    'bg-transparent text-ds-red-ink border border-ds-red',
   orange: 'bg-transparent text-ds-gray-500 border border-ds-gray-200',
   blue:   'bg-ds-surface text-ds-gray-400 border border-ds-gray-200',
   purple: 'bg-ds-surface text-ds-gray-400 border border-ds-gray-200',
