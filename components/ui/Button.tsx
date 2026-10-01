@@ -16,7 +16,35 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const base =
-  'relative inline-flex items-center justify-center gap-2 font-semibold rounded-ds-lg transition-[box-shadow,background-color,color,border-color] duration-100 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:bg-ds-gray-200 disabled:text-ds-gray-300 disabled:border-transparent';
+  'relative inline-flex items-center justify-center gap-2 font-semibold rounded-ds-lg transition-[box-shadow,background-color,color,border-color] duration-100 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none';
+
+// ─── Apagado NO es lo mismo que trabajando ───────────────────────────────────
+//
+// Las dos cosas ponen `disabled` en el <button> —y asi tiene que ser, es lo que
+// impide el doble clic que crearia dos partidas o dos solicitudes—, pero le
+// dicen cosas distintas a quien lo mira:
+//
+//   apagado    = «todavia no se puede: falta llenar algo»
+//   trabajando = «lo estoy haciendo AHORA MISMO»
+//
+// Hasta ahora los dos se pintaban igual, de gris, y eso borraba el segundo
+// mensaje: al tocar «Crear partida» el boton se volvia gris y el spinner,
+// que se dibuja con `border-current`, quedaba del mismo gris claro sobre el
+// gris del fondo. Medido en el navegador el 2026-10-01: 1,56:1 en claro y
+// 2,12:1 en oscuro, o sea invisible. El boton parecia haberse apagado solo
+// y la pantalla, trabada.
+//
+// Ahora, mientras trabaja, el boton CONSERVA su color (verde con texto negro,
+// 11,81:1) y lo unico que cambia es que aparece el spinner girando encima.
+// Se ve lo que uno acaba de tocar, haciendose.
+//
+// El gris se reserva para el apagado de verdad, y su texto sube de gray-300 a
+// gray-400: 3,93:1 en claro y 3,94:1 en oscuro. Sigue leyendose claramente
+// menos que un boton vivo —que es el punto— pero ahora se puede LEER, que hace
+// falta cuando el boton esta apagado justo porque falta un dato y hay que saber
+// cual accion es la que esta trabada.
+const apagado =
+  'disabled:bg-ds-gray-200 disabled:text-ds-gray-400 disabled:border-transparent';
 
 const variants: Record<Variant, string> = {
   primary:   'bg-brand text-black hover:bg-brand-200 focus-visible:ring-brand shadow-ds-03',
@@ -63,7 +91,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <motion.button
         ref={ref}
         disabled={off}
-        className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
+        aria-busy={loading || undefined}
+        className={`${base} ${variants[variant]} ${sizes[size]} ${loading ? '' : apagado} ${className}`}
         whileTap={{ scale: off ? 1 : 0.97 }}
         transition={springs.snappy}
         style={{
