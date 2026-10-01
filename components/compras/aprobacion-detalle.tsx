@@ -12,7 +12,7 @@ import {
   ordenConsumoDirecto, ordenDevueltaPorBc, ordenEsDirecta, ordenLineaEsConsumoDirecto,
   numeroOrdenPlano, ordenLineaImporte, ordenMaquinas, ordenPedidos, ordenTotalConIva, ROL_LABEL,
 } from "@/lib/compras/helpers";
-import type { Orden } from "@/lib/compras/types";
+import type { Orden, Pedido } from "@/lib/compras/types";
 
 type Tab = "resumen" | "lineas" | "obra" | "historial";
 
@@ -37,7 +37,7 @@ export function AprobacionDetalle({
   /** Abre el panel del proveedor (al lado del riel), con su historial de compras. */
   onVerProveedor: (codigo: string) => void;
 }) {
-  const { proveedores, pedidos, movimientos, bcEstados, cargarMovimientos } = useStore();
+  const { proveedores, pedidos, movimientos, bcEstados, cargandoExtra, cargarMovimientos } = useStore();
   const [tab, setTab] = useState<Tab>(tabInicial);
   const marco = useRef<HTMLElement>(null);
 
@@ -159,6 +159,13 @@ export function AprobacionDetalle({
               </span>
             </button>
 
+            {/* De dónde salió la compra. Vivía solo al fondo de "Obra y proyecto", y quien
+                aprueba abre el riel en Resumen: desde ahí no había cómo llegar a la
+                solicitud ni ver quién pidió el material sin salirse de la bandeja. */}
+            {ordenEsDirecta(orden)
+              ? <Dato icon="boleta" rotulo="Solicitud de origen" valor="Compra directa · sin solicitud" />
+              : peds.map((n) => <SolicitudOrigen key={n} numero={n} pedido={pedidos.find((x) => x.numero === n)} cargando={cargandoExtra} />)}
+
             <div className="oc-det__datos">
               <Dato icon="reloj" rotulo="Fecha" valor={formatDate(orden.fecha)} />
               <Dato icon="list" rotulo="Cantidad de líneas" valor={String(articulos.length)} />
@@ -245,9 +252,11 @@ export function AprobacionDetalle({
                   <span className="oc-det__linea-n" aria-hidden>{i + 1}</span>
                   <span className="oc-det__linea-nom">
                     <span className="ds-wrap ds-strong">{l.descripcion}</span>
-                    {(l.articuloId || l.variantCode) && (
+                    {/* De qué solicitud salió la línea: en una orden que junta varios
+                        pedidos es lo único que dice cuál material pidió quién. */}
+                    {(l.articuloId || l.variantCode || lineaPedido(l)) && (
                       <span className="oc-det__linea-cod">
-                        {[l.articuloId, l.variantCode && `Variante ${l.variantCode}`].filter(Boolean).join(" · ")}
+                        {[l.articuloId, l.variantCode && `Variante ${l.variantCode}`, lineaPedido(l)].filter(Boolean).join(" · ")}
                       </span>
                     )}
                   </span>
@@ -287,6 +296,9 @@ export function AprobacionDetalle({
 
         {tab === "obra" && (
           <div className="oc-det__lista">
+            {articulos.length === 0 && (
+              <span className="oc-det__linea-dest">Esta orden no tiene líneas de material: no hay obra ni proyecto que mostrar.</span>
+            )}
             {cd.hay && (
               <div className="oc-det__grupo">
                 <span className="oc-det__rot">Consumo directo · el costo va a la obra</span>
@@ -311,21 +323,6 @@ export function AprobacionDetalle({
                 ))}
               </div>
             )}
-            <div className="oc-det__grupo">
-              <span className="oc-det__rot">Solicitudes de origen</span>
-              {ordenEsDirecta(orden) ? (
-                <span className="oc-det__linea-dest">Compra directa · sin solicitud de origen.</span>
-              ) : (
-                <div className="oc-det__chips">
-                  {peds.map((n) => {
-                    const p = pedidos.find((x) => x.numero === n);
-                    return p
-                      ? <Link key={n} href={`/compras/solicitud/${p.id}`} className="badge-link" title={`Abrir la solicitud ${n}`}><Badge tone="gray">{n}</Badge></Link>
-                      : <Badge key={n} tone="gray">{n}</Badge>;
-                  })}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -347,6 +344,47 @@ export function AprobacionDetalle({
         </Link>
       </footer>
     </section>
+  );
+}
+
+/** N.º de solicitud de una línea. "Manual" es lo que Proveeduría le pone a lo que
+ *  agregó a mano: no es una solicitud, así que no se muestra como si lo fuera. */
+function lineaPedido(l: { pedidoNumero?: string }): string | null {
+  return l.pedidoNumero && l.pedidoNumero !== "Manual" ? l.pedidoNumero : null;
+}
+
+// La solicitud de la que salió la orden, en el Resumen: el número, quién pidió el
+// material y la fecha, y abre el pedido completo. Mientras el bootstrap no haya traído
+// los pedidos no hay id al que ir, así que la fila se muestra igual pero sin link: un
+// link a una solicitud que todavía no está en memoria cae en "Solicitud no encontrada".
+function SolicitudOrigen({ numero, pedido, cargando }: { numero: string; pedido?: Pedido; cargando: boolean }) {
+  const cuerpo = (
+    <>
+      <span className="oc-det__ic"><Icon name="boleta" size="md" color="currentColor" /></span>
+      <span className="oc-det__dato-txt">
+        <span className="oc-det__rot">Solicitud de origen</span>
+        <span className="oc-det__sol-num">{numero}</span>
+        <span className="oc-det__sol-quien ds-wrap">
+          {pedido
+            ? [pedido.solicitante && `La pidió ${pedido.solicitante}`, formatDate(pedido.fecha)].filter(Boolean).join(" · ")
+            : cargando ? "Cargando la solicitud…" : "La solicitud no está disponible."}
+        </span>
+      </span>
+      {pedido && (
+        <span className="oc-det__sol-ir" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </span>
+      )}
+    </>
+  );
+  if (!pedido) return <div className="oc-det__sol">{cuerpo}</div>;
+  return (
+    <Link href={`/compras/solicitud/${pedido.id}`} className="oc-det__sol"
+      title={`Abrir la solicitud ${numero}: qué se pidió, para qué obra y quién la pidió`}>
+      {cuerpo}
+    </Link>
   );
 }
 
