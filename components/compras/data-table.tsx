@@ -185,7 +185,9 @@ export function DataTable<T>({
   // mismo que "no hay nada": la segunda tiene arreglo, así que se dice cuál es y
   // se ofrece deshacerla. Mismo criterio que la tabla del DS.
   const filtrosPuestos = columnFilters.length + (globalFilter ? 1 : 0);
-  const Vacio = () =>
+  // Es un ELEMENTO, no un componente definido adentro: un componente nuevo en
+  // cada render hace que React desmonte y vuelva a montar el subárbol.
+  const vacioEl =
     filtrosPuestos > 0 ? (
       <div className="empty">
         Nada coincide con lo que buscaste.{" "}
@@ -357,12 +359,9 @@ export function DataTable<T>({
         />
       )}
 
-      {/* "No hay registros." decía lo mismo con y sin filtro puesto, y son dos
-          cosas distintas: la segunda tiene arreglo. Se dice cuál es y se ofrece
-          deshacerla. Mismo criterio que la tabla del DS. */}
       {/* Vista Grid (tarjetas) */}
       {modo === "grid" ? (
-        rows.length === 0 ? <Vacio /> : (
+        rows.length === 0 ? vacioEl : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
             {rows.map((row) => (
               <Card key={row.id} className={`dt-gridcard ${rowClassName?.(row.original) ?? ""}`.trim()} interactive={!!onRowClick} onClick={onRowClick ? () => onRowClick(row.original) : undefined}>
@@ -432,7 +431,7 @@ export function DataTable<T>({
                 ))}
               </thead>
               <tbody>
-                {rows.length === 0 && <tr><td colSpan={table.getVisibleLeafColumns().length + (renderExpanded ? 1 : 0)}><Vacio /></td></tr>}
+                {rows.length === 0 && <tr><td colSpan={table.getVisibleLeafColumns().length + (renderExpanded ? 1 : 0)}>{vacioEl}</td></tr>}
                 {rows.map((row) => {
                   const open = expanded.has(row.id);
                   return (
