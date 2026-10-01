@@ -10,6 +10,7 @@ import { haptic } from '@/components/ds/haptic';
 import { springs } from '@/lib/springs';
 import { useConfirm } from '@/components/ui/Confirm';
 import { modulosDeRuta, visibleEnMenu } from '@/lib/permissions';
+import { limpiarDatosLocales } from '@/lib/sesion-local';
 
 const THEME_KEY = 'adelante_oc_theme';
 
@@ -197,7 +198,13 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
       confirmLabel: 'Cerrar sesión',
       danger: true,
     });
-    if (ok) logoutRef.current?.requestSubmit();
+    if (!ok) return;
+    // Antes de irse: lo que esta persona dejó guardado en ESTE navegador. La
+    // cookie la borra el servidor, pero el borrador de la solicitud y su nombre
+    // se quedaban para quien entrara después — y estas pantallas viven en
+    // tabletas compartidas de obra. Ver lib/sesion-local.ts.
+    limpiarDatosLocales();
+    logoutRef.current?.requestSubmit();
   };
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
