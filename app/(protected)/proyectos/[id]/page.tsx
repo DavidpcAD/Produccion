@@ -67,7 +67,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
       traerProyecto(),
       // La lista de colaboradores es para el modal de asignar: si falla (p. ej. sin
       // permiso de usuarios) el detalle debe cargar igual.
-      fetch('/api/usuarios?activo=1&porPagina=5000')
+      fetch('/api/usuarios?activo=1&porPagina=5000&campos=basico')
         .then(r => (r.ok ? r.json() : { data: [] }))
         .catch(() => ({ data: [] })),
     ]).then(([p, u]) => {
@@ -100,7 +100,14 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
   }
 
   async function handleRetirar(idColProy: number) {
-    await fetch(`/api/proyectos/${id}/asignaciones`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idColProy }) });
+    // Se revisa la respuesta antes de cantar victoria: si falla, la persona sigue
+    // asignada y el aviso en verde esconde el problema.
+    const res = await fetch(`/api/proyectos/${id}/asignaciones`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idColProy }) });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      toast(e.error || 'No se pudo retirar a la persona', 'error');
+      return;
+    }
     toast('Persona retirada del proyecto', 'warning');
     await load();
   }

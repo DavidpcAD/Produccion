@@ -74,7 +74,7 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
   useEffect(() => {
     Promise.all([
       fetch(`/api/cuadrillas/${id}`).then(r => r.json()),
-      fetch('/api/usuarios?activo=1&porPagina=5000').then(r => r.json()),
+      fetch('/api/usuarios?activo=1&porPagina=5000&campos=basico').then(r => r.json()),
       fetch('/api/proyectos').then(r => r.json()),
       fetch('/api/partidas').then(r => r.json()),
     ]).then(([c, u, p, pt]) => {
@@ -154,7 +154,16 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
   }
 
   async function handleQuitar(idCuadMiembro: number) {
-    await fetch(`/api/cuadrillas/${id}/miembros`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idCuadMiembro }) });
+    // Se revisa la respuesta antes de cantar victoria: si la sesión venció o el
+    // servidor falló, el miembro sigue ahí y decirle "removido" al usuario lo
+    // manda a cerrar la pantalla creyendo que quedó hecho. Mismo trato que
+    // `handleAgregar` acá arriba.
+    const res = await fetch(`/api/cuadrillas/${id}/miembros`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idCuadMiembro }) });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      toast(e.error || 'No se pudo quitar el miembro', 'error');
+      return;
+    }
     toast('Miembro removido', 'warning');
     await load();
   }

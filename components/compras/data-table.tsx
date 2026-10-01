@@ -148,7 +148,13 @@ export function DataTable<T>({
     } catch { alert("No se pudo guardar la vista."); }
   }
   async function borrarVista(v: Vista) {
-    try { await fetch(`/api/compras/vistas/${v.id}?usuario=${encodeURIComponent(usuario ?? "")}`, { method: "DELETE" }); await cargarVistas(); } catch { /* noop */ }
+    // Igual que `guardarVista`: si el borrado no pasó, se dice. Antes el catch se
+    // comía el fallo y la vista reaparecía en la lista sin explicación.
+    try {
+      const r = await fetch(`/api/compras/vistas/${v.id}?usuario=${encodeURIComponent(usuario ?? "")}`, { method: "DELETE" });
+      if (!r.ok) throw new Error();
+      await cargarVistas();
+    } catch { alert("No se pudo borrar la vista."); }
     finally { setVistaABorrar(null); }
   }
   function resetVista() {

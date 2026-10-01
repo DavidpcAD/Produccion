@@ -42,16 +42,28 @@ export async function GET(req: NextRequest) {
     where += ` AND c.idUsuario IS NOT NULL`;
   }
 
-  const countRes = await request.query(`
-    SELECT COUNT(*) as total FROM dbo.V_Colaborador c ${where}
-  `);
-  const total = countRes.recordset[0].total;
+  // `?campos=basico` — lo que necesita un SELECTOR de personas (Cuadrillas,
+  // Proyectos): id, nombre, cédula y puesto. Nada más.
+  //
+  // La consulta completa de abajo trae 13 columnas por fila y, por CADA UNA,
+  // arma el JSON de sus apps con una subconsulta correlacionada más un
+  // STRING_AGG sobre UsuarioRol/Rol. Para pintar un desplegable de nombres eso
+  // son 105 KB y ~2 s por 342 colaboradores, y de paso le manda el correo y el
+  // teléfono de toda la empresa a cualquiera que abra Cuadrillas. El modo
+  // básico se salta los dos joins y la subconsulta.
+  const soloBasico = searchParams.get('campos') === 'basico';
 
-  const dataRes = await db.request()
-    .input('busqueda', sql.NVarChar, `%${busqueda}%`)
-    .input('offset', sql.Int, offset)
-    .input('porPagina', sql.Int, porPagina)
-    .query(`
+  const selectBasico = `
+      SELECT c.idColaborador AS IDCol, c.cedula AS Cedula,
+             c.calcNombreCompleto AS NombreCompleto, c.puesto AS Puesto,
+             c.esActivo AS Activo
+      FROM dbo.V_Colaborador c
+      ${where}
+      ORDER BY c.esActivo DESC, c.calcNombreCompleto
+      OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
+    `;
+
+  const selectCompleto = `
       SELECT c.idColaborador AS IDCol, c.cedula AS Cedula,
              c.calcNombreCompleto AS NombreCompleto, c.correo AS Correo,
              c.telefono AS Telefono, c.departamento AS Departamento, c.puesto AS Puesto,
@@ -79,14 +91,27 @@ export async function GET(req: NextRequest) {
                c.username, c.idUsuario
       ORDER BY c.esActivo DESC, c.calcNombreCompleto
       OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
-    `);
+    `;
+
+  // El conteo y la página no dependen uno del otro: van juntos.
+  const [countRes, dataRes] = await Promise.all([
+    request.query(`SELECT COUNT(*) as total FROM dbo.V_Colaborador c ${where}`),
+    db.request()
+      .input('busqueda', sql.NVarChar, `%${busqueda}%`)
+      .input('offset', sql.Int, offset)
+      .input('porPagina', sql.Int, porPagina)
+      .query(soloBasico ? selectBasico : selectCompleto),
+  ]);
+  const total = countRes.recordset[0].total;
 
   // `apps` viene como string JSON (FOR JSON PATH) o null si no tiene roles.
-  const data = dataRes.recordset.map((row: Record<string, unknown>) => ({
-    ...row,
-    EsUsuario: !!row.EsUsuario,
-    apps: typeof row.apps === 'string' ? JSON.parse(row.apps as string) : [],
-  }));
+  const data = soloBasico
+    ? dataRes.recordset
+    : dataRes.recordset.map((row: Record<string, unknown>) => ({
+        ...row,
+        EsUsuario: !!row.EsUsuario,
+        apps: typeof row.apps === 'string' ? JSON.parse(row.apps as string) : [],
+      }));
 
   return NextResponse.json({
     data,

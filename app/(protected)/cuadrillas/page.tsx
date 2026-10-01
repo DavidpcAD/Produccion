@@ -399,7 +399,7 @@ export default function CuadrillasPage() {
       fetch('/api/obras?porPagina=1000').then(r => r.json()),
       // Todos los colaboradores activos (no solo 200): si se corta la lista, los
       // que quedan fuera del corte alfabético no aparecen en el buscador de miembros.
-      fetch('/api/usuarios?activo=1&porPagina=5000').then(r => r.json()),
+      fetch('/api/usuarios?activo=1&porPagina=5000&campos=basico').then(r => r.json()),
       fetch('/api/partidas').then(r => r.json()),
       fetch('/api/encargados-partida').then(r => r.json()).catch(() => ({})),
       fetch('/api/usuarios?activo=1&soloUsuarios=1&porPagina=500').then(r => r.json()).catch(() => ({ data: [] })),
@@ -591,10 +591,17 @@ export default function CuadrillasPage() {
     if (!(await confirm({ message: '¿Quitar este miembro de la cuadrilla?', confirmLabel: 'Quitar', danger: true }))) return;
     setRemovingId(idCuadMiembro);
     try {
-      await fetch(`/api/cuadrillas/${verCuad.IDCuadrilla}/miembros`, {
+      // Se revisa la respuesta antes de cantar victoria: con la sesión vencida el
+      // DELETE da 401 y el miembro sigue en la cuadrilla.
+      const res = await fetch(`/api/cuadrillas/${verCuad.IDCuadrilla}/miembros`, {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idCuadMiembro }),
       });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        toast(e.error || 'No se pudo quitar el miembro', 'error');
+        return;
+      }
       toast('Miembro removido', 'warning');
       await loadDetalle(verCuad.IDCuadrilla);
       await loadCuadrillas();

@@ -487,7 +487,14 @@ export default function PresupuestoPage() {
     toast(`Plantilla "${d.nombre}" cargada. Elegí la obra y subí.`, 'success');
   }
   async function borrarPlantilla(id: number) {
-    await fetch(`/api/presupuesto/plantillas?id=${id}`, { method: 'DELETE' });
+    // Si el borrado falla, la lista se recarga con la plantilla todavía adentro y
+    // no se dice por qué. Se avisa.
+    const res = await fetch(`/api/presupuesto/plantillas?id=${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      toast(e.error || 'No se pudo borrar la plantilla', 'error');
+      return;
+    }
     cargarPlantillas();
   }
 
