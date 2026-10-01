@@ -453,7 +453,7 @@ function DetallePorObra({ obras }: { obras: ReporteObra[] }) {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-ds-gray-200 bg-ds-gray-50">
+            <tr className="border-b border-ds-gray-200 bg-ds-gray-100">
               <th className={`${th} text-left`}>Obra</th>
               <th className={`${th} text-left`}>Tipo</th>
               <th className={`${th} text-right`}>Sprint</th>

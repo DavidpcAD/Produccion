@@ -161,7 +161,7 @@ function TabNomina({ semanaId }: { semanaId: number }) {
 
   return (
     <div className="max-w-md space-y-4">
-      <p className="rounded-ds border border-ds-gray-100 bg-ds-gray-50 px-3 py-2 text-sm text-ds-gray-500">
+      <p className="rounded-ds border border-ds-gray-200 bg-ds-gray-100 px-3 py-2 text-sm text-ds-gray-500">
         Ingresá el <strong className="text-ds-ink">total</strong> de la planilla directa de la semana (sin subcontratos) y el <strong className="text-ds-ink">costo teórico por m²</strong> presupuestado. Con esto el sistema calcula el costo de M.O. por m² y el sobrecosto.
       </p>
       <Input

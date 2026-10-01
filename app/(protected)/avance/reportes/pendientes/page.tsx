@@ -130,7 +130,7 @@ export default function ReportePendientesPage() {
 
           {grupos.map(([clave, lista]) => (
             <section key={clave} className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
-              <div className="flex items-center justify-between border-b border-ds-gray-200 bg-ds-gray-50 px-3 py-1.5">
+              <div className="flex items-center justify-between border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-1.5">
                 <span className="text-sm font-semibold">
                   {agrupar === 'sub' && lista[0]?.es_critica && <span className="mr-1 text-ds-red">●</span>}
                   {clave}

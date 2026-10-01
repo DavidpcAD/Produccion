@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Pills } from '../_components/Pills';
+import { AvisoTope, rotuloTope } from '../_components/AvisoTope';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { BatchDetallePlanta, PlantaListadoItem } from '@/lib/concreto/tipos';
 
@@ -31,6 +32,9 @@ function delta(n: number | null): React.ReactNode {
 export default function BatchesPage() {
   const { toast } = useToast();
   const [batches, setBatches] = useState<BatchDetallePlanta[]>([]);
+  // Cuántas hay EN LA BASE, no cuántas se bajaron: el subtítulo contaba las
+  // filas de la página 1 y las daba por el total. Ver AvisoTope.
+  const [total, setTotal] = useState(0);
   const [plantas, setPlantas] = useState<PlantaListadoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -47,9 +51,11 @@ export default function BatchesPage() {
       const data = await fetch(`/api/concreto/batches?${params}`).then((r) => r.json());
       if (data.error) throw new Error(data.error);
       setBatches(data.batches ?? []);
+      setTotal(data.total ?? (data.batches?.length ?? 0));
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Error cargando batches', 'error');
       setBatches([]);
+      setTotal(0);
       setError(true);
     } finally {
       setLoading(false);
@@ -128,7 +134,7 @@ export default function BatchesPage() {
     <PageShell>
       <PageHeader
         title="Batches"
-        subtitle={loading ? 'Cargando…' : `${batches.length} batches · datos crudos de planta`}
+        subtitle={loading ? 'Cargando…' : `${rotuloTope(batches.length, total, 'batches')} · datos crudos de planta`}
       />
 
       <div className="space-y-3">
@@ -157,6 +163,15 @@ export default function BatchesPage() {
           <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar los batches.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
+      )}
+
+      {!loading && !error && (
+        <AvisoTope
+          cargadas={batches.length}
+          total={total}
+          sustantivo="batches"
+          comoFiltrar="filtrá por planta, o marcá “Solo con anomalías”, para acercarte al que buscás."
+        />
       )}
 
       <DataTable

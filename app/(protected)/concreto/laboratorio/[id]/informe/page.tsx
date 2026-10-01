@@ -132,7 +132,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
             <div className="text-xs text-ds-gray-400">Laboratorio de Concreto</div>
           </div>
           <div className="text-right">
-            <div className="text-sm font-semibold uppercase tracking-wide text-ds-gray-600">Informe de ensayo</div>
+            <div className="text-sm font-semibold uppercase tracking-wide text-ds-gray-500">Informe de ensayo</div>
             <div className="text-xs text-ds-gray-400">Resistencia a la compresión (ASTM C-39)</div>
           </div>
         </header>
@@ -165,7 +165,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
 
         {/* Resultados */}
         <section className="mt-6" style={{ breakInside: 'avoid' }}>
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ds-gray-600">Resultados de resistencia</h2>
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ds-gray-500">Resultados de resistencia</h2>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b-2 border-ds-gray-300 text-left">
@@ -211,7 +211,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
 
         {/* Gráfico */}
         <section className="mt-6" style={{ breakInside: 'avoid' }}>
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ds-gray-600">Curva de resistencia</h2>
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ds-gray-500">Curva de resistencia</h2>
           <div className="rounded-ds border border-ds-gray-200 p-2">
             <GraficoInforme ensayos={ensayos} fcObjetivo={fc} curva={curva} />
           </div>
@@ -220,7 +220,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
         {/* Detalle de probetas */}
         {hayMediciones && (
           <section className="mt-6" style={{ breakInside: 'avoid' }}>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ds-gray-600">Detalle de probetas</h2>
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ds-gray-500">Detalle de probetas</h2>
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b-2 border-ds-gray-300 text-left">
@@ -251,8 +251,8 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
         {/* Notas */}
         {data.notas && (
           <section className="mt-6" style={{ breakInside: 'avoid' }}>
-            <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-ds-gray-600">Notas</h2>
-            <p className="whitespace-pre-wrap text-sm text-ds-gray-600">{data.notas}</p>
+            <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-ds-gray-500">Notas</h2>
+            <p className="whitespace-pre-wrap text-sm text-ds-gray-500">{data.notas}</p>
           </section>
         )}
 

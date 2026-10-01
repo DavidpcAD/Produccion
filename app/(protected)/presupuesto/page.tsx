@@ -221,7 +221,7 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
           {r.descompuestoChunks != null && <span>Chunks: <strong className="text-ds-ink">{r.descompuestoChunks}</strong></span>}
         </div>
         {mensajeBC && (
-          <div className="rounded-ds bg-ds-gray-100 px-3 py-2 text-xs font-mono text-ds-gray-600 break-words">
+          <div className="rounded-ds bg-ds-gray-100 px-3 py-2 text-xs font-mono text-ds-gray-500 break-words">
             Respuesta BC: {mensajeBC}
           </div>
         )}
@@ -232,7 +232,7 @@ function DetalleBC({ r }: { r: ResultadoBC }) {
               {Object.entries(r.obraCampos).map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3 border-b border-ds-gray-100 py-0.5">
                   <span className="text-ds-gray-400 break-words">{k}</span>
-                  <span className="font-mono text-ds-gray-600 shrink-0">{v.toLocaleString('es-CR', { maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono text-ds-gray-500 shrink-0">{v.toLocaleString('es-CR', { maximumFractionDigits: 2 })}</span>
                 </div>
               ))}
             </div>
@@ -840,7 +840,7 @@ export default function PresupuestoPage() {
                             {d.taskType === 'Total' ? 'Capítulo' : 'Partida'}
                           </span>
                           <span className="font-mono text-xs font-semibold text-ds-ink shrink-0">{d.taskNo}</span>
-                          <span className="text-ds-gray-600 min-w-0 break-words">{d.description}</span>
+                          <span className="text-ds-gray-500 min-w-0 break-words">{d.description}</span>
                           {d.ubicacion && d.taskType === 'Posting' && (
                             <span className="text-ds-gray-400 text-xs shrink-0">→ iría en {d.ubicacion}</span>
                           )}

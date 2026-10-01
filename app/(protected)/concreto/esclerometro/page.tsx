@@ -10,6 +10,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { AvisoTope, rotuloTope } from '../_components/AvisoTope';
 import { ANGULOS_IMPACTO } from '@/lib/concreto/tipos-esclerometro';
 import type {
   EnsayoEsclerometroListado,
@@ -51,6 +52,9 @@ export default function EsclerometroPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [ensayos, setEnsayos] = useState<EnsayoEsclerometroListado[]>([]);
+  // Cuántas hay EN LA BASE, no cuántas se bajaron: el subtítulo contaba las
+  // filas de la página 1 y las daba por el total. Ver AvisoTope.
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [obra, setObra] = useState('');
@@ -69,9 +73,11 @@ export default function EsclerometroPage() {
       const data = await fetch(`/api/concreto/lab/esclerometro?${params}`).then((r) => r.json());
       if (data.error) throw new Error(data.error);
       setEnsayos(data.ensayos ?? []);
+      setTotal(data.total ?? (data.ensayos?.length ?? 0));
     } catch {
       toast('Error cargando ensayos', 'error');
       setEnsayos([]);
+      setTotal(0);
       setError(true);
     } finally {
       setLoading(false);
@@ -158,7 +164,7 @@ export default function EsclerometroPage() {
     <PageShell>
       <PageHeader
         title="Esclerómetro"
-        subtitle={loading ? 'Cargando…' : `${ensayos.length} ensayos · martillo Schmidt (no destructivo)`}
+        subtitle={loading ? 'Cargando…' : `${rotuloTope(ensayos.length, total, 'ensayos')} · martillo Schmidt (no destructivo)`}
         actions={
           <Button onClick={() => setModalNuevo(true)} icon={<Icon name="plus" size="sm" color="currentColor" />}>
             Nuevo ensayo
@@ -182,6 +188,15 @@ export default function EsclerometroPage() {
           <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar los ensayos.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
+      )}
+
+      {!loading && !error && (
+        <AvisoTope
+          cargadas={ensayos.length}
+          total={total}
+          sustantivo="ensayos"
+          comoFiltrar="usá los filtros de arriba para acercarte al que buscás."
+        />
       )}
 
       <DataTable

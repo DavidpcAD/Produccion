@@ -299,7 +299,7 @@ export default function MuestraDetallePage({ params }: { params: Promise<{ id: s
                     {e.mediciones.map((m) => (
                       <span
                         key={m.id}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-ds-gray-100 text-ds-gray-600 text-xs font-semibold pl-2.5 pr-1.5 py-1"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-ds-gray-100 text-ds-gray-500 text-xs font-semibold pl-2.5 pr-1.5 py-1"
                       >
                         <button
                           onClick={() => setMedEdit({ id: m.id, resistencia_mpa: m.resistencia_mpa, notas: m.notas })}

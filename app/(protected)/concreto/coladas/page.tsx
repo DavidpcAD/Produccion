@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Pills } from '../_components/Pills';
+import { AvisoTope, rotuloTope } from '../_components/AvisoTope';
 import { ESTADO_COLADA, ESTADOS_COLADA } from '@/lib/concreto/estados';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { ColadaListadoItem, EstadoColada, PlantaListadoItem } from '@/lib/concreto/tipos';
@@ -23,6 +24,9 @@ export default function ColadasPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [coladas, setColadas] = useState<ColadaListadoItem[]>([]);
+  // Cuántas hay EN LA BASE, no cuántas se bajaron: el subtítulo decía
+  // "500 coladas" con 1 433 en SBX. Ver AvisoTope.
+  const [total, setTotal] = useState(0);
   const [plantas, setPlantas] = useState<PlantaListadoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -39,9 +43,11 @@ export default function ColadasPage() {
       const data = await fetch(`/api/concreto/coladas?${params}`).then((r) => r.json());
       if (data.error) throw new Error(data.error);
       setColadas(data.coladas ?? []);
+      setTotal(data.total ?? (data.coladas?.length ?? 0));
     } catch {
       toast('Error cargando coladas', 'error');
       setColadas([]);
+      setTotal(0);
       setError(true);
     } finally {
       setLoading(false);
@@ -137,7 +143,7 @@ export default function ColadasPage() {
     <PageShell>
       <PageHeader
         title="Coladas"
-        subtitle={loading ? 'Cargando…' : `${coladas.length} coladas`}
+        subtitle={loading ? 'Cargando…' : rotuloTope(coladas.length, total, 'coladas')}
       />
 
       <div className="space-y-3">
@@ -166,6 +172,15 @@ export default function ColadasPage() {
           <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar las coladas.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
+      )}
+
+      {!loading && !error && (
+        <AvisoTope
+          cargadas={coladas.length}
+          total={total}
+          sustantivo="coladas"
+          comoFiltrar="filtrá por estado o por planta para acercarte a la que buscás."
+        />
       )}
 
       <DataTable

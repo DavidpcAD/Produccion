@@ -228,9 +228,9 @@ function HistoricoGrilla({
           <tr>
             {/* sticky en las CELDAS (no en <thead>/<tr>, que varios navegadores ignoran)
                 para que la primera fila (encabezado de obras) quede anclada al hacer scroll. */}
-            <th className="sticky left-0 top-0 z-30 border-b border-r border-ds-gray-200 bg-ds-gray-50 px-2 py-2 text-left">Sub-partida</th>
+            <th className="sticky left-0 top-0 z-30 border-b border-r border-ds-gray-200 bg-ds-gray-100 px-2 py-2 text-left">Sub-partida</th>
             {obras.map((o) => (
-              <th key={o.codigo} className="sticky top-0 z-10 border-b border-ds-gray-200 bg-ds-gray-50 px-1 py-2 text-center font-mono" style={{ minWidth: 44 }}
+              <th key={o.codigo} className="sticky top-0 z-10 border-b border-ds-gray-200 bg-ds-gray-100 px-1 py-2 text-center font-mono" style={{ minWidth: 44 }}
                 title={`${o.codigo}${o.tipo_casa ? ` · ${o.tipo_casa}` : ''}${o.sprint_actual != null ? ` · S${o.sprint_actual}` : ''}`}>
                 <span className="inline-block whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{o.codigo}</span>
               </th>
@@ -368,7 +368,7 @@ function SubLista({
           const txt = v == null ? '—' : completadaSemana ? '✓' : v >= 100 ? '100%' : `${Math.round(v)}%`;
           return (
             <li key={s.id} className={'flex items-center justify-between gap-1 py-0.5 ' + (marc ? 'border-l-2 border-brand pl-1' : '')}>
-              <span className="min-w-0 flex-1 truncate text-ds-gray-600">{s.nombre}</span>
+              <span className="min-w-0 flex-1 truncate text-ds-gray-500">{s.nombre}</span>
               <span className={'shrink-0 tabular-nums ' + (completadaSemana ? 'font-semibold text-ds-green-ink' : v != null && v >= 100 ? 'font-semibold text-ds-green-ink' : 'text-ds-gray-400')}>{txt}</span>
             </li>
           );

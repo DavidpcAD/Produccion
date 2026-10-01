@@ -251,7 +251,7 @@ function M2PorPartida({ m, soloAvance }: { m: M2Reporte; soloAvance: boolean }) 
           {partidas.map((p) => (
             <PartidaBloque key={p.partida_id} p={p} m={m} soloAvance={soloAvance} expandidas={expandidas} toggle={toggle} />
           ))}
-          <tr className="border-t-2 border-ds-gray-200 bg-ds-gray-50 font-semibold">
+          <tr className="border-t-2 border-ds-gray-200 bg-ds-gray-100 font-semibold">
             <td className="px-3 py-2">TOTAL</td>
             <td className="border-l border-ds-gray-200 px-3 py-2 text-right tabular-nums">{fmt(totSemana)}</td>
             <td className="border-l border-ds-gray-200 px-3 py-2 text-right tabular-nums">{fmt(totAcum)}</td>
@@ -308,7 +308,7 @@ function FragmentoSub({
 }) {
   return (
     <>
-      <tr className="border-t border-ds-gray-100 hover:bg-ds-gray-50">
+      <tr className="border-t border-ds-gray-100 hover:bg-ds-gray-100">
         <td className="py-1 pr-3 pl-6">
           <button type="button" onClick={onToggle} className="flex w-full items-center gap-1 text-left">
             <span className="inline-flex w-3 text-ds-gray-400">{abierta ? '▾' : '▸'}</span>
@@ -328,14 +328,14 @@ function FragmentoSub({
       </tr>
       {abierta &&
         (obras.length === 0 ? (
-          <tr className="bg-ds-gray-50">
+          <tr className="bg-ds-gray-100">
             <td className="py-1 pr-3 pl-14 text-xs text-ds-gray-400" colSpan={3}>
               Sin obras con avance para esta sub-partida.
             </td>
           </tr>
         ) : (
           obras.map(({ o, c }) => (
-            <tr key={o.codigo} className="bg-ds-gray-50 text-xs">
+            <tr key={o.codigo} className="bg-ds-gray-100 text-xs">
               <td className="py-0.5 pr-3 pl-14">
                 <span className="font-mono text-xs">{o.codigo}</span>
                 <span className="ml-1 text-xs text-ds-gray-400">

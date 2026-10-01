@@ -195,7 +195,7 @@ export default function ImportacionesPage() {
           onDragLeave={(e) => { e.preventDefault(); setArrastrando(false); }}
           onDrop={onDrop}
           className={`flex flex-col items-center justify-center gap-3 rounded-ds-lg border-2 border-dashed p-8 transition-colors ${
-            arrastrando ? 'border-brand bg-brand/5' : 'border-ds-gray-200 bg-ds-gray-50'
+            arrastrando ? 'border-brand bg-brand/5' : 'border-ds-gray-200 bg-ds-gray-100'
           }`}
         >
           <p className="text-sm font-semibold text-ds-ink">Arrastrá un CSV o seleccionalo</p>
@@ -300,9 +300,9 @@ export default function ImportacionesPage() {
 
 function Metric({ label, value, strong, danger }: { label: string; value: number; strong?: boolean; danger?: boolean }) {
   return (
-    <div className="rounded-ds bg-ds-gray-50 px-3 py-2">
+    <div className="rounded-ds bg-ds-gray-100 px-3 py-2">
       <p className="text-[11px] uppercase tracking-wide text-ds-gray-400">{label}</p>
-      <p className={`tabular-nums text-sub-sm ${danger ? 'text-ds-red' : strong ? 'text-ds-ink font-bold' : 'text-ds-gray-600'}`}>
+      <p className={`tabular-nums text-sub-sm ${danger ? 'text-ds-red' : strong ? 'text-ds-ink font-bold' : 'text-ds-gray-500'}`}>
         {value}
       </p>
     </div>

@@ -13,6 +13,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { AvisoTope, rotuloTope } from '../_components/AvisoTope';
 import type { ActividadLab, MuestraListadoItem } from '@/lib/concreto/tipos';
 import { evaluarMuestraCumplimiento, CUMPLIMIENTO_META } from '@/lib/concreto/evaluacion-resistencia';
 import {
@@ -37,6 +38,9 @@ export default function LaboratorioPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [muestras, setMuestras] = useState<MuestraListadoItem[]>([]);
+  // Cuántas hay EN LA BASE, no cuántas se bajaron: el subtítulo contaba las
+  // filas de la página 1 y las daba por el total. Ver AvisoTope.
+  const [total, setTotal] = useState(0);
   const [actividades, setActividades] = useState<ActividadLab[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -53,9 +57,11 @@ export default function LaboratorioPage() {
       const data = await fetch(`/api/concreto/lab/muestras?${params}`).then((r) => r.json());
       if (data.error) throw new Error(data.error);
       setMuestras(data.muestras ?? []);
+      setTotal(data.total ?? (data.muestras?.length ?? 0));
     } catch {
       toast('Error cargando muestras', 'error');
       setMuestras([]);
+      setTotal(0);
       setError(true);
     } finally {
       setLoading(false);
@@ -149,7 +155,7 @@ export default function LaboratorioPage() {
     <PageShell>
       <PageHeader
         title="Laboratorio de Concreto"
-        subtitle={loading ? 'Cargando…' : `${muestras.length} muestras`}
+        subtitle={loading ? 'Cargando…' : rotuloTope(muestras.length, total, 'muestras')}
         actions={
           <>
             <Button variant="outline" onClick={() => setImportAbierto(true)} icon={<Icon name="list" size="sm" color="currentColor" />}>
@@ -181,6 +187,15 @@ export default function LaboratorioPage() {
           <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar las muestras.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
+      )}
+
+      {!loading && !error && (
+        <AvisoTope
+          cargadas={muestras.length}
+          total={total}
+          sustantivo="muestras"
+          comoFiltrar="usá los filtros de arriba para acercarte a la que buscás."
+        />
       )}
 
       <DataTable

@@ -368,7 +368,7 @@ function HitoRow({ h }: { h: HitoVinculable }) {
         </td>
       </tr>
       {h.Links.map((lk) => (
-        <tr key={lk.IDLink} className="border-b border-ds-gray-50 bg-ds-gray-100/40">
+        <tr key={lk.IDLink} className="border-b border-ds-gray-100 bg-ds-gray-100/40">
           <td className={`${td} pl-8 text-xs text-ds-gray-500`} colSpan={2}>
             ↳ Mov #{lk.IDMovimiento} · {lk.AbreviaturaTipo} · {lk.FechaRealizado ?? '—'}
           </td>

@@ -35,7 +35,12 @@
   --color-ds-green-ink:  #4A6F00; /* texto verde intenso (Badge, badges éxito) */
   --color-ds-red-soft:   #FDE8E8; /* fondo badge peligro */
   --color-ds-red-ink:    #B42318; /* texto rojo intenso */
-  --color-ds-yellow-ink: #8A7400; /* texto ámbar intenso */
+  --color-ds-yellow-soft: #FBF1C2; /* fondo aviso ámbar */
+  /* #8A7400 reprobaba AA en claro: 4.13 sobre el fondo de página (#F3F3F3) y
+     3.85 sobre ds-gray-100, que es donde viven casi todos sus 35 usos. Solo
+     pasaba sobre blanco puro, y raspando (4.59). Bajado a #7A6500 el peor caso
+     real queda en 4.78. Medido el 2026-10-01 en el navegador. */
+  --color-ds-yellow-ink: #7A6500; /* texto ámbar intenso */
 
   /* Font family */
   --font-family-sans: var(--font-roboto), 'Roboto', system-ui, sans-serif;
@@ -202,9 +207,14 @@
      tema claro y dejarlos claros con el texto ya aclarado da claro sobre claro.
      Se mezclan contra la superficie del tema, igual que los chips de Compras.
      `--color-brand-soft` NO se toca: se usa como fondo de selección con texto
-     negro encima (ver presupuesto), así que aclararlo o oscurecerlo rompe eso. */
+     negro encima (ver presupuesto), así que aclararlo o oscurecerlo rompe eso.
+
+     `yellow-soft` se agregó el 2026-10-01: el amarillo tenía «ink» pero no
+     tenía fondo, y un aviso ámbar sin superficie propia deja el texto #8A7400
+     sobre el gris de la página, que mide 3.35:1 (AA pide 4.5). */
   --color-ds-green-soft: color-mix(in srgb, var(--ds-color-green-100) 18%, #212530);
   --color-ds-red-soft:   color-mix(in srgb, var(--ds-color-red-100) 18%, #212530);
+  --color-ds-yellow-soft: color-mix(in srgb, var(--ds-color-yellow) 18%, #212530);
 }
 
 /* Impresión: forzar tema claro aunque la app esté en dark. */
