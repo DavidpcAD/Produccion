@@ -4,14 +4,12 @@ import { useRouter } from 'next/navigation';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
-import { TaskBCSelector, Partida, SubPartida } from '@/components/cuadrillas/TaskBCSelector';
 
 interface Miembro {
   IDCuadMiembro: number;
@@ -42,7 +40,6 @@ interface Cuadrilla {
   otrasMembresias: OtraMembresia[];
 }
 interface Colaborador { IDCol: number; NombreCompleto: string; Cedula: string; }
-interface Proyecto { IDProyecto: number; Nombre: string; CodigoBC: string; }
 
 export default function CuadrillaDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -55,16 +52,8 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
-  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
-  const [partidas, setPartidas] = useState<Partida[]>([]);
-  const [subpartidas, setSubpartidas] = useState<SubPartida[]>([]);
   const [selectedCol, setSelectedCol] = useState('');
   const [saving, setSaving] = useState(false);
-
-  // Edición de la cuadrilla
-  const [editOpen, setEditOpen] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [edit, setEdit] = useState<{ nombre: string; idProyecto: string; idEncargado: string; capacidad: string; idSubPartida: number | null }>({ nombre: '', idProyecto: '', idEncargado: '', capacidad: '25', idSubPartida: null });
 
   async function load() {
     const data = await fetch(`/api/cuadrillas/${id}`).then(r => r.json());
@@ -72,17 +61,15 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
   }
 
   useEffect(() => {
+    // Ya no se piden /api/proyectos ni /api/partidas: solo alimentaban los
+    // selectores del editor que vivía acá, que nunca pudo guardar. Son dos viajes
+    // menos en cada entrada (el catálogo de partidas son 22 KB).
     Promise.all([
       fetch(`/api/cuadrillas/${id}`).then(r => r.json()),
       fetch('/api/usuarios?activo=1&porPagina=5000&campos=basico').then(r => r.json()),
-      fetch('/api/proyectos').then(r => r.json()),
-      fetch('/api/partidas').then(r => r.json()),
-    ]).then(([c, u, p, pt]) => {
+    ]).then(([c, u]) => {
       setCuadrilla(c);
       setColaboradores(u.data ?? []);
-      setProyectos(p.data ?? []);
-      setPartidas(pt.partidas ?? []);
-      setSubpartidas(pt.subpartidas ?? []);
     }).finally(() => setLoading(false));
   }, [id]);
 
@@ -97,40 +84,6 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
     () => new Set((cuadrilla?.miembros ?? []).filter(m => m.Activo).map(m => m.IDCol)),
     [cuadrilla],
   );
-
-  function openEdit() {
-    if (!cuadrilla) return;
-    setEdit({
-      nombre: cuadrilla.Nombre,
-      idProyecto: String(cuadrilla.IDProyecto),
-      idEncargado: String(cuadrilla.IDEncargado),
-      capacidad: String(cuadrilla.Capacidad),
-      idSubPartida: cuadrilla.idSubPartida ?? null,
-    });
-    setEditOpen(true);
-  }
-
-  async function handleGuardarEdit() {
-    if (!edit.nombre || !edit.idProyecto || !edit.idEncargado) { toast('Completa los campos requeridos', 'warning'); return; }
-    if (!edit.idSubPartida) { toast('La subpartida (tarea BC) es obligatoria', 'warning'); return; }
-    setSavingEdit(true);
-    try {
-      const res = await fetch(`/api/cuadrillas/${id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: edit.nombre, idProyecto: parseInt(edit.idProyecto),
-          idEncargado: parseInt(edit.idEncargado), capacidad: parseInt(edit.capacidad) || 25,
-          idSubPartida: edit.idSubPartida,
-        }),
-      });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); toast(e.error || 'Error guardando la cuadrilla', 'error'); return; }
-      toast('Cuadrilla actualizada', 'success');
-      setEditOpen(false);
-      await load();
-    } finally {
-      setSavingEdit(false);
-    }
-  }
 
   async function handleAgregar() {
     if (!selectedCol) { toast('Selecciona un colaborador', 'warning'); return; }
@@ -215,8 +168,16 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
         }
         actions={isAdmin && (
           <>
-            <Button variant="outline" onClick={openEdit} icon={<Icon name="edit" size="sm" color="currentColor" />}>
-              Editar
+            {/* A la LISTA, que es donde vive el editor de verdad. El que había acá
+                no se podía guardar: quedó del modelo de UN proyecto por cuadrilla y
+                nunca se actualizó al de varios (`bloques`). Mandaba `idProyecto` e
+                `idSubPartida` sueltos —el API espera bloques con sus obras— y
+                encima abría con el proyecto y la subpartida VACÍOS, porque leía
+                `IDProyecto` cuando la API devuelve `idProyecto` y porque esa
+                consulta nunca trajo `idSubPartida`. Resultado: "La subpartida
+                (tarea BC) es obligatoria" y de ahí no pasaba. */}
+            <Button variant="outline" onClick={() => router.push('/cuadrillas')} icon={<Icon name="edit" size="sm" color="currentColor" />}>
+              Editar en la lista
             </Button>
             <Button onClick={() => setModalOpen(true)} icon={<Icon name="user" size="sm" color="currentColor" />}>
               Agregar
@@ -322,36 +283,6 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
         </div>
       </Modal>
 
-      {/* Editar cuadrilla */}
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Editar cuadrilla"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
-            <Button loading={savingEdit} onClick={handleGuardarEdit}>Guardar cambios</Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Input label="Nombre de la cuadrilla" value={edit.nombre}
-            onChange={e => setEdit(p => ({ ...p, nombre: e.target.value }))} required />
-          <Combobox label="Proyecto" value={edit.idProyecto}
-            onChange={v => setEdit(p => ({ ...p, idProyecto: v }))}
-            placeholder="Seleccionar proyecto" required
-            options={proyectos.map(p => ({
-              value: String(p.IDProyecto),
-              label: `${p.Nombre} ${p.CodigoBC}`,
-              parts: [{ text: p.Nombre, weight: 'bold' as const }, { text: p.CodigoBC, weight: 'light' as const }],
-            }))} />
-          <Combobox label="Encargado" value={edit.idEncargado}
-            onChange={v => setEdit(p => ({ ...p, idEncargado: v }))}
-            placeholder="Seleccionar encargado" required
-            options={colaboradores.map(c => ({ value: String(c.IDCol), label: c.NombreCompleto }))} />
-          <Input label="Capacidad máxima" type="number" value={edit.capacidad}
-            onChange={e => setEdit(p => ({ ...p, capacidad: e.target.value }))} />
-          <TaskBCSelector partidas={partidas} subpartidas={subpartidas} required
-            value={edit.idSubPartida} onChange={v => setEdit(p => ({ ...p, idSubPartida: v }))} />
-        </div>
-      </Modal>
     </PageShell>
   );
 }
