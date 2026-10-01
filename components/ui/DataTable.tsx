@@ -314,7 +314,7 @@ export function DataTable<T>({
 
       {activeFilters > 0 && (
         <div className="flex items-center gap-2 text-xs text-ds-gray-400">
-          <span>{activeFilters} filtro(s) activo(s)</span>
+          <span>{activeFilters === 1 ? '1 filtro activo' : `${activeFilters} filtros activos`}</span>
           <button onClick={() => { setColumnFilters([]); setGlobalFilter(''); }}
             className="font-semibold text-ds-ink hover:underline">Limpiar</button>
         </div>
@@ -390,9 +390,25 @@ export function DataTable<T>({
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td colSpan={table.getVisibleLeafColumns().length} className="px-4 py-14 text-center text-ds-gray-400">
+                  {/* "Sin batches" con un filtro puesto se lee como "no hay
+                      batches", y lo que pasa es que ninguno calza con lo que se
+                      escribió. Son dos cosas distintas y la segunda tiene
+                      arreglo, así que se dice cuál es y se ofrece deshacerla. */}
                   <div className="flex flex-col items-center gap-2">
-                    <Icon name="list" size="lg" color="currentColor" className="text-ds-gray-300" />
-                    <span className="text-sm">{emptyMessage}</span>
+                    <Icon name={activeFilters > 0 ? 'search' : 'list'} size="lg" color="currentColor" className="text-ds-gray-300" />
+                    {activeFilters > 0 ? (
+                      <>
+                        <span className="text-sm">Nada coincide con lo que buscaste.</span>
+                        <button
+                          onClick={() => { setColumnFilters([]); setGlobalFilter(''); }}
+                          className="text-sm font-semibold text-ds-ink hover:underline"
+                        >
+                          {activeFilters === 1 ? 'Quitar el filtro' : `Quitar los ${activeFilters} filtros`}
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-sm">{emptyMessage}</span>
+                    )}
                   </div>
                 </td>
               </tr>
