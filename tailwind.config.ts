@@ -22,7 +22,7 @@ const config: Config = {
           100: "#EBEBEB",
           200: "#D9D9D9",
           300: "#AAAFB6",
-          400: "#747B86",
+          400: "#646A74",
           500: "#5D636C",
         },
         // Design System: Red/Danger

@@ -11,7 +11,13 @@
   --color-ds-gray-100:  #EBEBEB;
   --color-ds-gray-200:  #D9D9D9;
   --color-ds-gray-300:  #AAAFB6;
-  --color-ds-gray-400:  #747B86;
+  /* #747B86 reprobaba AA en claro contra TODOS los fondos reales de la app:
+     4,27 sobre blanco, 3,85 sobre el fondo de página (#F3F3F3) y 3,58 sobre
+     ds-gray-100 (las bandas de tabla). Son 446 usos —casi todo el texto
+     secundario—, así que era la causa de casi todo lo que quedaba bajo el
+     mínimo. Medido en el navegador el 2026-10-01: el valor de ahora da
+     5,45 / 4,91 / 4,57 sobre esos tres fondos. Decisión de David. */
+  --color-ds-gray-400:  #646A74;
   --color-ds-gray-500:  #5D636C;
 
   --color-ds-red:       #C96C6C;
@@ -97,7 +103,7 @@
   --ds-color-red-100:   #c96c6c;
   --ds-color-red-200:   #bb4a4a;
   --ds-color-gray-500:  #5d636c;
-  --ds-color-gray-400:  #747b86;
+  --ds-color-gray-400:  #646a74;
   --ds-color-gray-300:  #aaafb6;
   --ds-color-gray-200:  #d9d9d9;
   --ds-color-gray-100:  #ebebeb;
@@ -224,10 +230,10 @@
     --ds-bg:#fff; --ds-surface:#fff; --ds-surface-2:#fff; --ds-text:#000; --ds-tint-base:#fff;
     --ds-color-surface:#f3f3f3;
     --ds-color-gray-100:#ebebeb; --ds-color-gray-200:#d9d9d9; --ds-color-gray-300:#aaafb6;
-    --ds-color-gray-400:#747b86; --ds-color-gray-500:#5d636c;
+    --ds-color-gray-400:#646a74; --ds-color-gray-500:#5d636c;
     --color-ds-surface:#fff; --color-ds-surface-2:#fff; --color-ds-ink:#000; --color-ds-bg:#f3f3f3;
     --color-ds-gray-100:#ebebeb; --color-ds-gray-200:#d9d9d9; --color-ds-gray-300:#aaafb6;
-    --color-ds-gray-400:#747b86; --color-ds-gray-500:#5d636c;
+    --color-ds-gray-400:#646a74; --color-ds-gray-500:#5d636c;
   }
 }
 
