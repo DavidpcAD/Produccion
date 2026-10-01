@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { EstadoVacio } from '@/components/ui/EstadoVacio';
 import type {
   CatalogoHito,
   EsquemaBancoResumen,
@@ -36,19 +37,37 @@ export default function EsquemasPage() {
   const [bancos, setBancos] = useState<EsquemaBancoResumen[]>([]);
   const [hitos, setHitos] = useState<CatalogoHito[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [fallo, setFallo] = useState(false);
   const [sel, setSel] = useState<EsquemaBancoResumen | null>(null);
 
   function recargar() {
     setCargando(true);
+    setFallo(false);
     Promise.all([
       fetch('/api/desembolsos/esquemas').then((r) => (r.ok ? r.json() : Promise.reject(new Error('No autorizado')))),
-      fetch('/api/desembolsos/catalogo-hitos').then((r) => (r.ok ? r.json() : [])),
+      // El catálogo de hitos NO es opcional, aunque sea la segunda llamada.
+      // Devolvía `[]` cuando fallaba, y ese `[]` no se distingue de "este
+      // catálogo está vacío": la lista de bancos cargaba bien, la pantalla se
+      // veía sana, y recién al abrir un banco aparecía el daño —los hitos ya
+      // guardados salían como «#3», «#7» (nombreHito no los encuentra), el
+      // selector de hitos quedaba vacío y una fila nueva nacía con IDHito 0,
+      // que es un id que no existe—. Guardar ahí escribe basura. Mejor que
+      // reviente y caiga en el catch.
+      fetch('/api/desembolsos/catalogo-hitos').then((r) => (r.ok ? r.json() : Promise.reject(new Error('Catálogo de hitos')))),
     ])
       .then(([d, hs]: [RespuestaEsquemas, CatalogoHito[]]) => {
         setBancos(d.bancos ?? []);
         setHitos(hs ?? []);
       })
-      .catch(() => toast('No se pudieron cargar los esquemas.', 'error'))
+      .catch(() => {
+        // El toast solo no alcanza: se va a los pocos segundos y la pantalla
+        // queda diciendo «Configurados (0)», que es una afirmación sobre el
+        // negocio —y es falsa—. El estado de error se queda y deja reintentar.
+        setFallo(true);
+        setBancos([]);
+        setHitos([]);
+        toast('No se pudieron cargar los esquemas.', 'error');
+      })
       .finally(() => setCargando(false));
   }
   useEffect(recargar, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -65,7 +84,19 @@ export default function EsquemasPage() {
 
       {cargando && <SkeletonRows rows={4} />}
 
-      {!cargando && (
+      {!cargando && fallo && (
+        <EstadoVacio
+          tono="error"
+          titulo="No se pudieron cargar los esquemas"
+          accion={<Button onClick={recargar}>Reintentar</Button>}
+        >
+          Falló la consulta de los esquemas o la del catálogo de hitos. No se
+          muestra nada porque sin el catálogo los hitos aparecerían sin nombre y
+          lo que se guardara quedaría mal.
+        </EstadoVacio>
+      )}
+
+      {!cargando && !fallo && (
         <>
           <SeccionBancos titulo={`Configurados (${configurados.length})`} bancos={configurados} onSel={setSel} />
           {sinEsquema.length > 0 && (

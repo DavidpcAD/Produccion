@@ -6,6 +6,7 @@ import { SkeletonText } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { EstadoVacio } from '@/components/ui/EstadoVacio';
 import type {
   DistribucionProyectoResumen,
   EntidadDistribucion,
@@ -22,19 +23,37 @@ export default function DistribucionPage() {
   const [proyectos, setProyectos] = useState<DistribucionProyectoResumen[]>([]);
   const [entidades, setEntidades] = useState<EntidadDistribucion[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [fallo, setFallo] = useState(false);
   const [sel, setSel] = useState<DistribucionProyectoResumen | null>(null);
 
   function recargar() {
     setCargando(true);
+    setFallo(false);
     Promise.all([
       fetch('/api/desembolsos/distribucion').then((r) => (r.ok ? r.json() : Promise.reject(new Error('No autorizado')))),
-      fetch('/api/desembolsos/distribucion/entidades').then((r) => (r.ok ? r.json() : [])),
+      // La lista de entidades NO es opcional. Devolvía `[]` al fallar, y ese
+      // `[]` no se distingue de "no hay entidades": la lista de proyectos
+      // cargaba bien y la pantalla se veía sana. El daño aparecía al abrir un
+      // proyecto: el panel usa `codToId` —armado con estas entidades— para
+      // rellenar el IDEntidad de las filas ya guardadas, así que con la lista
+      // vacía TODAS caen a 0, un id que no existe, y guardar escribe esa
+      // distribución rota encima de una que estaba bien.
+      fetch('/api/desembolsos/distribucion/entidades').then((r) => (r.ok ? r.json() : Promise.reject(new Error('Entidades')))),
     ])
       .then(([d, ents]: [RespuestaDistribucion, EntidadDistribucion[]]) => {
         setProyectos(d.proyectos ?? []);
         setEntidades(ents ?? []);
       })
-      .catch(() => toast('No se pudo cargar la distribución.', 'error'))
+      .catch(() => {
+        // El toast solo no alcanza: se va a los pocos segundos y la pantalla
+        // queda diciendo «Sin proyectos con ventas activas», que es una
+        // afirmación sobre el negocio —y es falsa—. El estado de error se
+        // queda y deja reintentar.
+        setFallo(true);
+        setProyectos([]);
+        setEntidades([]);
+        toast('No se pudo cargar la distribución.', 'error');
+      })
       .finally(() => setCargando(false));
   }
   useEffect(recargar, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -46,6 +65,18 @@ export default function DistribucionPage() {
         subtitle="Reparto del precio interno del lote entre entidades. Las tarifas se versionan por fecha de vigencia — cada cambio crea una nueva vigencia o edita la vigente."
       />
 
+      {!cargando && fallo && (
+        <EstadoVacio
+          tono="error"
+          titulo="No se pudo cargar la distribución"
+          accion={<Button onClick={recargar}>Reintentar</Button>}
+        >
+          Falló la consulta de los proyectos o la de las entidades. No se muestra
+          nada porque sin las entidades el reparto que se guardara quedaría mal.
+        </EstadoVacio>
+      )}
+
+      {!fallo && (
       <div className="divide-y divide-ds-gray-100 rounded-ds border border-ds-gray-200 bg-ds-surface">
         {cargando && <div className="px-4 py-4"><SkeletonText lines={4} /></div>}
         {!cargando && proyectos.length === 0 && (
@@ -92,6 +123,7 @@ export default function DistribucionPage() {
           );
         })}
       </div>
+      )}
 
       {sel && (
         <PanelDistribucion
