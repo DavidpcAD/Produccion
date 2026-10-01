@@ -167,7 +167,41 @@ function tipoDeBc(v: unknown): BcItemTipo {
 }
 
 let lastGoodItems: BcItem[] | null = null;
+
+// ─── El catálogo armado, memorizado ──────────────────────────────────────────
+// Las TRES fuentes de abajo ya se cachean 5 min cada una (listAll y bcItemExtra
+// con `next: { revalidate }`, los bloqueados con su propio mapa). Lo que NO se
+// guardaba era el resultado: cada llamada volvía a leer todas las páginas de la
+// caché, a recorrer los ~5 500 artículos dos veces y a armar de nuevo el mismo
+// arreglo. Medido el 2026-10-01 contra el Sandbox: 2,0 s constantes, llamada
+// tras llamada, con 863 KB de JSON. Y esto lo pide CADA pantalla que arma un
+// pedido.
+//
+// Con el resultado memorizado la segunda llamada no hace nada. El TTL es el
+// mismo 5 min de las fuentes; en el peor cruce un artículo nuevo puede tardar
+// hasta 10 min en aparecer, que para un catálogo de materiales no es problema
+// (y antes ya podía tardar 5).
+//
+// `enVuelo` es para que dos pantallas que abren a la vez compartan una sola
+// construcción en lugar de hacer el trabajo dos veces. Mismo patrón que
+// `bcMaquinas` más abajo.
+const ITEMS_TTL_MS = 5 * 60_000;
+let itemsCache: { items: BcItem[]; exp: number } | null = null;
+let itemsEnVuelo: Promise<BcItem[]> | null = null;
+
 export async function bcItems(): Promise<BcItem[]> {
+  if (itemsCache && itemsCache.exp > Date.now()) return itemsCache.items;
+  if (itemsEnVuelo) return itemsEnVuelo;
+  itemsEnVuelo = construirItems()
+    .then((items) => {
+      if (items.length) itemsCache = { items, exp: Date.now() + ITEMS_TTL_MS };
+      return items;
+    })
+    .finally(() => { itemsEnVuelo = null; });
+  return itemsEnVuelo;
+}
+
+async function construirItems(): Promise<BcItem[]> {
   try {
     const rows = await listAll("inventory", "items");
     let items: BcItem[] = rows
