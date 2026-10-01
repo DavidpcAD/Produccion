@@ -1130,7 +1130,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
           id: m.no, no: m.no, nombre: m.nombre || m.no, placa: m.placa || undefined,
         })));
       })
-      .catch(() => { /* sin catálogo: el selector queda vacío y no se puede pedir CD */ });
+      // Lista vacía y NO `null`: `null` es lo que la pantalla usa para decir
+      // "Cargando máquinas…", así que dejarlo así ante una caída de red deja el
+      // selector diciendo que carga para siempre. Con [] sale el aviso de abajo
+      // ("No se pudo traer el parque de maquinaria…"), que es la verdad.
+      .catch(() => { if (!cancel) setBcMaq([]); });
     return () => { cancel = true; };
   }, [tipo, bcMaq]);
 
@@ -1145,7 +1149,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         const rows = (d.jobTasks ?? []) as { jobTaskNo: string; descripcion: string; tipo: string }[];
         setBcTareasMaq(rows.filter((t) => t.tipo === "Posting").map((t) => ({ jobTaskNo: t.jobTaskNo, descripcion: t.descripcion })));
       })
-      .catch(() => { /* si BC no contesta queda la de por defecto (CMAQ) */ });
+      // Igual que las máquinas: con [] el selector deja de decir "Cargando
+      // actividades…" y queda la de por defecto (CMAQ).
+      .catch(() => { if (!cancel) setBcTareasMaq([]); });
     return () => { cancel = true; };
   }, [tipo, bcTareasMaq]);
 
@@ -1166,7 +1172,8 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
           tipo: "no-inventario" as Articulo["tipo"],
         })));
       })
-      .catch(() => { /* sin catálogo: el buscador queda vacío y no se puede pedir */ });
+      // Igual: [] en vez de `null` para que la pantalla sepa que ya no espera.
+      .catch(() => { if (!cancel) setBcActivos([]); });
     return () => { cancel = true; };
   }, [tipo, bcActivos]);
 
@@ -2182,6 +2189,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                         <span className="ds-form-field__label">Materiales</span>
                         <span className="ds-muted ds-label">{validLines.length} línea(s)</span>
                       </div>
+                      {/* Mismo trato que el parque de maquinaria: si el catálogo de
+                          activos no llegó, se dice, en vez de dejar un buscador que
+                          no encuentra nada sin explicar por qué. */}
+                      {esActivoTipo && bcActivos !== null && !bcActivos.length && (
+                        <span className="ds-muted ds-label">No se pudo traer el catálogo de activos fijos de Business Central. Reintentá en un momento.</span>
+                      )}
                       <MaterialSearch items={articuloItems} onAdd={(id, vc, vn) => addRow(SOLO, id, vc, vn)} />
                       {lineas.length > 0 && (
                         <div className="col gap-2" style={{ marginTop: 4 }}>
