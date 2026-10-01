@@ -114,30 +114,54 @@ function mapTipo(r: FilaTipo): TipoObra {
   };
 }
 
+/** ── La tabla de tipos, en memoria del proceso ────────────────────────────────
+ *  `dbo.TipoObra` son SIETE filas de configuración y la app NO las escribe: se
+ *  mantienen por migración (buscá INSERT/UPDATE sobre la tabla y no hay ninguno).
+ *  Aun así se consultaba en CADA request: `/api/partidas` pide `getTipoObra`
+ *  ANTES de su Promise.all —o sea, un viaje a Azure SQL en serie antes de poder
+ *  empezar— y `/api/obras` hace lo propio con el mapa de áreas de costeo.
+ *
+ *  Se guardan en memoria por 5 min. Lo único que puede quedar viejo es una
+ *  migración recién corrida, y para eso 5 min no son nada. Las llamadas que
+ *  coinciden comparten el MISMO fetch, así que una ráfaga de requests no dispara
+ *  siete consultas iguales. Mismo patrón que `bcMaquinas` en lib/compras/bc.ts.
+ *
+ *  Se cachea la tabla ENTERA (activos y no) y de ahí salen las dos funciones:
+ *  `listarTiposObra` filtra los activos y `getTipoObra` busca por código sin
+ *  filtrar — exactamente lo que hacía cada consulta por su lado. */
+const TIPOS_TTL_MS = 5 * 60 * 1000;
+let tiposCache: { filas: TipoObra[]; exp: number } | null = null;
+let tiposEnVuelo: Promise<TipoObra[]> | null = null;
+
+async function todosLosTipos(): Promise<TipoObra[]> {
+  const ahora = Date.now();
+  if (tiposCache && tiposCache.exp > ahora) return tiposCache.filas;
+  if (!tiposEnVuelo) {
+    tiposEnVuelo = (async () => {
+      const db = await getDb();
+      const r = await db.request().query<FilaTipo>(`
+        SELECT codigo, letra, nombre, terminoGrupo AS termino_grupo, terminoGrupoPl AS termino_grupo_pl, genero,
+               usaSprints AS usa_sprints, usaTiposCasa AS usa_tipos_casa, orden, esActivo AS activo
+        FROM dbo.TipoObra
+        ORDER BY orden, codigo
+      `);
+      const filas = r.recordset.map(mapTipo);
+      tiposCache = { filas, exp: Date.now() + TIPOS_TTL_MS };
+      return filas;
+    })().finally(() => { tiposEnVuelo = null; });
+  }
+  return tiposEnVuelo;
+}
+
 /** Los tipos activos, en el orden del negocio. */
 export async function listarTiposObra(): Promise<TipoObra[]> {
-  const db = await getDb();
-  const r = await db.request().query<FilaTipo>(`
-    SELECT codigo, letra, nombre, terminoGrupo AS termino_grupo, terminoGrupoPl AS termino_grupo_pl, genero,
-           usaSprints AS usa_sprints, usaTiposCasa AS usa_tipos_casa, orden, esActivo AS activo
-    FROM dbo.TipoObra
-    WHERE esActivo = 1
-    ORDER BY orden, codigo
-  `);
-  return r.recordset.map(mapTipo);
+  return (await todosLosTipos()).filter((t) => t.activo);
 }
 
 /** Un tipo por código ('VIVIENDA', 'FABRICA'…). null si no existe. */
 export async function getTipoObra(codigo: string): Promise<TipoObra | null> {
-  const db = await getDb();
-  const r = await db.request()
-    .input('cod', sql.VarChar(20), String(codigo ?? '').trim().toUpperCase())
-    .query<FilaTipo>(`
-      SELECT codigo, letra, nombre, terminoGrupo AS termino_grupo, terminoGrupoPl AS termino_grupo_pl, genero,
-             usaSprints AS usa_sprints, usaTiposCasa AS usa_tipos_casa, orden, esActivo AS activo
-      FROM dbo.TipoObra WHERE codigo = @cod
-    `);
-  return r.recordset[0] ? mapTipo(r.recordset[0]) : null;
+  const cod = String(codigo ?? '').trim().toUpperCase();
+  return (await todosLosTipos()).find((t) => t.codigo === cod) ?? null;
 }
 
 /** El tipo de obra al que pertenece un grupo del catálogo. null si no existe. */
@@ -200,12 +224,27 @@ export async function tipoObraDeObra(numeroObra: string): Promise<
 }
 
 /** Mapa completo área de costeo → tipo de obra (para clasificar varias obras de una). */
+let mapaCache: { mapa: Map<string, string>; exp: number } | null = null;
+let mapaEnVuelo: Promise<Map<string, string>> | null = null;
+
 export async function mapaAreaCosteoTipo(): Promise<Map<string, string>> {
-  const db = await getDb();
-  const r = await db.request().query<{ area_costeo: string; tipo_obra: string }>(
-    'SELECT areaCosteo AS area_costeo, tipoObra AS tipo_obra FROM dbo.TipoObraAreaCosteo',
-  );
-  return new Map(r.recordset.map((f) => [f.area_costeo.trim().toUpperCase(), f.tipo_obra]));
+  // Mismo trato que `todosLosTipos`: `dbo.TipoObraAreaCosteo` es configuración de
+  // solo lectura y `/api/obras` la pedía en cada listado. Se devuelve una COPIA
+  // para que quien la reciba no pueda ensuciar la del caché.
+  const ahora = Date.now();
+  if (mapaCache && mapaCache.exp > ahora) return new Map(mapaCache.mapa);
+  if (!mapaEnVuelo) {
+    mapaEnVuelo = (async () => {
+      const db = await getDb();
+      const r = await db.request().query<{ area_costeo: string; tipo_obra: string }>(
+        'SELECT areaCosteo AS area_costeo, tipoObra AS tipo_obra FROM dbo.TipoObraAreaCosteo',
+      );
+      const mapa = new Map(r.recordset.map((f) => [f.area_costeo.trim().toUpperCase(), f.tipo_obra]));
+      mapaCache = { mapa, exp: Date.now() + TIPOS_TTL_MS };
+      return new Map(mapa);
+    })().finally(() => { mapaEnVuelo = null; });
+  }
+  return mapaEnVuelo;
 }
 
 /** Separadores con los que se corta un código de BC: 'VN-L.05' → 'VN-L' → 'VN-'. */
