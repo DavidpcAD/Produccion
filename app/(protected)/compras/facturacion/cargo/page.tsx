@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { getProveedoresBc } from '@/lib/compras/catalogo-bc';
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
@@ -43,9 +44,8 @@ export default function CargoSobreFacturaPage() {
   const [bcProv, setBcProv] = useState<Vendor[] | null>(null);
   const [itemCharges, setItemCharges] = useState<{ no: string; descripcion: string }[]>([]);
   useEffect(() => {
-    fetch("/api/compras/bc/vendors")
-      .then((r) => (r.ok ? r.json() : { proveedores: [] }))
-      .then((d) => { if (Array.isArray(d.proveedores) && d.proveedores.length) setBcProv(d.proveedores); })
+    getProveedoresBc()
+      .then((prov) => { if (prov.length) setBcProv(prov); })
       .catch(() => { /* sin BC: cae al catálogo de respaldo */ });
     fetch("/api/compras/bc/itemcharges")
       .then((r) => (r.ok ? r.json() : { itemCharges: [] }))

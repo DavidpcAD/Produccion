@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { getCatalogoBc } from '@/lib/compras/catalogo-bc';
+import { getAlmacenesBc, getCatalogoBc, getProveedoresBc } from '@/lib/compras/catalogo-bc';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Select, useToast } from "@/components/compras/ui";
@@ -42,9 +42,9 @@ export default function EditarOrdenPage() {
   const [itemsBc, setItemsBc] = useState<{ code: string; descripcion: string; unidad: string; precioUltimo?: number; tipo?: Articulo["tipo"] }[]>([]);
   const [bcAlm, setBcAlm] = useState<typeof almacenes | null>(null);
   useEffect(() => {
-    fetch("/api/compras/bc/vendors").then((r) => (r.ok ? r.json() : { proveedores: [] })).then((d) => { if (Array.isArray(d.proveedores) && d.proveedores.length) setBcProv(d.proveedores); }).catch(() => {});
+    getProveedoresBc().then((prov) => { if (prov.length) setBcProv(prov); }).catch(() => {});
     getCatalogoBc().then((d) => { if (Array.isArray(d.items)) setItemsBc(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", precioUltimo: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined, tipo: i.tipo }))); }).catch(() => {});
-    fetch("/api/compras/bc/almacenes").then((r) => (r.ok ? r.json() : { almacenes: [] })).then((d) => { if (Array.isArray(d.almacenes) && d.almacenes.length) setBcAlm(d.almacenes); }).catch(() => {});
+    getAlmacenesBc().then((alm) => { if (alm.length) setBcAlm(alm); }).catch(() => {});
   }, []);
   const catProv = bcProv ?? proveedores;
   const catAlm = almacenesFisicos(bcAlm ?? almacenes);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { getCatalogoBc } from '@/lib/compras/catalogo-bc';
+import { getAlmacenesBc, getCatalogoBc, getProveedoresBc } from '@/lib/compras/catalogo-bc';
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, LineaPedidaInfo, Modal, Select, useToast } from "@/components/compras/ui";
@@ -49,9 +49,8 @@ export default function ArmarOrdenPage() {
   // Proveedores en vivo desde Business Central (fallback al catálogo si BC falla).
   const [bcProv, setBcProv] = useState<typeof proveedores | null>(null);
   useEffect(() => {
-    fetch("/api/compras/bc/vendors")
-      .then((r) => (r.ok ? r.json() : { proveedores: [] }))
-      .then((d) => { if (Array.isArray(d.proveedores) && d.proveedores.length) setBcProv(d.proveedores); })
+    getProveedoresBc()
+      .then((prov) => { if (prov.length) setBcProv(prov); })
       .catch(() => { /* sin BC, usa catálogo de respaldo */ });
   }, []);
   const catProv = bcProv ?? proveedores;
@@ -81,12 +80,11 @@ export default function ArmarOrdenPage() {
     getCatalogoBc()
       .then((d) => { if (Array.isArray(d.items)) setItemsBc(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", precioUltimo: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined }))); })
       .catch(() => { /* sin BC */ });
-    fetch("/api/compras/bc/almacenes")
-      .then((r) => (r.ok ? r.json() : { almacenes: [] }))
-      .then((d) => {
-        if (Array.isArray(d.almacenes) && d.almacenes.length) {
-          setBcAlm(d.almacenes);
-          if (!d.almacenes.some((a: any) => a.codigo === "ALM-GRAL")) setAlmacen(d.almacenes[0].codigo);
+    getAlmacenesBc()
+      .then((alm) => {
+        if (alm.length) {
+          setBcAlm(alm);
+          if (!alm.some((a) => a.codigo === "ALM-GRAL")) setAlmacen(alm[0].codigo);
         }
       })
       .catch(() => { /* sin BC, usa seed */ });

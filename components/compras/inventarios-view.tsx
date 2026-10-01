@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getCatalogoBc } from '@/lib/compras/catalogo-bc';
+import { getAlmacenesBc, getCatalogoBc } from '@/lib/compras/catalogo-bc';
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/compras/data-table";
 import { Skeleton } from "@/components/compras/ui";
@@ -70,9 +70,7 @@ export function InventariosView({ tablaKey = "inventarios" }: { tablaKey?: strin
       setStockEstado("loading");
       let locs: string[] = [];
       try {
-        const r = await fetch("/api/compras/bc/almacenes");
-        const d = await r.json().catch(() => ({}));
-        locs = Array.isArray(d.almacenes) ? d.almacenes.map((a: any) => a.codigo).filter(Boolean) : [];
+        locs = (await getAlmacenesBc()).map((a) => a.codigo).filter(Boolean);
       } catch { /* sin BC */ }
       if (!vivo) return;
       if (!locs.length) { setStockEstado("error"); return; }
