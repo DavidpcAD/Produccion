@@ -25,11 +25,17 @@ type Modo = 'BRUTO' | 'NETO_AD';
 type EstadoFiltrable = 1 | 2 | 4;
 const ESTADOS_LABELS: Record<EstadoFiltrable, string> = { 1: 'Entregado', 2: 'Formalizado', 4: 'Reservado' };
 
-/** ₡X.XX MM / ₡X.X M para displays compactos. */
+/** ₡X,XX MM / ₡X,X M para displays compactos.
+ *
+ *  Con COMA decimal: `toFixed` pone siempre un punto, y acá el punto separa
+ *  miles. El titular de esta pantalla decía "₡38.19 MM", que se lee 3 819.
+ *  Compras ya lo formateaba bien; ahora los dos módulos escriben igual. */
 function fmtCorto(n: number): string {
   if (!Number.isFinite(n)) return '₡0';
-  if (Math.abs(n) >= 1_000_000_000) return `₡${(n / 1_000_000_000).toFixed(2)} MM`;
-  if (Math.abs(n) >= 1_000_000) return `₡${(n / 1_000_000).toFixed(1)} M`;
+  const es = (v: number, dec: number) =>
+    v.toLocaleString('es-CR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  if (Math.abs(n) >= 1_000_000_000) return `₡${es(n / 1_000_000_000, 2)} MM`;
+  if (Math.abs(n) >= 1_000_000) return `₡${es(n / 1_000_000, 1)} M`;
   return `₡${Math.round(n).toLocaleString('es-CR')}`;
 }
 

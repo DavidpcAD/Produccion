@@ -37,11 +37,21 @@ export function formatCRC(valor: number | null | undefined): string {
   return `₡${Math.round(v).toLocaleString('es-CR')}`;
 }
 
-/** Versión abreviada para ejes/etiquetas: ₡1.2bn, ₡340M, etc. */
+/** Versión abreviada para ejes/etiquetas: ₡1,2 MM, ₡340 M.
+ *
+ *  OJO con el separador: `toFixed` escribe SIEMPRE el decimal con PUNTO, y en
+ *  Costa Rica el punto es el separador de MILES. "₡38.19 MM" se lee 3 819, no
+ *  38,19. Por eso el número pasa por `Intl` en es-CR, igual que el compacto de
+ *  Compras (components/compras/compras-resumen.tsx), que ya lo hacía bien.
+ *
+ *  Y "MM" en lugar de "bn": mil millones. Es la abreviatura que ya usa el resto
+ *  del app; "bn" es de otro idioma. */
 export function abreviarCRC(valor: number | null | undefined): string {
   const v = Number(valor ?? 0);
-  if (Math.abs(v) >= 1e9) return `₡${(v / 1e9).toFixed(1)}bn`;
-  if (Math.abs(v) >= 1e6) return `₡${(v / 1e6).toFixed(0)}M`;
+  const es = (n: number, dec: number) =>
+    n.toLocaleString('es-CR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  if (Math.abs(v) >= 1e9) return `₡${es(v / 1e9, 1)} MM`;
+  if (Math.abs(v) >= 1e6) return `₡${es(v / 1e6, 0)} M`;
   return `₡${Math.round(v).toLocaleString('es-CR')}`;
 }
 

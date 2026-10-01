@@ -142,9 +142,9 @@ function pct(n: number): string {
 function fmtMonto(n: number): string {
   if (!n) return '—';
   if (Math.abs(n) >= 1_000_000)
-    return `₡${(n / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`;
+    return `₡${(n / 1_000_000).toLocaleString('es-CR', { maximumFractionDigits: 1 })} M`;
   if (Math.abs(n) >= 1_000)
-    return `₡${(n / 1_000).toLocaleString('en-US', { maximumFractionDigits: 0 })}k`;
+    return `₡${(n / 1_000).toLocaleString('es-CR', { maximumFractionDigits: 0 })} K`;
   return formatCRC(n);
 }
 
