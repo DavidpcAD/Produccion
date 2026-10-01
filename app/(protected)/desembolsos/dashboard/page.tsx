@@ -239,7 +239,17 @@ export default function DesembolsosDashboardPage() {
       </section>
 
       {/* Filtros */}
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
+      {/* Cuatro columnas solo desde `xl`. Con `sm:grid-cols-4` la cuarta celda
+          medía 148 px en una tableta de 768 y el control segmentado de abajo
+          necesita 277: los tres botones llevan `flex-1`, pero `flex-1` no
+          encoge por debajo del ancho del contenido y FORMALIZADO es una sola
+          palabra que no parte. Resultado: los chips se salían de su caja y de
+          la pantalla, y el área de contenido aparecía con scroll horizontal
+          —en una tableta de obra, donde además hay que atinarle con el dedo—.
+          Encogerlos con `min-w-0` los habría recortado, que acá no se hace.
+          A 1024 tampoco caben (4 × 277 + separaciones pide ~1144 de ancho de
+          contenido), así que el salto a cuatro va en `xl`. */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Input placeholder="Buscar caso, cliente o lote…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         <Select
           value={idProyecto ?? ''}
