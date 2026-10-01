@@ -9,7 +9,7 @@ import { VistaToggle } from "@/components/compras/vista-toggle";
 import { IconReceipt, IconList } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 
-type Filtro = "todas" | "abierto" | "rechazado" | "lanzado" | "completado";
+type Filtro = "todas" | "abierto" | "pendiente_aprobacion" | "rechazado" | "lanzado" | "completado";
 
 export default function OrdenesPage() {
   const { ordenes } = useStore();
@@ -23,6 +23,12 @@ export default function OrdenesPage() {
   }
 
   const abiertas = ordenes.filter((o) => o.estado === "abierto").length;
+  // Una orden puede estar en CINCO estados y acá solo había panel para cuatro:
+  // la que proveeduría manda con "Enviar a aprobación" queda en
+  // `pendiente_aprobacion` y no aparecía en ninguna ficha. Resultado: los paneles
+  // no sumaban el total (se veía "2 órdenes totales" con 0+0+1+0 abajo) y esa
+  // orden no se podía filtrar — justo la que uno busca para saber en qué quedó.
+  const pendientes = ordenes.filter((o) => o.estado === "pendiente_aprobacion").length;
   const rechazadas = ordenes.filter((o) => o.estado === "rechazado").length;
   const lanzadas = ordenes.filter((o) => o.estado === "lanzado").length;
   const completas = ordenes.filter((o) => o.estado === "completado").length;
@@ -31,6 +37,7 @@ export default function OrdenesPage() {
   const etiqueta: Record<Filtro, string> = {
     todas: "Todas las órdenes",
     abierto: "Órdenes abiertas (borrador)",
+    pendiente_aprobacion: "Órdenes esperando aprobación",
     rechazado: "Órdenes rechazadas (corregir y reenviar)",
     lanzado: "Órdenes lanzadas",
     completado: "Órdenes completadas",
@@ -55,6 +62,7 @@ export default function OrdenesPage() {
         <div className="tiles mt-2">
           <Tile value={ordenes.length} label="Órdenes totales" onClick={() => seleccionar("todas")} active={filtro === "todas"} />
           <Tile value={abiertas} label="Abiertas (borrador)" accent="var(--ds-color-gray-300)" onClick={() => seleccionar("abierto")} active={filtro === "abierto"} />
+          <Tile value={pendientes} label="Esperando aprobación" accent="var(--st-pending)" onClick={() => seleccionar("pendiente_aprobacion")} active={filtro === "pendiente_aprobacion"} />
           <Tile value={rechazadas} label="Rechazadas" accent="var(--ds-color-red-200)" onClick={() => seleccionar("rechazado")} active={filtro === "rechazado"} />
           <Tile value={lanzadas} label="Lanzadas" accent="var(--ds-color-green-100)" onClick={() => seleccionar("lanzado")} active={filtro === "lanzado"} />
           <Tile value={completas} label="Completadas" accent="var(--ds-color-green-200)" onClick={() => seleccionar("completado")} active={filtro === "completado"} />
