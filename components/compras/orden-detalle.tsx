@@ -9,7 +9,7 @@ import { OrderLinesTable } from "@/components/compras/order-lines";
 import { Timeline } from "@/components/compras/timeline";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
-import { bcEstadoBadge, money, num, formatDate, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenDevueltaPorBc, ordenLineaImporte, ordenTotalConIva, ordenRecibidoPct, ordenPedidos, ordenMaquinas, ordenEsDirecta, ordenLineasSinObra } from "@/lib/compras/helpers";
+import { abrirPestana, bcEstadoBadge, formatDate, money, num, numeroOrden, ordenAlmacenDestino, ordenBadge, ordenConsumoDirecto, ordenDevueltaPorBc, ordenEsDirecta, ordenLineaImporte, ordenLineasSinObra, ordenMaquinas, ordenPedidos, ordenRecibidoPct, ordenTotalConIva } from "@/lib/compras/helpers";
 import type { Orden, Pedido } from "@/lib/compras/types";
 import type { EstadoBcOrden } from "@/lib/compras/api";
 
@@ -237,7 +237,11 @@ export function OrdenDetalle({
               va como botón, al lado de Imprimir, para que se encuentre. */}
           {orden.bcDeepLink && (
             <Button variant="outline" size="sm" title={`Abrir el pedido ${orden.bcNumber} en Business Central (editar · vista previa de registro · registrar)`}
-              onClick={() => window.open(orden.bcDeepLink!, "_blank")}>↗ Abrir en BC</Button>
+              onClick={() => {
+                if (!abrirPestana(orden.bcDeepLink!)) {
+                  toast("El navegador bloqueó la pestaña de Business Central. Permití las ventanas emergentes de este sitio.", "error");
+                }
+              }}>↗ Abrir en BC</Button>
           )}
           {/* Con la orden "sin lanzar en BC" el camino es el botón «Volver a lanzar en BC»
               (el de Aprobación, o el de abajo): este link repetía la misma acción al lado. */}

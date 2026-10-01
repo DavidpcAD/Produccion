@@ -5,7 +5,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Button, useToast } from "@/components/compras/ui";
 import { OrdenDetalle } from "@/components/compras/orden-detalle";
 import { useStore } from "@/lib/compras/store";
-import { numeroOrden } from "@/lib/compras/helpers";
+import { abrirPestana, numeroOrden } from "@/lib/compras/helpers";
 
 export default function ProvOrdenDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -47,7 +47,15 @@ export default function ProvOrdenDetallePage() {
         </>
       )}
       {orden.estado === "lanzado" && (
-        <Button variant="outline" onClick={() => { act("abierto", "Orden reabierta para edición"); if (orden.bcDeepLink) window.open(orden.bcDeepLink, "_blank"); }}>Volver a abrir</Button>
+        <Button variant="outline" onClick={() => {
+          act("abierto", "Orden reabierta para edición");
+          // La orden ya se reabrió acá; lo que falta es corregirla EN BC. Si el
+          // navegador bloquea la pestaña y nadie avisa, la persona cree que
+          // terminó y la orden queda a medias.
+          if (orden.bcDeepLink && !abrirPestana(orden.bcDeepLink)) {
+            toast("Se reabrió la orden, pero el navegador bloqueó la pestaña de Business Central. Permití las ventanas emergentes y abrila desde el detalle.", "error");
+          }
+        }}>Volver a abrir</Button>
       )}
     </>
   );

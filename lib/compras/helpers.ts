@@ -1061,3 +1061,13 @@ export function etiquetaInterna(numero: string): string {
 export function tieneBc(o: { bcNumber?: string }): boolean {
   return !!(o.bcNumber ?? "").trim();
 }
+
+/** Abre una pestaña nueva y dice si el navegador la bloqueó.
+ *
+ *  `window.open` devuelve null cuando el bloqueador se interpone, y en todos los
+ *  lados donde se usaba, ese null se ignoraba: se tocaba el botón y no pasaba
+ *  NADA. En las tabletas de obra el bloqueador suele venir prendido de fábrica.
+ *  Devuelve `false` si no pudo, para que quien llama avise. */
+export function abrirPestana(url: string): boolean {
+  return !!window.open(url, "_blank", "noopener");
+}
