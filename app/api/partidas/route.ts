@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
@@ -90,7 +91,9 @@ export async function GET(req: NextRequest) {
     `),
   ]);
 
-  return NextResponse.json({
+  // Comprimido: el catálogo completo lo piden /partidas y las dos pantallas de
+  // Cuadrillas en cada entrada. Ver lib/http/json-comprimido.ts.
+  return jsonComprimido(req, {
     tipo,
     etapas: etapas.recordset,
     partidas: partidas.recordset,

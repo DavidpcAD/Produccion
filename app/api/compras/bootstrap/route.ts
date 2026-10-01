@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonComprimido } from "@/lib/http/json-comprimido";
 import { mensajeParaCliente } from "@/lib/errores";
 import { listMovimientosResumen, listOrdenes, listPedidos, listRecepciones } from "@/lib/compras/repo";
 import { guardCompras, esRechazo, sesionDeActor } from "@/lib/compras/guard";
@@ -26,14 +27,17 @@ export async function GET(req: Request) {
   try {
     if (new URL(req.url).searchParams.get("parte") === "cola" && g.alcance === "todo") {
       const ordenes = await listOrdenes({ estados: ["pendiente_aprobacion"] });
-      return NextResponse.json({ ordenes, parcial: true });
+      return jsonComprimido(req, { ordenes, parcial: true });
     }
 
     const [pedidos, ordenes, recepciones, movimientos] = await Promise.all([
       listPedidos(), listOrdenes(), listRecepciones(), listMovimientosResumen(),
     ]);
     const todo = { pedidos, ordenes, recepciones, movimientos };
-    return NextResponse.json(
+    // Comprimido: es la respuesta más pesada de la app (~5 MB en AdelantePRO) y
+    // Next no comprime lo que devuelve un route handler. Ver lib/http/json-comprimido.ts.
+    return jsonComprimido(
+      req,
       g.alcance === "todo" ? todo : recortarAMisSolicitudes(todo, sesionDeActor(g)),
     );
   } catch (e: any) {

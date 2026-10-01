@@ -3,6 +3,7 @@
 // para poblar los selectores de Cuadrillas y Proyectos. Los métodos de
 // escritura se eliminaron el 2026-09-14 (ver auditoría de seguridad).
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 
@@ -113,7 +114,8 @@ export async function GET(req: NextRequest) {
         apps: typeof row.apps === 'string' ? JSON.parse(row.apps as string) : [],
       }));
 
-  return NextResponse.json({
+  // Comprimido: son 342 colaboradores y lo piden los selectores de personas.
+  return jsonComprimido(req, {
     data,
     total,
     paginas: Math.ceil(total / porPagina),

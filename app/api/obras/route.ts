@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
@@ -75,7 +76,9 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  return NextResponse.json({
+  // Comprimido: con `porPagina=1000` son 259 obras y el selector lo pide en cada
+  // entrada a Cuadrillas y a Presupuesto. Ver lib/http/json-comprimido.ts.
+  return jsonComprimido(req, {
     data, total, pagina,
     paginas: Math.ceil(total / porPagina),
   });
