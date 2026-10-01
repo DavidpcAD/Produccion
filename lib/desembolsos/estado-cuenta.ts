@@ -176,7 +176,7 @@ export async function obtenerEstadoCuenta(
   const [r] = cab.recordset;
   if (!r) return null;
 
-  const extras = await db
+  const extrasPromesa = db
     .request()
     .input('id', sql.Int, idCaso)
     .query<RawExtra>(`
@@ -189,7 +189,7 @@ export async function obtenerEstadoCuenta(
       ORDER BY FechaAprobacion, IDExtra;
     `);
 
-  const pagos = await db
+  const pagosPromesa = db
     .request()
     .input('id', sql.Int, idCaso)
     .query<RawPago>(`
@@ -202,7 +202,7 @@ export async function obtenerEstadoCuenta(
       ORDER BY FechaPlaneada, IDPago;
     `);
 
-  const pagosBanco = await db
+  const pagosBancoPromesa = db
     .request()
     .input('id', sql.Int, idCaso)
     .query<RawPagoBanco>(`
@@ -222,6 +222,18 @@ export async function obtenerEstadoCuenta(
       WHERE chp.IDCaso = @id
       ORDER BY m.FechaMovimiento, chp.OrdenEnCaso;
     `);
+
+  // Las tres consultas de arriba son independientes entre si: las tres van por
+  // el mismo @id y ninguna mira lo que devolvio otra. Encadenadas eran tres
+  // viajes a Azure EN FILA cada vez que alguien abre el estado de cuenta de un
+  // caso desde el dashboard. La cabecera si tiene que ir antes —si el caso no
+  // existe se devuelve null sin consultar nada mas—, asi que quedan dos idas y
+  // vueltas en lugar de cuatro.
+  const [extras, pagos, pagosBanco] = await Promise.all([
+    extrasPromesa,
+    pagosPromesa,
+    pagosBancoPromesa,
+  ]);
 
   const precioVentaActual = Number(r.PrecioVentaActual_CRC ?? 0);
   const montoBanco = Number(r.MontoFinanciaBanco_CRC ?? 0);

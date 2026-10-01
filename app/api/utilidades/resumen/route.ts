@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     const db = await getAdelanteDb();
 
     // Ecuación + componentes de la utilidad gastada — SUM sobre el rango.
-    const ecuRes = await db
+    const ecuPromesa = db
       .request()
       .input('desdeYM', sql.Int, rango.desdeYM)
       .input('hastaYM', sql.Int, rango.hastaYM).query(`
@@ -80,10 +80,9 @@ export async function GET(req: NextRequest) {
         FROM pro_uti.v_resumen_mensual
         WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM
       `);
-    const ecuRow = ecuRes.recordset[0];
 
     // Ingresos del período (Bruto + Neto AD).
-    const ingRes = await db
+    const ingPromesa = db
       .request()
       .input('desdeYM', sql.Int, rango.desdeYM)
       .input('hastaYM', sql.Int, rango.hastaYM).query(`
@@ -93,6 +92,73 @@ export async function GET(req: NextRequest) {
         FROM pro_uti.v_ingresos_utilidad_por_lote
         WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM
       `);
+
+    // Distribución por tipo de movimiento — GROUP BY tipo, SUM en el rango.
+    const distReq = db
+      .request()
+      .input('desdeYM', sql.Int, rango.desdeYM)
+      .input('hastaYM', sql.Int, rango.hastaYM);
+    tipos.forEach((t, i) => distReq.input(`tipo${i}`, sql.NVarChar(50), t));
+    const tiposClause =
+      tipos.length > 0
+        ? `AND tipo_movimiento IN (${tipos.map((_, i) => `@tipo${i}`).join(',')})`
+        : '';
+    const distPromesa = distReq.query(`
+      SELECT
+        tipo_movimiento,
+        SUM(monto_total)          AS monto_total,
+        SUM(cantidad_movimientos) AS cantidad_movimientos
+      FROM pro_uti.v_por_tipo_movimiento
+      WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${tiposClause}
+      GROUP BY tipo_movimiento
+      ORDER BY SUM(monto_total) DESC
+    `);
+
+    // Devolución y movimientos por lote — GROUP BY lote, SUM en el rango.
+    const lotesClause =
+      lotes.length > 0 ? `AND lote IN (${lotes.map((_, i) => `@lote${i}`).join(',')})` : '';
+
+    const devReq = db
+      .request()
+      .input('desdeYM', sql.Int, rango.desdeYM)
+      .input('hastaYM', sql.Int, rango.hastaYM);
+    lotes.forEach((l, i) => devReq.input(`lote${i}`, sql.NVarChar(100), l));
+    const devPromesa = devReq.query(`
+      SELECT lote, SUM(devolucion_utilidad) AS monto
+      FROM pro_uti.v_resumen_mensual_por_lote
+      WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
+      GROUP BY lote
+      HAVING SUM(devolucion_utilidad) <> 0
+      ORDER BY SUM(devolucion_utilidad)
+    `);
+
+    const movReq = db
+      .request()
+      .input('desdeYM', sql.Int, rango.desdeYM)
+      .input('hastaYM', sql.Int, rango.hastaYM);
+    lotes.forEach((l, i) => movReq.input(`lote${i}`, sql.NVarChar(100), l));
+    const movPromesa = movReq.query(`
+      SELECT lote, SUM(monto_total) AS monto
+      FROM pro_uti.v_resumen_mensual_por_lote
+      WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
+      GROUP BY lote
+      ORDER BY SUM(monto_total) DESC
+    `);
+
+    // Las cinco consultas son INDEPENDIENTES entre si: todas filtran por el mismo
+    // rango de meses y ninguna mira lo que devolvio otra. Encadenadas con await
+    // eran cinco viajes a Azure EN FILA —~2 s de pura espera de red— para una
+    // pantalla que solo muestra sumas. Los calculos de abajo estaban intercalados
+    // entre las consultas; se bajaron para poder lanzarlas todas a la vez.
+    const [ecuRes, ingRes, distRes, devRes, movRes] = await Promise.all([
+      ecuPromesa,
+      ingPromesa,
+      distPromesa,
+      devPromesa,
+      movPromesa,
+    ]);
+
+    const ecuRow = ecuRes.recordset[0];
     const ingRow = ingRes.recordset[0];
 
     const ecuacionPrincipal = ecuRow
@@ -120,58 +186,6 @@ export async function GET(req: NextRequest) {
           compra_maquinaria: Number(ecuRow.compra_maquinaria ?? 0),
         }
       : COMPONENTES_VACIOS;
-
-    // Distribución por tipo de movimiento — GROUP BY tipo, SUM en el rango.
-    const distReq = db
-      .request()
-      .input('desdeYM', sql.Int, rango.desdeYM)
-      .input('hastaYM', sql.Int, rango.hastaYM);
-    tipos.forEach((t, i) => distReq.input(`tipo${i}`, sql.NVarChar(50), t));
-    const tiposClause =
-      tipos.length > 0
-        ? `AND tipo_movimiento IN (${tipos.map((_, i) => `@tipo${i}`).join(',')})`
-        : '';
-    const distRes = await distReq.query(`
-      SELECT
-        tipo_movimiento,
-        SUM(monto_total)          AS monto_total,
-        SUM(cantidad_movimientos) AS cantidad_movimientos
-      FROM pro_uti.v_por_tipo_movimiento
-      WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${tiposClause}
-      GROUP BY tipo_movimiento
-      ORDER BY SUM(monto_total) DESC
-    `);
-
-    // Devolución y movimientos por lote — GROUP BY lote, SUM en el rango.
-    const lotesClause =
-      lotes.length > 0 ? `AND lote IN (${lotes.map((_, i) => `@lote${i}`).join(',')})` : '';
-
-    const devReq = db
-      .request()
-      .input('desdeYM', sql.Int, rango.desdeYM)
-      .input('hastaYM', sql.Int, rango.hastaYM);
-    lotes.forEach((l, i) => devReq.input(`lote${i}`, sql.NVarChar(100), l));
-    const devRes = await devReq.query(`
-      SELECT lote, SUM(devolucion_utilidad) AS monto
-      FROM pro_uti.v_resumen_mensual_por_lote
-      WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
-      GROUP BY lote
-      HAVING SUM(devolucion_utilidad) <> 0
-      ORDER BY SUM(devolucion_utilidad)
-    `);
-
-    const movReq = db
-      .request()
-      .input('desdeYM', sql.Int, rango.desdeYM)
-      .input('hastaYM', sql.Int, rango.hastaYM);
-    lotes.forEach((l, i) => movReq.input(`lote${i}`, sql.NVarChar(100), l));
-    const movRes = await movReq.query(`
-      SELECT lote, SUM(monto_total) AS monto
-      FROM pro_uti.v_resumen_mensual_por_lote
-      WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
-      GROUP BY lote
-      ORDER BY SUM(monto_total) DESC
-    `);
 
     return NextResponse.json({
       ecuacionPrincipal,
