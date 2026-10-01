@@ -5,6 +5,22 @@ import type { Request as SqlRequest } from 'mssql';
 export function bindObra(reqObj: SqlRequest, b: Record<string, unknown>): SqlRequest {
   const num = (v: unknown) => (v != null && v !== '' ? Number(v) : null);
   const str = (v: unknown) => ((v as string) || null);
+  /** La fecha VACÍA de Business Central llega como `0001-01-01`, y el driver de
+   *  SQL la rechaza con «Validation failed for parameter 'fechaInicio'. Out of
+   *  range.» (probado: acepta desde 1752, el año 1 no). O sea que guardar
+   *  CUALQUIER obra que la tuviera daba 500 y no se guardaba nada: en producción
+   *  son 206 de las 259 obras, el 80 %.
+   *
+   *  `0001-01-01` no es una fecha, es el centinela de "sin fecha" de BC, así que
+   *  se guarda NULL — que es lo mismo pero en SQL, y es lo que ya hace el
+   *  importador de BC (ver `toDate` en app/api/bc/jobs/route.ts, que descarta
+   *  `0001` y `1753`). */
+  const fecha = (v: unknown): Date | null => {
+    if (!v) return null;
+    const d = new Date(v as string);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.getUTCFullYear() < 1753 ? null : d;
+  };
   return reqObj
     .input('numeroObra', sql.NVarChar, b.numeroObra)
     .input('nombreMostrado', sql.NVarChar, str(b.nombreMostrado))
@@ -20,8 +36,8 @@ export function bindObra(reqObj: SqlRequest, b: Record<string, unknown>): SqlReq
     .input('idEncargado', sql.NVarChar, str(b.idEncargado))
     .input('ubicacion', sql.NVarChar, str(b.ubicacion))
     .input('estado', sql.NVarChar, str(b.estado))
-    .input('fechaInicio', sql.Date, b.fechaInicio ? new Date(b.fechaInicio as string) : null)
-    .input('fechaFin', sql.Date, b.fechaFin ? new Date(b.fechaFin as string) : null)
+    .input('fechaInicio', sql.Date, fecha(b.fechaInicio))
+    .input('fechaFin', sql.Date, fecha(b.fechaFin))
     .input('precioNormalMaquinaria', sql.Decimal(18, 2), num(b.precioNormalMaquinaria))
     .input('precioConcretoMaquinaria', sql.Decimal(18, 2), num(b.precioConcretoMaquinaria))
     .input('origenPrincipal', sql.NVarChar, str(b.origenPrincipal))

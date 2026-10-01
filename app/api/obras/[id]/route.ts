@@ -39,6 +39,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
   const { id } = await params;
+  const idObra = Number(id);
+  if (!Number.isInteger(idObra) || idObra <= 0) {
+    return NextResponse.json({ error: 'Obra no encontrada' }, { status: 404 });
+  }
   const body = await req.json();
   if (!body.numeroObra) {
     return NextResponse.json({ error: 'El número de obra es requerido' }, { status: 400 });
@@ -56,8 +60,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // El número de obra es la LLAVE del registro (BC, avances, presupuesto): no se
     // actualiza aquí aunque venga en el body (el campo llega deshabilitado desde el
     // editor). origenPrincipal es un campo de sistema (importación) y tampoco se toca.
-    await bindObra(db.request(), body)
-      .input('id', sql.BigInt, id)
+    const r = await bindObra(db.request(), body)
+      .input('id', sql.BigInt, idObra)
       .input('modificadoPor', sql.NVarChar, session.cedula ?? 'control-usuarios')
       .query(`
         UPDATE dbo.Obra SET
@@ -74,6 +78,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           fechaModificacion = SYSUTCDATETIME(), modificadoPor = @modificadoPor
         WHERE idObra = @id
       `);
+
+    // Si no actualizó NADA, la obra no existe (la borraron desde otra pantalla, o
+    // el id venía mal). Se corta ACÁ, antes de BC: si no, la sincronización de
+    // abajo —que trabaja con `body.numeroObra`, no con la fila— mandaba el área
+    // prorrateada a Business Central mientras la base de acá no cambiaba, y la
+    // pantalla decía "guardada" igual.
+    if (!r.rowsAffected[0]) {
+      return NextResponse.json({ error: 'Esa obra ya no existe' }, { status: 404 });
+    }
 
     // Sincronización opcional con Business Central (pedida explícitamente desde el
     // editor). Hoy BC solo acepta actualizar el área prorrateada de la obra/Job; el
@@ -116,9 +129,18 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
   const { id } = await params;
+  const idObra = Number(id);
+  if (!Number.isInteger(idObra) || idObra <= 0) {
+    return NextResponse.json({ error: 'Obra no encontrada' }, { status: 404 });
+  }
   const db = await getDb();
   try {
-    await db.request().input('id', sql.BigInt, id).query('DELETE FROM dbo.Obra WHERE idObra = @id');
+    const r = await db.request().input('id', sql.BigInt, idObra).query('DELETE FROM dbo.Obra WHERE idObra = @id');
+    // Igual que el PATCH: si no borró nada, se dice, en vez de confirmar un borrado
+    // que no pasó.
+    if (!r.rowsAffected[0]) {
+      return NextResponse.json({ error: 'Esa obra ya no existe' }, { status: 404 });
+    }
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const msg = mensajeParaCliente(err);
