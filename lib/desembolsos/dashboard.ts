@@ -66,19 +66,23 @@ export interface DashboardSemana {
   TotalAD_CRC: number;
 }
 
+/** Un caso, TAL COMO LO PINTA el dashboard — no todo lo que trae la vista.
+ *
+ *  `vw_dashboard_caso` devuelve 51 columnas por caso y acá se mandaban las 51:
+ *  con 855 casos en cartera son 1 047 KB de JSON, de los cuales 559 KB eran
+ *  campos que la pantalla nunca lee (notas de formalización, montos ya pagados,
+ *  colores de hito, área del lote…). Medido el 2026-10-01.
+ *
+ *  El detalle completo de un caso NO sale de acá: la fila solo manda su IDCaso
+ *  y `EstadoCuentaModal` pide lo suyo aparte. Si mañana la tabla necesita una
+ *  columna más, se agrega acá y en el `map` de abajo; la consulta ya la trae. */
 export interface DashboardCaso {
   IDCaso: number;
-  CodigoCaso: string | null;
   Cliente: string;
   NombreModelo: string | null;
-  IDLote: number;
-  NombreBloque: string | null;
   CodigoLote: string;
-  AreaLote_m2: number | null;
   IDBan: number;
   AbrevBanco: string;
-  NombreBanco: string;
-  ColorBanco: string | null;
   IDProyecto: number;
   AbreviaturaProyecto: string;
   NombreProyecto: string;
@@ -86,38 +90,18 @@ export interface DashboardCaso {
   EsReservado: number;
   NivelConfianzaFormalizacion: NivelConfianza | null;
   PrecioVenta_CRC: number | null;
-  PrecioVentaContractual_CRC: number | null;
-  FechaReserva: string | null;
-  FechaFormalizacion: string | null;
-  TotalExtras_CRC: number;
-  TotalDescuentos_CRC: number;
-  ExtrasPendientesAprobacion: number;
-  NumExtrasTotal: number;
   MontoBanco_CRC: number | null;
-  MontoFinanciaBancoCapturado_CRC: number | null;
   PagoCliente_CRC: number;
-  NumPagosCliente: number;
-  FechaPagoCliente: string | null;
-  PagadoProyectado_CRC: number;
-  PagadoReal_CRC: number;
-  NumLinks: number;
   Pendiente_CRC: number;
-  Sobrecobro_CRC: number;
-  TieneSobrecobro: number;
-  IngresoTotalAD_CRC: number | null;
   PendienteAD_CRC: number | null;
   PorcentajeAvance: number;
-  RatioCobroReal: number | null;
   TotalHitos: number;
   HitosCubiertos: number;
   ProximoCodigoHito: string | null;
-  ProximoNombreHito: string | null;
-  ProximoColorHito: string | null;
   ProximoMonto_CRC: number | null;
   ProximoMontoAD_CRC: number | null;
   ProximaFechaDesembolso: string | null;
   FechaProyectadaFormalizacion: string | null;
-  NotasFormalizacion: string | null;
 }
 
 export interface RespuestaDashboard {
@@ -417,17 +401,11 @@ export async function calcularDashboard(
 
   const casos: DashboardCaso[] = casosRes.recordset.map((r) => ({
     IDCaso: num(r.IDCaso),
-    CodigoCaso: (r.CodigoCaso as string) ?? null,
     Cliente: (r.Cliente as string)?.trim() ?? '',
     NombreModelo: (r.NombreModelo as string) ?? null,
-    IDLote: num(r.IDLote),
-    NombreBloque: (r.NombreBloque as string) ?? null,
     CodigoLote: (r.CodigoLote as string) ?? '',
-    AreaLote_m2: numN(r.AreaLote_m2),
     IDBan: num(r.IDBan),
     AbrevBanco: (r.AbrevBanco as string)?.trim() ?? '',
-    NombreBanco: (r.NombreBanco as string)?.trim() ?? '',
-    ColorBanco: (r.ColorBanco as string) ?? null,
     IDProyecto: num(r.IDProyecto),
     AbreviaturaProyecto: (r.AbreviaturaProyecto as string)?.trim() ?? '',
     NombreProyecto: (r.NombreProyecto as string)?.trim() ?? '',
@@ -435,38 +413,18 @@ export async function calcularDashboard(
     EsReservado: r.EsReservado ? 1 : 0,
     NivelConfianzaFormalizacion: (r.NivelConfianzaFormalizacion as NivelConfianza) ?? null,
     PrecioVenta_CRC: numN(r.PrecioVenta_CRC),
-    PrecioVentaContractual_CRC: numN(r.PrecioVentaContractual_CRC),
-    FechaReserva: toIso(r.FechaReserva as Date | string | null),
-    FechaFormalizacion: toIso(r.FechaFormalizacion as Date | string | null),
-    TotalExtras_CRC: num(r.TotalExtras_CRC),
-    TotalDescuentos_CRC: num(r.TotalDescuentos_CRC),
-    ExtrasPendientesAprobacion: num(r.ExtrasPendientesAprobacion),
-    NumExtrasTotal: num(r.NumExtrasTotal),
     MontoBanco_CRC: numN(r.MontoBanco_CRC),
-    MontoFinanciaBancoCapturado_CRC: numN(r.MontoFinanciaBancoCapturado_CRC),
     PagoCliente_CRC: num(r.PagoCliente_CRC),
-    NumPagosCliente: num(r.NumPagosCliente),
-    FechaPagoCliente: toIso(r.FechaPagoCliente as Date | string | null),
-    PagadoProyectado_CRC: num(r.PagadoProyectado_CRC),
-    PagadoReal_CRC: num(r.PagadoReal_CRC),
-    NumLinks: num(r.NumLinks),
     Pendiente_CRC: num(r.Pendiente_CRC),
-    Sobrecobro_CRC: num(r.Sobrecobro_CRC),
-    TieneSobrecobro: r.TieneSobrecobro ? 1 : 0,
-    IngresoTotalAD_CRC: numN(r.IngresoTotalAD_CRC),
     PendienteAD_CRC: numN(r.PendienteAD_CRC),
     PorcentajeAvance: num(r.PorcentajeAvance),
-    RatioCobroReal: numN(r.RatioCobroReal),
     TotalHitos: num(r.TotalHitos),
     HitosCubiertos: num(r.HitosCubiertos),
     ProximoCodigoHito: (r.ProximoCodigoHito as string) ?? null,
-    ProximoNombreHito: (r.ProximoNombreHito as string) ?? null,
-    ProximoColorHito: (r.ProximoColorHito as string) ?? null,
     ProximoMonto_CRC: numN(r.ProximoMonto_CRC),
     ProximoMontoAD_CRC: numN(r.ProximoMontoAD_CRC),
     ProximaFechaDesembolso: toIso(r.ProximaFechaDesembolso as Date | string | null),
     FechaProyectadaFormalizacion: toIso(r.FechaProyectadaFormalizacion as Date | string | null),
-    NotasFormalizacion: (r.NotasFormalizacion as string) ?? null,
   }));
 
   const kpis: DashboardKPIs = {

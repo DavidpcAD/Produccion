@@ -364,7 +364,7 @@ export async function listarDesembolsos(
 ): Promise<RespuestaDesembolsos> {
   // Todos los hitos cuya FechaProyectada cae en el rango visible (pendientes y
   // ya desembolsados). La UI distingue visualmente.
-  const result = await db
+  const resultPromesa = db
     .request()
     .input('desde', sql.Date, desde)
     .input('hasta', sql.Date, hasta)
@@ -396,10 +396,9 @@ export async function listarDesembolsos(
       WHERE v.FechaProyectada BETWEEN @desde AND @hasta
       ORDER BY v.IDBan, v.OrdenEnEsquema, v.FechaProyectada;
     `);
-
   // Backlog por defecto: hitos sin fecha (NULL) siempre visibles; con fecha
   // fuera de rango, rn=1 por caso.
-  const backlogResult = await db
+  const backlogResultPromesa = db
     .request()
     .input('desde', sql.Date, desde)
     .input('hasta', sql.Date, hasta)
@@ -428,7 +427,7 @@ export async function listarDesembolsos(
     `);
 
   // Backlog expandido: todos los pendientes (sin rn=1), para búsqueda.
-  const backlogExpandidoResult = await db
+  const backlogExpandidoResultPromesa = db
     .request()
     .input('desde', sql.Date, desde)
     .input('hasta', sql.Date, hasta)
@@ -447,12 +446,8 @@ export async function listarDesembolsos(
         v.OrdenEnEsquema;
     `);
 
-  const desembolsos = result.recordset.map(toDesembolsoProyectado);
-  const backlog = backlogResult.recordset.map(toDesembolsoProyectado);
-  const backlogExpandido = backlogExpandidoResult.recordset.map(toDesembolsoProyectado);
-
   // Hitos del Crédito Puente (Fase 6.1d). Solo CP con Estado='ACTIVO'.
-  const cpHitosResult = await db
+  const cpHitosResultPromesa = db
     .request()
     .input('desde', sql.Date, desde)
     .input('hasta', sql.Date, hasta)
@@ -513,40 +508,9 @@ export async function listarDesembolsos(
       WHERE cp.Estado = 'ACTIVO'
       ORDER BY v.AbrevBancoCP, v.AbreviaturaProyecto, v.CodigoLote, v.OrdenEnEsquema;
     `);
-  const cpHitosTodos = cpHitosResult.recordset.map((r) => ({
-    IDCreditoPuenteLoteHito: r.IDCreditoPuenteLoteHito,
-    IDCreditoPuente: r.IDCreditoPuente,
-    IDCreditoPuenteLote: r.IDCreditoPuenteLote,
-    IDLote: r.IDLote,
-    CodigoLote: r.CodigoLote?.trim() ?? '',
-    AbreviaturaProyecto: r.AbreviaturaProyecto?.trim() ?? '',
-    IDBancoCP: r.IDBancoCP,
-    AbrevBancoCP: r.AbrevBancoCP?.trim() ?? '',
-    IDHito: r.IDHito,
-    CodigoHito: r.CodigoHito?.trim() ?? '',
-    NombreHito: r.NombreHito?.trim() ?? '',
-    ColorHito: r.ColorHito,
-    OrdenEnEsquema: r.OrdenEnEsquema,
-    Porcentaje: Number(r.Porcentaje ?? 0),
-    MontoHitoEsperado_CRC: Number(r.MontoHitoEsperado_CRC ?? 0),
-    MontoAplicado_CRC: Number(r.MontoAplicado_CRC ?? 0),
-    MontoPendiente_CRC: Number(r.MontoPendiente_CRC ?? 0),
-    CantidadLinks: Number(r.CantidadLinks ?? 0),
-    FechaProyectada: toIsoDate(r.FechaProyectada),
-    FechaProyectadaDesembolso: toIsoDate(r.FechaProyectadaDesembolso),
-    FechaRealDesembolso: toIsoDate(r.FechaRealDesembolso),
-    EstadoTramite: r.EstadoTramite as EstadoTramite,
-    _enRango: !!r.EnRango,
-  }));
-  const cpHitos = cpHitosTodos
-    .filter((h) => h._enRango)
-    .map(({ _enRango: _drop, ...rest }) => rest);
-  const cpBacklog = cpHitosTodos
-    .filter((h) => !h._enRango)
-    .map(({ _enRango: _drop, ...rest }) => rest);
 
   // Cancelaciones del CP (Fase 6.2 + 6.3).
-  const cpCancelacionesResult = await db
+  const cpCancelacionesResultPromesa = db
     .request()
     .input('desde', sql.Date, desde)
     .input('hasta', sql.Date, hasta)
@@ -590,6 +554,82 @@ export async function listarDesembolsos(
       ORDER BY COALESCE(cpl.FechaConfirmacionCancelacion, cpl.FechaCancelacionAlBanco),
                b.Abreviatura, p.AbreviaturaProyecto, l.Lote;
     `);
+
+  // Distribución del lote por caso (casos con hito visible + casos con pago LOTE).
+  const casosConPagoLoteResultPromesa = db
+    .request()
+    .input('desde', sql.Date, desde)
+    .input('hasta', sql.Date, hasta)
+    .query<{ IDCaso: number }>(`
+      SELECT DISTINCT IDCaso
+      FROM [pro_app].pago_cliente
+      WHERE Concepto = 'LOTE'
+        AND FechaPlaneada BETWEEN @desde AND @hasta;
+    `);
+
+
+  // Las seis consultas de arriba son INDEPENDIENTES entre si: cada una arma su
+  // propio request con el mismo rango de fechas y ninguna mira lo que devolvio
+  // otra. Encadenadas con await costaban seis viajes a Azure EN FILA —2.2 s
+  // medidos, y casi todo era espera de red, no trabajo del servidor. Lanzadas
+  // juntas, el costo pasa a ser el del viaje mas lento.
+  //
+  // Estaban escritas cada una junto al codigo que la consume; se subieron todas
+  // aca para poder arrancarlas a la vez. La de `distribuciones`, mas abajo, se
+  // queda donde esta: necesita los IDCaso que salen justamente de estas.
+  const [
+    result,
+    backlogResult,
+    backlogExpandidoResult,
+    cpHitosResult,
+    cpCancelacionesResult,
+    casosConPagoLoteResult,
+  ] = await Promise.all([
+    resultPromesa,
+    backlogResultPromesa,
+    backlogExpandidoResultPromesa,
+    cpHitosResultPromesa,
+    cpCancelacionesResultPromesa,
+    casosConPagoLoteResultPromesa,
+  ]);
+
+
+  const desembolsos = result.recordset.map(toDesembolsoProyectado);
+  const backlog = backlogResult.recordset.map(toDesembolsoProyectado);
+  const backlogExpandido = backlogExpandidoResult.recordset.map(toDesembolsoProyectado);
+
+  const cpHitosTodos = cpHitosResult.recordset.map((r) => ({
+    IDCreditoPuenteLoteHito: r.IDCreditoPuenteLoteHito,
+    IDCreditoPuente: r.IDCreditoPuente,
+    IDCreditoPuenteLote: r.IDCreditoPuenteLote,
+    IDLote: r.IDLote,
+    CodigoLote: r.CodigoLote?.trim() ?? '',
+    AbreviaturaProyecto: r.AbreviaturaProyecto?.trim() ?? '',
+    IDBancoCP: r.IDBancoCP,
+    AbrevBancoCP: r.AbrevBancoCP?.trim() ?? '',
+    IDHito: r.IDHito,
+    CodigoHito: r.CodigoHito?.trim() ?? '',
+    NombreHito: r.NombreHito?.trim() ?? '',
+    ColorHito: r.ColorHito,
+    OrdenEnEsquema: r.OrdenEnEsquema,
+    Porcentaje: Number(r.Porcentaje ?? 0),
+    MontoHitoEsperado_CRC: Number(r.MontoHitoEsperado_CRC ?? 0),
+    MontoAplicado_CRC: Number(r.MontoAplicado_CRC ?? 0),
+    MontoPendiente_CRC: Number(r.MontoPendiente_CRC ?? 0),
+    CantidadLinks: Number(r.CantidadLinks ?? 0),
+    FechaProyectada: toIsoDate(r.FechaProyectada),
+    FechaProyectadaDesembolso: toIsoDate(r.FechaProyectadaDesembolso),
+    FechaRealDesembolso: toIsoDate(r.FechaRealDesembolso),
+    EstadoTramite: r.EstadoTramite as EstadoTramite,
+    _enRango: !!r.EnRango,
+  }));
+  const cpHitos = cpHitosTodos
+    .filter((h) => h._enRango)
+    .map(({ _enRango: _drop, ...rest }) => rest);
+  const cpBacklog = cpHitosTodos
+    .filter((h) => !h._enRango)
+    .map(({ _enRango: _drop, ...rest }) => rest);
+
   const cpCancelaciones: CreditoPuenteCancelacion[] = cpCancelacionesResult.recordset.map((r) => ({
     IDCreditoPuenteLote: r.IDCreditoPuenteLote,
     IDCreditoPuente: r.IDCreditoPuente,
@@ -607,17 +647,6 @@ export async function listarDesembolsos(
     Notas: r.Notas,
   }));
 
-  // Distribución del lote por caso (casos con hito visible + casos con pago LOTE).
-  const casosConPagoLoteResult = await db
-    .request()
-    .input('desde', sql.Date, desde)
-    .input('hasta', sql.Date, hasta)
-    .query<{ IDCaso: number }>(`
-      SELECT DISTINCT IDCaso
-      FROM [pro_app].pago_cliente
-      WHERE Concepto = 'LOTE'
-        AND FechaPlaneada BETWEEN @desde AND @hasta;
-    `);
   const idsCasoVisibles = Array.from(
     new Set([
       ...desembolsos.map((d) => d.IDCaso),
