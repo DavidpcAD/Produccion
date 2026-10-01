@@ -1902,6 +1902,12 @@
   background: color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-tint-base));
   border-color: var(--ds-color-green-200); color: var(--ds-color-green-200);
 }
+/* En oscuro la ficha activa queda sobre un tinte OSCURO, y el verde-200 es el tono
+   pensado para fondo claro: medido, 3.40:1 (AA pide 4.5 para texto chico). Con el
+   verde-100 sube a ~5.6. Mismo criterio que los distintivos de este archivo; lleva
+   :root[data-theme] adelante, así que gana por especificidad sin importar dónde
+   quede en el archivo. */
+:root[data-theme="dark"] .oc-scope .oc-ficha.is-active { color: var(--ds-color-green-100); }
 
 .oc-scope .oc-barra__acciones { display: flex; align-items: center; gap: var(--ds-space-2); margin-left: auto; }
 .oc-scope .oc-btn-filtros {
