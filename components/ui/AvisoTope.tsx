@@ -1,5 +1,5 @@
 'use client';
-import { Icon } from '@/components/ds/Icon/Icon';
+import { Aviso } from '@/components/ui/Aviso';
 
 // ─── "Esto no es todo" ────────────────────────────────────────────────────────
 //
@@ -54,23 +54,15 @@ export function AvisoTope({
   const n = (v: number) => v.toLocaleString('es-CR');
 
   return (
-    <div
-      role="status"
-      className="flex items-start gap-2.5 rounded-ds border border-ds-yellow/35 bg-ds-yellow-soft px-3.5 py-2.5"
-    >
-      <span className="mt-px shrink-0">
-        <Icon name="alert" size="sm" color="var(--color-ds-yellow-ink)" />
-      </span>
-      <p className="text-body-sm text-ds-yellow-ink">
-        Se están mostrando {n(cargadas)} {sustantivo} —{' '}
-        <strong className="font-semibold">
-          {n(faltan)} más {faltan === 1 ? 'queda' : 'quedan'} fuera de la lista
-        </strong>
-        .{' '}
-        {buscadorLocal
-          ? `El buscador solo mira lo que está acá, así que no va a encontrar el resto: ${comoFiltrar}`
-          : comoFiltrar}
-      </p>
-    </div>
+    <Aviso>
+      Se están mostrando {n(cargadas)} {sustantivo} —{' '}
+      <strong className="font-semibold">
+        {n(faltan)} más {faltan === 1 ? 'queda' : 'quedan'} fuera de la lista
+      </strong>
+      .{' '}
+      {buscadorLocal
+        ? `El buscador solo mira lo que está acá, así que no va a encontrar el resto: ${comoFiltrar}`
+        : comoFiltrar}
+    </Aviso>
   );
 }

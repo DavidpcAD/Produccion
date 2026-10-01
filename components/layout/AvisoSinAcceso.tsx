@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { Icon } from '@/components/ds/Icon/Icon';
+import { Aviso } from '@/components/ui/Aviso';
 
 // ─── "Esa pantalla no es tuya" ───────────────────────────────────────────────
 //
@@ -55,25 +55,22 @@ export function AvisoSinAcceso() {
   if (!modulo) return null;
 
   return (
-    <div
-      role="status"
-      className="mx-4 mt-4 flex items-start gap-2.5 rounded-ds border border-ds-yellow/35 bg-ds-yellow-soft px-3.5 py-2.5 sm:mx-6"
-    >
-      <span className="mt-px shrink-0">
-        <Icon name="alert" size="sm" color="var(--color-ds-yellow-ink)" />
-      </span>
-      <p className="flex-1 text-body-sm text-ds-yellow-ink">
+    <div className="mx-4 mt-4 sm:mx-6">
+      <Aviso
+        accion={
+          <button
+            type="button"
+            onClick={() => setModulo(null)}
+            className="shrink-0 self-center rounded-ds px-2 py-0.5 text-body-sm font-semibold text-ds-yellow-ink underline underline-offset-2 hover:opacity-70"
+          >
+            Entendido
+          </button>
+        }
+      >
         <strong className="font-semibold">Tu rol no abre {modulo}.</strong> Te dejamos en la
         primera pantalla que sí podés usar. Si necesitás entrar ahí, pedí el permiso en
         rh.adelante.cr.
-      </p>
-      <button
-        type="button"
-        onClick={() => setModulo(null)}
-        className="shrink-0 self-center rounded-ds px-2 py-0.5 text-body-sm font-semibold text-ds-yellow-ink underline underline-offset-2 hover:opacity-70"
-      >
-        Entendido
-      </button>
+      </Aviso>
     </div>
   );
 }

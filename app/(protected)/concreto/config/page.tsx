@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { Aviso } from '@/components/ui/Aviso';
 import { Button } from '@/components/ui/Button';
 import { EstadoVacio } from '@/components/ui/EstadoVacio';
 import { Badge } from '@/components/ui/Badge';
@@ -357,20 +358,12 @@ function TabUmbrales({ puede }: { puede: boolean }) {
               no estas filas.
           Una pantalla de configuración que acepta un cambio y no cambia nada es
           peor que no tenerla, así que mientras no se conecte, se dice. */}
-      <div
-        role="status"
-        className="flex items-start gap-2.5 rounded-ds border border-ds-yellow/35 bg-ds-yellow-soft px-3.5 py-2.5"
-      >
-        <span className="mt-px shrink-0">
-          <Icon name="alert" size="sm" color="var(--color-ds-yellow-ink)" />
-        </span>
-        <p className="text-body-sm text-ds-yellow-ink">
-          <strong className="font-semibold">Estos valores todavía no se aplican.</strong> Se
-          guardan, pero nada los lee: las alarmas de Batches son las que reporta la planta en su
-          CSV, y el veredicto de Laboratorio usa 0,95 y 0,85 fijos en el código. Cambiar un número
-          acá no cambia lo que se ve en esas pantallas.
-        </p>
-      </div>
+      <Aviso>
+        <strong className="font-semibold">Estos valores todavía no se aplican.</strong> Se
+        guardan, pero nada los lee: las alarmas de Batches son las que reporta la planta en su
+        CSV, y el veredicto de Laboratorio usa 0,95 y 0,85 fijos en el código. Cambiar un número
+        acá no cambia lo que se ve en esas pantallas.
+      </Aviso>
 
       <p className="text-ds-gray-400 text-body-sm">{items.length} umbrales</p>
 
