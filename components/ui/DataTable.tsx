@@ -9,6 +9,7 @@ import {
 import { Input } from '@/components/ui/Input';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { Pagination } from '@/components/ui/Table';
+import { useToast } from '@/components/ui/Toast';
 import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 // Metadata opcional por columna: etiqueta legible (para "Columnas" y export) y
@@ -184,6 +185,7 @@ export function DataTable<T>({
   const colsRef = useClickOutside(() => setColsOpen(false));
   const exportRef = useClickOutside(() => setExportOpen(false));
   const filterRef = useClickOutside(() => setFilterOpen(null));
+  const { toast } = useToast();
 
   const totalFiltered = table.getFilteredRowModel().rows.length;
   const activeFilters = columnFilters.length + (globalFilter ? 1 : 0);
@@ -243,7 +245,14 @@ export function DataTable<T>({
       <script>window.onload=function(){window.print();}<\/script>
       </body></html>`;
     const w = window.open('', '_blank');
-    if (!w) return;
+    // Si el navegador bloquea la ventana emergente, `window.open` devuelve null.
+    // Antes eso era un `return` mudo: se tocaba "Reporte PDF" y no pasaba NADA,
+    // que es justo lo que no puede hacer esta app (ver AvisoSesion). En las
+    // tabletas de obra el bloqueador suele venir prendido.
+    if (!w) {
+      toast('El navegador bloqueó la ventana del reporte. Permití las ventanas emergentes de este sitio y probá de nuevo.', 'error');
+      return;
+    }
     w.document.write(html);
     w.document.close();
   }

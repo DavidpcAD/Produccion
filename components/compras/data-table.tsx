@@ -8,7 +8,7 @@ import {
   getFacetedRowModel, getFacetedUniqueValues, flexRender,
   type Column, type ColumnDef, type FilterFn, type SortingState, type ColumnFiltersState, type VisibilityState, type ColumnOrderState, type PaginationState,
 } from "@tanstack/react-table";
-import { Button, Card, ConfirmDialog, Input, Select } from "@/components/compras/ui";
+import { Button, Card, ConfirmDialog, Input, Select, useToast } from "@/components/compras/ui";
 import { IconTable } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
@@ -78,6 +78,7 @@ export function DataTable<T>({
   const { usuario } = useStore();
   // Inyecta el filtro multi-selección a las columnas que no traigan uno propio.
   const cols = useMemo(() => columns.map((c) => (c.filterFn ? c : { ...c, filterFn: isDateCol(c) ? dateRangeFilter : multiFilter })), [columns]);
+  const toast = useToast();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -208,7 +209,13 @@ export function DataTable<T>({
     const ths = cols.map((c) => `<th>${escH(labelDe(c))}</th>`).join("");
     const trs = filas.map((r) => `<tr>${cols.map((c) => `<td>${escH(valCelda(r, c))}</td>`).join("")}</tr>`).join("");
     const w = window.open("", "_blank");
-    if (!w) return;
+    // Ventana emergente bloqueada: `window.open` devuelve null. Antes era un
+    // `return` mudo —se tocaba "Reporte PDF" y no pasaba NADA— y en las tabletas
+    // de obra el bloqueador suele venir prendido.
+    if (!w) {
+      toast("El navegador bloqueó la ventana del reporte. Permití las ventanas emergentes de este sitio y probá de nuevo.", "error");
+      return;
+    }
     const fecha = new Intl.DateTimeFormat("es-CR", { dateStyle: "long", timeStyle: "short" }).format(new Date());
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escH(titulo)}</title>
       <style>
