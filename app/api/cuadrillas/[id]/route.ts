@@ -12,12 +12,20 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   }
 
   const { id } = await params;
+  const idCuadrilla = Number(id);
+  if (!Number.isInteger(idCuadrilla) || idCuadrilla <= 0) {
+    return NextResponse.json({ error: 'Cuadrilla no encontrada' }, { status: 404 });
+  }
   const db = await getDb();
 
   try {
-    const cuadRes = await db.request()
-      .input('id', sql.Int, parseInt(id))
-      .query(`
+    // Las seis consultas son independientes entre sí, así que van JUNTAS: en serie
+    // la pantalla de la cuadrilla pagaba seis viajes de ida y vuelta a Azure SQL
+    // antes de pintar nada. La del 404 (`cuadRes`) se evalúa después: una cuadrilla
+    // que no existe es el caso raro y no vale la pena hacerle esperar al resto.
+    const q = (sqlText: string) => db.request().input('id', sql.Int, idCuadrilla).query(sqlText);
+    const [cuadRes, obrasRes, subRes, proyRes, miembrosRes, otrasRes] = await Promise.all([
+      q(`
         SELECT c.IDCuadrilla, c.Nombre, c.Capacidad, c.Activo, c.IDEncargado,
                c.IDProyecto AS idProyecto, pr.nombre AS Proyecto,
                col.calcNombreCompleto AS Encargado
@@ -25,24 +33,16 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
         LEFT JOIN dbo.Colaborador col ON col.idColaborador = c.IDEncargado
         LEFT JOIN dbo.Proyecto pr ON pr.idProyecto = c.IDProyecto
         WHERE c.IDCuadrilla = @id
-      `);
-    if (cuadRes.recordset.length === 0) {
-      return NextResponse.json({ error: 'Cuadrilla no encontrada' }, { status: 404 });
-    }
-
-    // Obras y subpartidas asociadas (relaciones muchos-a-muchos).
-    const obrasRes = await db.request()
-      .input('id', sql.Int, parseInt(id))
-      .query(`
+      `),
+      // Obras y subpartidas asociadas (relaciones muchos-a-muchos).
+      q(`
         SELECT o.idObra AS idObra, o.numeroObra AS numeroObra, o.nombreMostrado AS nombreMostrado,
                o.idProyecto AS idProyecto
         FROM dbo.CuadrillaObra co JOIN dbo.Obra o ON o.idObra = co.idObra
         WHERE co.IDCuadrilla = @id
         ORDER BY o.numeroObra
-      `);
-    const subRes = await db.request()
-      .input('id', sql.Int, parseInt(id))
-      .query(`
+      `),
+      q(`
         SELECT sp.idSubPartida AS idSubPartida, sp.codigo AS codigo, sp.nombre AS nombre,
                sp.idPartida AS idPartida, pa.codigo AS partidaCodigo, pa.nombre AS partidaNombre,
                cs.idProyecto AS idProyecto
@@ -51,11 +51,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
         LEFT JOIN dbo.Partida pa ON pa.idPartida = sp.idPartida
         WHERE cs.IDCuadrilla = @id
         ORDER BY sp.codigo
-      `);
-    // Proyectos en los que trabaja (unión de los de sus subpartidas y obras).
-    const proyRes = await db.request()
-      .input('id', sql.Int, parseInt(id))
-      .query(`
+      `),
+      // Proyectos en los que trabaja (unión de los de sus subpartidas y obras).
+      q(`
         SELECT DISTINCT p.idProyecto, p.nombre
         FROM dbo.Proyecto p
         WHERE p.idProyecto IN (
@@ -68,28 +66,26 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
           SELECT c.IDProyecto FROM dbo.Cuadrilla c WHERE c.IDCuadrilla = @id AND c.IDProyecto IS NOT NULL
         )
         ORDER BY p.nombre
-      `);
-
-    const miembrosRes = await db.request()
-      .input('id', sql.Int, parseInt(id))
-      .query(`
+      `),
+      q(`
         SELECT cm.IDCuadMiembro, cm.IDCol, cm.FechaIngreso, cm.Activo,
                v.calcNombreCompleto AS NombreCompleto, v.cedula AS Cedula, v.puesto AS Puesto
         FROM dbo.CuadrillaMiembro cm
         JOIN dbo.V_Colaborador v ON v.idColaborador = cm.IDCol
         WHERE cm.IDCuadrilla = @id
         ORDER BY cm.Activo DESC, v.calcNombreCompleto
-      `);
-
-    // Colaboradores en OTRA cuadrilla (para no permitir doble membresía).
-    const otrasRes = await db.request()
-      .input('id', sql.Int, parseInt(id))
-      .query(`
+      `),
+      // Colaboradores en OTRA cuadrilla (para no permitir doble membresía).
+      q(`
         SELECT cm.IDCol, c.IDCuadrilla, c.Nombre AS Cuadrilla
         FROM dbo.CuadrillaMiembro cm
         JOIN dbo.Cuadrilla c ON c.IDCuadrilla = cm.IDCuadrilla
         WHERE cm.Activo = 1 AND c.Activo = 1 AND cm.IDCuadrilla <> @id
-      `);
+      `),
+    ]);
+    if (cuadRes.recordset.length === 0) {
+      return NextResponse.json({ error: 'Cuadrilla no encontrada' }, { status: 404 });
+    }
 
     return NextResponse.json({
       ...cuadRes.recordset[0],

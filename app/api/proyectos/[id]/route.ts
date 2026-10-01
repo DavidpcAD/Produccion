@@ -10,28 +10,28 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   }
 
   const { id } = await params;
+  const idProyecto = Number(id);
+  if (!Number.isInteger(idProyecto) || idProyecto <= 0) {
+    return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+  }
   const db = await getDb();
 
   // Modelo nuevo (dbo.Proyecto). Las personas asignadas se leen de
   // dbo.UsuarioProyecto -> dbo.Usuario -> dbo.V_Colaborador.
-  const proyRes = await db.request()
-    .input('id', sql.Int, parseInt(id))
-    .query(`
+  //
+  // Las tres consultas son independientes: van JUNTAS, un viaje a Azure SQL en vez
+  // de tres. El 404 se decide después; un proyecto que no existe es el caso raro.
+  const q = (sqlText: string) => db.request().input('id', sql.Int, idProyecto).query(sqlText);
+  const [proyRes, asigRes, obrasRes] = await Promise.all([
+    q(`
       SELECT p.idProyecto AS IDProyecto, p.abreviatura AS CodigoBC,
              p.nombre AS Nombre, p.categoria AS Estado,
              p.linkUbicacion AS Ubicacion,
              p.activo AS Activo, p.esProductivo AS EsProductivo
       FROM dbo.Proyecto p
       WHERE p.idProyecto = @id
-    `);
-
-  if (!proyRes.recordset.length) {
-    return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
-  }
-
-  const asigRes = await db.request()
-    .input('id', sql.Int, parseInt(id))
-    .query(`
+    `),
+    q(`
       SELECT up.idUsuarioProyecto AS IDColProy, v.idColaborador AS IDCol,
              v.calcNombreCompleto AS NombreCompleto, v.cedula AS Cedula, v.puesto AS Puesto,
              v.puesto AS NombreRol, NULL AS TaskNoBC, NULL AS DescripcionTask,
@@ -41,21 +41,23 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       JOIN dbo.V_Colaborador v ON v.idColaborador = u.idColaborador
       WHERE up.idProyecto = @id
       ORDER BY v.calcNombreCompleto
-    `);
-
-  // Obras del proyecto (para ver más información del proyecto en el detalle).
-  // dbo.Obra NO tiene columna `activo`: una obra vendida se BLOQUEA (estado =
-  // 'Blocked'), no se inactiva. Pedirla hacía que este GET diera 500 y que el
-  // detalle del proyecto se quedara cargando para siempre.
-  const obrasRes = await db.request()
-    .input('id', sql.Int, parseInt(id))
-    .query(`
+    `),
+    // Obras del proyecto (para ver más información del proyecto en el detalle).
+    // dbo.Obra NO tiene columna `activo`: una obra vendida se BLOQUEA (estado =
+    // 'Blocked'), no se inactiva. Pedirla hacía que este GET diera 500 y que el
+    // detalle del proyecto se quedara cargando para siempre.
+    q(`
       SELECT o.idObra AS IDObra, o.numeroObra AS NumeroObra, o.nombreMostrado AS Nombre,
              o.estado AS Estado, o.areaCosteo AS AreaCosteo
       FROM dbo.Obra o
       WHERE o.idProyecto = @id
       ORDER BY o.numeroObra
-    `);
+    `),
+  ]);
+
+  if (!proyRes.recordset.length) {
+    return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+  }
 
   return NextResponse.json({
     ...proyRes.recordset[0],

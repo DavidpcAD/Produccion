@@ -112,13 +112,18 @@ const COLS_PEDIDO_DET = `d.idPedidoCompraDet, d.idPedidoCompra, d.idEstado, d.it
 export async function listPedidos(): Promise<Pedido[]> {
   await ensureEstados();
   const pool = await getPool();
-  const h = await pool.request().query(`SELECT ${COLS_PEDIDO} FROM dbo.PedidoCompra WHERE esEliminada = 0 ORDER BY idPedidoCompra DESC`);
-  // Solo las líneas de los pedidos que este listado devuelve: las de pedidos borrados
-  // se mapeaban y se tiraban.
-  const d = await pool.request().query(`SELECT ${COLS_PEDIDO_DET}, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden
+  // Cabecera y líneas no dependen una de otra: van JUNTAS. En serie la lista
+  // pagaba dos viajes a Azure SQL en vez de uno, y el bootstrap espera por la más
+  // lenta de estas listas (ver app/api/compras/bootstrap/route.ts).
+  const [h, d] = await Promise.all([
+    pool.request().query(`SELECT ${COLS_PEDIDO} FROM dbo.PedidoCompra WHERE esEliminada = 0 ORDER BY idPedidoCompra DESC`),
+    // Solo las líneas de los pedidos que este listado devuelve: las de pedidos borrados
+    // se mapeaban y se tiraban.
+    pool.request().query(`SELECT ${COLS_PEDIDO_DET}, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden
       FROM dbo.PedidoCompraDet d
       JOIN dbo.PedidoCompra p ON p.idPedidoCompra = d.idPedidoCompra AND p.esEliminada = 0
-      ORDER BY d.idPedidoCompraDet`);
+      ORDER BY d.idPedidoCompraDet`),
+  ]);
   const porPedido = porCabecera(d.recordset, "idPedidoCompra");
   return h.recordset.map((p) => mapPedido(p, porPedido.get(p.idPedidoCompra) ?? []));
 }
@@ -126,9 +131,13 @@ export async function listPedidos(): Promise<Pedido[]> {
 export async function getPedido(id: number): Promise<Pedido | null> {
   await ensureEstados();
   const pool = await getPool();
-  const h = await pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.PedidoCompra WHERE idPedidoCompra=@id");
+  // Las dos a la vez: si el pedido no existe, las líneas vienen vacías igual y no
+  // se pagó un viaje de ida y vuelta de más para descubrirlo.
+  const [h, d] = await Promise.all([
+    pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.PedidoCompra WHERE idPedidoCompra=@id"),
+    pool.request().input("id", sql.Int, id).query(`SELECT d.*, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d WHERE d.idPedidoCompra=@id ORDER BY d.idPedidoCompraDet`),
+  ]);
   if (!h.recordset.length) return null;
-  const d = await pool.request().input("id", sql.Int, id).query(`SELECT d.*, (CASE WHEN ${enOrdenViva("d.idPedidoCompraDet")} THEN 1 ELSE 0 END) AS enOrden FROM dbo.PedidoCompraDet d WHERE d.idPedidoCompra=@id ORDER BY d.idPedidoCompraDet`);
   return mapPedido(h.recordset[0], d.recordset);
 }
 
@@ -603,8 +612,10 @@ export async function listOrdenes(opts?: { estados?: string[] }): Promise<Orden[
     .filter((x): x is number => typeof x === "number");
   const soloEstados = opts?.estados?.length ? ` AND idEstado IN (${ids.join(",") || "-1"})` : "";
   const soloEstadosDet = opts?.estados?.length ? ` AND oc.idEstado IN (${ids.join(",") || "-1"})` : "";
-  const h = await pool.request().query(`SELECT ${COLS_ORDEN} FROM dbo.OrdenCompra WHERE esEliminada = 0${soloEstados} ORDER BY idOrdenCompra DESC`);
-  const d = await pool.request().query(`SELECT ${COLS_ORDEN_DET},
+  // Cabecera y líneas son independientes: se piden a la vez (ver listPedidos).
+  const [h, d] = await Promise.all([
+    pool.request().query(`SELECT ${COLS_ORDEN} FROM dbo.OrdenCompra WHERE esEliminada = 0${soloEstados} ORDER BY idOrdenCompra DESC`),
+    pool.request().query(`SELECT ${COLS_ORDEN_DET},
              -- Consumo inmediato: la TAREA (Job Task) puede venir en NULL si la orden se
              -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
              -- la tarea del pedido. Sin tarea, BC no puede consumir contra el proyecto y
@@ -638,7 +649,8 @@ export async function listOrdenes(opts?: { estados?: string[] }): Promise<Orden[
       JOIN dbo.OrdenCompra oc ON oc.idOrdenCompra = d.idOrdenCompra AND oc.esEliminada = 0${soloEstadosDet}
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
-      ORDER BY d.idOrdenCompraDet`);
+      ORDER BY d.idOrdenCompraDet`),
+  ]);
   const porOrden = porCabecera(d.recordset, "idOrdenCompra");
   return h.recordset.map((o) => mapOrden(o, porOrden.get(o.idOrdenCompra) ?? []));
 }
@@ -646,9 +658,10 @@ export async function listOrdenes(opts?: { estados?: string[] }): Promise<Orden[
 export async function getOrden(id: number): Promise<Orden | null> {
   await ensureEstados();
   const pool = await getPool();
-  const h = await pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.OrdenCompra WHERE idOrdenCompra=@id");
-  if (!h.recordset.length) return null;
-  const d = await pool.request().input("id", sql.Int, id).query(`SELECT d.*,
+  // Las dos a la vez (ver getPedido).
+  const [h, d] = await Promise.all([
+    pool.request().input("id", sql.Int, id).query("SELECT * FROM dbo.OrdenCompra WHERE idOrdenCompra=@id"),
+    pool.request().input("id", sql.Int, id).query(`SELECT d.*,
              -- Consumo inmediato: la TAREA (Job Task) puede venir en NULL si la orden se
              -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
              -- la tarea del pedido. Sin tarea, BC no puede consumir contra el proyecto y
@@ -682,7 +695,9 @@ export async function getOrden(id: number): Promise<Orden | null> {
       LEFT JOIN dbo.PedidoCompraDet pd ON pd.idPedidoCompraDet = d.idPedidoCompraDet
       LEFT JOIN dbo.PedidoCompra pc ON pc.idPedidoCompra = pd.idPedidoCompra
       WHERE d.idOrdenCompra = @id
-      ORDER BY d.idOrdenCompraDet`);
+      ORDER BY d.idOrdenCompraDet`),
+  ]);
+  if (!h.recordset.length) return null;
   return mapOrden(h.recordset[0], d.recordset);
 }
 
@@ -1041,13 +1056,16 @@ export async function contarDevoluciones(
 
 export async function listRecepciones(): Promise<Recepcion[]> {
   const pool = await getPool();
-  const h = await pool.request().query(`SELECT idRecepcionCompra, idOrdenCompra, numeroFactura, total, esParcial, creadoPor,
+  // Cabecera y líneas son independientes: se piden a la vez (ver listPedidos).
+  const [h, d] = await Promise.all([
+    pool.request().query(`SELECT idRecepcionCompra, idOrdenCompra, numeroFactura, total, esParcial, creadoPor,
       fechaFactura, fechaRecepcion, fechaRegistro
-      FROM dbo.RecepcionCompra WHERE esEliminada = 0 ORDER BY idRecepcionCompra DESC`);
-  const d = await pool.request().query(`SELECT d.idRecepcionCompra, d.idOrdenCompraDet, d.quantityRecibida, d.precioFactura
+      FROM dbo.RecepcionCompra WHERE esEliminada = 0 ORDER BY idRecepcionCompra DESC`),
+    pool.request().query(`SELECT d.idRecepcionCompra, d.idOrdenCompraDet, d.quantityRecibida, d.precioFactura
       FROM dbo.RecepcionCompraDet d
       JOIN dbo.RecepcionCompra r ON r.idRecepcionCompra = d.idRecepcionCompra AND r.esEliminada = 0
-      ORDER BY d.idRecepcionCompraDet`);
+      ORDER BY d.idRecepcionCompraDet`),
+  ]);
   const porRecepcion = porCabecera(d.recordset, "idRecepcionCompra");
   return h.recordset.map((r): Recepcion => ({
     id: String(r.idRecepcionCompra), ordenId: String(r.idOrdenCompra), numeroFactura: r.numeroFactura ?? "",

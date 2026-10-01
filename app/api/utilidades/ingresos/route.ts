@@ -57,57 +57,25 @@ export async function GET(req: NextRequest) {
       WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM
     `;
 
-    // KPIs período actual.
-    const kpisReq = db
-      .request()
-      .input('desdeYM', sql.Int, rango.desdeYM)
-      .input('hastaYM', sql.Int, rango.hastaYM);
-    lotes.forEach((l, i) => kpisReq.input(`lote${i}`, sql.NVarChar(100), l));
-    const kpisRes = await kpisReq.query(kpisSql);
-
-    const pctRes = await db
-      .request()
-      .input('desdeYM', sql.Int, rango.desdeYM)
-      .input('hastaYM', sql.Int, rango.hastaYM)
-      .query(pctSql);
-
-    const kpisActual = {
-      ingresos: Number(kpisRes.recordset[0]?.ingresos ?? 0),
-      ingreso_neto_ad: Number(kpisRes.recordset[0]?.ingreso_neto_ad ?? 0),
-      utilidad: Number(kpisRes.recordset[0]?.utilidad ?? 0),
-      porcentaje: pctRes.recordset[0]?.porcentaje_utilidad ?? null,
+    // Las seis consultas del tablero no dependen una de otra —cambian solo los
+    // parámetros del rango—, así que van JUNTAS. En serie, Utilidades pagaba seis
+    // viajes de ida y vuelta a Azure SQL antes de pintar un solo número.
+    const conLotes = (req: ReturnType<typeof db.request>) => {
+      lotes.forEach((l, i) => req.input(`lote${i}`, sql.NVarChar(100), l));
+      return req;
     };
+    const rangoReq = (desdeYM: number, hastaYM: number) =>
+      db.request().input('desdeYM', sql.Int, desdeYM).input('hastaYM', sql.Int, hastaYM);
 
-    // KPIs período anterior.
-    const kpisAntReq = db
-      .request()
-      .input('desdeYM', sql.Int, antDesdeYM)
-      .input('hastaYM', sql.Int, antHastaYM);
-    lotes.forEach((l, i) => kpisAntReq.input(`lote${i}`, sql.NVarChar(100), l));
-    const kpisAntRes = await kpisAntReq.query(kpisSql);
-
-    const pctAntRes = await db
-      .request()
-      .input('desdeYM', sql.Int, antDesdeYM)
-      .input('hastaYM', sql.Int, antHastaYM)
-      .query(pctSql);
-
-    const kpisAnterior = kpisRes.recordset[0]
-      ? {
-          ingresos: Number(kpisAntRes.recordset[0]?.ingresos ?? 0),
-          ingreso_neto_ad: Number(kpisAntRes.recordset[0]?.ingreso_neto_ad ?? 0),
-          utilidad: Number(kpisAntRes.recordset[0]?.utilidad ?? 0),
-          porcentaje: pctAntRes.recordset[0]?.porcentaje_utilidad ?? null,
-        }
-      : KPIS_VACIOS;
-
-    // Por lote (agregado en el rango).
-    const porLoteReq = db
-      .request()
-      .input('desdeYM', sql.Int, rango.desdeYM)
-      .input('hastaYM', sql.Int, rango.hastaYM);
-    lotes.forEach((l, i) => porLoteReq.input(`lote${i}`, sql.NVarChar(100), l));
-    const porLoteRes = await porLoteReq.query(`
+    const [kpisRes, pctRes, kpisAntRes, pctAntRes, porLoteRes, evRes] = await Promise.all([
+      // KPIs período actual.
+      conLotes(rangoReq(rango.desdeYM, rango.hastaYM)).query(kpisSql),
+      rangoReq(rango.desdeYM, rango.hastaYM).query(pctSql),
+      // KPIs período anterior.
+      conLotes(rangoReq(antDesdeYM, antHastaYM)).query(kpisSql),
+      rangoReq(antDesdeYM, antHastaYM).query(pctSql),
+      // Por lote (agregado en el rango).
+      conLotes(rangoReq(rango.desdeYM, rango.hastaYM)).query(`
       SELECT
         lote,
         SUM(ingresos)        AS ingresos,
@@ -117,13 +85,12 @@ export async function GET(req: NextRequest) {
       WHERE (anio * 100 + mes) BETWEEN @desdeYM AND @hastaYM ${lotesClause}
       GROUP BY lote
       ORDER BY SUM(ingresos) DESC
-    `);
-
-    // Evolución: últimos 24 meses terminando en el `hasta` del rango (mensual).
-    const evRes = await db
-      .request()
-      .input('hastaAnio', sql.SmallInt, rango.hastaAnio)
-      .input('hastaMes', sql.TinyInt, rango.hastaMes).query(`
+    `),
+      // Evolución: últimos 24 meses terminando en el `hasta` del rango (mensual).
+      db
+        .request()
+        .input('hastaAnio', sql.SmallInt, rango.hastaAnio)
+        .input('hastaMes', sql.TinyInt, rango.hastaMes).query(`
         SELECT
           anio, mes,
           COALESCE(SUM(ingresos), 0)        AS ingresos,
@@ -134,7 +101,29 @@ export async function GET(req: NextRequest) {
           AND (anio * 100 + mes) >  ((@hastaAnio - 2) * 100 + @hastaMes)
         GROUP BY anio, mes
         ORDER BY anio, mes
-      `);
+      `),
+    ]);
+
+    const kpisActual = {
+      ingresos: Number(kpisRes.recordset[0]?.ingresos ?? 0),
+      ingreso_neto_ad: Number(kpisRes.recordset[0]?.ingreso_neto_ad ?? 0),
+      utilidad: Number(kpisRes.recordset[0]?.utilidad ?? 0),
+      porcentaje: pctRes.recordset[0]?.porcentaje_utilidad ?? null,
+    };
+
+    // Ojo: el guard mira `kpisAntRes`, el período ANTERIOR, que es lo que se está
+    // armando. Antes miraba `kpisRes` (el actual): un mes actual sin filas habría
+    // borrado del tablero los números del anterior, que sí existían. Hoy el SELECT
+    // es un agregado sin GROUP BY y siempre devuelve su fila, así que no llegó a
+    // verse; queda apuntando a la variable correcta por si la consulta cambia.
+    const kpisAnterior = kpisAntRes.recordset[0]
+      ? {
+          ingresos: Number(kpisAntRes.recordset[0]?.ingresos ?? 0),
+          ingreso_neto_ad: Number(kpisAntRes.recordset[0]?.ingreso_neto_ad ?? 0),
+          utilidad: Number(kpisAntRes.recordset[0]?.utilidad ?? 0),
+          porcentaje: pctAntRes.recordset[0]?.porcentaje_utilidad ?? null,
+        }
+      : KPIS_VACIOS;
 
     return NextResponse.json({
       kpisActual,

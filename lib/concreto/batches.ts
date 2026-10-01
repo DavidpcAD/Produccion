@@ -167,7 +167,9 @@ export async function consultarBatches(
     .input('offset', sql.Int, offset)
     .input('por_pagina', sql.Int, por_pagina);
 
-  const rItems = await reqItems.query(`
+  // El listado y su conteo son independientes: van JUNTOS, un viaje en vez de dos.
+  const [rItems, rTotal] = await Promise.all([
+    reqItems.query(`
     SELECT
       b.id, b.record_no, b.fecha_inicio,
       p.codigo                        AS planta_nombre,
@@ -194,13 +196,13 @@ export async function consultarBatches(
     ${whereClause}
     ORDER BY b.fecha_inicio DESC, b.record_no DESC
     OFFSET @offset ROWS FETCH NEXT @por_pagina ROWS ONLY
-  `);
-
-  const rTotal = await bind(pool.request()).query(`
+  `),
+    bind(pool.request()).query(`
     SELECT COUNT(*) AS total
     ${baseFrom}
     ${whereClause}
-  `);
+  `),
+  ]);
 
   return {
     batches: rItems.recordset.map(mapearBatch),

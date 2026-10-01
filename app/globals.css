@@ -401,8 +401,17 @@ body {
 .app-nav__user { display: flex; align-items: center; justify-content: center; gap: 0; padding: 6px; border-radius: var(--ds-radius-lg); background: rgba(255, 255, 255, 0.06); }
 .app-nav__avatar { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--ds-color-green-100); color: #000; font-weight: 700; font-size: 13px; }
 .app-nav__user-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.app-nav__user-name { font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-nav__user-name { font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); color: #fff; }
 .app-nav__user-role { font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+/* El nombre NO se corta con «…»: con tres apellidos ("Daniel Navarro Jimenez")
+   el riel de 264px lo cortaba, y media firma no identifica a nadie. Baja de
+   línea. Solo cuando el rótulo está a la vista: colapsado sigue mandando el
+   `nowrap` de .app-nav__label, porque envolver a max-width:0 pone una letra por
+   renglón y estira el pie del menú aunque no se vea. Ver la regla del proyecto:
+   nada de elipsis. */
+.app-shell.pinned .app-nav__user-meta,
+.app-shell.pinned .app-nav__user-name,
+.app-shell.pinned .app-nav__user-role { white-space: normal; overflow-wrap: anywhere; }
 .app-nav__logout { flex-shrink: 0; display: none; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--ds-radius-md); background: transparent; color: rgba(255, 255, 255, 0.6); cursor: pointer; transition: background .12s ease, color .12s ease; }
 .app-nav__logout:hover { background: color-mix(in srgb, var(--ds-color-red-100) 24%, transparent); color: var(--ds-color-red-100); }
 
@@ -445,6 +454,8 @@ body {
   .app-nav.is-open { transform: translateX(0); box-shadow: 0 12px 44px rgba(0, 0, 0, .5); }
   .app-shell.pinned .app-nav { width: 280px; box-shadow: none; }
   .app-nav__label, .app-nav__section, .app-nav__brand-name { max-width: none; opacity: 1; }
+  /* En el drawer el rótulo siempre está a la vista: el nombre envuelve igual. */
+  .app-nav__user-meta, .app-nav__user-name, .app-nav__user-role { white-space: normal; overflow-wrap: anywhere; }
   .app-nav__item, .app-shell.pinned .app-nav__item { justify-content: flex-start; padding: 0 16px; gap: var(--ds-space-3); }
   .app-nav__user, .app-shell.pinned .app-nav__user { justify-content: flex-start; gap: var(--ds-space-3); }
   .app-nav__logout, .app-shell.pinned .app-nav__logout { display: inline-grid; }

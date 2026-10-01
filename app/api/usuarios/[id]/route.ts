@@ -12,14 +12,20 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   }
 
   const { id } = await params;
+  const idCol = Number(id);
+  if (!Number.isInteger(idCol) || idCol <= 0) {
+    return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+  }
   const db = await getDb();
+  const q = (sqlText: string) => db.request().input('id', sql.Int, idCol).query(sqlText);
 
   // Modelo nuevo: se lee de dbo.V_Colaborador (resuelve puesto/departamento/
   // país/geografía). Se exponen además los FK granulares (idPuesto,
   // codigoDistrito, idPais) para precargar los dropdowns del formulario.
-  const userRes = await db.request()
-    .input('id', sql.Int, parseInt(id))
-    .query(`
+  // Las cuatro consultas son independientes: van JUNTAS. En serie la ficha
+  // pagaba cuatro viajes de ida y vuelta a Azure SQL antes de pintar nada.
+  const [userRes, rolesRes, proyectosRes, extraRes] = await Promise.all([
+    q(`
       SELECT c.idColaborador AS IDCol, c.cedula AS Cedula, c.nombre AS Nombre,
              c.primerApellido AS PrimerApellido, c.segundoApellido AS SegundoApellido,
              c.calcNombreCompleto AS NombreCompleto, c.correo AS Correo,
@@ -32,15 +38,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
              (SELECT TOP 1 u.idUsuario FROM dbo.Usuario u WHERE u.idColaborador = c.idColaborador) AS IDUsuario
       FROM dbo.V_Colaborador c
       WHERE c.idColaborador = @id
-    `);
-
-  if (!userRes.recordset.length) {
-    return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
-  }
-
-  const rolesRes = await db.request()
-    .input('id', sql.Int, parseInt(id))
-    .query(`
+    `),
+    q(`
       SELECT r.idRol AS IDRol, r.nombre AS NombreRol, a.nombre AS Categoria, 0 AS NivelAdmin,
              ur.esTipo AS esTipo
       FROM dbo.Usuario u
@@ -48,11 +47,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       JOIN dbo.Rol r ON r.idRol = ur.idRol
       LEFT JOIN dbo.App a ON a.idApp = r.idApp
       WHERE u.idColaborador = @id
-    `);
-
-  const proyectosRes = await db.request()
-    .input('id', sql.Int, parseInt(id))
-    .query(`
+    `),
+    q(`
       SELECT p.idProyecto AS IDProyecto, p.nombre AS Nombre,
              p.abreviatura AS CodigoBC,
              NULL AS TaskNoBC, NULL AS DescripcionTask, NULL AS NombreRol,
@@ -61,12 +57,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       JOIN dbo.UsuarioProyecto up ON up.idUsuario = u.idUsuario
       JOIN dbo.Proyecto p ON p.idProyecto = up.idProyecto
       WHERE u.idColaborador = @id
-    `);
-
-  // Campos de jornada, salario y marcaje viven en la tabla base (no en la vista).
-  const extraRes = await db.request()
-    .input('id', sql.Int, parseInt(id))
-    .query(`
+    `),
+    // Campos de jornada, salario y marcaje viven en la tabla base (no en la vista).
+    q(`
       SELECT c.salarioMensual AS SalarioMensual,
              CONVERT(varchar(5), c.horaEntrada, 108) AS HoraEntrada,
              CONVERT(varchar(5), c.horaSalida, 108) AS HoraSalida,
@@ -79,7 +72,12 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
               WHERE db.pin = c.cedula AND db.tipo = N'foto'
               ORDER BY db.fechaCaptura DESC) AS FotoBase64
       FROM dbo.Colaborador c WHERE c.idColaborador = @id
-    `);
+    `),
+  ]);
+
+  if (!userRes.recordset.length) {
+    return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+  }
 
   return NextResponse.json({
     ...userRes.recordset[0],
