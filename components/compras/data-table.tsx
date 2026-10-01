@@ -246,7 +246,12 @@ export function DataTable<T>({
       {/* Toolbar */}
       <div className="row row--between wrap gap-3 dt-toolbar" style={{ marginBottom: 14, alignItems: "center", position: "relative" }}>
         <Input value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} placeholder={buscarPlaceholder} style={{ flex: "1 1 340px", minWidth: 220, maxWidth: 560 }} />
-        <div className="row gap-2" style={{ alignItems: "center" }}>
+        {/* `wrap` también acá dentro: la fila de afuera envolvía, pero este grupo
+            —Tabla · Grid · Columnas · Vistas · Exportar— no, así que en un celular
+            de 375 px se salía hasta x=507. Y como esta fila no tiene scroll
+            horizontal propio (la tabla sí, la barra no), "Vistas" quedaba cortada
+            y "Exportar" directamente fuera de la pantalla, sin forma de llegarle. */}
+        <div className="row wrap gap-2" style={{ alignItems: "center" }}>
           <div className="segmented">
             <button type="button" aria-pressed={modo === "tabla"} className={`segmented__btn ${modo === "tabla" ? "is-active" : ""}`} onClick={() => setModo("tabla")}><IconTable size={15} />Tabla</button>
             <button type="button" aria-pressed={modo === "grid"} className={`segmented__btn ${modo === "grid" ? "is-active" : ""}`} onClick={() => setModo("grid")}>
