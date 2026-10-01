@@ -6,7 +6,13 @@
   --color-brand-100:    #ADD010;
   --color-brand-200:    #88A024;
   --color-brand-light:  #D4F04A;
-  --color-brand-dark:   #6a8019;
+  /* El verde de marca OSCURECIDO para usarlo como TEXTO (las cifras en verde
+     del dashboard de Desembolsos y los deltas de Avance). #6a8019 se quedaba
+     corto: medido en el navegador el 2026-10-01 daba 4,01:1 en claro y 3,99 en
+     oscuro, los dos bajo el 4,5 de AA. Un solo valor no arregla los dos temas
+     —oscurecer sube el claro y hunde el oscuro—, asi que este baja y mas abajo
+     va el override del tema oscuro, igual que los tres «ink». */
+  --color-brand-dark:   #5E7216;
 
   --color-ds-gray-100:  #EBEBEB;
   --color-ds-gray-200:  #D9D9D9;
@@ -208,6 +214,9 @@
   --color-ds-green-ink:  var(--ds-color-green-100);
   --color-ds-yellow-ink: var(--ds-color-yellow);
   --color-ds-red-ink:    color-mix(in srgb, var(--ds-color-red-100) 65%, #fff);
+  /* Mismo caso: `brand-dark` es texto verde y en oscuro hay que ACLARARLO, no
+     oscurecerlo. Es el verde de marca mezclado hacia el blanco. */
+  --color-brand-dark:    color-mix(in srgb, var(--color-brand-100) 78%, #fff);
 
   /* Los fondos «soft» de esos dos chips acompañan: son tintes pensados para el
      tema claro y dejarlos claros con el texto ya aclarado da claro sobre claro.
