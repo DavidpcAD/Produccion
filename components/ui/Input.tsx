@@ -44,7 +44,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             type={effectiveType}
             className={`
-              w-full h-12 rounded-ds-xl bg-ds-surface text-ds-ink placeholder-ds-gray-300
+              w-full h-12 rounded-ds-xl bg-ds-surface text-ds-ink placeholder-ds-gray-400
               text-body-sm transition-all duration-150 font-normal
               border-2 shadow-ds-01
               focus:outline-none focus:border-black focus:shadow-none

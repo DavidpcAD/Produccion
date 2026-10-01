@@ -195,10 +195,10 @@ export function Combobox({
                       {m.label}
                     </span>
                   ))
-                : <span className="text-ds-gray-300">{placeholder}</span>)
+                : <span className="text-ds-gray-400">{placeholder}</span>)
             : (selected
                 ? <OptionLabel opt={selected} />
-                : <span className="text-ds-gray-300">{placeholder}</span>)}
+                : <span className="text-ds-gray-400">{placeholder}</span>)}
           <CaretDown
             size={16} weight="bold"
             className={`absolute right-4 top-1/2 -translate-y-1/2 text-ds-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -225,7 +225,7 @@ export function Combobox({
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Buscar…"
-                className="w-full text-body-sm text-ds-ink placeholder-ds-gray-300 focus:outline-none bg-transparent"
+                className="w-full text-body-sm text-ds-ink placeholder-ds-gray-400 focus:outline-none bg-transparent"
               />
             </div>
             <div ref={listRef} style={{ maxHeight: coords.maxH }} className="overflow-y-auto py-1">
