@@ -89,7 +89,7 @@ export default function DistribucionPage() {
               key={p.IDProyecto}
               type="button"
               onClick={() => setSel(p)}
-              className="flex w-full items-center gap-4 px-4 py-4 text-left transition hover:bg-ds-gray-100"
+              className="flex w-full items-center gap-4 px-4 py-4 text-left text-ds-ink transition hover:bg-ds-gray-100"
             >
               <div className="flex w-32 items-center gap-2">
                 {p.ColorHex && <span className="h-8 w-1 rounded-full" style={{ backgroundColor: p.ColorHex }} />}

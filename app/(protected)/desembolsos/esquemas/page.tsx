@@ -130,7 +130,7 @@ function SeccionBancos({
           const e = b.EsquemaVigente;
           return (
             <button key={b.IDBan} type="button" onClick={() => onSel(b)}
-              className="flex w-full items-center gap-4 px-4 py-4 text-left transition hover:bg-ds-gray-100">
+              className="flex w-full items-center gap-4 px-4 py-4 text-left text-ds-ink transition hover:bg-ds-gray-100">
               <div className="flex w-40 items-center gap-2">
                 {b.ColorBanco && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: b.ColorBanco }} />}
                 <div>
