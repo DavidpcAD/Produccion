@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './lib/auth';
-import { getRouteLevel, getRouteModule, moduloPublicado, rutaPermitida } from './lib/permissions';
+import { getRouteLevel, getRouteModule, moduloPublicado, modulosDeRuta, rutaPermitida } from './lib/permissions';
 
 /** Prefijos cuyo acceso va por MÓDULO del rol de Producción y no por nivel.
  *
@@ -94,16 +94,42 @@ export function proxy(request: NextRequest) {
   // pantalla que no puede usar. El permiso de verdad lo verifica cada ruta con
   // su guard (lib/compras/guard.ts, lib/concreto/guard.ts), porque `proxy.ts` no
   // es —ni debe ser— la solución de autorización (doc de Next: 01-getting-started/16-proxy).
-  if (POR_MODULO.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
-    const permitido = session.modules
-      ? rutaPermitida(pathname, session.modules)
-      : session.nivelAdmin >= requiredLevel;
-    if (!permitido) {
-      return rechazar(request, pathname, {
-        status: 403, error: 'No autorizado', destino: '/?error=forbidden',
-      });
-    }
-  } else if (session.nivelAdmin < requiredLevel) {
+  //
+  // DESDE 2026-10-01 el módulo manda en TODAS las rutas, no solo en estas dos.
+  // Antes, fuera de Compras y Concreto el permiso lo daba el nivel — y a los
+  // siete roles de Producción se les había subido el nivel justo para que
+  // pudieran usar sus módulos, así que el nivel ya no distinguía nada. Medido:
+  // un usuario de Ingeniería (módulos dashboard + ingenieria) llegaba
+  // escribiendo la URL a 16 de 17 pantallas, incluidas Desembolsos —₡38 MM y 855
+  // casos con nombre de cliente—, Utilidades, Reporte H4 y las de
+  // administración. El menú se las escondía; la dirección, no.
+  //
+  // Cómo se combinan las dos reglas:
+  //   · Compras y Concreto: el módulo REEMPLAZA al nivel. Es a propósito —Bodega
+  //     es nivel 1 y tiene que entrar a pedir material—, y es lo que ya hacía.
+  //   · El resto: hay que pasar las DOS. El nivel se queda como estaba, y encima
+  //     el módulo. Así esto solo puede CERRAR accesos, nunca abrir uno que antes
+  //     no existía.
+  //   · Sin rol de Producción (`modules` ausente): manda el nivel, como siempre.
+  //     Es el fallback de seguridad de siempre: nadie se queda sin app de golpe,
+  //     y un token emitido antes de este cambio sigue funcionando hasta que su
+  //     dueño vuelva a entrar.
+  const pasaNivel = session.nivelAdmin >= requiredLevel;
+  // `null` = esta persona NO tiene rol de Producción.
+  const pasaModulo = session.modules ? rutaPermitida(pathname, session.modules) : null;
+  // ¿La ruta pertenece a un módulo de verdad, o cayó en el 'dashboard' de los que
+  // no están clasificados? La distinción importa: en una ruta clasificada el
+  // módulo MANDA —abre y cierra—, pero en una sin clasificar manda el nivel, como
+  // siempre. Si no, una ruta nueva que nadie clasifique nacería abierta a todo el
+  // que tenga rol de Producción, que es justo el descuido que esto viene a cerrar.
+  const mods = modulosDeRuta(pathname);
+  const estaClasificada = !(mods.length === 1 && mods[0] === 'dashboard');
+
+  const permitido =
+    pasaModulo === null ? pasaNivel        // sin rol de Producción: el nivel, igual que siempre
+    : estaClasificada ? pasaModulo         // con módulo: el módulo manda
+    : pasaNivel;                           // sin clasificar: el nivel
+  if (!permitido) {
     return rechazar(request, pathname, {
       status: 403, error: 'No autorizado', destino: '/?error=forbidden',
     });

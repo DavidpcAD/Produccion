@@ -278,11 +278,30 @@ export function rolLabelDeUsuario(
 }
 
 /** Módulo de Producción al que pertenece una ruta (para gatear páginas). */
+/** APIs de CATÁLOGO que lee más de un módulo y que por eso NO se pueden atar a
+ *  uno solo: Cuadrillas (ingeniería) lee obras y usuarios, Partidas lee sprints,
+ *  Compras lee obras… Atarlas rompería pantallas ajenas — es la trampa que avisa
+ *  el comentario de `POR_MODULO` en proxy.ts. Siguen gateadas por NIVEL, igual
+ *  que hoy; lo que se cierra con el módulo son las pantallas y las APIs propias
+ *  de cada módulo. Son todas de solo lectura. */
+const API_CATALOGO_COMPARTIDO = [
+  '/api/obras', '/api/proyectos', '/api/usuarios', '/api/cuadrillas',
+  '/api/partidas', '/api/subpartidas', '/api/etapas', '/api/tipos-obra',
+  '/api/catalogos', '/api/encargados-partida',
+];
+
 export function getRouteModule(pathname: string): Modulo {
-  const p = pathname;
+  // Una API pertenece al MISMO módulo que su pantalla: `/api/desembolsos/...` es
+  // de Desembolsos igual que `/desembolsos/...`. Sin esto, todo `/api/*` que no
+  // fuera de compras o concreto caía en 'dashboard' —o sea, abierto a cualquiera
+  // con nivel— y la pantalla quedaba cerrada mientras su API contestaba igual.
+  if (API_CATALOGO_COMPARTIDO.some((c) => pathname === c || pathname.startsWith(c + '/') || pathname.startsWith(c + '?'))) {
+    return 'dashboard';
+  }
+  const p = pathname.startsWith('/api/') ? pathname.slice(4) : pathname;
   if (p === '/' ) return 'dashboard';
   // Business Central (integración de avance + presupuestos por obra) = dominio Presupuesto.
-  if (p.startsWith('/bc') || p.startsWith('/api/bc') || p.startsWith('/api/presupuestos')) return 'presupuesto';
+  if (p.startsWith('/bc') || p.startsWith('/presupuestos')) return 'presupuesto';
   // Catálogos que viven bajo /avance pero son del dominio de Partidas (Presupuesto).
   // Catálogos de obra (pestañas de /partidas): viven bajo /avance pero son de
   // Presupuesto, así que NO los apaga el interruptor de Avance de obra.
@@ -295,7 +314,10 @@ export function getRouteModule(pathname: string): Modulo {
   if (p.startsWith('/cuadrillas') || p.startsWith('/encargados') || p.startsWith('/compras')) return 'ingenieria';
   if (p.startsWith('/concreto')) return 'concreto';
   if (p.startsWith('/desembolsos')) return 'desembolsos';
-  if (p.startsWith('/utilidades') || p.startsWith('/reporte-h4') || p.startsWith('/roles') || p.startsWith('/apps') || p.startsWith('/cuentas') || p.startsWith('/usuarios') || p.startsWith('/auditoria')) return 'admin';
+  // Marcaje va con Reporte H4: es la misma familia (marcas de los relojes de H4) y
+  // no cuelga de ningún menú — se entra escribiendo la dirección. Sin esto caía en
+  // 'dashboard', o sea abierto a cualquiera con rol de Producción.
+  if (p.startsWith('/utilidades') || p.startsWith('/reporte-h4') || p.startsWith('/marcaje') || p.startsWith('/roles') || p.startsWith('/apps') || p.startsWith('/cuentas') || p.startsWith('/usuarios') || p.startsWith('/auditoria')) return 'admin';
   return 'dashboard';
 }
 
