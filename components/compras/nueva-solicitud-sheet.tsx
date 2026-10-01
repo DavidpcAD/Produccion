@@ -238,7 +238,7 @@ function Popover({ anchorRef, open, onClose, children, minWidth }: {
         transition={{ height: { type: "spring", stiffness: 100, damping: 19, mass: 1.1 }, opacity: { duration: 0.3, ease: "easeOut" } }}
         // El redondeo + la sombra van AQUÍ (el contenedor que recorta con overflow:hidden),
         // así las esquinas quedan redondeadas y la sombra no se recorta en cuadrado.
-        style={{ position: "fixed", left: menuLeft, width: menuW, ...pos, zIndex: 2000, overflow: "hidden", borderRadius: 18, background: "var(--ds-color-white)", boxShadow: "0 18px 44px rgba(15,18,20,.20)" }}>
+        style={{ position: "fixed", left: menuLeft, width: menuW, ...pos, zIndex: 2000, overflow: "hidden", borderRadius: 18, background: "var(--ds-surface)", boxShadow: "0 18px 44px rgba(15,18,20,.20)" }}>
         {children}
       </motion.div>
     </div>,
@@ -247,18 +247,30 @@ function Popover({ anchorRef, open, onClose, children, minWidth }: {
 }
 
 // ─── Segmented (chips negro/gris) ───────────────────────────────────────────────
+// ── Por qué acá NO se usa `--ds-color-white` de fondo ─────────────────────────
+// El blanco y el negro son colores de MARCA: quedan literales y no se invierten
+// con el tema (ver el bloque :root[data-theme="dark"] de app/globals.css). Los
+// grises sí se invierten dentro de .oc-scope. Mezclar las dos cosas es lo que
+// rompía este panel en modo oscuro: la barra de "Tipo de solicitud" y el campo
+// de "Destino del material" quedaban BLANCOS y su texto —`--ds-color-gray-400/500`,
+// ya invertido a gris claro— salía gris claro sobre blanco. 1,68 de contraste.
+//
+// Las superficies van con los tokens semánticos, que sí siguen al tema y en claro
+// valen exactamente lo mismo que antes (así el tema claro no cambia en nada):
+//
+//   fondo de una caja ........ var(--ds-surface)     (#fff en claro, #212530 en oscuro)
+//   tinte de un color ........ color-mix(…, var(--ds-tint-base))
+//                              (#fff en claro, #262b36 en oscuro — el tinte se mezcla
+//                               hacia el oscuro en vez de aclararse hasta el blanco)
+//
+// El blanco literal se queda SOLO donde va encima de un relleno de color y por lo
+// tanto no depende del tema: el texto de la pastilla negra y el anillo del punto
+// rojo de aviso.
 function Segmented<T extends string>({ value, options, onChange, size = "md", variant = "box" }: {
   value: T; options: { v: T; label: string }[]; onChange: (v: T) => void; size?: "sm" | "md"; variant?: "box" | "pill";
 }) {
   if (variant === "pill") {
     // Pill full-width: las opciones se reparten el ancho; la activa es un pill negro grande.
-    //
-    // El fondo va con `--ds-surface`, no con `--ds-color-white`: el blanco es un
-    // color de marca LITERAL y no se invierte, así que en modo oscuro esta barra
-    // quedaba blanca y las opciones sin elegir —que usan `--ds-color-gray-500`,
-    // que ahí sí se invierte a gris claro— salían gris claro sobre blanco (1,68
-    // de contraste: ilegibles). `--ds-surface` es blanco en claro, así que el tema
-    // claro no cambia. Es el mismo token que usan .ds-btn--white/--ghost.
     return (
       <div className="row gap-0" style={{ width: "100%", border: "1.5px solid var(--ds-color-gray-200)", borderRadius: 999, padding: 4, background: "var(--ds-surface)", boxShadow: "var(--ds-shadow-01)" }}>
         {options.map((o) => {
@@ -313,7 +325,7 @@ function Dropdown({ placeholder, items, value, onPick, mode = "select", small, w
     <div style={{ width: "100%" }}>
       {/* Header card: input + toggle DS (efecto giratorio) */}
       <div ref={boxRef} onClick={noToggle ? () => { if (!open) { setOpen(true); inputRef.current?.focus(); } } : undefined}
-        style={{ display: "flex", alignItems: "center", gap: 6, minHeight: small ? 44 : 62, paddingLeft: small ? 14 : 18, paddingRight: noToggle ? (small ? 12 : 16) : (small ? 5 : 8), background: "var(--ds-color-white)", borderRadius: 999, boxShadow: "var(--ds-shadow-01)", border: `1.5px solid ${borderColor}`, cursor: noToggle ? "pointer" : "default" }}>
+        style={{ display: "flex", alignItems: "center", gap: 6, minHeight: small ? 44 : 62, paddingLeft: small ? 14 : 18, paddingRight: noToggle ? (small ? 12 : 16) : (small ? 5 : 8), background: "var(--ds-surface)", borderRadius: 999, boxShadow: "var(--ds-shadow-01)", border: `1.5px solid ${borderColor}`, cursor: noToggle ? "pointer" : "default" }}>
         <input ref={inputRef} value={open || mode === "add" ? q : (sel ? sel.title : "")} placeholder={placeholder}
           onFocus={() => { setOpen(true); if (mode === "select") setQ(""); }} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           style={{ flex: 1, minWidth: 0, border: 0, background: "transparent", outline: "none", fontSize: small ? 13 : 15, fontWeight: sel && !open ? 600 : 400, color: sel && !open ? "var(--ds-color-ink)" : "var(--ds-color-gray-500)", cursor: noToggle ? "pointer" : "text" }} />
@@ -376,7 +388,7 @@ function UnidadBtn({ unidades, value, base, onPick }: {
     <div ref={wrapRef} style={{ display: "inline-flex", flexShrink: 0 }}>
       <button type="button" onClick={() => setOpen((o) => !o)} title={equiv || `Unidad: ${value}`}
         aria-label={`Unidad de la línea: ${value}`}
-        style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 40, minWidth: 62, padding: "0 8px", borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "var(--ds-color-ink)" }}>
+        style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 40, minWidth: 62, padding: "0 8px", borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "var(--ds-color-ink)" }}>
         <span>{value || base}</span>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden
           style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s ease" }}><path d="M6 9l6 6 6-6" /></svg>
@@ -429,7 +441,7 @@ function VarianteBtn({ variantes, value, onPick }: {
         <div style={{ width: "100%", padding: 8 }}>
           {conBuscador && (
             <input ref={buscaRef} value={q} autoFocus placeholder="Buscar variante…" onChange={(e) => setQ(e.target.value)}
-              style={{ width: "100%", margin: "2px 0 8px", height: 38, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 14px", fontSize: 14, outline: "none" }} />
+              style={{ width: "100%", margin: "2px 0 8px", height: 38, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", padding: "0 14px", fontSize: 14, outline: "none" }} />
           )}
           <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 260 }}>
             {variantes.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin variantes.</div>}
@@ -482,7 +494,7 @@ function Cantidad({ value, onChange }: { value: number; onChange: (n: number) =>
       onKeyDown={saltarCantidad}
       onChange={(e) => { const t = limpiarCantidad(e.target.value); setTxt(t); onChange(Math.max(0, Number(t) || 0)); }}
       onBlur={() => setTxt(null)}
-      style={{ width: 86, textAlign: "center", height: 40, borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", color: "var(--ds-color-yellow)", fontVariantNumeric: "tabular-nums", fontWeight: 700 }} />
+      style={{ width: 86, textAlign: "center", height: 40, borderRadius: 8, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", color: "var(--ds-color-yellow)", fontVariantNumeric: "tabular-nums", fontWeight: 700 }} />
   );
 }
 
@@ -503,7 +515,7 @@ function Monto({ value, onChange, currency }: { value?: number; onChange: (n: nu
         onFocus={(e) => { setTxt(value && value > 0 ? textoDeCantidad(value) : ""); e.currentTarget.select(); }}
         onChange={(e) => { const t = limpiarCantidad(e.target.value); setTxt(t); onChange(Math.max(0, Number(t) || 0)); }}
         onBlur={() => setTxt(null)}
-        style={{ width: 130, textAlign: "right", height: 40, borderRadius: 8, border: `1.5px solid ${value && value > 0 ? "var(--ds-color-gray-200)" : "var(--ds-color-yellow)"}`, background: "var(--ds-color-white)", color: "var(--ds-color-ink)", fontVariantNumeric: "tabular-nums", fontWeight: 700, padding: "0 10px" }} />
+        style={{ width: 130, textAlign: "right", height: 40, borderRadius: 8, border: `1.5px solid ${value && value > 0 ? "var(--ds-color-gray-200)" : "var(--ds-color-yellow)"}`, background: "var(--ds-surface)", color: "var(--ds-color-ink)", fontVariantNumeric: "tabular-nums", fontWeight: 700, padding: "0 10px" }} />
     </div>
   );
 }
@@ -569,7 +581,7 @@ function MaterialSearch({ items, onAdd, compact }: {
   useEffect(() => { if (compact) { setOpen(true); const t = setTimeout(() => inputRef.current?.focus(), 30); return () => clearTimeout(t); } }, [compact]);
   return (
     <div style={{ width: "100%" }}>
-      <div ref={boxRef} style={{ display: "flex", alignItems: "center", gap: 6, minHeight: compact ? 46 : 62, paddingLeft: compact ? 16 : 18, paddingRight: compact ? 16 : 8, background: "var(--ds-color-white)", borderRadius: 999, boxShadow: "var(--ds-shadow-01)", border: `1.5px solid ${open ? "var(--ds-color-gray-300)" : "var(--ds-color-gray-100)"}` }}>
+      <div ref={boxRef} style={{ display: "flex", alignItems: "center", gap: 6, minHeight: compact ? 46 : 62, paddingLeft: compact ? 16 : 18, paddingRight: compact ? 16 : 8, background: "var(--ds-surface)", borderRadius: 999, boxShadow: "var(--ds-shadow-01)", border: `1.5px solid ${open ? "var(--ds-color-gray-300)" : "var(--ds-color-gray-100)"}` }}>
         <input ref={inputRef} value={q} placeholder={placeholder} onFocus={() => { if (compact || q.trim()) setOpen(true); }} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           style={{ flex: 1, minWidth: 0, border: 0, background: "transparent", outline: "none", fontSize: compact ? 14 : 15, color: "var(--ds-color-gray-500)" }} />
         {!compact && (
@@ -637,7 +649,7 @@ function TareaPicker({ obra, value, valueNombre, onPick }: {
     <div ref={ref} style={{ display: "inline-flex", minWidth: 0, flex: 1 }}>
       <button type="button" onClick={() => setOpen((o) => !o)} className="ds-body-sm"
         style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 40, padding: "0 12px", borderRadius: 10, cursor: "pointer",
-          background: "var(--ds-color-white)", border: `1.5px solid ${has ? "var(--ds-color-green-100)" : "var(--ds-color-gray-200)"}`, color: has ? "var(--ds-color-ink)" : "var(--ds-color-gray-400)", textAlign: "left" }}>
+          background: "var(--ds-surface)", border: `1.5px solid ${has ? "var(--ds-color-green-100)" : "var(--ds-color-gray-200)"}`, color: has ? "var(--ds-color-ink)" : "var(--ds-color-gray-400)", textAlign: "left" }}>
         <Icon name="calculator" size="sm" color="currentColor" />
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {has ? `${value} · ${valueNombre ?? ""}` : "Elegí actividad (tarea)…"}
@@ -694,7 +706,7 @@ function ObraChip({ obras, value, nombre, onPick }: {
       <Popover anchorRef={wrapRef} open={open} onClose={() => { setOpen(false); setQ(""); }} minWidth={320}>
         <div style={{ width: "100%", padding: 8, display: "flex", flexDirection: "column" }}>
           <input ref={inputRef} value={q} placeholder="Buscar obra…" onChange={(e) => setQ(e.target.value)}
-            style={{ margin: "2px 4px 8px", height: 40, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 14px", fontSize: 14, outline: "none" }} />
+            style={{ margin: "2px 4px 8px", height: 40, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", padding: "0 14px", fontSize: 14, outline: "none" }} />
           <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 280 }}>
             {matches.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin resultados.</div>}
             {matches.map((o) => (
@@ -757,7 +769,7 @@ function ComentarioBtn({ value, onChange, required, para }: { value: string; onC
         <div style={{ padding: 14, width: "100%" }}>
           <span className="ds-form-field__label" style={{ display: "block", marginBottom: 8 }}>Comentario para {para ?? "proveeduría"}{required ? " (obligatorio)" : ""}</span>
           <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={5} placeholder="Escribí una nota…"
-            style={{ display: "block", width: "100%", minWidth: 372, height: 128, resize: "vertical", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-color-white)", color: "var(--ds-color-ink)" }} />
+            style={{ display: "block", width: "100%", minWidth: 372, height: 128, resize: "vertical", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-surface)", color: "var(--ds-color-ink)" }} />
         </div>
       </Popover>
     </div>
@@ -796,7 +808,7 @@ function LineaComentarioBtn({ value, onChange }: { value: string; onChange: (v: 
         <div style={{ padding: 12, width: "100%" }}>
           <span className="ds-form-field__label" style={{ display: "block", marginBottom: 6 }}>Comentario de la línea</span>
           <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} placeholder="Nota para esta línea…" maxLength={255}
-            style={{ display: "block", width: "100%", minWidth: 276, height: 84, resize: "vertical", padding: "10px 12px", borderRadius: 10, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-color-white)", color: "var(--ds-color-ink)" }} />
+            style={{ display: "block", width: "100%", minWidth: 276, height: 84, resize: "vertical", padding: "10px 12px", borderRadius: 10, border: "1.5px solid var(--ds-color-gray-200)", outline: "none", fontSize: 14, lineHeight: 1.5, boxSizing: "border-box", background: "var(--ds-surface)", color: "var(--ds-color-ink)" }} />
         </div>
       </Popover>
     </div>
@@ -824,7 +836,7 @@ function UsarPlantillaBtn({ items, value, onPick, onClear, filterNode, hasMateri
         <div style={{ width: "100%", padding: 8, display: "flex", flexDirection: "column" }}>
           {filterNode && <div style={{ display: "flex", justifyContent: "center", paddingBottom: 8 }}>{filterNode}</div>}
           <input ref={inputRef} value={q} placeholder="Buscar plantilla…" onChange={(e) => setQ(e.target.value)}
-            style={{ margin: "2px 4px 8px", height: 40, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 14px", fontSize: 14, outline: "none" }} />
+            style={{ margin: "2px 4px 8px", height: 40, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", padding: "0 14px", fontSize: 14, outline: "none" }} />
           <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 280 }}>
             {value && <button type="button" onClick={() => { onClear(); setOpen(false); setQ(""); }} className="nsl-opt" style={{ textAlign: "left", padding: "10px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent", color: "var(--ds-color-red-100)", fontWeight: 700 }}>Quitar plantilla</button>}
             {matches.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin resultados.</div>}
@@ -1918,7 +1930,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 22px" }}>
               <div className="col gap-5">
                 {borradorRecuperado && (
-                  <div className="row row--between wrap gap-2" style={{ alignItems: "center", padding: "10px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" }}>
+                  <div className="row row--between wrap gap-2" style={{ alignItems: "center", padding: "10px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-tint-base))" }}>
                     <span className="ds-body-sm">Recuperamos el pedido que estabas armando ({lineas.length} línea(s)).</span>
                     <Button variant="ghost" onClick={() => { limpiarBorradorLocal(); reset(); }}>Descartar y empezar de cero</Button>
                   </div>
@@ -1988,7 +2000,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                       </span>
                     </div>
                     {obrasChocadas.length > 0 && (
-                      <div className="ds-body-sm" style={{ padding: "8px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-red-100) 12%, var(--ds-color-white))", color: "var(--ds-color-red-200)" }}>
+                      <div className="ds-body-sm" style={{ padding: "8px 12px", borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-red-100) 12%, var(--ds-tint-base))", color: "var(--ds-color-red-200)" }}>
                         La obra {obrasChocadas.join(", ")} está bloqueada en Business Central: no se le puede cargar material.
                         Cambiá la obra de esa tarjeta, o pedí que la desbloqueen en BC.
                       </div>
@@ -1998,7 +2010,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                         const filas = lineas.filter((l) => l.grupoKey === g.key);
                         const abierto = openMat.includes(g.key);
                         return (
-                          <div key={g.key} className="col gap-0" style={{ position: "relative", borderRadius: 18, border: "1.5px solid var(--ds-color-gray-100)", background: "var(--ds-color-white)", overflow: "hidden" }}>
+                          <div key={g.key} className="col gap-0" style={{ position: "relative", borderRadius: 18, border: "1.5px solid var(--ds-color-gray-100)", background: "var(--ds-surface)", overflow: "hidden" }}>
                             {/* Cabecera (franja): OBRA como chip prominente + agregar material (+) + menú (⋮) */}
                             <div className="row gap-2 nsl-obra-head" data-empty={g.obraCodigo ? undefined : "1"} style={{ alignItems: "center", padding: "10px 12px" }}>
                               {/* La OBRA queda SIEMPRE visible (nunca la tapa el buscador). */}
@@ -2027,7 +2039,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                               {cardMenuKey === g.key && (
                                 <>
                                   <div onClick={() => setCardMenuKey(null)} style={{ position: "fixed", inset: 0, zIndex: 3 }} />
-                                  <div className="col" style={{ position: "absolute", top: 52, right: 10, zIndex: 4, minWidth: 200, background: "var(--ds-color-white)", border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 30px rgba(15,18,20,.16)" }}>
+                                  <div className="col" style={{ position: "absolute", top: 52, right: 10, zIndex: 4, minWidth: 200, background: "var(--ds-surface)", border: "1.5px solid var(--ds-color-gray-100)", borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 30px rgba(15,18,20,.16)" }}>
                                     {filas.length > 0 && (
                                       <button type="button" onClick={() => duplicarGrupo(g.key)} className="ds-body-sm" style={{ textAlign: "left", padding: "10px 14px", border: 0, background: "none", cursor: "pointer" }}>Duplicar a otra obra</button>
                                     )}
@@ -2066,7 +2078,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                                   // SUBCONTRATO: servicio + ALCANCE en texto libre + MONTO global. No hay
                                   // cantidad, ni variante, ni existencias: el servicio se contrata completo.
                                   if (esSub) return (
-                                    <div key={l.key} className="col gap-2" style={{ padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0, background: flash ? "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" : "transparent", transition: "background .2s ease" }}>
+                                    <div key={l.key} className="col gap-2" style={{ padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0, background: flash ? "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-tint-base))" : "transparent", transition: "background .2s ease" }}>
                                       <div className="row gap-3" style={{ alignItems: "center" }}>
                                         <div className="col" style={{ gap: 2, minWidth: 0, flex: 1 }}>
                                           <span className="ds-body-sm ds-strong">{a?.descripcion ?? "—"}</span>
@@ -2093,11 +2105,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                                           deja vacío queda la descripción del servicio del catálogo. */}
                                       <input value={l.detalle ?? ""} onChange={(e) => setLinea(l.key, { detalle: e.target.value })}
                                         placeholder="Alcance (lo que va a decir la orden)…" aria-label="Alcance del servicio"
-                                        style={{ width: "100%", height: 38, borderRadius: 10, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 12px", fontSize: 14, outline: "none" }} />
+                                        style={{ width: "100%", height: 38, borderRadius: 10, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", padding: "0 12px", fontSize: 14, outline: "none" }} />
                                     </div>
                                   );
                                   return (
-                                    <div key={l.key} className="row gap-3 wrap" style={{ alignItems: "center", padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0, background: flash ? "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" : faltaVar ? "color-mix(in srgb, var(--ds-color-yellow) 12%, var(--ds-color-white))" : "transparent", transition: "background .2s ease" }}>
+                                    <div key={l.key} className="row gap-3 wrap" style={{ alignItems: "center", padding: "10px 12px", borderTop: i ? "1.5px solid var(--ds-color-gray-100)" : 0, background: flash ? "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-tint-base))" : faltaVar ? "color-mix(in srgb, var(--ds-color-yellow) 12%, var(--ds-tint-base))" : "transparent", transition: "background .2s ease" }}>
                                       <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
                                         <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
                                         <span className="ds-muted ds-label">{a?.code}</span>
@@ -2178,7 +2190,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                             const faltaVar = necesitaVariante(l);
                             const flash = l.key === flashKey;
                             return (
-                              <div key={l.key} className="row gap-3 wrap" style={{ alignItems: "center", padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${flash ? "var(--ds-color-green-100)" : faltaVar ? "var(--ds-color-yellow)" : "var(--ds-color-gray-100)"}`, background: "var(--ds-color-white)", transition: "border-color .2s ease" }}>
+                              <div key={l.key} className="row gap-3 wrap" style={{ alignItems: "center", padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${flash ? "var(--ds-color-green-100)" : faltaVar ? "var(--ds-color-yellow)" : "var(--ds-color-gray-100)"}`, background: "var(--ds-surface)", transition: "border-color .2s ease" }}>
                                 <div className="col" style={{ gap: 2, minWidth: 0, flex: "1 1 160px" }}>
                                   <span className="ds-body-sm ds-strong">{l.variantNombre || a?.descripcion || "—"}</span>
                                   <span className="ds-muted ds-label">{a?.code}</span>
@@ -2217,7 +2229,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
           {/* Footer (UNA SOLA PANTALLA): CANCELAR · barra de acciones · Solicitar */}
           <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 12, padding: "16px 22px", borderTop: "1.5px solid var(--ds-color-gray-100)", flexShrink: 0 }}>
             <button type="button" onClick={requestDismiss} aria-label="Cancelar"
-              style={{ height: 48, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", boxShadow: "var(--ds-shadow-01)", cursor: "pointer", padding: "0 20px", display: "inline-flex", alignItems: "center", gap: 8, color: "var(--ds-color-ink)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".03em", flexShrink: 0 }}>
+              style={{ height: 48, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", boxShadow: "var(--ds-shadow-01)", cursor: "pointer", padding: "0 20px", display: "inline-flex", alignItems: "center", gap: 8, color: "var(--ds-color-ink)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".03em", flexShrink: 0 }}>
               <Icon name="back" size="sm" color="currentColor" /> Cancelar
             </button>
             {/* Prioridad · Comentario · Guardar como plantilla — como botones de ícono */}
@@ -2252,7 +2264,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                 <input autoFocus value={nombrePlant} onChange={(e) => setNombrePlant(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && nombrePlant.trim()) guardarComoPlantilla(); }}
                   placeholder="Nombre de la plantilla…"
-                  style={{ width: "100%", height: 48, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-color-white)", padding: "0 16px", fontSize: 15, outline: "none" }} />
+                  style={{ width: "100%", height: 48, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", padding: "0 16px", fontSize: 15, outline: "none" }} />
                 <div className="col gap-2" style={{ marginTop: 16 }}>
                   <Button block onClick={guardarComoPlantilla} disabled={!nombrePlant.trim() || savingPlant}>
                     {savingPlant ? "Guardando…" : "Guardar plantilla"}

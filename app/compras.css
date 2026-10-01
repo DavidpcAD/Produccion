@@ -727,7 +727,7 @@
 /* Selector de variante como BOTÓN (no se ve como dropdown); abre la lista al click. */
 /* AGREGAR VARIANTE: caja blanca radio 8, texto AMARILLO en mayúsculas cuando falta
    elegir (igual que la referencia); cuando hay variante elegida, texto normal. */
-.oc-scope .nsl-varbtn { display: inline-flex; align-items: center; gap: 6px; width: 100%; min-width: 0; height: 40px; padding: 0 8px 0 14px; border-radius: 8px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white); color: var(--ds-text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, box-shadow .12s, transform .1s; }
+.oc-scope .nsl-varbtn { display: inline-flex; align-items: center; gap: 6px; width: 100%; min-width: 0; height: 40px; padding: 0 8px 0 14px; border-radius: 8px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-surface); color: var(--ds-text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, box-shadow .12s, transform .1s; }
 .oc-scope .nsl-varbtn:hover { border-color: var(--ds-color-gray-400); box-shadow: 0 0 0 3px var(--ds-color-gray-100); }
 .oc-scope .nsl-varbtn:active { transform: translateY(1px); }
 .oc-scope .nsl-varbtn[data-warn] { border-color: var(--ds-color-gray-200); color: var(--ds-color-yellow); }
@@ -735,9 +735,9 @@
 .oc-scope .nsl-varbtn__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .oc-scope .nsl-varbtn__chev { flex-shrink: 0; color: var(--ds-color-gray-400); }
 /* Botones de la barra de acciones (prioridad · comentario · plantilla). */
-.oc-scope .nsl-toolbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 48px; min-width: 48px; padding: 0 12px; border-radius: 14px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white); color: var(--ds-color-gray-500); cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, color .12s, background .12s; }
+.oc-scope .nsl-toolbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 48px; min-width: 48px; padding: 0 12px; border-radius: 14px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-surface); color: var(--ds-color-gray-500); cursor: pointer; box-shadow: var(--ds-shadow-01); transition: border-color .12s, color .12s, background .12s; }
 .oc-scope .nsl-toolbtn:hover { border-color: var(--ds-color-gray-400); color: var(--ds-color-ink); }
-.oc-scope .nsl-toolbtn[data-active="1"] { border-color: var(--ds-color-green-100); color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-color-white)); }
+.oc-scope .nsl-toolbtn[data-active="1"] { border-color: var(--ds-color-green-100); color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 12%, var(--ds-tint-base)); }
 .oc-scope .nsl-toolbtn:disabled { opacity: .45; cursor: not-allowed; }
 /* Tooltip (pastilla negra) arriba del botón al pasar el mouse. */
 /* Esqueleto de carga (ej. el stock del almacén mientras BC responde). */
@@ -747,7 +747,7 @@
 
 /* Comentario de una línea de material: visible en la fila (no solo en el tooltip).
    Click = abrir el editor. Se corta a 2 líneas para no estirar la fila. */
-.oc-scope .nsl-linenota { display: flex; align-items: flex-start; gap: 6px; width: 100%; min-width: 0; text-align: left; padding: 6px 10px; border-radius: 10px; border: 1.5px solid var(--ds-color-gray-100); background: var(--ds-color-gray-50, color-mix(in srgb, var(--ds-color-gray-100) 45%, var(--ds-color-white))); color: var(--ds-color-gray-500); cursor: pointer; font: inherit; font-size: 12.5px; line-height: 1.35; transition: border-color .12s, color .12s; }
+.oc-scope .nsl-linenota { display: flex; align-items: flex-start; gap: 6px; width: 100%; min-width: 0; text-align: left; padding: 6px 10px; border-radius: 10px; border: 1.5px solid var(--ds-color-gray-100); background: var(--ds-color-gray-50, color-mix(in srgb, var(--ds-color-gray-100) 45%, var(--ds-tint-base))); color: var(--ds-color-gray-500); cursor: pointer; font: inherit; font-size: 12.5px; line-height: 1.35; transition: border-color .12s, color .12s; }
 .oc-scope .nsl-linenota:hover { border-color: var(--ds-color-gray-400); color: var(--ds-color-ink); }
 .oc-scope .nsl-linenota > svg { flex-shrink: 0; margin-top: 1px; color: var(--ds-color-green-200); }
 .oc-scope .nsl-linenota__txt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
@@ -781,11 +781,11 @@
 /* Franja de cabecera de una tarjeta de OBRA: separa visualmente la obra de sus
    materiales. Amarilla mientras no se elige la obra (llama la atención). */
 .oc-scope .nsl-obra-head { background: var(--ds-color-surface); border-bottom: 1.5px solid var(--ds-color-gray-100); }
-.oc-scope .nsl-obra-head[data-empty="1"] { background: color-mix(in srgb, var(--ds-color-yellow) 14%, var(--ds-color-white)); border-bottom-color: color-mix(in srgb, var(--ds-color-yellow) 45%, var(--ds-color-gray-100)); }
+.oc-scope .nsl-obra-head[data-empty="1"] { background: color-mix(in srgb, var(--ds-color-yellow) 14%, var(--ds-tint-base)); border-bottom-color: color-mix(in srgb, var(--ds-color-yellow) 45%, var(--ds-color-gray-100)); }
 /* Chip de OBRA: etiqueta prominente (ícono + nombre en negrita) que abre el
    buscador de obras. Se ve DISTINTA al buscador de materiales para no confundir. */
 /* Con obra: CAJA blanca "A05" (borde gris, código en negrita). */
-.oc-scope .nsl-obrachip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 40px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-color-white); color: var(--ds-text); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }
+.oc-scope .nsl-obrachip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 40px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--ds-color-gray-200); background: var(--ds-surface); color: var(--ds-text); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }
 .oc-scope .nsl-obrachip:hover { border-color: var(--ds-color-gray-400); box-shadow: 0 0 0 3px var(--ds-color-gray-100); }
 /* Sin obra: pill VERDE "OBRA +" (mismos colores de la referencia). */
 .oc-scope .nsl-obrachip[data-empty="1"] { border-radius: 999px; border-color: var(--ds-color-green-100); background: var(--ds-color-green-100); color: var(--ds-color-black); box-shadow: var(--ds-shadow-01); }
