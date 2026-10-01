@@ -653,8 +653,16 @@ export function ordenRecibidoPct(o: Orden): number {
   const arts = o.lineas.filter((l) => l.tipo === "articulo");
   const total = arts.reduce((s, l) => s + l.cantidad, 0);
   if (total === 0) return 0;
-  const rec = arts.reduce((s, l) => s + l.cantidadRecibida, 0);
-  return Math.round((rec / total) * 100);
+  // Acotado por línea y al 100, igual que `pedidoOrdenadoPct` acá arriba. La
+  // pantalla de recibir de ESTE app no deja pasarse de lo pendiente (ver el
+  // `max={pend}` y el "No podés recibir más de lo pendiente"), pero
+  // dbo.OrdenCompraDet la escriben también la app de proveeduría (otro repo,
+  // mismas tablas) y la recepción desde BC, que acumulan sin tope. Sin acotar,
+  // una línea recibida de más daba "Parcial · 110 %", que no quiere decir nada;
+  // y de paso tapaba a otra línea que venía corta. El anillo (QtyRing) ya lo
+  // acotaba por su lado.
+  const rec = arts.reduce((s, l) => s + Math.min(l.cantidadRecibida, l.cantidad), 0);
+  return Math.round(Math.min(100, (rec / total) * 100));
 }
 
 // Cantidades para los anillos/barras de progreso (mismo criterio que el %: los
