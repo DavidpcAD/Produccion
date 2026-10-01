@@ -181,7 +181,12 @@ export default function ProveeduriaMaterialesPage() {
                 <span className="ds-strong">Todos los pedidos</span>
                 <span className="md-pill">{rows.length}</span>
               </div>
-              <span className="ds-body-sm ds-muted">Ver todas las líneas pendientes</span>
+              {/* El número es de LÍNEAS, igual que el de cada pedido de abajo. Pegado al
+                  rótulo "Todos los pedidos" se leía como la cantidad de pedidos: en SBX
+                  decía 99 habiendo 11 pedidos con saldo. Se dice cuál es cuál. */}
+              <span className="ds-body-sm ds-muted">
+                {rows.length} líneas pendientes en {pedidosConSaldo.length} pedidos
+              </span>
             </button>
             {pedidosConSaldo
               .filter((p) => { const q = pedFiltro.trim(); if (!q) return true; const r = solicitudResumen(p); return coincideBusqueda([p.numero, destinoCodigo(p), r.principal, r.secundaria ?? "", p.notas ?? ""].join(" "), q); })
