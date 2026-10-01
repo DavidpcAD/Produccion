@@ -209,7 +209,10 @@ export function QtyRing({ recibida, total }: { recibida: number; total: number }
         className="ds-qty-selector__ring"
         style={{ background: `conic-gradient(${color} ${pct * 360}deg, transparent 0deg)` }}
       />
-      <span className="ds-qty-selector__inner" style={{ background: "var(--ds-color-white)", width: 34, height: 34, borderRadius: "50%", display: "grid", placeItems: "center" }}>
+      {/* `--ds-surface`, no `--ds-color-white`: el blanco es literal y no se invierte,
+          así que en oscuro este círculo quedaba blanco con el porcentaje encima en
+          el gris claro del tema — 1.21:1, ilegible. */}
+      <span className="ds-qty-selector__inner" style={{ background: "var(--ds-surface)", width: 34, height: 34, borderRadius: "50%", display: "grid", placeItems: "center" }}>
         {Math.round(pct * 100)}%
       </span>
     </span>

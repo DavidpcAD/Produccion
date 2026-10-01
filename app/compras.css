@@ -1165,7 +1165,11 @@
 /* segmented control */
 .oc-scope .segmented { display: inline-flex; background: var(--ds-color-gray-100); border-radius: var(--ds-radius-xl); padding: 4px; gap: 4px; }
 .oc-scope .segmented__btn { padding: 8px 16px; border-radius: var(--ds-radius-lg); border: 0; background: transparent; font-family: inherit; font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-label); color: var(--ds-color-gray-500); cursor: pointer; transition: background-color .12s, color .12s; }
-.oc-scope .segmented__btn.is-active { background: var(--ds-surface); color: #000; box-shadow: var(--ds-shadow-02-soft); }
+/* `color: var(--ds-text)`, no `#000`: el fondo de este botón SÍ sigue al tema
+   (--ds-surface), así que con negro literal quedaba texto negro sobre fondo
+   oscuro — medido, 1.37:1, invisible. El negro literal solo vale encima de un
+   relleno que tampoco cambia (el verde de marca, por ejemplo). */
+.oc-scope .segmented__btn.is-active { background: var(--ds-surface); color: var(--ds-text); box-shadow: var(--ds-shadow-02-soft); }
 
 /* Filtros de estado como "chips" (pills con contador) — lenguaje visual distinto
    del toggle de vista, para que no se vean como una barra doble amontonada. */
