@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, use } from 'react';
+import { useConfirm } from '@/components/ui/Confirm';
 import { useRouter } from 'next/navigation';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
@@ -33,6 +34,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
   const router = useRouter();
   const session = useSession();
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +101,17 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
     }
   }
 
-  async function handleRetirar(idColProy: number) {
+  async function handleRetirar(idColProy: number, nombre: string) {
+    // Mismo caso que en Cuadrillas: botón chiquito sin rótulo y baja de verdad
+    // (la fila se borra, se pierde la fecha de asignación).
+    const ok = await confirm({
+      title: 'Retirar del proyecto',
+      message: `${nombre} sale de este proyecto. Se puede volver a asignar, pero la fecha de asignación arranca de nuevo.`,
+      confirmLabel: 'Retirar',
+      danger: true,
+    });
+    if (!ok) return;
+
     // Se revisa la respuesta antes de cantar victoria: si falla, la persona sigue
     // asignada y el aviso en verde esconde el problema.
     const res = await fetch(`/api/proyectos/${id}/asignaciones`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idColProy }) });
@@ -311,7 +323,9 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
                     )}
                     {session && session.nivelAdmin >= 2 && (
                       <button
-                        onClick={() => handleRetirar(m.IDColProy)}
+                        onClick={() => handleRetirar(m.IDColProy, m.NombreCompleto)}
+                        aria-label={`Retirar a ${m.NombreCompleto} del proyecto`}
+                        title="Retirar del proyecto"
                         className="p-1.5 text-ds-gray-300 hover:text-ds-red hover:bg-ds-gray-100 rounded-ds transition-colors"
                       >
                         <Icon name="close" size="sm" color="currentColor" />

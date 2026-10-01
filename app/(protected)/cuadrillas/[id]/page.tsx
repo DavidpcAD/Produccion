@@ -8,6 +8,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/Confirm';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 
@@ -46,6 +47,7 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
   const router = useRouter();
   const session = useSession();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const isAdmin = !!session && session.nivelAdmin >= 2;
 
   const [cuadrilla, setCuadrilla] = useState<Cuadrilla | null>(null);
@@ -106,7 +108,19 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
     }
   }
 
-  async function handleQuitar(idCuadMiembro: number) {
+  async function handleQuitar(idCuadMiembro: number, nombre: string) {
+    // Pregunta antes: es un botón chiquito, sin rótulo, al borde de la fila —y
+    // en una tableta de obra un roce lo aprieta—. Y la baja es DE VERDAD: la
+    // fila se borra, así que volver a meter a la persona le pone fecha de
+    // ingreso de hoy y se pierde desde cuándo estaba.
+    const ok = await confirm({
+      title: 'Quitar de la cuadrilla',
+      message: `${nombre} sale de esta cuadrilla. Se puede volver a agregar, pero la fecha de ingreso arranca de nuevo.`,
+      confirmLabel: 'Quitar',
+      danger: true,
+    });
+    if (!ok) return;
+
     // Se revisa la respuesta antes de cantar victoria: si la sesión venció o el
     // servidor falló, el miembro sigue ahí y decirle "removido" al usuario lo
     // manda a cerrar la pantalla creyendo que quedó hecho. Mismo trato que
@@ -226,7 +240,9 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
                   </span>
                   {isAdmin && (
                     <button
-                      onClick={() => handleQuitar(m.IDCuadMiembro)}
+                      onClick={() => handleQuitar(m.IDCuadMiembro, m.NombreCompleto)}
+                      aria-label={`Quitar a ${m.NombreCompleto} de la cuadrilla`}
+                      title="Quitar de la cuadrilla"
                       className="p-1.5 text-ds-gray-300 hover:text-ds-red hover:bg-ds-gray-100 rounded-ds transition-colors"
                     >
                       <Icon name="remove" size="sm" color="currentColor" />
