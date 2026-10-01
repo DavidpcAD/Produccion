@@ -22,10 +22,19 @@ export async function GET(req: NextRequest) {
   const offset = (pagina - 1) * porPagina;
 
   const db = await getDb();
-  const request = db.request()
-    .input('busqueda', sql.NVarChar, `%${busqueda}%`)
-    .input('offset', sql.Int, offset)
-    .input('porPagina', sql.Int, porPagina);
+  // Una sola forma de armar las peticiones, para que el COUNT y la PÁGINA lleven
+  // SIEMPRE los mismos parámetros. Antes `@departamento` se declaraba solo en la
+  // del conteo pero el WHERE lo comparten las dos, así que `?departamento=X`
+  // reventaba con «Must declare the scalar variable "@departamento"» y la ruta
+  // devolvía 500.
+  const conParams = () => {
+    const r = db.request()
+      .input('busqueda', sql.NVarChar, `%${busqueda}%`)
+      .input('offset', sql.Int, offset)
+      .input('porPagina', sql.Int, porPagina);
+    if (departamento) r.input('departamento', sql.NVarChar, departamento);
+    return r;
+  };
 
   // Modelo nuevo: se lee de dbo.V_Colaborador (resuelve puesto/departamento/
   // geografía) + roles vía UsuarioRol/Rol. Alias PascalCase para la UI.
@@ -35,7 +44,6 @@ export async function GET(req: NextRequest) {
     where += ` AND c.esActivo = ${activo === '1' ? '1' : '0'}`;
   }
   if (departamento) {
-    request.input('departamento', sql.NVarChar, departamento);
     where += ` AND c.departamento = @departamento`;
   }
   // "Usuarios" = colaboradores con cuenta de login (acceso a apps).
@@ -96,12 +104,8 @@ export async function GET(req: NextRequest) {
 
   // El conteo y la página no dependen uno del otro: van juntos.
   const [countRes, dataRes] = await Promise.all([
-    request.query(`SELECT COUNT(*) as total FROM dbo.V_Colaborador c ${where}`),
-    db.request()
-      .input('busqueda', sql.NVarChar, `%${busqueda}%`)
-      .input('offset', sql.Int, offset)
-      .input('porPagina', sql.Int, porPagina)
-      .query(soloBasico ? selectBasico : selectCompleto),
+    conParams().query(`SELECT COUNT(*) as total FROM dbo.V_Colaborador c ${where}`),
+    conParams().query(soloBasico ? selectBasico : selectCompleto),
   ]);
   const total = countRes.recordset[0].total;
 

@@ -67,13 +67,20 @@ const gzip = promisify(gzipCb);
  * que escribe en esas tablas la mantenga (y a `dbo.OrdenCompra*` también le
  * escribe la app de proveeduría, que es otro repo).
  *
- * `private` la deja fuera de cachés compartidas. Si entra otra persona en el
- * mismo navegador, el servidor arma SU respuesta, la huella da distinta y vuelve
- * un 200 con sus datos: no hay forma de que vea los del anterior.
+ * Si entra otra persona en el mismo navegador no hay nada que pueda ver del
+ * anterior: la respuesta es `no-store` (no queda guardada) y la huella vive en
+ * memoria de la página, que se va con ella.
  */
 
 /** Debajo de esto gzip agrega más de lo que quita. */
 const MINIMO_BYTES = 1400;
+
+/** ¿Quien llama trajo su propio Cache-Control? Sin mirar mayúsculas: las
+ *  cabeceras no distinguen, pero un objeto de JavaScript sí, y con
+ *  `Cache-Control` escrito distinto se colarían dos directivas peleadas. */
+function traeCacheControl(h?: Record<string, string>): boolean {
+  return !!h && Object.keys(h).some((k) => k.toLowerCase() === 'cache-control');
+}
 
 export async function jsonComprimido(
   req: Request,
@@ -95,7 +102,7 @@ export async function jsonComprimido(
     // proveedores de todas las órdenes, cosa que hoy no pasa (el store solo
     // persiste en localStorage en modo mock), y estas pantallas se usan en
     // tabletas compartidas de obra.
-    ...(init?.headers?.['cache-control'] ? {} : { 'cache-control': 'no-store' }),
+    ...(traeCacheControl(init?.headers) ? {} : { 'cache-control': 'no-store' }),
     ...(init?.headers ?? {}),
   };
 
