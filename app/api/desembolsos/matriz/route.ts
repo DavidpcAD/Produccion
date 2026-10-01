@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getAdelanteDb();
     const data = await listarDesembolsos(db, desde, hasta);
-    return NextResponse.json(data);
+    return jsonComprimido(req, data);
   } catch (err) {
     console.error('/api/desembolsos/matriz GET error:', err);
     return NextResponse.json(
