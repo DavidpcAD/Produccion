@@ -458,7 +458,10 @@
   width: 30px; height: 30px; border-radius: 50%;
   display: grid; place-items: center;
   background: color-mix(in srgb, var(--ds-color-green-100) 24%, var(--ds-tint-base));
-  color: var(--ds-color-green-200);
+  /* `green-200` sobre este tinte daba 2,58:1 y las iniciales casi no se leían
+     —y son para saber de un vistazo quién pidió—. `green-ink` es el token de
+     TEXTO verde del DS (5,13:1 acá) y ya trae su variante de tema oscuro. */
+  color: var(--color-ds-green-ink);
   font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold);
   letter-spacing: .02em; user-select: none;
   transition: box-shadow .18s ease;
