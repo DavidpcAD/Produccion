@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Pills } from '../_components/Pills';
-import { AvisoTope, rotuloTope } from '../_components/AvisoTope';
+import { AvisoTope, rotuloTope } from '@/components/ui/AvisoTope';
 import { ESTADO_COLADA, ESTADOS_COLADA } from '@/lib/concreto/estados';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { ColadaListadoItem, EstadoColada, PlantaListadoItem } from '@/lib/concreto/tipos';

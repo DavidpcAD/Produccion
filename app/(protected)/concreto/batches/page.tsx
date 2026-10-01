@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Pills } from '../_components/Pills';
-import { AvisoTope, rotuloTope } from '../_components/AvisoTope';
+import { AvisoTope, rotuloTope } from '@/components/ui/AvisoTope';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import type { BatchDetallePlanta, PlantaListadoItem } from '@/lib/concreto/tipos';
 

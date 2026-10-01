@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { AvisoTope } from '@/components/ui/AvisoTope';
 import { Skeleton, SkeletonText } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
@@ -41,6 +42,9 @@ export default function DesembolsosMovimientosPage() {
   const [movs, setMovs] = useState<MovimientoCaso[]>([]);
   const [bancos, setBancos] = useState<Banco[]>([]);
   const [cargando, setCargando] = useState(false);
+  // Cuántos calzan con el filtro, no cuántos se bajaron: la consulta trae como
+  // mucho 500 y en SBX hay 2 744. Ver AvisoTope.
+  const [total, setTotal] = useState(0);
 
   const [busqueda, setBusqueda] = useState('');
   const [busquedaDeb, setBusquedaDeb] = useState('');
@@ -76,8 +80,14 @@ export default function DesembolsosMovimientosPage() {
     if (hasta) params.set('hasta', hasta);
     fetch(`/api/desembolsos/movimientos?${params.toString()}`)
       .then((r) => (r.ok ? r.json() : { movimientos: [] }))
-      .then((d) => setMovs(d.movimientos ?? []))
-      .catch(() => toast('No se pudieron cargar los movimientos.', 'error'))
+      .then((d) => {
+        setMovs(d.movimientos ?? []);
+        setTotal(d.total ?? (d.movimientos?.length ?? 0));
+      })
+      .catch(() => {
+        setTotal(0);
+        toast('No se pudieron cargar los movimientos.', 'error');
+      })
       .finally(() => setCargando(false));
   }, [busquedaDeb, idBanco, clasificacion, estado, desde, hasta, toast]);
 
@@ -100,7 +110,7 @@ export default function DesembolsosMovimientosPage() {
 
       <PageHeader
         title="Movimientos"
-        subtitle="Movimientos de la cartera y su vinculación a hitos de desembolso. Consulta (máx. 500)."
+        subtitle="Movimientos de la cartera y su vinculación a hitos de desembolso. Solo consulta."
       />
 
       {/* Filtros */}
@@ -130,8 +140,21 @@ export default function DesembolsosMovimientosPage() {
         <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} hint="Hasta" />
       </div>
 
-      <div className="mb-2 flex items-center justify-between text-sm text-ds-gray-500">
-        <span>{movs.length} movimiento(s)</span>
+      {!cargando && (
+        <AvisoTope
+          cargadas={movs.length}
+          total={total}
+          sustantivo="movimientos"
+          buscadorLocal={false}
+          comoFiltrar="Son los más recientes; el buscador sí consulta todos. Para ver los de otra fecha, acotá el rango."
+        />
+      )}
+
+      <div className="mb-2 mt-3 flex items-center justify-between text-sm text-ds-gray-500">
+        <span>
+          {movs.length.toLocaleString('es-CR')}
+          {total > movs.length ? ` de ${total.toLocaleString('es-CR')}` : ''} movimiento(s)
+        </span>
         <span>
           Total ₡ mostrado: <strong>{formatCRC(totalMonto)}</strong>
         </span>

@@ -43,8 +43,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const db = await getAdelanteDb();
-    const movimientos = await listarMovimientosGlobal(db, filtro);
-    return jsonComprimido(req, { movimientos });
+    const { movimientos, total } = await listarMovimientosGlobal(db, filtro);
+    return jsonComprimido(req, { movimientos, total });
   } catch (err) {
     console.error('/api/desembolsos/movimientos GET error:', err);
     return NextResponse.json(

@@ -13,7 +13,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { PageShell, PageHeader } from '@/components/layout/Page';
-import { AvisoTope, rotuloTope } from '../_components/AvisoTope';
+import { AvisoTope, rotuloTope } from '@/components/ui/AvisoTope';
 import type { ActividadLab, MuestraListadoItem } from '@/lib/concreto/tipos';
 import { evaluarMuestraCumplimiento, CUMPLIMIENTO_META } from '@/lib/concreto/evaluacion-resistencia';
 import {

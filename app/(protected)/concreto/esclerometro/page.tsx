@@ -10,7 +10,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { PageShell, PageHeader } from '@/components/layout/Page';
-import { AvisoTope, rotuloTope } from '../_components/AvisoTope';
+import { AvisoTope, rotuloTope } from '@/components/ui/AvisoTope';
 import { ANGULOS_IMPACTO } from '@/lib/concreto/tipos-esclerometro';
 import type {
   EnsayoEsclerometroListado,

@@ -1,4 +1,4 @@
-import type { ConnectionPool } from 'mssql';
+import type { ConnectionPool, ISqlType } from 'mssql';
 import { sql } from '@/lib/db-adelantedb';
 
 /**
@@ -204,39 +204,53 @@ function mapMovimiento(r: RawMovimientoCaso): MovimientoCaso {
 
 // -------------------------------------------------------- Lista global (Slice D)
 
+/** Tope de filas de la lista global. El COUNT dice cuántas calzan de verdad. */
+export const TOPE_MOVIMIENTOS = 500;
+
 /**
  * Lista global de movimientos con filtros. Puerto de `listarMovimientosGlobal`.
- * Devuelve hasta 500 movimientos. Expone IDBanco/IDProyecto como columnas extra
- * para filtrado client-side multi-select.
+ * Devuelve hasta `TOPE_MOVIMIENTOS` movimientos MÁS cuántos calzan con el
+ * filtro, para que la pantalla pueda decir "500 de 2 744" en vez de "500" a
+ * secas. Expone IDBanco/IDProyecto como columnas extra para filtrado
+ * client-side multi-select.
  */
 export async function listarMovimientosGlobal(
   db: ConnectionPool,
   filtro: FiltroMovimientos,
-): Promise<MovimientoCaso[]> {
+): Promise<{ movimientos: MovimientoCaso[]; total: number }> {
+  // Los parámetros se guardan UNA vez y se aplican a las DOS peticiones (página
+  // y conteo). Declararlos solo en una es el error que dejaba la otra con un
+  // «Must declare the scalar variable» en cuanto alguien usaba ese filtro.
+  type TipoSql = ISqlType | (() => ISqlType);
+  const params: Array<[string, TipoSql, unknown]> = [];
   const request = db.request();
+  const addInput = (nombre: string, tipo: TipoSql, valor: unknown) => {
+    params.push([nombre, tipo, valor]);
+    request.input(nombre, tipo as ISqlType, valor);
+  };
   const conds: string[] = ['vw.IDCaso IS NOT NULL'];
 
   if (filtro.idCaso) {
     conds.push('vw.IDCaso = @idCaso');
-    request.input('idCaso', sql.Int, filtro.idCaso);
+    addInput('idCaso', sql.Int, filtro.idCaso);
   }
   if (filtro.clasificacion) {
     conds.push('vw.Clasificacion = @clasif');
-    request.input('clasif', sql.VarChar(20), filtro.clasificacion);
+    addInput('clasif', sql.VarChar(20), filtro.clasificacion);
   }
   if (filtro.categoria) {
     conds.push('vw.CategoriaTipo = @cat');
-    request.input('cat', sql.VarChar(20), filtro.categoria);
+    addInput('cat', sql.VarChar(20), filtro.categoria);
   }
   if (filtro.estadoVinculacion === 'VINCULADOS') conds.push('vw.EstaVinculado = 1');
   else if (filtro.estadoVinculacion === 'SIN_VINCULAR') conds.push('vw.EstaVinculado = 0');
   if (filtro.desde) {
     conds.push('vw.FechaRealizado >= @desde');
-    request.input('desde', sql.Date, filtro.desde);
+    addInput('desde', sql.Date, filtro.desde);
   }
   if (filtro.hasta) {
     conds.push('vw.FechaRealizado <= @hasta');
-    request.input('hasta', sql.Date, filtro.hasta);
+    addInput('hasta', sql.Date, filtro.hasta);
   }
   if (filtro.q) {
     conds.push(`(
@@ -246,35 +260,50 @@ export async function listarMovimientosGlobal(
       OR vw.CodigoLote LIKE @q
       OR CAST(vw.IDCaso AS NVARCHAR(20)) LIKE @q
     )`);
-    request.input('q', sql.NVarChar(200), `%${filtro.q}%`);
+    addInput('q', sql.NVarChar(200), `%${filtro.q}%`);
   }
 
   let joinBanco = '';
   if (filtro.idBanco) {
     joinBanco = 'INNER JOIN pro_ventas.Casos cs2 ON cs2.IDCaso = vw.IDCaso AND cs2.IDBanco = @idBanco';
-    request.input('idBanco', sql.Int, filtro.idBanco);
+    addInput('idBanco', sql.Int, filtro.idBanco);
   }
   let joinProyecto = '';
   if (filtro.idProyecto) {
     joinProyecto = 'INNER JOIN pro_ventas.Lotes lt2 ON lt2.IDLote = vw.IDLote AND lt2.IDProyecto = @idProyecto';
-    request.input('idProyecto', sql.Int, filtro.idProyecto);
+    addInput('idProyecto', sql.Int, filtro.idProyecto);
   }
 
   const whereClause = 'WHERE ' + conds.join(' AND ');
-  const result = await request.query<RawMovimientoCaso>(`
-    SELECT TOP 500
-      vw.*,
-      csB.IDBanco     AS IDBanco,
-      ltB.IDProyecto  AS IDProyecto
+  const desde = `
     FROM [pro_app].vw_movimientos_caso vw
     LEFT JOIN pro_ventas.Casos csB ON csB.IDCaso = vw.IDCaso
     LEFT JOIN pro_ventas.Lotes ltB ON ltB.IDLote = vw.IDLote
     ${joinBanco}
     ${joinProyecto}
-    ${whereClause}
+    ${whereClause}`;
+
+  const conteo = db.request();
+  for (const [n, t, v] of params) conteo.input(n, t as ISqlType, v);
+
+  // Las dos van juntas: son independientes y cada viaje a Azure cuesta lo mismo
+  // esperando que trabajando.
+  const [result, totalRes] = await Promise.all([
+    request.query<RawMovimientoCaso>(`
+    SELECT TOP ${TOPE_MOVIMIENTOS}
+      vw.*,
+      csB.IDBanco     AS IDBanco,
+      ltB.IDProyecto  AS IDProyecto
+    ${desde}
     ORDER BY vw.FechaRealizado DESC, vw.IDMovimiento DESC;
-  `);
-  return result.recordset.map(mapMovimiento);
+  `),
+    conteo.query<{ total: number }>(`SELECT COUNT(*) AS total ${desde};`),
+  ]);
+
+  return {
+    movimientos: result.recordset.map(mapMovimiento),
+    total: Number(totalRes.recordset[0]?.total ?? result.recordset.length),
+  };
 }
 
 // ------------------------------------------------------------ Detalle por caso

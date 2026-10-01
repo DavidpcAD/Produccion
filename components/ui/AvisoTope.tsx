@@ -3,8 +3,8 @@ import { Icon } from '@/components/ds/Icon/Icon';
 
 // ─── "Esto no es todo" ────────────────────────────────────────────────────────
 //
-// Las pantallas de Concreto piden SIEMPRE la página 1 con un tope (500 batches,
-// 500 coladas, 100 ensayos) y hasta ahora rotulaban el resultado con
+// Varias pantallas piden la primera página con un tope (500 batches, 500
+// coladas, 500 movimientos, 100 ensayos) y rotulaban el resultado con
 // `${filas.length} batches`. O sea que con 8 299 batches en la base la pantalla
 // decía "500 batches", como si esos fueran todos los que hay.
 //
@@ -36,13 +36,18 @@ export function AvisoTope({
   total,
   sustantivo,
   comoFiltrar,
+  buscadorLocal = true,
 }: {
   cargadas: number;
   total: number;
-  /** Plural en minúscula: "batches", "coladas", "ensayos". */
+  /** Plural en minúscula: "batches", "coladas", "movimientos". */
   sustantivo: string;
   /** Qué filtros tiene esta pantalla para achicar la consulta. */
   comoFiltrar: string;
+  /** ¿El buscador filtra en el navegador (true) o consulta al servidor (false)?
+   *  Con buscador del servidor la búsqueda SÍ encuentra lo que no está en la
+   *  lista, así que no hay que advertir de eso — solo de que falta gente. */
+  buscadorLocal?: boolean;
 }) {
   if (total <= cargadas) return null;
   const faltan = total - cargadas;
@@ -61,8 +66,10 @@ export function AvisoTope({
         <strong className="font-semibold">
           {n(faltan)} más {faltan === 1 ? 'queda' : 'quedan'} fuera de la lista
         </strong>
-        . El buscador solo mira las que están acá, así que no va a encontrar{' '}
-        {faltan === 1 ? 'la que falta' : 'las que faltan'}: {comoFiltrar}
+        .{' '}
+        {buscadorLocal
+          ? `El buscador solo mira lo que está acá, así que no va a encontrar el resto: ${comoFiltrar}`
+          : comoFiltrar}
       </p>
     </div>
   );
