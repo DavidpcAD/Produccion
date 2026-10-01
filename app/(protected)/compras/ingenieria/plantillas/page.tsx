@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getCatalogoBc } from '@/lib/compras/catalogo-bc';
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, ConfirmDialog, Field, Input, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
@@ -53,12 +54,7 @@ export default function PlantillasPage() {
   const cargarItems = useCallback(() => {
     setItemsCargando(true);
     setItemsError(false);
-    fetch("/api/compras/bc/items")
-      .then(async (r) => {
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
-        return d;
-      })
+    getCatalogoBc()
       .then((d) => {
         const arr = Array.isArray(d.items) ? d.items : [];
         setItems(arr.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", tipo: i.tipo })));

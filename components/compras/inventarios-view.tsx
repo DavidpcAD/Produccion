@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getCatalogoBc } from '@/lib/compras/catalogo-bc';
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/compras/data-table";
 import { Skeleton } from "@/components/compras/ui";
@@ -26,8 +27,7 @@ export function InventariosView({ tablaKey = "inventarios" }: { tablaKey?: strin
   // Catálogo de BC (todos los productos). Fallback al catálogo local si BC no responde.
   const [items, setItems] = useState<{ code: string; descripcion: string; unidad: string; lastDirectCost?: number; tipo?: Articulo["tipo"] }[] | null>(null);
   useEffect(() => {
-    fetch("/api/compras/bc/items")
-      .then((r) => (r.ok ? r.json() : { items: [] }))
+    getCatalogoBc()
       .then((d) => { if (Array.isArray(d.items)) setItems(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", lastDirectCost: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined, tipo: i.tipo }))); })
       .catch(() => { /* sin BC: se usa el catálogo local */ });
   }, []);

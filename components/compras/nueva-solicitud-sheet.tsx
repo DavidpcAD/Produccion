@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { getCatalogoBc } from '@/lib/compras/catalogo-bc';
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { ToggleCards } from "@/components/ds/ToggleCards/ToggleCards";
@@ -890,15 +891,19 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     let cancel = false;
     (async () => {
       try {
-        const ri = await fetch("/api/compras/bc/items");
-        const dataItems = ri.ok ? await ri.json() : {};
+        // Los tres catálogos van juntos: antes el de artículos se esperaba solo y
+        // recién después salían los otros dos.
+        const [dataItems, ro, ra] = await Promise.all([
+          getCatalogoBc().catch(() => ({ items: [], bloqueados: [] as string[] })),
+          fetch("/api/compras/bc/obras"),
+          fetch("/api/compras/bc/almacenes"),
+        ]);
         // TODO el catálogo, tal cual viene de BC: inventario, servicio y no
         // inventariable. El tipo solo se guarda para etiquetarlo en el buscador.
-        const items: Articulo[] = ri.ok ? ((dataItems.items ?? []).map((i: any) => ({
+        const items: Articulo[] = (dataItems.items ?? []).map((i: any) => ({
           id: i.id, code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", unidadCompra: i.unidadCompra || undefined, almacenDefault: "", precioReferencia: 0,
           tipo: (i.tipo === "servicio" || i.tipo === "no-inventario" ? i.tipo : "inventario") as Articulo["tipo"],
-        }))) : [];
-        const [ro, ra] = await Promise.all([fetch("/api/compras/bc/obras"), fetch("/api/compras/bc/almacenes")]);
+        }));
         const obrasBc: Obra[] = ro.ok ? ((await ro.json()).obras ?? []) : [];
         const almBc: Almacen[] = ra.ok ? ((await ra.json()).almacenes ?? []) : [];
         if (cancel) return;

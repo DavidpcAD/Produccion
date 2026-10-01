@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { getCatalogoBc } from '@/lib/compras/catalogo-bc';
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, LineaPedidaInfo, Modal, Select, useToast } from "@/components/compras/ui";
@@ -77,8 +78,7 @@ export default function ArmarOrdenPage() {
   // Almacenes reales de BC (fallback al catálogo seed si BC no responde).
   const [bcAlm, setBcAlm] = useState<typeof almacenes | null>(null);
   useEffect(() => {
-    fetch("/api/compras/bc/items")
-      .then((r) => (r.ok ? r.json() : { items: [] }))
+    getCatalogoBc()
       .then((d) => { if (Array.isArray(d.items)) setItemsBc(d.items.map((i: any) => ({ code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", precioUltimo: typeof i.lastDirectCost === "number" ? i.lastDirectCost : undefined }))); })
       .catch(() => { /* sin BC */ });
     fetch("/api/compras/bc/almacenes")

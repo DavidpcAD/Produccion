@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getCatalogoBc } from '@/lib/compras/catalogo-bc';
 import { AppShell } from "@/components/compras/shell";
 import { Button, Card, Input } from "@/components/compras/ui";
 import { useStore } from "@/lib/compras/store";
@@ -26,8 +27,8 @@ export default function PlanificacionPage() {
     let cancel = false;
     (async () => {
       try {
-        const [ri, ro] = await Promise.all([fetch("/api/compras/bc/items"), fetch("/api/compras/bc/obras")]);
-        const items = ri.ok ? ((await ri.json()).items ?? []) : [];
+        const [cat, ro] = await Promise.all([getCatalogoBc(), fetch("/api/compras/bc/obras")]);
+        const items = cat.items;
         const obras = ro.ok ? ((await ro.json()).obras ?? []) : [];
         if (cancel) return;
         setItemCat(Object.fromEntries(items.map((i: any) => [i.code, (i.categoria ?? "").trim()]).filter((x: any[]) => x[0])));
