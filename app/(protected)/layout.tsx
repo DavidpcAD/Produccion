@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { AvisoSesion } from '@/components/layout/AvisoSesion';
+import { AvisoSinAcceso } from '@/components/layout/AvisoSinAcceso';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSession } from '@/hooks/useSession';
 import { getInitials, rutaPermitida } from '@/lib/permissions';
@@ -116,6 +117,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             el título (y en móvil no se monte con el botón del menú). Mientras la
             sesión viva no pinta nada. */}
         <AvisoSesion />
+
+        {/* Rebotada de una ruta que su rol no abre: se le dice, en vez de
+            dejarla caer callada en otra pantalla. Va acá por lo mismo que el de
+            sesión: el rebote puede aterrizar en cualquier pantalla. */}
+        <Suspense fallback={null}>
+          <AvisoSinAcceso />
+        </Suspense>
 
         <AnimatePresence mode="wait" initial={false}>
           <motion.main

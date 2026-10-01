@@ -18,11 +18,23 @@ import { Icon } from '@/components/ds/Icon/Icon';
 // layout cuando alguien escribe a mano una ruta que no le toca.
 export const dynamic = 'force-dynamic';
 
-export default async function Entrada() {
+export default async function Entrada({
+  searchParams,
+}: {
+  searchParams: Promise<{ sinacceso?: string }>;
+}) {
   const session = await getSession();
   const destino = rutaDeEntrada(session?.modules, session?.nivelAdmin ?? 0);
 
-  if (destino) redirect(destino);
+  // Si llegó rebotada de una ruta que no le toca, el motivo sigue viaje hasta la
+  // pantalla donde va a aterrizar; ahí lo lee `AvisoSinAcceso`. Si no se pasa, el
+  // redirect se come el parámetro y la persona cae en otra pantalla sin que nada
+  // le explique qué pasó.
+  const { sinacceso } = await searchParams;
+
+  if (destino) {
+    redirect(sinacceso ? `${destino}?sinacceso=${encodeURIComponent(sinacceso)}` : destino);
+  }
 
   // Sin ninguna pantalla asignada. Se DICE, en vez de rebotarla de una ruta a otra:
   // el rebote se vería como una app rota y no como un permiso que falta.

@@ -156,6 +156,46 @@ const MODULOS_BASE: Modulo[] =
 export const MODULOS_TODOS: Modulo[] =
   MODULOS_BASE.filter((m) => m !== 'avance' || AVANCE_OBRA_ACTIVO);
 
+/** Cómo se llama cada módulo para una persona. Se usa al rebotar a alguien de
+ *  una ruta que no le toca: decirle "no tenés acceso a Desembolsos" es una
+ *  explicación; dejarlo caer callado en otra pantalla parece la app rota. */
+const NOMBRE_MODULO: Record<Modulo, string> = {
+  dashboard: 'esa pantalla',
+  presupuesto: 'Presupuesto',
+  ingenieria: 'Órdenes de Compra',
+  avance: 'Avance de obra',
+  concreto: 'Concreto',
+  desembolsos: 'Desembolsos',
+  bodega: 'Órdenes de Compra',
+  recepcion: 'Recibir material',
+  admin: 'Administración',
+};
+
+/** Pantallas que comparten módulo pero tienen nombre propio. Casi todas caen en
+ *  'admin', que agrupa cosas que no se parecen en nada: contestarle
+ *  "no abrís Administración" a quien pidió Utilidades no explica nada. */
+const NOMBRE_RUTA: { prefijo: string; nombre: string }[] = [
+  { prefijo: '/utilidades', nombre: 'Utilidades' },
+  { prefijo: '/reporte-h4', nombre: 'el Reporte H4' },
+  { prefijo: '/marcaje', nombre: 'Marcaje' },
+  { prefijo: '/auditoria', nombre: 'Auditoría' },
+  { prefijo: '/compras/aprobacion', nombre: 'Aprobación de órdenes' },
+  { prefijo: '/bc', nombre: 'Business Central' },
+];
+
+/** Nombre legible de lo que hay detrás de una ruta ("Desembolsos", "Concreto").
+ *  Para rutas sin módulo propio devuelve algo neutro: nunca una ruta cruda, que
+ *  no le dice nada a nadie. */
+export function nombreDeRuta(pathname: string): string {
+  const p = pathname.startsWith('/api/') ? pathname.slice(4) : pathname;
+  const propio = NOMBRE_RUTA.find((r) => p === r.prefijo || p.startsWith(r.prefijo + '/'));
+  if (propio) return propio.nombre;
+  const mods = modulosDeRuta(pathname);
+  // Varias rutas de Compras las abren dos módulos; el nombre es el mismo.
+  const nombres = Array.from(new Set(mods.map((m) => NOMBRE_MODULO[m])));
+  return nombres.length === 1 ? nombres[0] : 'esa pantalla';
+}
+
 /** ¿El módulo está publicado? (respeta los interruptores de arriba). */
 export function moduloPublicado(m: Modulo): boolean {
   return MODULOS_TODOS.includes(m);

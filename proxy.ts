@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './lib/auth';
-import { getRouteLevel, getRouteModule, moduloPublicado, puedeAbrirRuta } from './lib/permissions';
+import {
+  getRouteLevel, getRouteModule, moduloPublicado, nombreDeRuta, puedeAbrirRuta, rutaDeEntrada,
+} from './lib/permissions';
 
 // Ya no hay lista de "estas sí van por módulo": desde el 2026-10-01 van TODAS
 // (ver `puedeAbrirRuta` en lib/permissions.ts). Lo que sí sigue valiendo del
@@ -115,8 +117,23 @@ export function proxy(request: NextRequest) {
   // La regla vive en `puedeAbrirRuta` (lib/permissions.ts) y la comparte con la
   // pantalla de entrada, para que no se puedan desincronizar.
   if (!puedeAbrirRuta(pathname, session.modules, session.nivelAdmin, requiredLevel)) {
+    // Se rebota DIRECTO a la pantalla de entrada de esa persona, con el motivo
+    // pegado. Dos razones:
+    //
+    //  1. Sin motivo, quien escribe una ruta que no le toca aterriza en otra
+    //     pantalla sin explicación: se ve como un link roto, no como un permiso
+    //     que falta. Va el nombre del módulo, no la ruta cruda.
+    //  2. Pasando por "/" el motivo se perdía. La raíz no es pantalla: redirige
+    //     con `redirect()` desde un Server Component, y ese salto —que Next
+    //     resuelve del lado del cliente— se comía el parámetro. Saltándose el
+    //     rodeo llega entero, y de paso es una ida y vuelta menos.
+    //
+    // Si no tiene NINGUNA pantalla, va a "/" igual que siempre: esa es la que
+    // sabe decirle que su rol no habilita nada.
+    const entrada = rutaDeEntrada(session.modules, session.nivelAdmin) ?? '/';
+    const destino = `${entrada}?sinacceso=${encodeURIComponent(nombreDeRuta(pathname))}`;
     return rechazar(request, pathname, {
-      status: 403, error: 'No autorizado', destino: '/?error=forbidden',
+      status: 403, error: 'No autorizado', destino,
     });
   }
 
