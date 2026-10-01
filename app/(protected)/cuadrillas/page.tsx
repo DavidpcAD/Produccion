@@ -859,7 +859,11 @@ export default function CuadrillasPage() {
                   <Icon name="folder" size="sm" color="currentColor" className="inline mr-1 text-ds-gray-300" />
                   {c.Proyecto || 'Sin proyecto'}
                 </p>
-                <p className="text-xs text-ds-gray-300 mb-1 break-words">Enc: {c.Encargado || '—'}</p>
+                {/* gray-400, no gray-300: el nombre del encargado es DATO de la tarjeta, igual
+                    que el renglón de obras de abajo. En gray-300 (el gris de bordes y
+                    deshabilitados) quedaba en 3,17 de contraste en oscuro y 2,4 en claro —
+                    por debajo del mínimo para 12 px. */}
+                <p className="text-xs text-ds-gray-400 mb-1 break-words">Enc: {c.Encargado || '—'}</p>
                 {/* Cuántas obras, no cuáles. La lista entera —Eléctricos llega a 40
                     códigos— estiraba la tarjeta cinco veces más que sus vecinas y
                     reventaba la fila del grid; y cortarla con «…» no sirve, porque los
@@ -881,7 +885,7 @@ export default function CuadrillasPage() {
                   </div>
                 </div>
                 <div className="flex items-center mt-3 pt-2">
-                  <span className="ml-auto text-xs font-semibold text-ds-gray-300 group-hover:text-ds-ink transition-colors">Ver →</span>
+                  <span className="ml-auto text-xs font-semibold text-ds-gray-400 group-hover:text-ds-ink transition-colors">Ver →</span>
                 </div>
               </motion.div>
             );

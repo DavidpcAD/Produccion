@@ -424,7 +424,7 @@ function PlantillaEditor({ plantilla, wbs, items, usuario, itemsCargando, itemsE
         <Button onClick={guardar} disabled={guardando || !nombre.trim() || (tipo === "general" && !idClas)}>{guardando ? "Guardando…" : "Guardar plantilla"}</Button>
       </>}>
       {recuperado && (
-        <div className="row row--between wrap gap-2" style={{ alignItems: "center", padding: "10px 14px", marginBottom: 12, borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-color-white))" }}>
+        <div className="row row--between wrap gap-2" style={{ alignItems: "center", padding: "10px 14px", marginBottom: 12, borderRadius: 12, background: "color-mix(in srgb, var(--ds-color-green-100) 16%, var(--ds-tint-base))" }}>
           <span className="ds-body-sm">Recuperamos lo que estabas armando{borrador?.lineas?.length ? ` (${borrador.lineas.length} línea(s))` : ""}. Se guarda solo mientras editás.</span>
           <Button variant="ghost" onClick={() => {
             borrarBorrador(clave);
