@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { puedeAbrirRuta, getRouteLevel } from '@/lib/permissions';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -61,6 +62,29 @@ export async function GET(req: NextRequest) {
   // teléfono de toda la empresa a cualquiera que abra Cuadrillas. El modo
   // básico se salta los dos joins y la subconsulta.
   const soloBasico = searchParams.get('campos') === 'basico';
+
+  // El padrón COMPLETO (cédula, correo, teléfono, fecha de ingreso, usuario,
+  // roles y apps de los 342 colaboradores) es de quien administra gente, no de
+  // cualquiera con sesión. Esta ruta está en el catálogo compartido —la abre
+  // todo el mundo— porque Cuadrillas y Proyectos necesitan los NOMBRES para
+  // sus selectores, y para eso está `campos=basico`.
+  //
+  // Hasta hoy bastaba con `nivelAdmin >= 1`, así que un usuario de Ingeniería
+  // se bajaba el correo y el teléfono de toda la empresa abriendo Cuadrillas.
+  // Dentro de esta app ya nadie pide la forma completa (el alta/edición de
+  // gente vive en rh.adelante.cr); se deja para quien abra `/usuarios`.
+  //
+  // La decisión se delega en `puedeAbrirRuta`, la MISMA regla del proxy: con
+  // rol de Producción mandan los módulos y el nivel no se mira. Mirarlo sería
+  // inútil: `MODULE_LEVEL` le da 4 —el máximo— a ingenieria y a presupuesto,
+  // así que casi todo el que tiene rol es nivel 4. El nivel solo sigue
+  // decidiendo para los usuarios legacy, que no tienen módulos.
+  if (!soloBasico && !puedeAbrirRuta('/usuarios', session.modules, session.nivelAdmin, getRouteLevel('/usuarios'))) {
+    return NextResponse.json(
+      { error: 'Para eso necesitás administración de personas. Pedí la lista con ?campos=basico.' },
+      { status: 403 },
+    );
+  }
 
   const selectBasico = `
       SELECT c.idColaborador AS IDCol, c.cedula AS Cedula,

@@ -402,7 +402,7 @@ export default function CuadrillasPage() {
       fetch('/api/usuarios?activo=1&porPagina=5000&campos=basico').then(r => r.json()),
       fetch('/api/partidas').then(r => r.json()),
       fetch('/api/encargados-partida').then(r => r.json()).catch(() => ({})),
-      fetch('/api/usuarios?activo=1&soloUsuarios=1&porPagina=500').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/usuarios?activo=1&soloUsuarios=1&porPagina=500&campos=basico').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/proyectos').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/tipos-obra').then(r => r.json()).catch(() => ({ tipos: [] })),
     ]).then(([c, o, u, pt, en, usu, pr, ti]) => {
