@@ -281,7 +281,7 @@ export function rolLabelDeUsuario(
 /** APIs de CATÁLOGO que lee más de un módulo y que por eso NO se pueden atar a
  *  uno solo: Cuadrillas (ingeniería) lee obras y usuarios, Partidas lee sprints,
  *  Compras lee obras… Atarlas rompería pantallas ajenas — es la trampa que avisa
- *  el comentario de `POR_MODULO` en proxy.ts. Siguen gateadas por NIVEL, igual
+ *  el comentario que estaba en proxy.ts. Siguen gateadas por NIVEL, igual
  *  que hoy; lo que se cierra con el módulo son las pantallas y las APIs propias
  *  de cada módulo. Son todas de solo lectura. */
 const API_CATALOGO_COMPARTIDO = [
@@ -410,19 +410,43 @@ function puedeEntrar(item: { href: string; minLevel: number }, modules: string[]
     ? modulosDeRuta(href).some((m) => modules.includes(m))
     : nivelAdmin >= minLevel;
   if (!enElMenu) return false;
-  // 2) ¿La deja pasar el proxy? Órdenes de Compra va por módulo cuando el token los
-  //    trae (un bodeguero de nivel 1 entra) y por nivel cuando no; el resto, por nivel.
-  //    Sin esto la entrada podía caer en una ruta que el proxy rebota de vuelta a "/".
-  if (href.startsWith('/compras')) {
-    return modules ? rutaPermitida(href, modules) : nivelAdmin >= getRouteLevel(href);
-  }
-  return nivelAdmin >= getRouteLevel(href);
+  // 2) ¿La deja pasar el proxy? La MISMA función que usa el proxy, no una copia:
+  //    sin esto la entrada puede caer en una ruta que el proxy rebota de vuelta a
+  //    "/" (bucle) o descartar una que sí pasa (y entonces le dice a la persona
+  //    que no tiene pantallas cuando sí las tiene).
+  return puedeAbrirRuta(href, modules, nivelAdmin, getRouteLevel(href));
 }
 
 /** A dónde entra esta persona al abrir la app. `null` = su rol no habilita ninguna
  *  pantalla (hay que decírselo, no mandarla a dar vueltas). */
 export function rutaDeEntrada(modules: string[] | undefined, nivelAdmin: number): string | null {
   return RUTAS_DE_ENTRADA.find((r) => puedeEntrar(r, modules, nivelAdmin))?.href ?? null;
+}
+
+/** LA REGLA DE ACCESO, en un solo lugar.
+ *
+ *  La usan el proxy (proxy.ts) y la pantalla de entrada (`puedeEntrar`). Antes
+ *  cada uno la escribía por su lado "para no confiar en el otro", y el 2026-10-01
+ *  se pagó: al pasar el proxy a mandar por módulo, la entrada se quedó con la
+ *  regla vieja y Contabilidad —que SÍ puede abrir Desembolsos— entraba al app y
+ *  le salía "tu rol todavía no tiene pantallas asignadas". Una sola función no se
+ *  puede desincronizar.
+ *
+ *    · sin rol de Producción (`modules` ausente) → manda el NIVEL, como siempre;
+ *    · ruta CLASIFICADA (tiene módulo propio)    → manda el MÓDULO, abre y cierra;
+ *    · ruta sin clasificar (cae en 'dashboard')  → manda el nivel, para que una
+ *      ruta nueva que nadie clasifique no nazca abierta.
+ */
+export function puedeAbrirRuta(
+  pathname: string,
+  modules: string[] | undefined,
+  nivelAdmin: number,
+  nivelRequerido: number,
+): boolean {
+  if (!modules) return nivelAdmin >= nivelRequerido;
+  const mods = modulosDeRuta(pathname);
+  const estaClasificada = !(mods.length === 1 && mods[0] === 'dashboard');
+  return estaClasificada ? rutaPermitida(pathname, modules) : nivelAdmin >= nivelRequerido;
 }
 
 /** ¿Los módulos de un usuario abren esta ruta? `modules` undefined = sin rol de

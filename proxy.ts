@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from './lib/auth';
-import { getRouteLevel, getRouteModule, moduloPublicado, modulosDeRuta, rutaPermitida } from './lib/permissions';
+import { getRouteLevel, getRouteModule, moduloPublicado, puedeAbrirRuta } from './lib/permissions';
 
-/** Prefijos cuyo acceso va por MÓDULO del rol de Producción y no por nivel.
- *
- *  Ojo con agregar acá: solo sirve para módulos CERRADOS, o sea cuyas pantallas
- *  llaman únicamente a APIs del mismo módulo. Presupuesto, Obras o Cuadrillas no
- *  lo son —las pantallas de Compras leen /api/obras, por ejemplo—, así que
- *  gatearlos por módulo rompería pantallas ajenas. Para esos casos el permiso se
- *  verifica en la ruta (ver lib/compras/guard.ts y lib/concreto/guard.ts). */
-const POR_MODULO = ['/compras', '/api/compras', '/concreto', '/api/concreto'];
+// Ya no hay lista de "estas sí van por módulo": desde el 2026-10-01 van TODAS
+// (ver `puedeAbrirRuta` en lib/permissions.ts). Lo que sí sigue valiendo del
+// comentario que había acá: hay APIs de CATÁLOGO que leen pantallas de varios
+// módulos —Compras lee /api/obras, Partidas lee los sprints—, y atarlas a un
+// módulo rompe pantallas ajenas. Esas están exceptuadas por nombre en
+// `API_CATALOGO_COMPARTIDO`, en lib/permissions.ts.
 
 const SESION_VENCIDA = 'Tu sesión terminó. Entrá de nuevo.';
 
@@ -114,22 +112,9 @@ export function proxy(request: NextRequest) {
   //     Es el fallback de seguridad de siempre: nadie se queda sin app de golpe,
   //     y un token emitido antes de este cambio sigue funcionando hasta que su
   //     dueño vuelva a entrar.
-  const pasaNivel = session.nivelAdmin >= requiredLevel;
-  // `null` = esta persona NO tiene rol de Producción.
-  const pasaModulo = session.modules ? rutaPermitida(pathname, session.modules) : null;
-  // ¿La ruta pertenece a un módulo de verdad, o cayó en el 'dashboard' de los que
-  // no están clasificados? La distinción importa: en una ruta clasificada el
-  // módulo MANDA —abre y cierra—, pero en una sin clasificar manda el nivel, como
-  // siempre. Si no, una ruta nueva que nadie clasifique nacería abierta a todo el
-  // que tenga rol de Producción, que es justo el descuido que esto viene a cerrar.
-  const mods = modulosDeRuta(pathname);
-  const estaClasificada = !(mods.length === 1 && mods[0] === 'dashboard');
-
-  const permitido =
-    pasaModulo === null ? pasaNivel        // sin rol de Producción: el nivel, igual que siempre
-    : estaClasificada ? pasaModulo         // con módulo: el módulo manda
-    : pasaNivel;                           // sin clasificar: el nivel
-  if (!permitido) {
+  // La regla vive en `puedeAbrirRuta` (lib/permissions.ts) y la comparte con la
+  // pantalla de entrada, para que no se puedan desincronizar.
+  if (!puedeAbrirRuta(pathname, session.modules, session.nivelAdmin, requiredLevel)) {
     return rechazar(request, pathname, {
       status: 403, error: 'No autorizado', destino: '/?error=forbidden',
     });
