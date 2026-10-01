@@ -501,6 +501,29 @@ export function puedeAbrirRuta(
   return estaClasificada ? rutaPermitida(pathname, modules) : nivelAdmin >= nivelRequerido;
 }
 
+/** ¿Esta entrada del menú se le muestra a esta persona?
+ *
+ *  La usa el Sidebar (padres y submenús) y la usa `scripts/verificar-acceso.mjs`
+ *  para comprobar que lo que el menú MUESTRA el proxy lo DEJA ABRIR. Estaba
+ *  escrita a mano dentro del JSX del Sidebar; si vuelve a escribirse ahí, el
+ *  verificador deja de verla y la desincronización pasa sin que nadie se entere
+ *  —que es justo como se rompió la entrada de Contabilidad el 2026-10-01.
+ *
+ *  Ojo con `minLevel`: solo decide para quien NO tiene rol de Producción. Con
+ *  módulos mandan los módulos, igual que en `puedeAbrirRuta`. */
+export function visibleEnMenu(
+  href: string,
+  modules: string[] | undefined,
+  nivelAdmin: number,
+  minLevel?: number,
+): boolean {
+  // Módulo apagado (Avance de obra, ver AVANCE_OBRA_ACTIVO): fuera del menú para
+  // todos, con rol de Producción o sin él.
+  if (!moduloPublicado(getRouteModule(href))) return false;
+  if (modules) return rutaPermitida(href, modules);
+  return !minLevel || nivelAdmin >= minLevel;
+}
+
 /** ¿Los módulos de un usuario abren esta ruta? `modules` undefined = sin rol de
  *  Producción (quien llama decide el fallback, normalmente el nivel). */
 export function rutaPermitida(pathname: string, modules: string[] | undefined): boolean {
