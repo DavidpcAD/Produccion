@@ -431,12 +431,21 @@ function FilaCaso({ caso, modo, onClick }: { caso: DashboardCaso; modo: Modo; on
   const esReservado = caso.EsReservado === 1;
   const labelEstado =
     caso.IDEstado === 1 ? 'Entregado' : caso.IDEstado === 2 ? 'Formalizado' : caso.IDEstado === 4 ? 'Reservado' : `Estado ${caso.IDEstado}`;
-  const colorEstado =
+  // Los tres distintivos iban con hex a mano, fuera del DS. El de formalizado
+  // —verde #88a024 sobre #eef5d6— daba 2.63:1, que no se lee en NINGUN tema
+  // (los hex no cambian con el tema, asi que fallaba igual en claro y en oscuro).
+  // Con los tokens del DS pasan los dos: green-soft/green-ink y el gris siguen al
+  // tema, y el verde de ambos ya quedo ajustado para oscuro en globals.css.
+  // Los dos grises se diferencian por el FONDO, no por el texto: con gray-400
+  // encima de gray-100 el de reservado daba 3.58:1. Los dos llevan gray-500 y
+  // entregado va sobre un gris mas marcado. Medido: 4.75 y 5.40 en claro, 5.8 y
+  // 7.3 en oscuro.
+  const claseEstado =
     caso.IDEstado === 1
-      ? { bg: '#e4e4e7', color: '#52525b' }
+      ? 'bg-ds-gray-200 text-ds-gray-500'
       : caso.IDEstado === 4
-        ? { bg: '#f4f4f5', color: '#71717a' }
-        : { bg: '#eef5d6', color: '#88a024' };
+        ? 'bg-ds-gray-100 text-ds-gray-500'
+        : 'bg-ds-green-soft text-ds-green-ink';
   const pendiente = modo === 'NETO_AD' ? Number(caso.PendienteAD_CRC ?? 0) : caso.Pendiente_CRC;
   const proximoMonto = modo === 'NETO_AD' ? Number(caso.ProximoMontoAD_CRC ?? 0) : Number(caso.ProximoMonto_CRC ?? 0);
 
@@ -455,10 +464,7 @@ function FilaCaso({ caso, modo, onClick }: { caso: DashboardCaso; modo: Modo; on
         </div>
       </td>
       <td className="px-4 py-3">
-        <span
-          className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-          style={{ backgroundColor: colorEstado.bg, color: colorEstado.color }}
-        >
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${claseEstado}`}>
           {labelEstado}
         </span>
       </td>
