@@ -2823,19 +2823,22 @@
   .oc-scope .oc-buscar__ic { left: 15px; }
 }
 
-/* ---- La solicitud de origen, arriba en el Resumen de la orden ----
+/* ---- La solicitud de origen: la fila del Resumen y la ficha de su panel ----
    Misma tarjeta que la del proveedor (clases propias para no atarla a ese bloque).
-   Sin pedido en memoria la fila es un <div>: se ve igual, pero no invita a clickear. */
+   En el Resumen es un <button> que abre el panel al lado; dentro del panel es un
+   <div> —ya estás ahí—, y por eso lo que invita a tocar cuelga de `button`. */
 .oc-scope .oc-det__sol {
-  display: flex; align-items: center; gap: var(--ds-space-3); padding: var(--ds-space-3);
+  display: flex; width: 100%; align-items: center; gap: var(--ds-space-3); padding: var(--ds-space-3);
   border: 1.5px solid var(--ds-color-gray-100); border-radius: var(--ds-radius-md);
-  font: inherit; color: inherit; text-decoration: none;
+  background: none; font: inherit; color: inherit; text-align: left; text-decoration: none;
   transition: border-color .12s ease, background-color .12s ease;
 }
-.oc-scope a.oc-det__sol { cursor: pointer; }
-.oc-scope a.oc-det__sol:hover { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 7%, var(--ds-tint-base)); }
-.oc-scope a.oc-det__sol:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 2px; }
-.oc-scope .oc-det__sol-num { font-size: var(--ds-font-size-body-md); font-weight: var(--ds-font-weight-semibold); line-height: 1.3; }
+.oc-scope button.oc-det__sol { cursor: pointer; }
+.oc-scope button.oc-det__sol:hover { border-color: var(--ds-color-green-200); background: color-mix(in srgb, var(--ds-color-green-100) 7%, var(--ds-tint-base)); }
+.oc-scope button.oc-det__sol:focus-visible { outline: 2px solid var(--ds-color-green-200); outline-offset: 2px; }
+.oc-scope .oc-det__sol-num { font-size: var(--ds-font-size-body-md); font-weight: var(--ds-font-weight-semibold); line-height: 1.3; white-space: nowrap; }
 .oc-scope .oc-det__sol-quien { font-size: var(--ds-font-size-body-sm); line-height: 1.4; }
 .oc-scope .oc-det__sol-ir { flex-shrink: 0; align-self: center; display: inline-grid; color: var(--ds-color-gray-300); transition: color .12s ease; }
-.oc-scope a.oc-det__sol:hover .oc-det__sol-ir { color: var(--ds-color-green-200); }
+.oc-scope button.oc-det__sol:hover .oc-det__sol-ir { color: var(--ds-color-green-200); }
+/* Tipo y estado de la solicitud, debajo del nombre en la ficha del panel. */
+.oc-scope .oc-det__sol-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

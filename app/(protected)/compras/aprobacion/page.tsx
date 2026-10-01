@@ -7,6 +7,7 @@ import { Button, Modal, Select, Textarea, useToast } from "@/components/compras/
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
 import { AprobarControl } from "@/components/compras/aprobar-control";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
+import { PedidoPanel } from "@/components/compras/pedido-panel";
 import { OrdenFila } from "@/components/compras/orden-fila";
 import { IconChevronDown } from "@/components/compras/icons";
 import { Icon } from "@/components/ds/Icon/Icon";
@@ -125,6 +126,9 @@ export default function AprobacionPage() {
   // columna con el proveedor: es el panel de consulta, el riel sigue siendo lo que se
   // está por aprobar.
   const [ordenCentral, setOrdenCentral] = useState<string | null>(() => sp.get("det"));
+  // Solicitud de origen abierta (su PED-…), en la MISMA columna que el proveedor: las
+  // tres cosas que se consultan antes de aprobar se leen sin soltar la orden.
+  const [pedAbierto, setPedAbierto] = useState<string | null>(() => sp.get("ped"));
   const [confirmLote, setConfirmLote] = useState(false);
   const [confirmOrden, setConfirmOrden] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{ ok: number; fallos: string[] } | null>(null);
@@ -163,11 +167,12 @@ export default function AprobacionPage() {
     if (vista !== "pendientes") p.set("vista", vista);
     if (abiertaId) p.set("orden", abiertaId);
     if (provAbierto) p.set("prov", provAbierto);
+    if (pedAbierto) p.set("ped", pedAbierto);
     if (ordenCentral) p.set("det", ordenCentral);
     if (sel.size) p.set("sel", [...sel].join(","));
     const q = p.toString();
     window.history.replaceState(null, "", q ? `?${q}` : window.location.pathname);
-  }, [vista, abiertaId, provAbierto, ordenCentral, sel]);
+  }, [vista, abiertaId, provAbierto, pedAbierto, ordenCentral, sel]);
 
   const meta = VISTA[vista];
   // Aprobar y rechazar solo aplican a las pendientes (las tres vistas de la cola). En
@@ -313,7 +318,7 @@ export default function AprobacionPage() {
 
   return (
     <AppShell role="aprobacion">
-      <div className={`oc-bandeja${provAbierto || ordenCentral ? " tiene-central" : ""}`}>
+      <div className={`oc-bandeja${provAbierto || pedAbierto || ordenCentral ? " tiene-central" : ""}`}>
         <main className="oc-bandeja__lista">
           <header className="oc-bandeja__head">
             <h1 className="ds-heading">Aprobación de órdenes de compra</h1>
@@ -443,7 +448,7 @@ export default function AprobacionPage() {
           )}
         </main>
 
-        {(provAbierto || ordenCentral) && (
+        {(provAbierto || pedAbierto || ordenCentral) && (
           <aside className="oc-riel oc-riel--central is-abierto">
             {provAbierto ? (
               <ProveedorPanel
@@ -454,6 +459,15 @@ export default function AprobacionPage() {
                 onCerrar={() => setProvAbierto(null)}
                 onAbrirOrden={(id) => { setOrdenCentral(null); setAbiertaId(id); setRielModo("orden"); }}
               />
+            ) : pedAbierto ? (
+              <PedidoPanel
+                key={pedAbierto}
+                numero={pedAbierto}
+                ordenActualId={abierta?.id}
+                onVolver={() => setPedAbierto(null)}
+                onCerrar={() => setPedAbierto(null)}
+                onAbrirOrden={(id) => { setPedAbierto(null); setOrdenCentral(null); setAbiertaId(id); setRielModo("orden"); }}
+              />
             ) : central ? (
               // De consulta: los botones del lote viven en el riel, al lado.
               <AprobacionDetalle
@@ -462,6 +476,7 @@ export default function AprobacionPage() {
                 tabInicial="lineas"
                 onCerrar={() => setOrdenCentral(null)}
                 onVerProveedor={(c) => { setOrdenCentral(null); setProvAbierto(c); }}
+                onVerPedido={(n) => { setOrdenCentral(null); setPedAbierto(n); }}
               />
             ) : null}
           </aside>
@@ -603,7 +618,8 @@ export default function AprobacionPage() {
               aprobando={lote || aprobandoId === abierta.id}
               onCerrar={() => setAbiertaId(null)}
               onAprobar={() => pedirAprobarOrden(abierta)}
-              onVerProveedor={(c) => setProvAbierto(c)}
+              onVerProveedor={(c) => { setPedAbierto(null); setProvAbierto(c); }}
+              onVerPedido={(n) => { setProvAbierto(null); setPedAbierto(n); }}
               onRechazar={() => {
                 setMotivo("");
                 setRechObj({
@@ -625,7 +641,7 @@ export default function AprobacionPage() {
           )}
         </aside>
 
-        {(abierta || provAbierto || ordenCentral || verLote) && <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setOrdenCentral(null); setAbiertaId(null); setRielModo("orden"); }} aria-hidden />}
+        {(abierta || provAbierto || pedAbierto || ordenCentral || verLote) && <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setPedAbierto(null); setOrdenCentral(null); setAbiertaId(null); setRielModo("orden"); }} aria-hidden />}
       </div>
 
       {/* Un solo diálogo para las dos: aprobar una orden y aprobar el lote son la

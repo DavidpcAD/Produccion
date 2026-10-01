@@ -6,6 +6,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Select } from "@/components/compras/ui";
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
+import { PedidoPanel } from "@/components/compras/pedido-panel";
 import { OrdenFila } from "@/components/compras/orden-fila";
 import { OrdenesLista } from "@/components/compras/ordenes-lista";
 import { Icon } from "@/components/ds/Icon/Icon";
@@ -47,6 +48,9 @@ export default function AprobacionTodasPage() {
   const [orden, setOrden] = useState<Orden_>("recientes");
   const [abiertaId, setAbiertaId] = useState<string | null>(() => sp.get("orden"));
   const [provAbierto, setProvAbierto] = useState<string | null>(() => sp.get("prov"));
+  // La solicitud de origen comparte columna con el proveedor: las dos consultas se
+  // leen al lado de la orden, sin salir de la lista.
+  const [pedAbierto, setPedAbierto] = useState<string | null>(() => sp.get("ped"));
   // La tabla vieja sigue disponible: es la única con columnas, vistas y exportar.
   const [comoTabla, setComoTabla] = useState(false);
 
@@ -55,9 +59,10 @@ export default function AprobacionTodasPage() {
     if (vista !== "todas") p.set("vista", vista);
     if (abiertaId) p.set("orden", abiertaId);
     if (provAbierto) p.set("prov", provAbierto);
+    if (pedAbierto) p.set("ped", pedAbierto);
     const q = p.toString();
     window.history.replaceState(null, "", q ? `?${q}` : window.location.pathname);
-  }, [vista, abiertaId, provAbierto]);
+  }, [vista, abiertaId, provAbierto, pedAbierto]);
 
   // Las que pasaron por aprobación: las que siguen en proveeduría no son de acá.
   const base = useMemo(() => ordenes.filter((o) => o.estado !== "abierto"), [ordenes]);
@@ -88,7 +93,7 @@ export default function AprobacionTodasPage() {
 
   return (
     <AppShell role="aprobacion">
-      <div className={`oc-bandeja${provAbierto ? " tiene-central" : ""}`}>
+      <div className={`oc-bandeja${provAbierto || pedAbierto ? " tiene-central" : ""}`}>
         <main className="oc-bandeja__lista">
           <header className="oc-bandeja__head">
             <h1 className="ds-heading">Todas las órdenes</h1>
@@ -191,16 +196,27 @@ export default function AprobacionTodasPage() {
           )}
         </main>
 
-        {provAbierto && (
+        {(provAbierto || pedAbierto) && (
           <aside className="oc-riel oc-riel--central is-abierto">
-            <ProveedorPanel
-              key={provAbierto}
-              codigo={provAbierto}
-              ordenActualId={abierta?.id}
-              onVolver={() => setProvAbierto(null)}
-              onCerrar={() => setProvAbierto(null)}
-              onAbrirOrden={(id) => setAbiertaId(id)}
-            />
+            {provAbierto ? (
+              <ProveedorPanel
+                key={provAbierto}
+                codigo={provAbierto}
+                ordenActualId={abierta?.id}
+                onVolver={() => setProvAbierto(null)}
+                onCerrar={() => setProvAbierto(null)}
+                onAbrirOrden={(id) => setAbiertaId(id)}
+              />
+            ) : (
+              <PedidoPanel
+                key={pedAbierto!}
+                numero={pedAbierto!}
+                ordenActualId={abierta?.id}
+                onVolver={() => setPedAbierto(null)}
+                onCerrar={() => setPedAbierto(null)}
+                onAbrirOrden={(id) => { setPedAbierto(null); setAbiertaId(id); }}
+              />
+            )}
           </aside>
         )}
 
@@ -210,7 +226,8 @@ export default function AprobacionTodasPage() {
               key={abierta.id}
               orden={abierta}
               onCerrar={() => setAbiertaId(null)}
-              onVerProveedor={(c) => setProvAbierto(c)}
+              onVerProveedor={(c) => { setPedAbierto(null); setProvAbierto(c); }}
+              onVerPedido={(n) => { setProvAbierto(null); setPedAbierto(n); }}
             />
           ) : (
             <div className="oc-riel__vacio">
@@ -222,8 +239,8 @@ export default function AprobacionTodasPage() {
           )}
         </aside>
 
-        {(abierta || provAbierto) && (
-          <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setAbiertaId(null); }} aria-hidden />
+        {(abierta || provAbierto || pedAbierto) && (
+          <div className="oc-riel__velo" onClick={() => { setProvAbierto(null); setPedAbierto(null); setAbiertaId(null); }} aria-hidden />
         )}
       </div>
     </AppShell>

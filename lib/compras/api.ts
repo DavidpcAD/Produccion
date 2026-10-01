@@ -51,10 +51,19 @@ export interface SincronizacionBc {
 let etagBootstrap: string | null = null;
 
 export const api = {
-  /** `null` = el servidor contestó 304: no cambió nada desde la última vez. */
-  bootstrap: async (): Promise<Bootstrap | null> => {
+  /** `null` = el servidor contestó 304: no cambió nada desde la última vez.
+   *
+   *  `condicional: false` pide el cuerpo ENTERO aunque haya huella. Lo usa quien
+   *  todavía no tiene los datos: la huella vive en el módulo y sobrevive a que el
+   *  store se desmonte (salir de Compras y volver), así que un store recién
+   *  montado preguntaba "¿cambió algo?" con las listas VACÍAS, el servidor le
+   *  contestaba 304 y se quedaba sin pedidos para siempre — en Aprobación la cola
+   *  pintaba las órdenes igual, y lo único que se notaba era que la solicitud de
+   *  origen decía "no está disponible". */
+  bootstrap: async (opts?: { condicional?: boolean }): Promise<Bootstrap | null> => {
+    const huella = opts?.condicional === false ? null : etagBootstrap;
     const res = await fetch("/api/compras/bootstrap", {
-      headers: etagBootstrap ? { "If-None-Match": etagBootstrap } : undefined,
+      headers: huella ? { "If-None-Match": huella } : undefined,
       cache: "no-store",
     });
     if (res.status === 304) return null;

@@ -22,7 +22,7 @@ type Tab = "resumen" | "lineas" | "obra" | "historial";
 // lee acá mismo y la lista sigue a la vista. El detalle COMPLETO (facturas, imprimir,
 // abrir en BC) sigue viviendo en su propia pantalla, enlazada abajo.
 export function AprobacionDetalle({
-  orden, aprobando = false, tabInicial = "resumen", onCerrar, onAprobar, onRechazar, onVerProveedor,
+  orden, aprobando = false, tabInicial = "resumen", onCerrar, onAprobar, onRechazar, onVerProveedor, onVerPedido,
 }: {
   orden: Orden;
   aprobando?: boolean;
@@ -36,6 +36,9 @@ export function AprobacionDetalle({
   onRechazar?: () => void;
   /** Abre el panel del proveedor (al lado del riel), con su historial de compras. */
   onVerProveedor: (codigo: string) => void;
+  /** Abre el panel de UNA solicitud de origen (PED-…), en la misma columna que el
+   *  del proveedor. Con varias solicitudes, la que se tocó. */
+  onVerPedido: (numero: string) => void;
 }) {
   const { proveedores, pedidos, movimientos, bcEstados, cargandoExtra, cargarMovimientos } = useStore();
   const [tab, setTab] = useState<Tab>(tabInicial);
@@ -164,7 +167,10 @@ export function AprobacionDetalle({
                 solicitud ni ver quién pidió el material sin salirse de la bandeja. */}
             {ordenEsDirecta(orden)
               ? <Dato icon="boleta" rotulo="Solicitud de origen" valor="Compra directa · sin solicitud" />
-              : peds.map((n) => <SolicitudOrigen key={n} numero={n} pedido={pedidos.find((x) => x.numero === n)} cargando={cargandoExtra} />)}
+              : peds.map((n) => (
+                <SolicitudOrigen key={n} numero={n} pedido={pedidos.find((x) => x.numero === n)}
+                  cargando={cargandoExtra} onVer={() => onVerPedido(n)} />
+              ))}
 
             <div className="oc-det__datos">
               <Dato icon="reloj" rotulo="Fecha" valor={formatDate(orden.fecha)} />
@@ -354,12 +360,14 @@ function lineaPedido(l: { pedidoNumero?: string }): string | null {
 }
 
 // La solicitud de la que salió la orden, en el Resumen: el número, quién pidió el
-// material y la fecha, y abre el pedido completo. Mientras el bootstrap no haya traído
-// los pedidos no hay id al que ir, así que la fila se muestra igual pero sin link: un
-// link a una solicitud que todavía no está en memoria cae en "Solicitud no encontrada".
-function SolicitudOrigen({ numero, pedido, cargando }: { numero: string; pedido?: Pedido; cargando: boolean }) {
-  const cuerpo = (
-    <>
+// material y la fecha. Abre el panel de la solicitud AL LADO, no una pantalla nueva:
+// quien aprueba la lee y sigue con la orden abierta, igual que con el proveedor.
+function SolicitudOrigen({ numero, pedido, cargando, onVer }: {
+  numero: string; pedido?: Pedido; cargando: boolean; onVer: () => void;
+}) {
+  return (
+    <button type="button" className="oc-det__sol" onClick={onVer}
+      title={`Ver la solicitud ${numero}: qué se pidió, para qué obra y quién la pidió`}>
       <span className="oc-det__ic"><Icon name="boleta" size="md" color="currentColor" /></span>
       <span className="oc-det__dato-txt">
         <span className="oc-det__rot">Solicitud de origen</span>
@@ -367,24 +375,15 @@ function SolicitudOrigen({ numero, pedido, cargando }: { numero: string; pedido?
         <span className="oc-det__sol-quien ds-wrap">
           {pedido
             ? [pedido.solicitante && `La pidió ${pedido.solicitante}`, formatDate(pedido.fecha)].filter(Boolean).join(" · ")
-            : cargando ? "Cargando la solicitud…" : "La solicitud no está disponible."}
+            : cargando ? "Cargando la solicitud…" : "Tocá para ver la solicitud"}
         </span>
       </span>
-      {pedido && (
-        <span className="oc-det__sol-ir" aria-hidden>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 6l6 6-6 6" />
-          </svg>
-        </span>
-      )}
-    </>
-  );
-  if (!pedido) return <div className="oc-det__sol">{cuerpo}</div>;
-  return (
-    <Link href={`/compras/solicitud/${pedido.id}`} className="oc-det__sol"
-      title={`Abrir la solicitud ${numero}: qué se pidió, para qué obra y quién la pidió`}>
-      {cuerpo}
-    </Link>
+      <span className="oc-det__sol-ir" aria-hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </span>
+    </button>
   );
 }
 

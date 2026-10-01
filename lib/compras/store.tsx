@@ -11,7 +11,7 @@ import * as seed from "./seed";
 import { nextNumero, nowISO, numeroOrden, ordenEstaCompleta, PERSONA_POR_ROL, todayISO, trabajaConOrdenes } from "./helpers";
 import { useSession } from "@/hooks/useSession";
 import { api, USE_API as USE_API_BUILD } from "./api";
-import type { EstadoBcOrden, SincronizacionBc } from "./api";
+import type { Bootstrap, EstadoBcOrden, SincronizacionBc } from "./api";
 
 export interface NewPedidoInput {
   tipoSolicitud: TipoSolicitud;
@@ -237,19 +237,30 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   // bajada seis veces seguidas.
   const ultimaCarga = useRef(0);
   const enVuelo = useRef<Promise<void> | null>(null);
+  // ¿ESTE store ya recibió el bootstrap completo? La huella del 304 vive en el
+  // módulo (lib/compras/api.ts) y sobrevive a que el store se desmonte —salir de
+  // Compras y volver—, así que sin esto un store recién montado preguntaba "¿cambió
+  // algo?" con las listas vacías, le contestaban 304 y se quedaba sin pedidos.
+  const tieneTodo = useRef(false);
+
+  /** Guarda lo que trajo el bootstrap completo. Con `null` (304) no toca nada. */
+  function guardarTodo(b: Bootstrap | null): void {
+    if (!b) return;
+    tieneTodo.current = true;
+    setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+  }
 
   /** Trae la data SIEMPRE. Es lo que usan las acciones (crear, aprobar, recibir…):
    *  tienen que ver lo que acaban de escribir, así que no pueden colgarse de una
    *  petición que ya venía en camino desde antes del cambio. */
   async function cargarDesdeApi(): Promise<void> {
-    const p = api.bootstrap().then((b) => {
+    const p = api.bootstrap({ condicional: tieneTodo.current }).then((b) => {
       setErrorCarga(null);
       ultimaCarga.current = Date.now();
       // `null` = el servidor contestó 304: no cambió nada desde la última vez, así
       // que no se toca el estado. Sin esto, cada refresco de 20 s re-pintaba el
       // módulo entero con datos idénticos. Ver `api.bootstrap`.
-      if (!b) return;
-      setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+      guardarTodo(b);
     }).finally(() => { if (enVuelo.current === p) enVuelo.current = null; });
     enVuelo.current = p;
     return p;
@@ -284,13 +295,16 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
           // Sin `await`: la pantalla ya se usa mientras baja el resto. `ultimaCarga`
           // se marca solo cuando llega TODO, para que el refresco de fondo lo
           // reintente si esto falló.
-          api.bootstrap()
+          api.bootstrap({ condicional: tieneTodo.current })
             .then((b) => {
               ultimaCarga.current = Date.now();
-              if (b) setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
-              setCargandoExtra(false);
+              guardarTodo(b);
             })
-            .catch((e) => console.error("bootstrap completo", e));
+            // Pase lo que pase deja de decir "cargando": si falló, el refresco de
+            // fondo lo reintenta, y mientras tanto la pantalla no puede quedarse
+            // prometiendo una solicitud que no va a llegar sola.
+            .catch((e) => console.error("bootstrap completo", e))
+            .finally(() => setCargandoExtra(false));
           return;
         }
       } catch (e) {
