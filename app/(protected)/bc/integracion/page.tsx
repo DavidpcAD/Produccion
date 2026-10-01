@@ -148,7 +148,7 @@ export default function IntegracionBcPage() {
       </div>
 
       {error && !loading && (
-        <p className="text-body-sm text-ds-red">{error}</p>
+        <p className="text-body-sm text-ds-red-ink">{error}</p>
       )}
 
       <div className="flex flex-wrap gap-6 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
@@ -228,7 +228,7 @@ export default function IntegracionBcPage() {
                   </td>
                   <td className="px-4 py-3 text-center text-body-sm">
                     {!o.produccion_inicializada ? (
-                      <span className="text-ds-red">Sin inicializar</span>
+                      <span className="text-ds-red-ink">Sin inicializar</span>
                     ) : o.ya_registrado ? (
                       <span className="text-ds-green-ink">Al día</span>
                     ) : (

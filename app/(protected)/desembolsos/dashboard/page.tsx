@@ -144,7 +144,7 @@ export default function DesembolsosDashboardPage() {
       />
 
       {error && (
-        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">{error}</p>
+        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red-ink">{error}</p>
       )}
 
       {/* Hero */}

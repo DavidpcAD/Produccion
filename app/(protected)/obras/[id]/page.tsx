@@ -116,7 +116,7 @@ function EstadoObra({ estado }: { estado: string | null }) {
   const cfg = e === 'open'
     ? { label: 'Abierta', cls: 'bg-brand/15 text-ds-green-ink', dot: 'bg-brand' }
     : e === 'blocked'
-      ? { label: 'Bloqueada', cls: 'bg-ds-red/10 text-ds-red', dot: 'bg-ds-red' }
+      ? { label: 'Bloqueada', cls: 'bg-ds-red/10 text-ds-red-ink', dot: 'bg-ds-red' }
       : { label: estado, cls: 'bg-ds-gray-100 text-ds-gray-500', dot: 'bg-ds-gray-400' };
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-3 h-7 text-[13px] font-semibold ${cfg.cls}`}>
@@ -301,7 +301,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
           <Campo label="Importe venta" value={fmtCRC(presup.venta)} />
           <Campo label="Importe coste directo" value={fmtCRC(presup.coste)} />
           <Campo label="Importe coste indirecto" value={fmtCRC(presup.indirecto)} />
-          <Campo label="Resultado" value={<span className={presup.resultado >= 0 ? 'text-ds-green-ink' : 'text-ds-red'}>{fmtCRC(presup.resultado)}</span>} />
+          <Campo label="Resultado" value={<span className={presup.resultado >= 0 ? 'text-ds-green-ink' : 'text-ds-red-ink'}>{fmtCRC(presup.resultado)}</span>} />
           <div className="px-4 py-3 space-y-2">
             <Button size="sm" variant="outline" onClick={verDetallePresup} icon={<Icon name="boleta" size="sm" color="currentColor" />}>
               Ver detalle por partida
@@ -546,7 +546,7 @@ export default function ObraDetallePage({ params }: { params: Promise<{ id: stri
             />
           )}
           {obra.esBC && postventas.length === 0 && (
-            <p className="text-xs text-ds-red">No se encontraron obras Postventa (con N° PV-…). Creá primero la obra Postventa del desarrollo.</p>
+            <p className="text-xs text-ds-red-ink">No se encontraron obras Postventa (con N° PV-…). Creá primero la obra Postventa del desarrollo.</p>
           )}
         </div>
       </Modal>

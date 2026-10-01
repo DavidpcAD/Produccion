@@ -209,7 +209,7 @@ function PanelDistribucion({
           <div>
             <div className="mb-1 flex items-center justify-between">
               <span className="text-sm font-medium">Entidades</span>
-              <span className={`text-sm tabular-nums ${sumaOk ? 'text-ds-green-ink' : 'text-ds-red'}`}>Suma {suma}%</span>
+              <span className={`text-sm tabular-nums ${sumaOk ? 'text-ds-green-ink' : 'text-ds-red-ink'}`}>Suma {suma}%</span>
             </div>
             <div className="space-y-2">
               {filas.map((f, i) => (
@@ -226,7 +226,7 @@ function PanelDistribucion({
                   <input type="number" min={0} max={100} step="0.01" value={f.Porcentaje}
                     onChange={(e) => setFila(i, { Porcentaje: e.target.value })} placeholder="%"
                     className="h-10 w-24 rounded-ds-xl border-2 border-transparent bg-ds-surface px-3 text-right text-sm tabular-nums shadow-ds-01 focus:border-black focus:outline-none" />
-                  <button type="button" onClick={() => quitar(i)} className="px-2 text-ds-gray-400 hover:text-ds-red" title="Quitar">×</button>
+                  <button type="button" onClick={() => quitar(i)} className="px-2 text-ds-gray-400 hover:text-ds-red-ink" title="Quitar">×</button>
                 </div>
               ))}
             </div>

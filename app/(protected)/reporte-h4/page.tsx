@@ -295,7 +295,7 @@ export default function ReporteH4Page() {
 function Kpi({ label, value, sub, tone }: {
   label: string; value: React.ReactNode; sub?: string; tone?: 'warning' | 'critical';
 }) {
-  const valueColor = tone === 'critical' ? 'text-ds-red' : tone === 'warning' ? 'text-ds-yellow-ink' : 'text-ds-ink';
+  const valueColor = tone === 'critical' ? 'text-ds-red-ink' : tone === 'warning' ? 'text-ds-yellow-ink' : 'text-ds-ink';
   return (
     <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5">
       <p className="text-xs font-bold tracking-wide text-ds-gray-500">{label}</p>

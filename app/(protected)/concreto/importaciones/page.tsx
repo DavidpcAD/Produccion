@@ -159,7 +159,7 @@ export default function ImportacionesPage() {
       header: 'Errores', meta: { label: 'Errores', align: 'right' },
       cell: ({ getValue }) => {
         const v = getValue() as number;
-        return <span className={`tabular-nums ${v > 0 ? 'text-ds-red font-semibold' : 'text-ds-gray-300'}`}>{v}</span>;
+        return <span className={`tabular-nums ${v > 0 ? 'text-ds-red-ink font-semibold' : 'text-ds-gray-300'}`}>{v}</span>;
       },
     }),
     col.accessor('filas_totales', {
@@ -261,7 +261,7 @@ export default function ImportacionesPage() {
               )}
               {resultado.errores.length > 0 && (
                 <details className="text-xs">
-                  <summary className="cursor-pointer text-ds-red font-medium">
+                  <summary className="cursor-pointer text-ds-red-ink font-medium">
                     {resultado.errores.length} error{resultado.errores.length === 1 ? '' : 'es'} de parseo
                   </summary>
                   <ul className="mt-2 space-y-1 max-h-40 overflow-auto">
@@ -302,7 +302,7 @@ function Metric({ label, value, strong, danger }: { label: string; value: number
   return (
     <div className="rounded-ds bg-ds-gray-100 px-3 py-2">
       <p className="text-[11px] uppercase tracking-wide text-ds-gray-400">{label}</p>
-      <p className={`tabular-nums text-sub-sm ${danger ? 'text-ds-red' : strong ? 'text-ds-ink font-bold' : 'text-ds-gray-500'}`}>
+      <p className={`tabular-nums text-sub-sm ${danger ? 'text-ds-red-ink' : strong ? 'text-ds-ink font-bold' : 'text-ds-gray-500'}`}>
         {value}
       </p>
     </div>

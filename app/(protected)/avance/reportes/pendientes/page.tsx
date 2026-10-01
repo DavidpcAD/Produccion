@@ -70,7 +70,7 @@ export default function ReportePendientesPage() {
       />
 
       {error && (
-        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">
+        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red-ink">
           {error}
         </p>
       )}
@@ -132,7 +132,7 @@ export default function ReportePendientesPage() {
             <section key={clave} className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
               <div className="flex items-center justify-between border-b border-ds-gray-200 bg-ds-gray-100 px-3 py-1.5">
                 <span className="text-sm font-semibold">
-                  {agrupar === 'sub' && lista[0]?.es_critica && <span className="mr-1 text-ds-red">●</span>}
+                  {agrupar === 'sub' && lista[0]?.es_critica && <span className="mr-1 text-ds-red-ink">●</span>}
                   {clave}
                 </span>
                 <span className="text-xs text-ds-gray-500">{lista.length} obras</span>
@@ -195,7 +195,7 @@ function Kpi({ label, value, accent, hint }: { label: string; value: number; acc
   return (
     <div className="rounded-ds border border-ds-gray-200 bg-ds-surface p-3 shadow-ds-01" title={hint} style={hint ? { cursor: 'help' } : undefined}>
       <p className="text-xs uppercase tracking-wider text-ds-gray-500">{label}</p>
-      <p className={`text-sub font-semibold tabular-nums ${accent === 'red' ? 'text-ds-red' : 'text-ds-ink'}`}>
+      <p className={`text-sub font-semibold tabular-nums ${accent === 'red' ? 'text-ds-red-ink' : 'text-ds-ink'}`}>
         {value}
       </p>
     </div>

@@ -113,7 +113,7 @@ function ObrasPicker({ obras, tipos, selected, onChange }: {
           <Icon name="place" size="sm" color="currentColor" className="text-brand" />
         </div>
         <div className="flex-1 min-w-0">
-          <label className="text-sm font-semibold text-ds-ink">Obras <span className="text-ds-red">*</span></label>
+          <label className="text-sm font-semibold text-ds-ink">Obras <span className="text-ds-red-ink">*</span></label>
           <p className="text-xs text-ds-gray-400">Elegí el tipo de obra y marcá en cuáles trabaja esta cuadrilla.</p>
         </div>
         {filtered.length > 0 && (
@@ -226,7 +226,7 @@ function SubpartidasPicker({ tipos, catalogos, cargandoTipos, onCargarTipo, subs
           <Icon name="list" size="sm" color="currentColor" className="text-brand" />
         </div>
         <div className="flex-1 min-w-0">
-          <label className="text-sm font-semibold text-ds-ink">Subpartidas <span className="text-ds-red">*</span></label>
+          <label className="text-sm font-semibold text-ds-ink">Subpartidas <span className="text-ds-red-ink">*</span></label>
           <p className="text-xs text-ds-gray-400">Elegí tipo de obra → {termGrupo.toLowerCase()} → partida, y marcá las que ejecuta.</p>
         </div>
         {selected.length > 0 && (
@@ -878,7 +878,7 @@ export default function CuadrillasPage() {
                 <div className="space-y-1.5 mt-auto">
                   <div className="flex justify-between text-xs">
                     <span className="text-ds-gray-400 font-medium">{c.TotalMiembros} / {c.Capacidad} miembros</span>
-                    <span className={`font-semibold ${pct > 80 ? 'text-ds-red' : pct > 60 ? 'text-ds-yellow-ink' : 'text-ds-ink'}`}>{pct}%</span>
+                    <span className={`font-semibold ${pct > 80 ? 'text-ds-red-ink' : pct > 60 ? 'text-ds-yellow-ink' : 'text-ds-ink'}`}>{pct}%</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-ds-gray-100 overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -1072,7 +1072,7 @@ export default function CuadrillasPage() {
                 </div>
               )}
               {selectedCol && otraCuadrillaPorCol.get(parseInt(selectedCol)) && (
-                <p className="text-xs text-ds-red">
+                <p className="text-xs text-ds-red-ink">
                   Este colaborador ya pertenece a la cuadrilla “{otraCuadrillaPorCol.get(parseInt(selectedCol))}”. Quítalo de ahí antes de agregarlo aquí.
                 </p>
               )}
@@ -1132,7 +1132,7 @@ export default function CuadrillasPage() {
                                   disabled={removingId === m.IDCuadMiembro}
                                   title="Quitar de la cuadrilla"
                                   aria-label="Quitar de la cuadrilla"
-                                  className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-ds text-ds-gray-400 hover:text-ds-red hover:bg-ds-gray-100 transition-colors disabled:opacity-50"
+                                  className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-ds text-ds-gray-400 hover:text-ds-red-ink hover:bg-ds-gray-100 transition-colors disabled:opacity-50"
                                 >
                                   <Icon name="remove" size="sm" color="currentColor" />
                                 </button>

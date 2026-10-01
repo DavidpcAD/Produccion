@@ -185,7 +185,7 @@ export default function EsclerometroPage() {
 
       {error && !loading && (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar los ensayos.</p>
+          <p className="text-body-sm text-ds-red-ink font-semibold">No se pudieron cargar los ensayos.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
       )}
@@ -361,7 +361,7 @@ function ModalNuevoEnsayo({
 
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-ds-ink">
-            Elemento estructural <span className="text-ds-red">*</span>
+            Elemento estructural <span className="text-ds-red-ink">*</span>
           </span>
           <div className="flex flex-wrap gap-1.5">
             {ELEMENTOS_TIPICOS.map((el) => (

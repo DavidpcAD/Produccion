@@ -51,7 +51,7 @@ function deltaPct(n: number | null): React.ReactNode {
   if (n === null || n === undefined) return <span className="text-ds-gray-300">—</span>;
   const alto = Math.abs(n) >= 5;
   return (
-    <span className={`tabular-nums ${alto ? 'text-ds-red font-semibold' : 'text-ds-gray-500'}`}>
+    <span className={`tabular-nums ${alto ? 'text-ds-red-ink font-semibold' : 'text-ds-gray-500'}`}>
       {n > 0 ? '+' : ''}{n.toFixed(1)}%
     </span>
   );
@@ -345,7 +345,7 @@ export default function ColadaDetallePage({ params }: { params: Promise<{ id: st
 
       {c.estado === 'anulada' && c.motivo_anulacion && (
         <div className="rounded-ds-lg border border-ds-red/50 bg-ds-red/10 px-4 py-3 text-sm text-ds-ink flex items-start gap-2.5">
-          <Icon name="alert" size="sm" color="currentColor" className="text-ds-red mt-0.5 shrink-0" />
+          <Icon name="alert" size="sm" color="currentColor" className="text-ds-red-ink mt-0.5 shrink-0" />
           <span><span className="font-semibold">Colada anulada:</span> {c.motivo_anulacion}</span>
         </div>
       )}

@@ -103,7 +103,7 @@ function ColumnFilterPanel({ column, label }: { column: Column<unknown, unknown>
       </div>
       {selected.size > 0 && (
         <button onClick={() => column.setFilterValue(undefined)}
-          className="mt-1.5 w-full px-2 py-1 text-left text-xs font-semibold text-ds-red hover:underline">
+          className="mt-1.5 w-full px-2 py-1 text-left text-xs font-semibold text-ds-red-ink hover:underline">
           Limpiar ({selected.size})
         </button>
       )}

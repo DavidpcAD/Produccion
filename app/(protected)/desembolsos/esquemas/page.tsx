@@ -251,7 +251,7 @@ function PanelEsquema({
           <div>
             <div className="mb-1 flex items-center justify-between">
               <span className="text-sm font-medium">Hitos</span>
-              <span className={`text-sm tabular-nums ${sumaOk ? 'text-ds-green-ink' : 'text-ds-red'}`}>Suma variable {suma}%</span>
+              <span className={`text-sm tabular-nums ${sumaOk ? 'text-ds-green-ink' : 'text-ds-red-ink'}`}>Suma variable {suma}%</span>
             </div>
             <div className="space-y-2">
               {filas.map((f, i) => (
@@ -265,7 +265,7 @@ function PanelEsquema({
                       disabled={f.EsMontoFijo}
                       onChange={(ev) => setFila(i, { Porcentaje: ev.target.value })}
                       className="h-9 w-20 rounded-ds border-2 border-transparent bg-ds-surface px-2 text-right text-sm tabular-nums shadow-ds-01 focus:border-black focus:outline-none disabled:bg-ds-gray-100" />
-                    <button type="button" onClick={() => quitar(i)} className="px-2 text-ds-gray-400 hover:text-ds-red" title="Quitar">×</button>
+                    <button type="button" onClick={() => quitar(i)} className="px-2 text-ds-gray-400 hover:text-ds-red-ink" title="Quitar">×</button>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2 text-xs text-ds-gray-500">
                     <label className="flex items-center gap-1">Solicitud

@@ -184,7 +184,7 @@ export default function LaboratorioPage() {
 
       {error && !loading && (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar las muestras.</p>
+          <p className="text-body-sm text-ds-red-ink font-semibold">No se pudieron cargar las muestras.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
       )}
@@ -478,8 +478,8 @@ function ModalImportarExcel({
             )}
             {resumen.errores.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-ds-red mb-1">Errores ({resumen.errores.length})</p>
-                <ul className="max-h-32 overflow-auto space-y-0.5 text-xs text-ds-red list-disc pl-4">
+                <p className="text-xs font-semibold text-ds-red-ink mb-1">Errores ({resumen.errores.length})</p>
+                <ul className="max-h-32 overflow-auto space-y-0.5 text-xs text-ds-red-ink list-disc pl-4">
                   {resumen.errores.map((e, i) => (
                     <li key={i}>Fila {e.fila_excel} ({e.numero_muestra ?? '—'}): {e.mensaje}</li>
                   ))}

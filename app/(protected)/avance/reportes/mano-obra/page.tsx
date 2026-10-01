@@ -97,7 +97,7 @@ export default function ReporteManoObraPage() {
       </div>
 
       {error && (
-        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">
+        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red-ink">
           {error}
         </p>
       )}
@@ -421,7 +421,7 @@ function Kpi({
       <p className="text-xs uppercase tracking-wider text-ds-gray-500">{label}</p>
       <p
         className={`font-semibold tabular-nums ${small ? 'text-sub-sm' : 'text-sub'} ${
-          accent === 'lime' ? 'text-brand-dark' : accent === 'red' ? 'text-ds-red' : 'text-ds-ink'
+          accent === 'lime' ? 'text-brand-dark' : accent === 'red' ? 'text-ds-red-ink' : 'text-ds-ink'
         }`}
       >
         {value}

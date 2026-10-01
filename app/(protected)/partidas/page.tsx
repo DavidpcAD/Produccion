@@ -883,7 +883,7 @@ export default function PartidasPage() {
                                             ? s.tiposCasa.map(tc => (
                                                 <span key={tc} className="rounded bg-ds-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-ds-gray-500">{tc}</span>
                                               ))
-                                            : <span className="text-[10px] font-semibold text-ds-red">Sin tipos de casa — clic para asignar</span>}
+                                            : <span className="text-[10px] font-semibold text-ds-red-ink">Sin tipos de casa — clic para asignar</span>}
                                         </div>
                                       )}
                                     </div>
@@ -1050,7 +1050,7 @@ export default function PartidasPage() {
           {/* Tipos de casa a los que aplica la subpartida (mismo modelo que Avance). */}
           {usaTiposCasa && (
             <div>
-              <label className="block text-body-sm font-semibold text-ds-ink mb-1.5">Tipos de casa <span className="text-ds-red">*</span></label>
+              <label className="block text-body-sm font-semibold text-ds-ink mb-1.5">Tipos de casa <span className="text-ds-red-ink">*</span></label>
               <div className="flex flex-wrap gap-2">
                 {TIPOS_CASA.map(tc => {
                   const on = subForm.tiposCasa.includes(tc);

@@ -23,7 +23,7 @@ function delta(n: number | null): React.ReactNode {
   if (n === null) return <span className="text-ds-gray-300">—</span>;
   const alto = Math.abs(n) >= 5;
   return (
-    <span className={`tabular-nums ${alto ? 'text-ds-red font-semibold' : 'text-ds-gray-500'}`}>
+    <span className={`tabular-nums ${alto ? 'text-ds-red-ink font-semibold' : 'text-ds-gray-500'}`}>
       {n > 0 ? '+' : ''}{n.toFixed(1)}%
     </span>
   );
@@ -160,7 +160,7 @@ export default function BatchesPage() {
 
       {error && !loading && (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar los batches.</p>
+          <p className="text-body-sm text-ds-red-ink font-semibold">No se pudieron cargar los batches.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
       )}

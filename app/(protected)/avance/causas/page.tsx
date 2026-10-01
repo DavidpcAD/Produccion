@@ -104,7 +104,7 @@ export default function CausasPage() {
                 </button>
                 <button
                   type="button"
-                  className="text-sm font-medium text-ds-red hover:underline"
+                  className="text-sm font-medium text-ds-red-ink hover:underline"
                   onClick={() => setEliminar(c)}
                 >
                   Eliminar

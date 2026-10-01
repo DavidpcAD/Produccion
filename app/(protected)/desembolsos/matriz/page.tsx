@@ -166,7 +166,7 @@ export default function MatrizPage() {
       </div>
 
       {error && (
-        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">
+        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red-ink">
           {error}
         </p>
       )}
@@ -383,7 +383,7 @@ function CreditoPuenteSection({
                 {c.Estado === 'CANCELACION_CONFIRMADA' ? 'Cancelación confirmada' : 'Cancelación programada'}
               </Badge>
               <span className="text-ds-gray-500">{c.AbrevBancoCP} · {c.AbreviaturaProyecto} · {c.CodigoLote}</span>
-              <span className="ml-auto font-mono tabular-nums text-ds-red">
+              <span className="ml-auto font-mono tabular-nums text-ds-red-ink">
                 −{formatCRC(c.MontoConfirmadoAlBanco_CRC ?? c.MontoCanceladoAlBanco_CRC)}
               </span>
               <span className="text-xs text-ds-gray-400">

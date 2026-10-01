@@ -280,7 +280,7 @@ export default function EsclerometroDetallePage({
         <Button variant="ghost" size="sm" icon={<Icon name="back" />} onClick={() => router.push('/concreto/esclerometro')}>
           Volver
         </Button>
-        <p className="text-sm text-ds-red">{error ?? 'No se encontró el ensayo.'}</p>
+        <p className="text-sm text-ds-red-ink">{error ?? 'No se encontró el ensayo.'}</p>
       </PageShell>
     );
   }

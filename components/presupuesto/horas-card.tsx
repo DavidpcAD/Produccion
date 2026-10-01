@@ -31,7 +31,7 @@ function Chip({ label, value, tone }: { label: string; value: string | number; t
   return (
     <div className="rounded-ds border border-ds-gray-100 p-2.5 min-w-[104px]">
       <p className="text-ds-gray-400 text-xs">{label}</p>
-      <p className={'font-bold text-sm mt-0.5 ' + (tone === 'ok' ? 'text-ds-green-ink' : tone === 'bad' ? 'text-ds-red' : tone === 'warn' ? 'text-ds-yellow-ink' : 'text-ds-ink')}>{value}</p>
+      <p className={'font-bold text-sm mt-0.5 ' + (tone === 'ok' ? 'text-ds-green-ink' : tone === 'bad' ? 'text-ds-red-ink' : tone === 'warn' ? 'text-ds-yellow-ink' : 'text-ds-ink')}>{value}</p>
     </div>
   );
 }
@@ -210,7 +210,7 @@ export function PresupuestoHorasCard() {
                   <td className="py-2 px-3 text-right tabular-nums font-semibold">{f.horas == null ? '—' : nf(f.horas)}</td>
                   <td className="py-2 px-3">
                     <span className={
-                      'text-xs ' + (f.estado.tone === 'ok' ? 'text-ds-green-ink' : f.estado.tone === 'warn' ? 'text-ds-yellow-ink' : 'text-ds-red')
+                      'text-xs ' + (f.estado.tone === 'ok' ? 'text-ds-green-ink' : f.estado.tone === 'warn' ? 'text-ds-yellow-ink' : 'text-ds-red-ink')
                     }>
                       {f.estado.tone === 'ok' && <Icon name="check" size="sm" color="currentColor" />} {f.estado.text}
                     </span>
@@ -228,7 +228,7 @@ export function PresupuestoHorasCard() {
             icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>
             Guardar {r.validas} en h4
           </Button>
-          {r.conError > 0 && <span className="text-ds-red text-xs">{r.conError} fila(s) sin guardar (obra/subpartida/horas). Se guardan solo las válidas.</span>}
+          {r.conError > 0 && <span className="text-ds-red-ink text-xs">{r.conError} fila(s) sin guardar (obra/subpartida/horas). Se guardan solo las válidas.</span>}
           {r.sugeridas > 0 && <span className="text-ds-yellow-ink text-xs">{r.sugeridas} sugerida(s) — revisá que la subpartida sea la correcta.</span>}
           <span className="text-ds-gray-400 text-xs">Business Central: espejo pendiente (campo de horas en BC).</span>
         </div>

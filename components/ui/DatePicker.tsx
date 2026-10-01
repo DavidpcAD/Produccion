@@ -183,7 +183,7 @@ export function DatePicker({
           document.body,
         )}
       </div>
-      {error && <p className="text-xs text-ds-red font-medium pl-1">{error}</p>}
+      {error && <p className="text-xs text-ds-red-ink font-medium pl-1">{error}</p>}
       {hint && !error && <p className="text-xs text-ds-gray-400 pl-1">{hint}</p>}
     </div>
   );

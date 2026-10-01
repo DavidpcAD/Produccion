@@ -169,7 +169,7 @@ export default function ColadasPage() {
 
       {error && !loading && (
         <div className="bg-ds-surface rounded-ds-lg border border-ds-red/40 shadow-ds-01 p-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-body-sm text-ds-red font-semibold">No se pudieron cargar las coladas.</p>
+          <p className="text-body-sm text-ds-red-ink font-semibold">No se pudieron cargar las coladas.</p>
           <Button variant="outline" size="sm" onClick={load}>Reintentar</Button>
         </div>
       )}

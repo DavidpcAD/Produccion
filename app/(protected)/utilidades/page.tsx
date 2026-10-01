@@ -65,7 +65,7 @@ function KpiCard({
       </p>
       <p className={`mt-1 text-sub-sm font-bold ${destacado ? 'text-brand' : 'text-ds-ink'}`}>{formatCRC(monto)}</p>
       {delta !== undefined && delta !== null && Number.isFinite(delta) && (
-        <p className={`mt-0.5 text-xs ${delta >= 0 ? 'text-ds-green-ink' : 'text-ds-red'}`}>
+        <p className={`mt-0.5 text-xs ${delta >= 0 ? 'text-ds-green-ink' : 'text-ds-red-ink'}`}>
           {delta >= 0 ? '▲' : '▼'} {formatPct(Math.abs(delta))} vs. período anterior
         </p>
       )}

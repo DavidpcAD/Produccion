@@ -349,7 +349,7 @@ function TabHoras({ semanaId }: { semanaId: number }) {
                 <td className="px-3 py-1.5 text-right">
                   <button
                     type="button"
-                    className="text-ds-red hover:underline"
+                    className="text-ds-red-ink hover:underline"
                     onClick={() => quitarFila(i)}
                   >
                     Quitar
@@ -489,7 +489,7 @@ function TabSubcontratos({ semanaId }: { semanaId: number }) {
             key: 'id',
             header: '',
             render: (s) => (
-              <button type="button" className="text-ds-red hover:underline" onClick={() => eliminar(s.id)}>
+              <button type="button" className="text-ds-red-ink hover:underline" onClick={() => eliminar(s.id)}>
                 Eliminar
               </button>
             ),

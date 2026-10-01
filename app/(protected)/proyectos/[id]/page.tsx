@@ -326,7 +326,7 @@ export default function ProyectoDetallePage({ params }: { params: Promise<{ id: 
                         onClick={() => handleRetirar(m.IDColProy, m.NombreCompleto)}
                         aria-label={`Retirar a ${m.NombreCompleto} del proyecto`}
                         title="Retirar del proyecto"
-                        className="p-1.5 text-ds-gray-300 hover:text-ds-red hover:bg-ds-gray-100 rounded-ds transition-colors"
+                        className="p-1.5 text-ds-gray-300 hover:text-ds-red-ink hover:bg-ds-gray-100 rounded-ds transition-colors"
                       >
                         <Icon name="close" size="sm" color="currentColor" />
                       </button>

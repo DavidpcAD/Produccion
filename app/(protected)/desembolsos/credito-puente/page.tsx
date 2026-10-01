@@ -214,7 +214,7 @@ export default function CreditoPuentePage() {
                   </button>
                   <button
                     type="button"
-                    className="text-sm text-ds-red hover:underline"
+                    className="text-sm text-ds-red-ink hover:underline"
                     onClick={(e) => {
                       e.stopPropagation();
                       eliminarCredito(c);
@@ -617,7 +617,7 @@ function MovimientosPanel({ idCp }: { idCp: number }) {
                 )}
                 <button
                   type="button"
-                  className="text-sm text-ds-red hover:underline"
+                  className="text-sm text-ds-red-ink hover:underline"
                   onClick={() => eliminar(m)}
                 >
                   Eliminar

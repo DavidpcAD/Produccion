@@ -97,7 +97,7 @@ export default function InformeMuestraPage({ params }: { params: Promise<{ id: s
         <Button variant="outline" size="sm" onClick={() => router.back()} icon={<Icon name="back" size="sm" color="currentColor" />}>
           Volver
         </Button>
-        <p className="text-sm text-ds-red">No se pudo cargar la muestra.</p>
+        <p className="text-sm text-ds-red-ink">No se pudo cargar la muestra.</p>
       </div>
     );
   }

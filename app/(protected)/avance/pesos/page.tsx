@@ -222,7 +222,7 @@ export default function PesosPage() {
                       <span key={x.tc}
                         className={'text-[11px] font-mono font-semibold rounded-full px-2 py-0.5 ' +
                           (!x.aplica ? 'bg-ds-gray-100 text-ds-gray-400'
-                            : Math.abs(x.total - 100) <= TOL ? 'bg-brand/20 text-ds-green-ink' : 'bg-ds-red/10 text-ds-red')}>
+                            : Math.abs(x.total - 100) <= TOL ? 'bg-brand/20 text-ds-green-ink' : 'bg-ds-red/10 text-ds-red-ink')}>
                         {x.tc}: {x.aplica ? `${x.total.toFixed(1)}%` : 'N/A'}
                       </span>
                     ))}
@@ -273,7 +273,7 @@ export default function PesosPage() {
                             if (!c.aplica) return <td key={c.tc} className="px-2 py-2 text-center text-xs text-ds-gray-300">—</td>;
                             const ok = Math.abs(c.total - 100) <= TOL;
                             return (
-                              <td key={c.tc} className={'px-2 py-2 text-center text-xs font-bold tabular-nums ' + (ok ? 'text-ds-green-ink' : 'text-ds-red')}>
+                              <td key={c.tc} className={'px-2 py-2 text-center text-xs font-bold tabular-nums ' + (ok ? 'text-ds-green-ink' : 'text-ds-red-ink')}>
                                 {c.total.toFixed(2)}%
                               </td>
                             );

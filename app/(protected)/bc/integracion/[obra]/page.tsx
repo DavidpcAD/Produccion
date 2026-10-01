@@ -162,7 +162,7 @@ export default function DetalleBcPage() {
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
             <div className="text-body-sm">
               {!preview.produccion_inicializada ? (
-                <span className="font-medium text-ds-red">
+                <span className="font-medium text-ds-red-ink">
                   Producción no inicializada en BC — primero “Importar avance de Excel”
                 </span>
               ) : preview.ya_registrado ? (

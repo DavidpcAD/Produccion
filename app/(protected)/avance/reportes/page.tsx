@@ -98,7 +98,7 @@ export default function ReportesPage() {
       </div>
 
       {error && (
-        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">
+        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red-ink">
           {error}
         </p>
       )}
@@ -118,7 +118,7 @@ export default function ReportesPage() {
               {cargando && ' · actualizando…'}
             </p>
             <p className="text-xs text-ds-gray-400">
-              En <span className="font-semibold text-ds-red">rojo</span>, el valor real quedó por debajo de lo esperado (atrasado). La fila <strong>Diferencia</strong> = real − esperado.
+              En <span className="font-semibold text-ds-red-ink">rojo</span>, el valor real quedó por debajo de lo esperado (atrasado). La fila <strong>Diferencia</strong> = real − esperado.
             </p>
           </div>
           {reporte && <KpisProduccion t={reporte.totales} />}
@@ -202,7 +202,7 @@ function ResumenGeneral({ data, semanaSel }: { data: ResumenMes; semanaSel: numb
                       ? 'text-ds-gray-400'
                       : f.crono_real >= f.crono_esp
                         ? 'text-brand-dark'
-                        : 'text-ds-red'
+                        : 'text-ds-red-ink'
                   }`}
                 >
                   {f.base_semanal ? pct(f.crono_real) : '—'}
@@ -216,7 +216,7 @@ function ResumenGeneral({ data, semanaSel }: { data: ResumenMes; semanaSel: numb
                       ? 'text-ds-gray-400'
                       : f.costo_real >= f.costo_esp
                         ? 'text-brand-dark'
-                        : 'text-ds-red'
+                        : 'text-ds-red-ink'
                   }`}
                 >
                   {f.base_semanal ? pct(f.costo_real) : '—'}
@@ -251,12 +251,12 @@ function ResumenGeneral({ data, semanaSel }: { data: ResumenMes; semanaSel: numb
               Diferencia (real − esperado)
             </td>
             <td />
-            <td className={`${td} text-right font-mono text-xs font-semibold ${dif_crono < 0 ? 'text-ds-red' : 'text-brand-dark'}`}>
+            <td className={`${td} text-right font-mono text-xs font-semibold ${dif_crono < 0 ? 'text-ds-red-ink' : 'text-brand-dark'}`}>
               {dif_crono >= 0 ? '+' : ''}
               {pct(dif_crono)}
             </td>
             <td />
-            <td className={`${td} text-right font-mono text-xs font-semibold ${dif_costo < 0 ? 'text-ds-red' : 'text-brand-dark'}`}>
+            <td className={`${td} text-right font-mono text-xs font-semibold ${dif_costo < 0 ? 'text-ds-red-ink' : 'text-brand-dark'}`}>
               {dif_costo >= 0 ? '+' : ''}
               {pct(dif_costo)}
             </td>
@@ -312,7 +312,7 @@ function ResumenFinanciero({ data, semanaSel }: { data: ResumenMes; semanaSel: n
                 </td>
                 <td
                   className={`${td} text-right font-mono tabular-nums font-semibold ${
-                    !f.base_semanal ? 'text-ds-gray-400' : f.utilidad >= 0 ? 'text-brand-dark' : 'text-ds-red'
+                    !f.base_semanal ? 'text-ds-gray-400' : f.utilidad >= 0 ? 'text-brand-dark' : 'text-ds-red-ink'
                   }`}
                 >
                   {f.base_semanal ? fmtMonto(f.utilidad) : '—'}
@@ -337,7 +337,7 @@ function ResumenFinanciero({ data, semanaSel }: { data: ResumenMes; semanaSel: n
             <td className={`${td} text-right font-mono text-xs font-semibold`}>{fmtMonto(tot_fin.indirecto)}</td>
             <td className={`${td} text-right font-mono text-xs font-semibold`}>{fmtMonto(tot_fin.venta)}</td>
             <td
-              className={`${td} text-right font-mono text-xs font-semibold ${tot_fin.utilidad >= 0 ? 'text-brand-dark' : 'text-ds-red'}`}
+              className={`${td} text-right font-mono text-xs font-semibold ${tot_fin.utilidad >= 0 ? 'text-brand-dark' : 'text-ds-red-ink'}`}
             >
               {fmtMonto(tot_fin.utilidad)}
             </td>
@@ -358,7 +358,7 @@ function Kpi({ label, value, sub, accent }: { label: string; value: string; sub?
   return (
     <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01 p-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-ds-gray-400">{label}</p>
-      <p className={'text-sub-sm font-bold mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red' : 'text-ds-ink')}>{value}</p>
+      <p className={'text-sub-sm font-bold mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red-ink' : 'text-ds-ink')}>{value}</p>
       {sub && <p className="text-xs text-ds-gray-400 mt-0.5">{sub}</p>}
     </div>
   );
@@ -402,7 +402,7 @@ function KpisFinanciero({ t }: { t: ReporteTotales }) {
         {cards.map((c) => (
           <div key={c.label} className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
             <p className="text-xs font-semibold uppercase tracking-wide text-ds-gray-500">{c.label}</p>
-            <p className={`mt-1 font-mono text-sub font-bold tabular-nums ${c.accent === 'neg' ? 'text-ds-red' : c.accent === 'pos' ? 'text-brand-dark' : 'text-ds-ink'}`}>
+            <p className={`mt-1 font-mono text-sub font-bold tabular-nums ${c.accent === 'neg' ? 'text-ds-red-ink' : c.accent === 'pos' ? 'text-brand-dark' : 'text-ds-ink'}`}>
               {formatCRC(c.semana)}
             </p>
             <p className="mt-0.5 text-xs text-ds-gray-400 tabular-nums">Acum: {formatCRC(c.acum)}</p>
@@ -480,7 +480,7 @@ function DetallePorObra({ obras }: { obras: ReporteObra[] }) {
                   <td className={`${td} text-right font-mono tabular-nums`}>{fmtMonto(v.directo)}</td>
                   <td className={`${td} text-right font-mono tabular-nums`}>{fmtMonto(v.indirecto)}</td>
                   <td className={`${td} text-right font-mono tabular-nums`}>{fmtMonto(v.venta)}</td>
-                  <td className={`${td} text-right font-mono tabular-nums font-semibold ${v.utilidad >= 0 ? 'text-brand-dark' : 'text-ds-red'}`}>{fmtMonto(v.utilidad)}</td>
+                  <td className={`${td} text-right font-mono tabular-nums font-semibold ${v.utilidad >= 0 ? 'text-brand-dark' : 'text-ds-red-ink'}`}>{fmtMonto(v.utilidad)}</td>
                 </tr>
               );
             })}

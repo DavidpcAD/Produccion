@@ -109,14 +109,14 @@ function TasasCard({ t, estado, error }: { t: TasasObra; estado?: ResultadoBC['t
         {fila('% tasa postventa', t.afterSalesTaxPcnt, t.postventa, `línea ${CODIGO_POSTVENTA} ÷ venta · BC: After-sales Tax Pcnt.`)}
       </div>
       {t.fueraDeRango && (
-        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red">
+        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red-ink">
           Alguna de las dos tasas queda fuera de 0–100 %, así que el Excel está mal (lo típico: los indirectos
           suman más que la venta). Esto NO se manda a BC — Business Central aceptaría el número igual y la obra
           quedaría con una tasa imposible. Revisá las hojas VentaAD e IND.
         </div>
       )}
       {t.venta <= 0 && (
-        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red">
+        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red-ink">
           El Excel no trae importe de venta, así que las dos tasas no se pueden calcular (habría que dividir entre cero).
           Revisá la hoja VentaAD antes de subir.
         </div>
@@ -135,13 +135,13 @@ function TasasCard({ t, estado, error }: { t: TasasObra; estado?: ResultadoBC['t
         </div>
       )}
       {estado === 'fuera-de-rango' && (
-        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red">
+        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red-ink">
           Las tasas NO se escribieron en la obra porque caen fuera de 0–100 %. El presupuesto sí quedó cargado:
           corregí el Excel y volvé a subir, o poné las tasas a mano en la ficha de la obra.
         </div>
       )}
       {estado === 'error' && (
-        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red break-words">
+        <div className="rounded-ds-lg border border-ds-red/40 bg-ds-red/5 px-3 py-2 text-xs text-ds-red-ink break-words">
           No se pudieron escribir las tasas en BC: {error ?? 'error desconocido'}
         </div>
       )}
@@ -157,7 +157,7 @@ function MetricBC({ label, value, accent }: { label: string; value: string; acce
   return (
     <div className="rounded-ds border border-ds-gray-100 p-2.5">
       <p className="text-ds-gray-400 text-xs">{label}</p>
-      <p className={'font-bold text-sm mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red' : 'text-ds-ink')}>{value}</p>
+      <p className={'font-bold text-sm mt-0.5 ' + (accent === 'pos' ? 'text-ds-green-ink' : accent === 'neg' ? 'text-ds-red-ink' : 'text-ds-ink')}>{value}</p>
     </div>
   );
 }
@@ -637,7 +637,7 @@ export default function PresupuestoPage() {
                 <span className="text-sm text-ds-ink font-medium flex-1 min-w-0 break-words">{pl.nombre}</span>
                 <span className="text-ds-gray-400 text-xs shrink-0 hidden sm:block">{pl.archivo}</span>
                 <Button size="sm" variant="outline" onClick={() => usarPlantilla(pl.idPlantilla)}>Usar</Button>
-                <button onClick={() => borrarPlantilla(pl.idPlantilla, pl.nombre)} className="text-ds-gray-300 hover:text-ds-red p-1" title="Borrar plantilla"><Icon name="delete" size="sm" color="currentColor" /></button>
+                <button onClick={() => borrarPlantilla(pl.idPlantilla, pl.nombre)} className="text-ds-gray-300 hover:text-ds-red-ink p-1" title="Borrar plantilla"><Icon name="delete" size="sm" color="currentColor" /></button>
               </div>
             ))}
           </div>

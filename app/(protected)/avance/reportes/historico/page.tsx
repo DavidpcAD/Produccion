@@ -154,7 +154,7 @@ export default function ReporteHistoricoPage() {
       )}
 
       {error && (
-        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red">{error}</p>
+        <p className="my-4 rounded-ds border border-ds-red bg-ds-red/5 px-4 py-3 text-sm text-ds-red-ink">{error}</p>
       )}
 
       {cargando ? (
@@ -267,7 +267,7 @@ function GrupoFilas({
         <tr key={s.id} className="border-b border-ds-gray-100 last:border-0">
           <th className="sticky left-0 z-10 border-r border-ds-gray-200 bg-ds-surface px-2 py-1 text-left font-normal">
             <span className="whitespace-nowrap">
-              {s.es_critica && <span className="mr-1 text-ds-red">●</span>}
+              {s.es_critica && <span className="mr-1 text-ds-red-ink">●</span>}
               <span className="font-mono text-[10px] text-ds-gray-400">S{s.sprint_numero}</span>{' '}
               <span className="font-semibold">{s.codigo}</span> {s.nombre}
             </span>

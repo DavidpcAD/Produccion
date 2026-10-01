@@ -243,7 +243,7 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
                       onClick={() => handleQuitar(m.IDCuadMiembro, m.NombreCompleto)}
                       aria-label={`Quitar a ${m.NombreCompleto} de la cuadrilla`}
                       title="Quitar de la cuadrilla"
-                      className="p-1.5 text-ds-gray-300 hover:text-ds-red hover:bg-ds-gray-100 rounded-ds transition-colors"
+                      className="p-1.5 text-ds-gray-300 hover:text-ds-red-ink hover:bg-ds-gray-100 rounded-ds transition-colors"
                     >
                       <Icon name="remove" size="sm" color="currentColor" />
                     </button>
@@ -291,7 +291,7 @@ export default function CuadrillaDetallePage({ params }: { params: Promise<{ id:
               })}
           />
           {selectedCol && otraCuadrillaPorCol.get(parseInt(selectedCol)) && (
-            <p className="text-xs text-ds-red">
+            <p className="text-xs text-ds-red-ink">
               Este colaborador ya pertenece a la cuadrilla “{otraCuadrillaPorCol.get(parseInt(selectedCol))}”. Quítalo de ahí antes de agregarlo aquí.
             </p>
           )}

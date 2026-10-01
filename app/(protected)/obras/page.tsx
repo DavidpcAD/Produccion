@@ -228,7 +228,7 @@ export default function ObrasPage() {
         const cfg = e === 'open'
           ? { label: 'Abierta', cls: 'bg-brand/15 text-ds-green-ink', dot: 'bg-brand' }
           : e === 'blocked'
-            ? { label: 'Bloqueada', cls: 'bg-ds-red/10 text-ds-red', dot: 'bg-ds-red' }
+            ? { label: 'Bloqueada', cls: 'bg-ds-red/10 text-ds-red-ink', dot: 'bg-ds-red' }
             : { label: raw, cls: 'bg-ds-gray-100 text-ds-gray-500', dot: 'bg-ds-gray-400' };
         return (
           <span className={`inline-flex items-center gap-1.5 rounded-full px-3 h-7 text-[13px] font-semibold ${cfg.cls}`}>
@@ -408,7 +408,7 @@ export default function ObrasPage() {
                 Crear también en Business Central
               </label>
               {crearEnBC && dimOpts.AC.length === 0 && !dimLoading && (
-                <p className="text-xs text-ds-red">BC no respondió: no se pudieron cargar valores de dimensión. Podés continuar en modo manual o desmarcar la opción.</p>
+                <p className="text-xs text-ds-red-ink">BC no respondió: no se pudieron cargar valores de dimensión. Podés continuar en modo manual o desmarcar la opción.</p>
               )}
             </>
           )}

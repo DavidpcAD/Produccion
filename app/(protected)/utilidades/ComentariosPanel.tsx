@@ -141,7 +141,7 @@ export function ComentariosPanel({
               </div>
               <button
                 onClick={() => eliminar(c.id_comentario)}
-                className="text-ds-gray-400 hover:text-ds-red shrink-0"
+                className="text-ds-gray-400 hover:text-ds-red-ink shrink-0"
                 title="Eliminar"
               >
                 <Icon name="delete" size="sm" color="currentColor" />
