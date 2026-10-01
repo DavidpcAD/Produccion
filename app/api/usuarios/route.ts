@@ -81,7 +81,11 @@ export async function GET(req: NextRequest) {
   // decidiendo para los usuarios legacy, que no tienen módulos.
   if (!soloBasico && !puedeAbrirRuta('/usuarios', session.modules, session.nivelAdmin, getRouteLevel('/usuarios'))) {
     return NextResponse.json(
-      { error: 'Para eso necesitás administración de personas. Pedí la lista con ?campos=basico.' },
+      {
+        error:
+          'El padrón completo (cédula, correo, teléfono, roles) es de quien administra personas. ' +
+          'Para un selector de personas alcanza con campos=basico.',
+      },
       { status: 403 },
     );
   }
