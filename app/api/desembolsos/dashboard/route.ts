@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { getSession } from '@/lib/auth';
@@ -33,7 +34,9 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getAdelanteDb();
     const data = await calcularDashboard(db, { idProyecto, idBanco, q, rango });
-    return NextResponse.json(data);
+    // Comprimido: es la respuesta mas grande de la app (~1 MB cruda). Ver
+    // lib/http/json-comprimido.ts.
+    return jsonComprimido(req, data);
   } catch (err) {
     console.error('/api/desembolsos/dashboard GET error:', err);
     return NextResponse.json(

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonComprimido } from "@/lib/http/json-comprimido";
 import { mensajeParaCliente } from "@/lib/errores";
 import { createPlantilla, listPlantillas } from "@/lib/compras/repo";
 import { guardCompras, esRechazo } from "@/lib/compras/guard";
@@ -9,12 +10,12 @@ export const dynamic = "force-dynamic";
 // `exigeTodo`: Las plantillas se leen desde el pedido nuevo, pero solo el ingeniero las guarda. Quien solo pide
 // material no tiene pantalla para esto, pero el proxy dejaba pasar la llamada.
 
-export async function GET() {
+export async function GET(req: Request) {
   const g = await guardCompras();
   if (esRechazo(g)) return g;
 
   try {
-    return NextResponse.json({ plantillas: await listPlantillas() });
+    return jsonComprimido(req, { plantillas: await listPlantillas() });
   } catch (e: any) {
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }

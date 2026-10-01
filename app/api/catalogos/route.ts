@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { getDb } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 
 // Catálogos para los selects del formulario de colaborador.
 // codigoDistrito e idPuesto son los FK granulares; el resto (departamento,
 // cantón, provincia) se deriva en la vista V_Colaborador.
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
@@ -32,7 +33,7 @@ export async function GET() {
     `),
   ]);
 
-  return NextResponse.json({
+  return jsonComprimido(req, {
     puestos: puestos.recordset,
     distritos: distritos.recordset,
     paises: paises.recordset,

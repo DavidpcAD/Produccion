@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { normalizarBloques, validarBloques } from '@/lib/cuadrillas';
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 1) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -40,7 +41,7 @@ export async function GET() {
     ORDER BY c.Nombre
   `);
 
-  return NextResponse.json({ data: result.recordset });
+  return jsonComprimido(req, { data: result.recordset });
 }
 
 export async function POST(req: NextRequest) {

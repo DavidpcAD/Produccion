@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getAdelanteDb } from '@/lib/db-adelantedb';
 import { guardConcreto, esRechazo } from '@/lib/concreto/guard';
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
       pagina,
       por_pagina: porPagina,
     });
-    return NextResponse.json(res);
+    return jsonComprimido(req, res);
   } catch (err: unknown) {
     const msg = mensajeParaCliente(err);
     console.error('/api/concreto/batches GET error:', err);
