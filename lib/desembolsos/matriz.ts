@@ -567,7 +567,6 @@ export async function listarDesembolsos(
         AND FechaPlaneada BETWEEN @desde AND @hasta;
     `);
 
-
   // Las seis consultas de arriba son INDEPENDIENTES entre si: cada una arma su
   // propio request con el mismo rango de fechas y ninguna mira lo que devolvio
   // otra. Encadenadas con await costaban seis viajes a Azure EN FILA —2.2 s
@@ -592,7 +591,6 @@ export async function listarDesembolsos(
     cpCancelacionesResultPromesa,
     casosConPagoLoteResultPromesa,
   ]);
-
 
   const desembolsos = result.recordset.map(toDesembolsoProyectado);
   const backlog = backlogResult.recordset.map(toDesembolsoProyectado);

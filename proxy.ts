@@ -130,8 +130,15 @@ export function proxy(request: NextRequest) {
     //
     // Si no tiene NINGUNA pantalla, va a "/" igual que siempre: esa es la que
     // sabe decirle que su rol no habilita nada.
-    const entrada = rutaDeEntrada(session.modules, session.nivelAdmin) ?? '/';
-    const destino = `${entrada}?sinacceso=${encodeURIComponent(nombreDeRuta(pathname))}`;
+    //
+    // Solo para PÁGINAS: a /api/* `rechazar` le contesta 403 con JSON y ni mira
+    // el destino, así que no tiene sentido calcularlo —esto corre en el proxy,
+    // o sea en CADA petición.
+    const esPagina = !pathname.startsWith('/api/');
+    const destino = esPagina
+      ? `${rutaDeEntrada(session.modules, session.nivelAdmin) ?? '/'}`
+        + `?sinacceso=${encodeURIComponent(nombreDeRuta(pathname))}`
+      : '/';
     return rechazar(request, pathname, {
       status: 403, error: 'No autorizado', destino,
     });
