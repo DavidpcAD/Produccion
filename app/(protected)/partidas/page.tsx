@@ -114,6 +114,12 @@ export default function PartidasPage() {
   // subpartida — no debe permitirse un sprint que no existe en el catálogo.
   const [sprintsCat, setSprintsCat] = useState<{ numero_global: number; codigo: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  // «No cargó» y «está vacío» son cosas distintas y se ven igual si no se
+  // distinguen: cuando /api/partidas falla —sesión vencida, 500, base caída—
+  // la pantalla decía "El catálogo de obra vivienda está vacío" e invitaba a
+  // crearlo o a traerlo de BC. El catálogo está lleno; lo que faltó fue la
+  // respuesta. Con esto se avisa del fallo y se ofrece reintentar.
+  const [falloCarga, setFalloCarga] = useState(false);
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState('');
 
@@ -184,23 +190,33 @@ export default function PartidasPage() {
   // administrativas. Cada etapa se queda marcada con el tipo del que vino.
   const load = useCallback(async () => {
     setLoading(true);
+    setFalloCarga(false);
     const fam = FAMILIAS.find(f => f.tipos.includes(tipoCodigo));
     const codigos = fam ? fam.tipos : [tipoCodigo];
-    const respuestas = await Promise.all(codigos.map(async (cod) => {
-      const qs = new URLSearchParams({ tipo: cod });
-      if (obraFiltro && !fam) qs.set('obra', obraFiltro);
-      const d: RespPartidas | null = await fetch(`/api/partidas?${qs}`)
-        .then(r => (r.ok ? r.json() : null)).catch(() => null);
-      return d ? { cod, d } : null;
-    }));
-    const vivos = respuestas.filter((r): r is { cod: string; d: RespPartidas } => !!r);
-    if (vivos.length > 0) {
-      setTipo(vivos[0].d.tipo ?? null);
-      setEtapas(vivos.flatMap(b => (b.d.etapas ?? []).map(e => ({ ...e, tipo: b.cod }))));
-      setPartidas(vivos.flatMap(b => b.d.partidas ?? []));
-      setSubpartidas(vivos.flatMap(b => b.d.subpartidas ?? []));
+    try {
+      const respuestas = await Promise.all(codigos.map(async (cod) => {
+        const qs = new URLSearchParams({ tipo: cod });
+        if (obraFiltro && !fam) qs.set('obra', obraFiltro);
+        const d: RespPartidas | null = await fetch(`/api/partidas?${qs}`)
+          .then(r => (r.ok ? r.json() : null)).catch(() => null);
+        return d ? { cod, d } : null;
+      }));
+      const vivos = respuestas.filter((r): r is { cod: string; d: RespPartidas } => !!r);
+      if (vivos.length > 0) {
+        setTipo(vivos[0].d.tipo ?? null);
+        setEtapas(vivos.flatMap(b => (b.d.etapas ?? []).map(e => ({ ...e, tipo: b.cod }))));
+        setPartidas(vivos.flatMap(b => b.d.partidas ?? []));
+        setSubpartidas(vivos.flatMap(b => b.d.subpartidas ?? []));
+      } else {
+        // NINGUNA respondió: no se toca lo que ya había en pantalla y se avisa.
+        setFalloCarga(true);
+      }
+    } catch {
+      setFalloCarga(true);
+    } finally {
+      // Siempre, pase lo que pase: si no, la pantalla se queda en esqueletos.
+      setLoading(false);
     }
-    setLoading(false);
   }, [tipoCodigo, obraFiltro]);
   useEffect(() => { load(); }, [load]);
 
@@ -629,7 +645,7 @@ export default function PartidasPage() {
                   aria-current={activo ? 'true' : undefined}
                   title={`${p.letra} = ${p.nombre}${detalle ? ` · ${detalle}` : ''}`}
                   className={'inline-flex items-center gap-1.5 rounded-ds px-3 py-1.5 text-label font-semibold transition-colors ' + (activo ? 'bg-black text-white' : 'text-ds-gray-500 hover:bg-ds-gray-100 hover:text-ds-ink')}>
-                  <span className={'font-mono text-body-sm font-bold ' + (activo ? 'text-white/60' : 'text-ds-gray-300')}>{p.letra}</span>
+                  <span className={'font-mono text-body-sm font-bold ' + (activo ? 'text-white/60' : 'text-ds-gray-400')}>{p.letra}</span>
                   {p.nombre}
                   {activo && partidas > 0 && <span className="text-body-sm font-normal text-white/70">{partidas}</span>}
                 </button>
@@ -683,6 +699,14 @@ export default function PartidasPage() {
 
         {loading ? (
           <div className="p-4 space-y-2">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        ) : falloCarga ? (
+          <div className="p-10 text-center">
+            <p className="text-ds-ink font-semibold">No se pudo cargar el catálogo.</p>
+            <p className="text-body-sm text-ds-gray-400 mt-1 mb-4 max-w-md mx-auto">
+              No es que esté vacío: el servidor no respondió. Si tu sesión venció, entrá de nuevo; si no, reintentá.
+            </p>
+            <Button variant="ghost" onClick={() => load()}>Reintentar</Button>
+          </div>
         ) : etapas.length === 0 ? (
           <div className="p-10 text-center">
             <p className="text-ds-gray-400">
