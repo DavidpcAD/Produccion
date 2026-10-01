@@ -252,8 +252,15 @@ function Segmented<T extends string>({ value, options, onChange, size = "md", va
 }) {
   if (variant === "pill") {
     // Pill full-width: las opciones se reparten el ancho; la activa es un pill negro grande.
+    //
+    // El fondo va con `--ds-surface`, no con `--ds-color-white`: el blanco es un
+    // color de marca LITERAL y no se invierte, así que en modo oscuro esta barra
+    // quedaba blanca y las opciones sin elegir —que usan `--ds-color-gray-500`,
+    // que ahí sí se invierte a gris claro— salían gris claro sobre blanco (1,68
+    // de contraste: ilegibles). `--ds-surface` es blanco en claro, así que el tema
+    // claro no cambia. Es el mismo token que usan .ds-btn--white/--ghost.
     return (
-      <div className="row gap-0" style={{ width: "100%", border: "1.5px solid var(--ds-color-gray-200)", borderRadius: 999, padding: 4, background: "var(--ds-color-white)", boxShadow: "var(--ds-shadow-01)" }}>
+      <div className="row gap-0" style={{ width: "100%", border: "1.5px solid var(--ds-color-gray-200)", borderRadius: 999, padding: 4, background: "var(--ds-surface)", boxShadow: "var(--ds-shadow-01)" }}>
         {options.map((o) => {
           const active = o.v === value;
           return (
