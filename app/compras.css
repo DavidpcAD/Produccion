@@ -227,7 +227,7 @@
 .oc-scope .ds-form-field--x .ds-form-field__input { border-color: var(--ds-color-green-100); box-shadow: none; }
 /* Advertencia (DS --advertencia) — borde rojo */
 .oc-scope .ds-form-field--advertencia .ds-form-field__input { border-color: var(--ds-color-red-100); box-shadow: none; }
-.oc-scope .ds-form-field--advertencia .ds-form-field__help { color: var(--ds-color-red-200); }
+.oc-scope .ds-form-field--advertencia .ds-form-field__help { color: var(--oc-rojo-txt); }
 .oc-scope .ds-form-field__help { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); padding-left: var(--ds-space-2); }
 .oc-scope .ds-form-field__input:disabled, .oc-scope .ds-form-field__select:disabled {
   background: var(--ds-color-gray-100);
@@ -305,6 +305,10 @@
      en si porque tambien es FONDO del toast de error y del punto de notificaciones, y
      ahi lleva texto blanco encima: aclararlo rompia esos dos. */
   --oc-rojo-chip: color-mix(in srgb, var(--ds-color-red-100) 65%, #fff);
+  /* El token de TEXTO rojo sigue al tema: en claro es el rojo oscurecido y en
+     oscuro, el aclarado. Asi cualquier cosa que lo use queda bien en los dos sin
+     tener que listarla aca abajo una por una. */
+  --oc-rojo-txt: var(--oc-rojo-chip);
 }
 /* 4.73:1 */
 :root[data-theme="dark"] .oc-scope .ds-badge--yellow,
@@ -677,7 +681,7 @@
 .oc-scope .dt-toolbar .segmented__btn svg { flex-shrink: 0; margin-right: 2px; }
 /* Encabezados numéricos alineados con sus datos (a la derecha) */
 .oc-scope .ds-table thead th.ds-num { text-align: right; }
-.oc-scope .ds-pending-text { color: var(--ds-color-red-200); font-weight: var(--ds-font-weight-semibold); }
+.oc-scope .ds-pending-text { color: var(--oc-rojo-txt); font-weight: var(--ds-font-weight-semibold); }
 
 /* Alta rápida de líneas (Ingeniería · nueva solicitud) */
 .oc-scope .qa-row { display: grid; grid-template-columns: 1fr 120px auto; gap: var(--ds-space-3); align-items: end; }
