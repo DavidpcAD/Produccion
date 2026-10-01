@@ -15,9 +15,13 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   }
 
   const { id } = await params;
+  const idColaborador = Number(id);
+  if (!Number.isInteger(idColaborador) || idColaborador <= 0) {
+    return NextResponse.json({ zonas: [] });
+  }
   const db = await getDb();
   const res = await db.request()
-    .input('id', sql.Int, parseInt(id))
+    .input('id', sql.Int, idColaborador)
     .query(`
       SELECT z.idZona, z.nombre AS zona, z.ubicacion,
              e.pin, e.estado,

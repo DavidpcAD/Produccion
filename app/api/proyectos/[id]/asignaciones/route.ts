@@ -13,9 +13,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
+  const idProyecto = Number(id);
   const ip = req.headers.get('x-forwarded-for') ?? '';
   const { idCol } = await req.json();
-  if (!idCol) return NextResponse.json({ error: 'Colaborador requerido' }, { status: 400 });
+  // Se validan antes de consultar: `sql.Int` manda un NaN como NULL y la fila
+  // entraría con idProyecto en NULL.
+  if (!Number.isInteger(idProyecto) || idProyecto <= 0) {
+    return NextResponse.json({ error: 'Proyecto no válido' }, { status: 400 });
+  }
+  if (!Number.isInteger(Number(idCol)) || Number(idCol) <= 0) {
+    return NextResponse.json({ error: 'Colaborador requerido' }, { status: 400 });
+  }
 
   const db = await getDb();
   try {
@@ -29,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const dup = await db.request()
       .input('idUsuario', sql.Int, idUsuario)
-      .input('idProyecto', sql.Int, parseInt(id))
+      .input('idProyecto', sql.Int, idProyecto)
       .query('SELECT idUsuarioProyecto FROM dbo.UsuarioProyecto WHERE idUsuario = @idUsuario AND idProyecto = @idProyecto');
     if (dup.recordset.length) {
       return NextResponse.json({ error: 'Esa persona ya está asignada a este proyecto' }, { status: 409 });
@@ -37,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const result = await db.request()
       .input('idUsuario', sql.Int, idUsuario)
-      .input('idProyecto', sql.Int, parseInt(id))
+      .input('idProyecto', sql.Int, idProyecto)
       .query(`
         INSERT INTO dbo.UsuarioProyecto (idUsuario, idProyecto)
         OUTPUT INSERTED.idUsuarioProyecto
@@ -48,8 +56,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       idColAccion: session.idCol,
       accion: 'ASIGNAR_PROYECTO',
       entidad: 'UsuarioProyecto',
-      idEntidad: parseInt(id),
-      detalleNuevo: { idUsuario, idProyecto: parseInt(id) },
+      idEntidad: idProyecto,
+      detalleNuevo: { idUsuario, idProyecto },
       ip,
     });
 
@@ -67,13 +75,28 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 
-  await params; // ruta con [id]
+  const { id } = await params;
+  const idProyecto = Number(id);
   const { idColProy } = await req.json();
+  if (!Number.isInteger(idProyecto) || idProyecto <= 0 || !Number.isInteger(idColProy) || idColProy <= 0) {
+    return NextResponse.json({ error: 'Datos no válidos' }, { status: 400 });
+  }
   const db = await getDb();
 
-  await db.request()
+  // El DELETE va atado al proyecto de la URL. Antes el `[id]` se descartaba a
+  // propósito y el id de la asignación venía suelto en el cuerpo, así que desde
+  // el endpoint de CUALQUIER proyecto se borraba una asignación de otro. Y como
+  // esto borra de verdad (no da de baja), la fila no volvía.
+  const r = await db.request()
     .input('id', sql.Int, idColProy)
-    .query('DELETE FROM dbo.UsuarioProyecto WHERE idUsuarioProyecto = @id');
+    .input('idProyecto', sql.Int, idProyecto)
+    .query('DELETE FROM dbo.UsuarioProyecto WHERE idUsuarioProyecto = @id AND idProyecto = @idProyecto');
+
+  // Si no borró nada, se dice: antes devolvía ok:true y la pantalla cantaba
+  // "Persona retirada del proyecto" sin haber retirado a nadie.
+  if (!r.rowsAffected[0]) {
+    return NextResponse.json({ error: 'Esa persona no está asignada a este proyecto' }, { status: 404 });
+  }
 
   return NextResponse.json({ ok: true });
 }
