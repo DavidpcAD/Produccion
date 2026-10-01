@@ -113,11 +113,18 @@ export function ComprasResumen({ k, filas }: { k: KpisCompras; filas: FilaProv[]
           // contesta se muestra la antigüedad, que sale de esta base y está de una.
           alerta={bc.datos
             ? (bc.datos.sinFecha.total > 0
-              ? `${corto(bc.datos.sinFecha.total)} sin fecha de entrega · ${bc.datos.sinFecha.proveedores} proveedores a los que preguntarle`
+              // "En BC" no es un detalle: este monto NO es una parte del pendiente
+              // de arriba. Ese sale de las órdenes de esta app; este, de TODAS las
+              // órdenes abiertas de Business Central, incluidas las que nunca
+              // pasaron por acá. Sin decirlo, un número más grande que el de la
+              // tarjeta se lee como un subconjunto y no cierra. (En SBX: 89
+              // órdenes en BC contra 29 en la app, medido el 2026-10-01.)
+              ? `En BC hay ${corto(bc.datos.sinFecha.total)} sin fecha de entrega · ${bc.datos.sinFecha.proveedores} proveedores a los que preguntarle`
               : null)
             : (() => { const d = diasDesde(k.vivo.masViejoISO, hoy); return d && d > 30 ? `lo más viejo lleva ${num.format(d)} días esperando` : null; })()}
           alertaTitulo={bc.datos && bc.datos.sinFecha.total > 0
             ? `${bc.datos.sinFecha.lineas} líneas en ${bc.datos.sinFecha.ordenes} órdenes con la fecha de entrega en blanco en Business Central. `
+              + `Es el total de BC, no una parte del pendiente de esta tarjeta: ahí entran también las órdenes que no se crearon desde esta app. `
               + `Las demás traen la fecha de la orden, que BC rellena solo: tampoco es una fecha que alguien haya prometido.`
             : undefined}
         />
