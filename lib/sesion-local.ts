@@ -41,3 +41,25 @@ export function limpiarDatosLocales(): void {
     // Modo privado o almacenamiento bloqueado: no hay nada guardado que limpiar.
   }
 }
+
+/** Borra lo de la persona anterior SOLO si quien acaba de entrar es otra.
+ *
+ *  Hace falta por el camino que no pasa por "Cerrar sesión": en una tableta
+ *  compartida lo normal es que la sesión se venza sola (dura 8 h) y que la
+ *  siguiente persona entre encima. Ahí nadie limpió nada.
+ *
+ *  Se compara contra el nombre que dejó guardado el store. Si es la MISMA
+ *  persona volviendo —sesión vencida, vuelve a entrar— no se toca nada: su
+ *  borrador la estaba esperando, que es justo lo que el aviso de sesión
+ *  vencida trata de proteger (ver components/layout/AvisoSesion.tsx).
+ *
+ *  Si no se sabe quién entró, no se borra: equivocarse hacia "no borrar" solo
+ *  deja un borrador de más; hacia "borrar" tira el trabajo de alguien. */
+export function limpiarSiEsOtraPersona(nombreQueEntra: string | null | undefined): void {
+  if (typeof window === 'undefined' || !nombreQueEntra) return;
+  let anterior: string | null = null;
+  try { anterior = window.localStorage.getItem('adelante_oc_usuario'); } catch { return; }
+  if (!anterior) return;
+  if (anterior.trim() === nombreQueEntra.trim()) return;
+  limpiarDatosLocales();
+}

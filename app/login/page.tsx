@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { limpiarSiEsOtraPersona } from '@/lib/sesion-local';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ds/Icon/Icon';
@@ -167,6 +168,14 @@ export default function LoginPage() {
         else toast(data?.error || 'Credenciales inválidas', 'error');
         return;
       }
+      // Tableta compartida: si entró OTRA persona, se va lo que dejó la
+      // anterior (su borrador de solicitud, su nombre). Si es la misma
+      // volviendo porque se le venció la sesión, no se toca nada. Ver
+      // lib/sesion-local.ts.
+      try {
+        const yo = await fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null));
+        limpiarSiEsOtraPersona(yo?.usuario?.nombre ?? yo?.nombre);
+      } catch { /* sin respuesta: no se borra nada (ver el comentario del helper) */ }
       toast('¡Bienvenido!', 'success');
       router.push(volverA);
     } catch {
