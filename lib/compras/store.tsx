@@ -245,6 +245,10 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     const p = api.bootstrap().then((b) => {
       setErrorCarga(null);
       ultimaCarga.current = Date.now();
+      // `null` = el servidor contestó 304: no cambió nada desde la última vez, así
+      // que no se toca el estado. Sin esto, cada refresco de 20 s re-pintaba el
+      // módulo entero con datos idénticos. Ver `api.bootstrap`.
+      if (!b) return;
       setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
     }).finally(() => { if (enVuelo.current === p) enVuelo.current = null; });
     enVuelo.current = p;
@@ -283,7 +287,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
           api.bootstrap()
             .then((b) => {
               ultimaCarga.current = Date.now();
-              setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+              if (b) setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
               setCargandoExtra(false);
             })
             .catch((e) => console.error("bootstrap completo", e));

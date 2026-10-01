@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { gzip as gzipCb } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 
 const gzip = promisify(gzipCb);
@@ -46,6 +47,29 @@ const gzip = promisify(gzipCb);
  *
  * No hay riesgo de doble compresión si algún día el App Service agrega la suya:
  * un proxy no vuelve a comprimir un cuerpo que ya trae `Content-Encoding`.
+ *
+ * ETAG: NO MANDAR LO MISMO DOS VECES
+ * ---------------------------------
+ * El store de Compras vuelve a pedir el bootstrap cada 20 s mientras la pestaña
+ * está a la vista (lib/compras/store.tsx, REFRESCO_MS), para enterarse de lo que
+ * crea Proveeduría en la base compartida. Son ~180 descargas por hora de la MISMA
+ * respuesta casi siempre: entre dos tics normalmente no cambió nada.
+ *
+ * Se le pone al cuerpo una huella (`ETag`). El cliente se la guarda EN MEMORIA y
+ * la manda de vuelta en `If-None-Match`; si no cambió nada se le contesta 304 sin
+ * cuerpo y él se queda con lo que ya tenía (ver `api.bootstrap` en
+ * lib/compras/api.ts). No se usa la caché del navegador —la respuesta sigue
+ * `no-store`— porque eso dejaría en el disco los precios y proveedores de todas
+ * las órdenes, y estas pantallas se usan en tabletas compartidas de obra.
+ *
+ * La huella se calcula sobre el cuerpo REAL, así que no puede quedar vieja — a
+ * diferencia de mirar una fecha de modificación, que dependería de que TODO el
+ * que escribe en esas tablas la mantenga (y a `dbo.OrdenCompra*` también le
+ * escribe la app de proveeduría, que es otro repo).
+ *
+ * `private` la deja fuera de cachés compartidas. Si entra otra persona en el
+ * mismo navegador, el servidor arma SU respuesta, la huella da distinta y vuelve
+ * un 200 con sus datos: no hay forma de que vea los del anterior.
  */
 
 /** Debajo de esto gzip agrega más de lo que quita. */
@@ -57,26 +81,44 @@ export async function jsonComprimido(
   init?: { status?: number; headers?: Record<string, string> },
 ): Promise<NextResponse> {
   const cuerpo = JSON.stringify(data);
+  const etag = `W/"${createHash('sha1').update(cuerpo).digest('base64url')}"`;
   const cabeceras: Record<string, string> = {
     'content-type': 'application/json; charset=utf-8',
     // Que las cachés intermedias no le sirvan la versión comprimida a un cliente
     // que no la pidió.
     vary: 'Accept-Encoding',
+    etag,
+    // `no-store`: la respuesta NO se guarda en el disco del navegador. El 304 de
+    // abajo NO depende de la caché del navegador — la huella la guarda el cliente
+    // en memoria y la manda a mano (ver lib/compras/api.ts). Se eligió así a
+    // propósito: con `no-cache` el navegador guardaría en disco los precios y los
+    // proveedores de todas las órdenes, cosa que hoy no pasa (el store solo
+    // persiste en localStorage en modo mock), y estas pantallas se usan en
+    // tabletas compartidas de obra.
+    ...(init?.headers?.['cache-control'] ? {} : { 'cache-control': 'no-store' }),
     ...(init?.headers ?? {}),
   };
 
+  // ¿El cliente ya tiene exactamente esto? 304 y se acabó. Solo para respuestas
+  // buenas: un error no se cachea.
+  const traia = req.headers.get('if-none-match');
+  const status = init?.status ?? 200;
+  if (traia && status === 200 && traia.split(',').some((t) => t.trim() === etag)) {
+    return new NextResponse(null, { status: 304, headers: cabeceras });
+  }
+
   const acepta = (req.headers.get('accept-encoding') ?? '').toLowerCase().includes('gzip');
   if (!acepta || Buffer.byteLength(cuerpo) < MINIMO_BYTES) {
-    return new NextResponse(cuerpo, { status: init?.status ?? 200, headers: cabeceras });
+    return new NextResponse(cuerpo, { status, headers: cabeceras });
   }
 
   try {
     const comprimido = await gzip(cuerpo, { level: 6 });
     return new NextResponse(new Uint8Array(comprimido), {
-      status: init?.status ?? 200,
+      status,
       headers: { ...cabeceras, 'content-encoding': 'gzip', 'content-length': String(comprimido.length) },
     });
   } catch {
-    return new NextResponse(cuerpo, { status: init?.status ?? 200, headers: cabeceras });
+    return new NextResponse(cuerpo, { status, headers: cabeceras });
   }
 }

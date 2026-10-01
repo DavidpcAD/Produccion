@@ -30,8 +30,41 @@ export interface SincronizacionBc {
   estados: Record<string, EstadoBcOrden>;
 }
 
+// ── Huella del bootstrap, en memoria ────────────────────────────────────────
+// El store vuelve a pedir el bootstrap cada 20 s mientras la pestaña está a la
+// vista (REFRESCO_MS en store.tsx), para enterarse de lo que crea Proveeduría en
+// la base compartida. Entre dos tics casi nunca cambió nada, y en AdelantePRO
+// eso son ~5 MB (~500 KB comprimidos) bajados 180 veces por hora para recibir
+// exactamente lo mismo.
+//
+// El servidor manda una huella del cuerpo (`ETag`, ver lib/http/json-comprimido.ts).
+// Acá se guarda y se devuelve en `If-None-Match`: si no cambió nada contesta 304
+// SIN cuerpo y `bootstrap()` devuelve `null`, que el store entiende como "lo que
+// hay en pantalla sigue vigente" y ni siquiera vuelve a parsear.
+//
+// La huella va en memoria y a mano, no por la caché del navegador: así la
+// respuesta puede seguir siendo `no-store` y no quedan precios ni proveedores
+// guardados en el disco de una tableta de obra.
+//
+// Es imposible que quede vieja: la huella se calcula sobre el cuerpo real, así
+// que cualquier cambio en los datos da una huella distinta y vuelve un 200.
+let etagBootstrap: string | null = null;
+
 export const api = {
-  bootstrap: (): Promise<Bootstrap> => fetch("/api/compras/bootstrap").then(jsonOrThrow),
+  /** `null` = el servidor contestó 304: no cambió nada desde la última vez. */
+  bootstrap: async (): Promise<Bootstrap | null> => {
+    const res = await fetch("/api/compras/bootstrap", {
+      headers: etagBootstrap ? { "If-None-Match": etagBootstrap } : undefined,
+      cache: "no-store",
+    });
+    if (res.status === 304) return null;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? `HTTP ${res.status}`);
+    }
+    etagBootstrap = res.headers.get("etag");
+    return res.json();
+  },
   /** Primera carga de Aprobación: solo la cola de pendientes, para pintar ya. Si el
    *  servidor no la pudo recortar (alcance "mis solicitudes"), viene sin `parcial`. */
   bootstrapCola: (): Promise<{ ordenes?: Orden[]; parcial?: boolean }> =>
