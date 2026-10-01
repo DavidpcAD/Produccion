@@ -169,7 +169,7 @@ export function Combobox({
     <div className="flex flex-col gap-1.5" ref={wrapRef}>
       {label && (
         <label htmlFor={labelId} className="text-sm font-semibold text-ds-ink">
-          {label}{required && <span className="text-ds-red ml-0.5">*</span>}
+          {label}{required && <span className="text-ds-red-ink ml-0.5">*</span>}
         </label>
       )}
       <div className="relative">
