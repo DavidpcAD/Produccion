@@ -206,7 +206,7 @@ export default function LoginPage() {
             </div>
             <div>
               <p className="text-white font-bold text-body leading-tight">Adelante</p>
-              <p className="text-white/40 text-xs">Desarrollos</p>
+              <p className="text-white/70 text-xs">Desarrollos</p>
             </div>
           </div>
 
@@ -232,7 +232,8 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <p className="text-white/20 text-xs">
+          {/* Estaba en white/20: 1,66:1 sobre el panel, o sea invisible. */}
+          <p className="text-white/60 text-xs">
             © {new Date().getFullYear()} Adelante Desarrollos
           </p>
         </div>
@@ -252,7 +253,7 @@ export default function LoginPage() {
           <div className="animate-fade-in">
             <div className="mb-8">
               <h2 className="text-heading font-bold text-ds-ink mb-1">Iniciar sesión</h2>
-              <p className="text-ds-gray-400 text-sm">Ingresa tu usuario y contraseña para continuar</p>
+              <p className="text-ds-gray-500 text-sm">Ingresá tu usuario y contraseña para continuar</p>
             </div>
 
             <form onSubmit={handleCredentials} className="space-y-4">
@@ -322,7 +323,8 @@ export default function LoginPage() {
             )}
           </div>
 
-          <p className="mt-10 text-center text-xs text-ds-gray-300">
+          {/* Estaba en ds-gray-300: 1,99:1. */}
+          <p className="mt-10 text-center text-xs text-ds-gray-500">
             Sistema interno · Adelante Desarrollos · {new Date().getFullYear()}
           </p>
         </div>
