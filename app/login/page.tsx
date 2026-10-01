@@ -170,12 +170,10 @@ export default function LoginPage() {
       }
       // Tableta compartida: si entró OTRA persona, se va lo que dejó la
       // anterior (su borrador de solicitud, su nombre). Si es la misma
-      // volviendo porque se le venció la sesión, no se toca nada. Ver
+      // volviendo porque se le venció la sesión, no se toca nada. El nombre
+      // viene en esta misma respuesta, así que no cuesta otro viaje. Ver
       // lib/sesion-local.ts.
-      try {
-        const yo = await fetch('/api/auth/me').then((r) => (r.ok ? r.json() : null));
-        limpiarSiEsOtraPersona(yo?.usuario?.nombre ?? yo?.nombre);
-      } catch { /* sin respuesta: no se borra nada (ver el comentario del helper) */ }
+      limpiarSiEsOtraPersona(data?.nombre);
       toast('¡Bienvenido!', 'success');
       router.push(volverA);
     } catch {

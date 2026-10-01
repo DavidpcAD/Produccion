@@ -87,7 +87,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
     }
     const token = signToken(payload);
-    const res = NextResponse.json({ ok: true });
+    // El nombre viaja en la respuesta para que el login pueda decidir, SIN otra
+    // ida al servidor, si quien entra es la misma persona de antes o es otra y
+    // hay que limpiar lo que dejó en esta tableta (ver lib/sesion-local.ts).
+    // No es un dato nuevo: es el de la sesión que se acaba de emitir.
+    const res = NextResponse.json({ ok: true, nombre: payload.nombre });
     setSessionCookie(res, token);
 
     // Entró bien: los fallos previos de esa cuenta dejan de contar.
