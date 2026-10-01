@@ -394,6 +394,11 @@ body {
 .app-nav__brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; opacity: 0; font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-body-md); transition: max-width .26s cubic-bezier(.34, 1.2, .5, 1), opacity .18s ease; }
 
 /* Ítems: gap:0 en colapsado para CENTRAR el ícono; ícono+texto al abrir. */
+/* Los textos apagados del menú: medidos sobre su propio fondo (rgb 42,42,42)
+   con el alfa compuesto, no a ojo. Estaban en .38 (rótulo de sección → 2.32:1,
+   ilegible) y .55 (subítems y el rol de la persona → 4.27, bajo el 4.5 de AA).
+   Subidos a .58 y .62: la jerarquía se mantiene —ítem .74 > subítem/rol .62 >
+   rótulo .58— y ninguno queda por debajo del mínimo. */
 .app-nav__item {
   position: relative;
   display: flex; align-items: center; gap: 0;
@@ -413,12 +418,12 @@ body {
 
 /* Submenú (solo se renderiza abierto): subcolumna con guía a la izquierda. */
 .app-nav__sub { margin: 2px 0 6px; padding-left: 30px; display: flex; flex-direction: column; gap: 2px; }
-.app-nav__subitem { display: block; padding: 6px 12px; border-radius: var(--ds-radius-md); font-size: var(--ds-font-size-label); color: rgba(255, 255, 255, 0.55); text-decoration: none; white-space: nowrap; transition: background .12s ease, color .12s ease; }
+.app-nav__subitem { display: block; padding: 6px 12px; border-radius: var(--ds-radius-md); font-size: var(--ds-font-size-label); color: rgba(255, 255, 255, 0.62); text-decoration: none; white-space: nowrap; transition: background .12s ease, color .12s ease; }
 .app-nav__subitem:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
 .app-nav__subitem.is-active { color: var(--ds-color-green-100); font-weight: var(--ds-font-weight-semibold); background: color-mix(in srgb, var(--ds-color-green-100) 12%, transparent); }
 
 /* Rótulo de sección "MENÚ" (visible solo al abrir, vía .app-nav__label) */
-.app-nav__section { padding: 0 12px; margin: var(--ds-space-2) 0 2px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.38); max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .26s ease, opacity .18s ease; }
+.app-nav__section { padding: 0 12px; margin: var(--ds-space-2) 0 2px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.58); max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .26s ease, opacity .18s ease; }
 
 /* Pie */
 .app-nav__foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding-top: var(--ds-space-2); }
@@ -436,7 +441,7 @@ body {
 .app-nav__avatar { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--ds-color-green-100); color: #000; font-weight: 700; font-size: 13px; }
 .app-nav__user-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .app-nav__user-name { font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); color: #fff; }
-.app-nav__user-role { font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+.app-nav__user-role { font-size: 11px; color: rgba(255, 255, 255, 0.62); }
 /* El nombre NO se corta con «…»: con tres apellidos ("Daniel Navarro Jimenez")
    el riel de 264px lo cortaba, y media firma no identifica a nadie. Baja de
    línea. Solo cuando el rótulo está a la vista: colapsado sigue mandando el
