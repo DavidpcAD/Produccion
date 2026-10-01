@@ -181,6 +181,26 @@ export function DataTable<T>({
   const labelDe = (colId: string) => (leaf.find((x) => x.id === colId)?.columnDef.meta as ColMeta | undefined)?.label ?? colId;
   const rows = table.getRowModel().rows;
 
+  // Lo que se muestra cuando no hay filas. Con filtro o búsqueda puesta NO es lo
+  // mismo que "no hay nada": la segunda tiene arreglo, así que se dice cuál es y
+  // se ofrece deshacerla. Mismo criterio que la tabla del DS.
+  const filtrosPuestos = columnFilters.length + (globalFilter ? 1 : 0);
+  const Vacio = () =>
+    filtrosPuestos > 0 ? (
+      <div className="empty">
+        Nada coincide con lo que buscaste.{" "}
+        <button
+          type="button"
+          className="link-btn"
+          onClick={() => { setColumnFilters([]); setGlobalFilter(""); }}
+        >
+          {filtrosPuestos === 1 ? "Quitar el filtro" : `Quitar los ${filtrosPuestos} filtros`}
+        </button>
+      </div>
+    ) : (
+      <div className="empty">{vacio}</div>
+    );
+
   // --- Exportar (CSV / PDF) — usa las filas FILTRADAS y las columnas visibles ---
   const valCelda = (row: any, colId: string): string => {
     try { const v = row.getValue(colId); if (v == null) return ""; return typeof v === "number" ? String(v) : String(v); }
@@ -337,9 +357,12 @@ export function DataTable<T>({
         />
       )}
 
+      {/* "No hay registros." decía lo mismo con y sin filtro puesto, y son dos
+          cosas distintas: la segunda tiene arreglo. Se dice cuál es y se ofrece
+          deshacerla. Mismo criterio que la tabla del DS. */}
       {/* Vista Grid (tarjetas) */}
       {modo === "grid" ? (
-        rows.length === 0 ? <div className="empty">{vacio}</div> : (
+        rows.length === 0 ? <Vacio /> : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
             {rows.map((row) => (
               <Card key={row.id} className={`dt-gridcard ${rowClassName?.(row.original) ?? ""}`.trim()} interactive={!!onRowClick} onClick={onRowClick ? () => onRowClick(row.original) : undefined}>
@@ -409,7 +432,7 @@ export function DataTable<T>({
                 ))}
               </thead>
               <tbody>
-                {rows.length === 0 && <tr><td colSpan={table.getVisibleLeafColumns().length + (renderExpanded ? 1 : 0)}><div className="empty">{vacio}</div></td></tr>}
+                {rows.length === 0 && <tr><td colSpan={table.getVisibleLeafColumns().length + (renderExpanded ? 1 : 0)}><Vacio /></td></tr>}
                 {rows.map((row) => {
                   const open = expanded.has(row.id);
                   return (
