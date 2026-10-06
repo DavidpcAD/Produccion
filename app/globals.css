@@ -323,6 +323,8 @@ body {
      80-90  internos de compras (.oc-scope: modal-overlay 80, combo__menu 90)
      100    portales de Combobox/DatePicker y los toasts
      110    .aviso-sesion — el aviso de sesión terminada, sobre absolutamente todo
+     115    .aviso-inactividad — la cuenta regresiva del minuto final
+     120    .bloqueo-sesion — la sesión ya cerrada por inactividad; nada va encima
    Un overlay por debajo de 60 queda TAPADO por el menú abierto en tablet (era el
    caso de los modales en z-50: se veían cortados y grises por el velo del menú).
    ─────────────────────────────────────────────────────────────────────────── */
@@ -372,6 +374,85 @@ body {
 .con-aviso-sesion .pila-toasts { top: calc(var(--alto-aviso, 56px) + var(--ds-space-4)); }
 @media (max-width: 760px) {
   .con-aviso-sesion .pila-toasts { top: calc(56px + var(--alto-aviso, 56px) + var(--ds-space-4)); }
+}
+
+/* ── Inactividad (components/layout/BloqueoInactividad.tsx) ──
+   Dos piezas de la misma historia: el aviso del minuto final y el bloqueo de
+   después. Van encima del aviso de sesión (110) porque este cierra la sesión de
+   verdad: lo que diga cualquier otra capa ya no se puede hacer. */
+
+/* El aviso: flotante y chico, no interrumpe. Abajo a la derecha en escritorio
+   —lejos del menú y del botón de la hamburguesa— y a lo ancho en móvil, donde
+   una tarjeta de 320px pegada a una esquina no se ve. */
+.aviso-inactividad {
+  position: fixed; z-index: 115;
+  right: var(--ds-space-4); bottom: var(--ds-space-4); max-width: min(420px, calc(100vw - var(--ds-space-6)));
+  display: flex; align-items: center; gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface); color: var(--ds-text);
+  border: 1px solid var(--ds-color-gray-200);
+  box-shadow: var(--ds-shadow-03-big);
+}
+.aviso-inactividad__icono { flex-shrink: 0; color: var(--color-ds-yellow-ink); display: grid; place-items: center; }
+.aviso-inactividad__texto {
+  flex: 1; min-width: 0;
+  font-size: var(--ds-font-size-label); line-height: 1.35;
+}
+.aviso-inactividad__texto strong { font-weight: var(--ds-font-weight-semibold); }
+@media (max-width: 760px) {
+  .aviso-inactividad { left: var(--ds-space-4); right: var(--ds-space-4); max-width: none; }
+}
+
+/* El bloqueo: velo opaco Y desenfoque. Las dos cosas — con solo oscurecer, los
+   montos y los nombres de atrás se siguen leyendo, que es justo lo que no puede
+   quedar a la vista en una tableta sola sobre la mesa. */
+.bloqueo-sesion {
+  position: fixed; inset: 0; z-index: 120;
+  display: grid; place-items: center;
+  padding: var(--ds-space-4);
+  background: rgba(0, 0, 0, 0.55);
+  /* Sin la copia `-webkit-` a mano: al compilar, Lightning CSS fusiona las dos
+     en una sola y se queda con la PREFIJADA, que el Chrome de hoy ya no
+     entiende — el velo quedaba oscuro pero nítido, con los nombres y los
+     montos de atrás perfectamente legibles (visto el 2026-10-06). El prefijo,
+     donde hace falta, lo pone él solo. */
+  backdrop-filter: blur(8px);
+}
+.bloqueo-sesion__panel {
+  width: 100%; max-width: 440px;
+  display: flex; flex-direction: column; gap: var(--ds-space-5);
+  padding: var(--ds-space-6);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface); color: var(--ds-text);
+  box-shadow: var(--ds-shadow-03-big);
+}
+.bloqueo-sesion__marca { display: flex; align-items: center; gap: var(--ds-space-2); }
+.bloqueo-sesion__marca-logo {
+  width: 28px; height: 28px; border-radius: var(--ds-radius-md);
+  background: var(--ds-color-green-100); color: #000;
+  display: grid; place-items: center;
+}
+.bloqueo-sesion__marca-nombre { font-weight: var(--ds-font-weight-semibold); font-size: var(--ds-font-size-body-md); }
+.bloqueo-sesion__cuerpo { display: flex; align-items: flex-start; gap: var(--ds-space-4); }
+.bloqueo-sesion__titulo {
+  margin: 0 0 var(--ds-space-2);
+  font-size: var(--ds-font-size-subtitle-lg); font-weight: var(--ds-font-weight-semibold); line-height: 1.2;
+}
+/* El texto envuelve entero: nada de cortarlo con puntos suspensivos. */
+.bloqueo-sesion__texto {
+  margin: 0;
+  font-size: var(--ds-font-size-body-md); line-height: 1.45; color: var(--ds-color-gray-500);
+}
+.bloqueo-sesion__arte {
+  flex-shrink: 0; width: 72px; height: 72px; border-radius: 50%;
+  background: var(--color-ds-green-soft); color: var(--color-ds-green-ink);
+  display: grid; place-items: center;
+}
+.bloqueo-sesion__arte svg { width: 32px; height: 32px; }
+/* En pantallas angostas el disco se queda sin espacio al lado del texto: se va. */
+@media (max-width: 460px) {
+  .bloqueo-sesion__arte { display: none; }
 }
 
 /* ── Sidebar (barmenu) — riel binario 72px ↔ 264px, solo por botón, sin hover.

@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ds/Button/Button';
 import { Icon } from '@/components/ds/Icon/Icon';
+import { useInactividad } from '@/hooks/useInactividad';
 import { irAlLogin, useSesionVencida } from '@/hooks/useSession';
 
 // ─── Aviso de sesión terminada ───────────────────────────────────────────────
@@ -19,7 +20,13 @@ import { irAlLogin, useSesionVencida } from '@/hooks/useSession';
 // Ocupa su propia franja en vez de flotar encima: así no le tapa el título de
 // la pantalla ni el botón del menú en móvil.
 export function AvisoSesion() {
-  const vencida = useSesionVencida();
+  const vencidaPorElServidor = useSesionVencida();
+  // Si la sesión la cerramos NOSOTROS por inactividad, el 401 que contesta el
+  // servidor desde ese momento es consecuencia, no noticia: lo que hay que leer
+  // es el bloqueo de encima, y esta barra solo repetiría el mensaje empujando la
+  // pantalla hacia abajo. Ver components/layout/BloqueoInactividad.tsx.
+  const { fase } = useInactividad();
+  const vencida = vencidaPorElServidor && fase !== 'cerrada';
   const barra = useRef<HTMLDivElement>(null);
 
   // Los toasts salen fijos arriba a la derecha, o sea encima de esta barra.

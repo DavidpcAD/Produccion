@@ -120,7 +120,10 @@ export default function LoginPage() {
   // página en un Suspense (esta se prerenderiza).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('sesion') === 'vencida') {
+    const sesion = params.get('sesion');
+    if (sesion === 'inactividad') {
+      toast('Tu sesión se cerró por inactividad. Entrá de nuevo.', 'warning');
+    } else if (sesion === 'vencida') {
       toast('Tu sesión terminó. Entrá de nuevo.', 'warning');
     }
     // Solo rutas internas: un destino como "//evil.com" o "https://evil.com"
