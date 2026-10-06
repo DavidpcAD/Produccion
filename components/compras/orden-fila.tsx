@@ -9,8 +9,9 @@ import {
 } from "@/components/compras/inventario-bc";
 import { useStore } from "@/lib/compras/store";
 import {
-  formatDate, money, num, numeroOrdenPlano, ordenAlmacenDestino, ordenConsumoDirecto,
-  ordenDevueltaPorBc, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas, ordenTotalConIva,
+  formatDate, formatDateTime, money, num, numeroOrdenPlano, ordenAlmacenDestino, ordenConsumoDirecto,
+  ordenDevueltaPorBc, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas,
+  ordenReabiertaTrasAprobar, ordenTotalConIva,
 } from "@/lib/compras/helpers";
 import type { Orden } from "@/lib/compras/types";
 
@@ -42,6 +43,10 @@ export function OrdenFila({
   const alm = ordenAlmacenDestino(orden);
   const maquinas = ordenMaquinas(orden, pedidos);
   const sinLanzarBc = ordenDevueltaPorBc(orden, movimientos);
+  // Ya se aprobó una vez y Proveeduría la volvió a abrir para cambiarle algo: hay que
+  // decirlo en la lista, antes de que alguien la vuelva a aprobar de corrido creyendo
+  // que es nueva.
+  const reab = ordenReabiertaTrasAprobar(orden, movimientos);
   const prov = proveedores.find((p) => p.id === orden.proveedorId);
   // La fecha NO va acá: ya se muestra arriba, al lado del número. Repetirla en esta
   // línea la sacaba dos veces en la misma tarjeta.
@@ -85,6 +90,13 @@ export function OrdenFila({
                 title={`El pedido ${orden.bcNumber} quedó sin lanzar en Business Central.`}>
                 <Icon name="traslado" size="sm" color="currentColor" />
                 Sin lanzar en BC
+              </span>
+            )}
+            {reab && (
+              <span className="ds-badge ds-badge--ink oc-marca"
+                title={`Ya se aprobó y se lanzó el ${formatDateTime(reab.fechaAprobacion)} (${reab.aprobadaPor}). ${reab.reabiertaPor} la volvió a abrir el ${formatDateTime(reab.fechaReapertura)}${reab.cambios.length ? ` y le quedaron ${reab.cambios.length} edición(es) después` : ""}. Abrila para ver qué le cambiaron.`}>
+                <Icon name="reloj" size="sm" color="currentColor" />
+                Ya aprobada · reabierta
               </span>
             )}
           </span>

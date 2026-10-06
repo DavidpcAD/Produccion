@@ -14,8 +14,8 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { useStore } from "@/lib/compras/store";
 import { aprobarYLanzar } from "@/lib/compras/aprobar";
 import {
-  bcEstadoBadge, money, numeroOrdenPlano, ordenConsumoDirecto, textoBuscableOrden,
-  ordenDevueltaPorBc, ordenTotalConIva,
+  bcEstadoBadge, formatDateTime, money, numeroOrdenPlano, ordenConsumoDirecto, textoBuscableOrden,
+  ordenDevueltaPorBc, ordenReabiertaTrasAprobar, ordenTotalConIva,
 } from "@/lib/compras/helpers";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
 import type { Movimiento, Orden } from "@/lib/compras/types";
@@ -35,7 +35,7 @@ const OTROS_ESTADOS: Vista[] = ["lanzado", "abierto", "completado"];
 // `corto`: el rótulo que entra en celular, donde las fichas se arrastran de lado.
 const VISTA: Record<Vista, { label: string; corto: string; vacio: string; ayuda: string }> = {
   pendientes: { label: "Pendientes", corto: "Pendientes", vacio: "No hay órdenes pendientes de aprobación.", ayuda: "Proveeduría ya las envió: falta aprobarlas o rechazarlas." },
-  atencion: { label: "Requieren atención", corto: "Atención", vacio: "Ninguna pendiente tiene problemas con Business Central.", ayuda: "Pendientes con algo trabado en Business Central: el último intento de lanzar falló, BC dice otra cosa, o el pedido quedó sin lanzar." },
+  atencion: { label: "Requieren atención", corto: "Atención", vacio: "Ninguna pendiente trae algo que mirar antes de aprobar.", ayuda: "Pendientes que no conviene aprobar de corrido: algo quedó trabado en Business Central (el último intento de lanzar falló, BC dice otra cosa, o el pedido quedó sin lanzar), o la orden YA se había aprobado y Proveeduría la volvió a abrir para cambiarle algo." },
   sin_bc: { label: "Sin lanzar en BC", corto: "Sin lanzar", vacio: "Ninguna orden quedó sin lanzar en Business Central.", ayuda: "Ya se aprobaron, pero el pedido quedó sin lanzar en BC: Bodega no puede recibir contra él." },
   lanzado: { label: "Lanzadas", corto: "Lanzadas", vacio: "Todavía no hay órdenes lanzadas.", ayuda: "Ya están en Business Central y el proveedor las tiene." },
   abierto: { label: "En proveeduría", corto: "Proveeduría", vacio: "No hay órdenes abiertas en proveeduría.", ayuda: "Todavía se están armando: aún no llegaron a aprobación." },
@@ -64,14 +64,17 @@ const ORDENES: { v: Orden_; label: string }[] = [
   { v: "menor", label: "Monto menor" },
 ];
 
-// "Requiere atención": la orden sigue pendiente pero algo quedó trabado del lado de BC y
-// aprobarla de nuevo sin mirar no la desatasca. Tres casos, todos reales:
+// "Requiere atención": la orden sigue pendiente pero NO es una más de la fila; leerla
+// como si fuera nueva se come algo. Cuatro casos, todos reales:
 //  · el pedido ya existe en BC pero quedó sin lanzar (BC devolvió la orden),
 //  · lo último que BC contestó contradice el estado de acá,
-//  · el último intento de lanzar falló y nadie la volvió a tocar.
+//  · el último intento de lanzar falló y nadie la volvió a tocar,
+//  · ya se había aprobado y Proveeduría la reabrió para cambiarle algo (lo que
+//    cambió es lo único que hay que revisar: lo demás ya se había firmado).
 function requiereAtencion(o: Orden, movs: Movimiento[], bcEstados: Record<string, EstadoBcOrden>): boolean {
   if (o.estado !== "pendiente_aprobacion") return false;
   if (ordenDevueltaPorBc(o, movs)) return true;
+  if (ordenReabiertaTrasAprobar(o, movs)) return true;
   const bc = bcEstados[o.id];
   if (bc && bcEstadoBadge(o.estado, bc).contradice) return true;
   const suyos = movs.filter((m) => m.entidad === "orden" && m.idEntidad === o.id);
@@ -205,11 +208,14 @@ export default function AprobacionPage() {
     return [...porMoneda].map(([m, v]) => money(v, m)).join(" · ");
   }, [seleccionadas]);
 
-  // Lo que cambia el peso de aprobar en lote: cuántas van contra la obra y cuántas
-  // arrastran un pedido sin lanzar en BC.
+  // Lo que cambia el peso de aprobar en lote: cuántas van contra la obra, cuántas
+  // arrastran un pedido sin lanzar en BC y cuántas ya se habían aprobado.
   const resumenLote = useMemo(() => ({
     cd: seleccionadas.filter((o) => ordenConsumoDirecto(o).hay).length,
     sinBc: seleccionadas.filter((o) => ordenDevueltaPorBc(o, movimientos)).length,
+    // Las que ya se habían aprobado y volvieron editadas: aprobar el lote de corrido
+    // vuelve a firmar algo que cambió después de la primera firma.
+    reab: seleccionadas.filter((o) => ordenReabiertaTrasAprobar(o, movimientos)).length,
   }), [seleccionadas, movimientos]);
 
   // Abrir una orden desde la lista: si el panel del proveedor está abierto, TIENE que
@@ -518,6 +524,10 @@ export default function AprobacionPage() {
                       <Icon name="traslado" size="sm" color="currentColor" />
                       {resumenLote.sinBc} sin lanzar en BC
                     </span>
+                    <span className={`oc-sel__aviso${resumenLote.reab > 0 ? " is-on" : ""}`}>
+                      <Icon name="reloj" size="sm" color="currentColor" />
+                      {resumenLote.reab} ya aprobada{resumenLote.reab === 1 ? "" : "s"} y reabierta{resumenLote.reab === 1 ? "" : "s"}
+                    </span>
                   </div>
 
                   <div className="oc-sel__lista-head">
@@ -530,6 +540,7 @@ export default function AprobacionPage() {
                     <ul className="oc-sel__lista">
                       {seleccionadas.map((o) => {
                         const cd = ordenConsumoDirecto(o);
+                        const re = ordenReabiertaTrasAprobar(o, movimientos);
                         return (
                           <li key={o.id} className={`oc-sel__item${ordenCentral === o.id ? " is-abierta" : ""}`}>
                             <button type="button" className="oc-sel__item-abrir"
@@ -546,6 +557,13 @@ export default function AprobacionPage() {
                                 <span className="ds-badge ds-badge--yellow oc-marca">
                                   <Icon name="alert" size="sm" color="currentColor" />
                                   Consumo directo{cd.parcial ? " (parcial)" : ""}
+                                </span>
+                              )}
+                              {re && (
+                                <span className="ds-badge ds-badge--ink oc-marca"
+                                  title={`Ya se aprobó el ${formatDateTime(re.fechaAprobacion)} y ${re.reabiertaPor} la volvió a abrir el ${formatDateTime(re.fechaReapertura)}.`}>
+                                  <Icon name="reloj" size="sm" color="currentColor" />
+                                  Ya aprobada · reabierta
                                 </span>
                               )}
                             </button>
@@ -650,6 +668,9 @@ export default function AprobacionPage() {
         const cuantas = unaPorConfirmar ? 1 : seleccionadas.length;
         const monto = unaPorConfirmar ? money(ordenTotalConIva(unaPorConfirmar), unaPorConfirmar.currencyCode) : montoLote;
         const cd = unaPorConfirmar ? (ordenConsumoDirecto(unaPorConfirmar).hay ? 1 : 0) : resumenLote.cd;
+        // Ya firmadas antes y reabiertas después: lo dice el diálogo, que es el último
+        // momento en que alguien puede frenar y mirar qué le cambiaron.
+        const re = unaPorConfirmar ? (ordenReabiertaTrasAprobar(unaPorConfirmar, movimientos) ? 1 : 0) : resumenLote.reab;
         const cerrar = () => { setConfirmLote(false); setConfirmOrden(null); };
         const enviar = () => {
           if (unaPorConfirmar) { const o = unaPorConfirmar; setConfirmOrden(null); void aprobar(o); }
@@ -679,6 +700,13 @@ export default function AprobacionPage() {
                   {cuantas === 1
                     ? "Va contra la obra (consumo directo): el material no entra a inventario."
                     : `${cd} ${cd === 1 ? "va" : "van"} contra la obra (consumo directo): el material no entra a inventario.`}
+                </p>
+              )}
+              {re > 0 && (
+                <p className="oc-confirmar__nota">
+                  {cuantas === 1
+                    ? "Ojo: esta orden YA se había aprobado y Proveeduría la volvió a abrir para cambiarle algo."
+                    : `Ojo: ${re} ${re === 1 ? "ya se había aprobado y la volvieron" : "ya se habían aprobado y las volvieron"} a abrir para cambiarles algo.`}
                 </p>
               )}
             </div>

@@ -13,7 +13,8 @@ import { useStore } from "@/lib/compras/store";
 import {
   bcEstadoBadge, formatDate, formatDateTime, money, num, numeroOrden, ordenAlmacenDestino, ordenBadge,
   ordenConsumoDirecto, ordenDevueltaPorBc, ordenEsDirecta, ordenLineaEsConsumoDirecto,
-  numeroOrdenPlano, ordenLineaImporte, ordenMaquinas, ordenPedidos, ordenTotalConIva, ROL_LABEL,
+  numeroOrdenPlano, ordenLineaImporte, ordenMaquinas, ordenPedidos, ordenReabiertaTrasAprobar,
+  ordenTotalConIva, ROL_LABEL,
 } from "@/lib/compras/helpers";
 import type { Orden, Pedido } from "@/lib/compras/types";
 
@@ -86,6 +87,10 @@ export function AprobacionDetalle({
   const pendiente = orden.estado === "pendiente_aprobacion";
   // Ya se aprobó una vez y BC devolvió la orden: el pedido allá quedó sin lanzar.
   const sinLanzarBc = ordenDevueltaPorBc(orden, movimientos);
+  // Ya se aprobó una vez y fue PROVEEDURÍA la que la volvió a abrir, para cambiarle
+  // algo antes de mandarla de nuevo. Lo que hay que leer antes de volver a firmarla es
+  // qué le cambiaron desde aquella aprobación, así que el aviso lo trae.
+  const reab = ordenReabiertaTrasAprobar(orden, movimientos);
   // Lo último que contestó BC. Si la orden ya dice "sin lanzar", repetirlo es ruido.
   const enBc = bcEstados[orden.id] && !(sinLanzarBc && bcEstados[orden.id] !== "lanzado")
     ? bcEstadoBadge(orden.estado, bcEstados[orden.id]) : null;
@@ -132,6 +137,11 @@ export function AprobacionDetalle({
             <Badge tone={b.tone}>{b.label}</Badge>
             {sinLanzarBc && (
               <Badge tone="red" title={`El pedido ${orden.bcNumber} quedó sin lanzar en Business Central.`}>Sin lanzar en BC</Badge>
+            )}
+            {reab && (
+              <Badge tone="ink" title={`Se aprobó el ${formatDateTime(reab.fechaAprobacion)} y ${reab.reabiertaPor} la volvió a abrir el ${formatDateTime(reab.fechaReapertura)}.`}>
+                Ya aprobada · reabierta
+              </Badge>
             )}
             {enBc && <Badge tone={enBc.tone} title="Estado real del pedido en Business Central (última sincronización)">{enBc.label}</Badge>}
           </div>
@@ -196,6 +206,31 @@ export function AprobacionDetalle({
                   <span className="oc-aviso__tit">Sin lanzar en Business Central</span>
                   La orden ya se había aprobado, pero el pedido {orden.bcNumber} quedó sin lanzar y Bodega no
                   puede recibir contra él. Volvé a lanzarlo: no se crea otro pedido.
+                </span>
+              </div>
+            )}
+
+            {reab && (
+              <div className="oc-aviso oc-aviso--amarillo">
+                <span className="oc-aviso__ic"><Icon name="reloj" size="sm" color="currentColor" /></span>
+                <span className="oc-aviso__txt">
+                  <span className="oc-aviso__tit">
+                    Esta orden ya se había aprobado{reab.veces > 1 ? ` ${reab.veces} veces` : ""} y la volvieron a abrir
+                  </span>
+                  Se aprobó y se lanzó el {formatDateTime(reab.fechaAprobacion)} ({reab.aprobadaPor}).
+                  {" "}{reab.reabiertaPor}{reab.rolReabrio ? ` · ${reab.rolReabrio}` : ""} la volvió a abrir el{" "}
+                  {formatDateTime(reab.fechaReapertura)} para cambiarle algo y la mandó de nuevo a aprobación.
+                  {orden.bcNumber ? ` Al aprobar se vuelve a lanzar el mismo pedido ${orden.bcNumber} en Business Central: no se crea otro.` : ""}
+                  <span className="ds-strong">
+                    {reab.cambios.length === 0
+                      ? "No quedó anotado ningún cambio: compará las líneas antes de volver a aprobarla."
+                      : `Lo que le cambiaron desde aquella aprobación (${reab.cambios.length}):`}
+                  </span>
+                  {reab.cambios.map((c, i) => (
+                    <span key={`${c.fecha}-${i}`} className="ds-wrap">
+                      · {formatDateTime(c.fecha)} · {c.usuario}{c.detalle ? ` · ${c.detalle}` : " · editó la orden (sin detalle)"}
+                    </span>
+                  ))}
                 </span>
               </div>
             )}

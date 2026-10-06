@@ -995,6 +995,66 @@ export function ordenDevueltaPorBc(
   return ult?.tipoMovimiento === "sincronizado_bc" && ult.estadoNuevo === "pendiente_aprobacion";
 }
 
+// ---- la orden ya se había aprobado y la volvieron a abrir ----
+// Proveeduría puede reabrir una orden YA LANZADA para corregirle algo —cambiar una
+// cantidad, agregar una línea, cambiar el precio— y volver a mandarla a aprobación.
+// Cuando eso pasa, la orden vuelve a la bandeja igual que una nueva y nada decía que
+// ya había pasado por acá: quien aprueba la lee de cero, sin saber que la firmó hace
+// una semana ni qué le tocaron después. Es justo lo que hay que mirar antes de volver
+// a aprobarla (y al aprobar se RELANZA el mismo pedido en BC, no se crea otro).
+//
+// Se lee de la bitácora: el último `aprobado_lanzado` y, DESPUÉS de él, un `reabierto`
+// (el que escribe "Volver a abrir" en Proveeduría). Ojo con el caso parecido pero
+// distinto: cuando es BC el que devuelve la orden el movimiento es `sincronizado_bc`,
+// nadie la editó, y de eso ya habla `ordenDevueltaPorBc` ("Sin lanzar en BC").
+export interface OrdenReabierta {
+  /** Cuántas veces se aprobó y lanzó ya (2 o más = van varias vueltas). */
+  veces: number;
+  /** La última aprobación: cuándo y quién la firmó. */
+  fechaAprobacion: string;
+  aprobadaPor: string;
+  /** La reapertura: cuándo, quién y de qué área. */
+  fechaReapertura: string;
+  reabiertaPor: string;
+  rolReabrio?: string;
+  /** Lo que le editaron desde que se reabrió, tal como quedó en la bitácora. */
+  cambios: { fecha: string; usuario: string; detalle?: string }[];
+}
+
+export function ordenReabiertaTrasAprobar(o: { id: string }, movimientos: Movimiento[]): OrdenReabierta | null {
+  // Por fecha y, cuando dos caen en el mismo instante, por el id de la bitácora (es
+  // correlativo). La lista llega al revés —la base la manda de la más nueva a la más
+  // vieja— y acá importa el ORDEN entre aprobar, reabrir y editar.
+  const suyos = movimientos
+    .filter((m) => m.entidad === "orden" && m.idEntidad === o.id)
+    .sort((a, b) => {
+      const d = a.fecha.localeCompare(b.fecha);
+      if (d !== 0) return d;
+      const na = Number(a.id), nb = Number(b.id);
+      return Number.isFinite(na) && Number.isFinite(nb) ? na - nb : 0;
+    });
+  const iAprob = suyos.map((m) => m.tipoMovimiento).lastIndexOf("aprobado_lanzado");
+  if (iAprob < 0) return null;
+  const despues = suyos.slice(iAprob + 1);
+  const iReab = despues.findIndex((m) => m.tipoMovimiento === "reabierto");
+  // Sin reapertura posterior la orden sigue aprobada (o volvió por otra vía): no hay
+  // nada que avisar.
+  if (iReab < 0) return null;
+  const aprob = suyos[iAprob];
+  const reab = despues[iReab];
+  return {
+    veces: suyos.filter((m) => m.tipoMovimiento === "aprobado_lanzado").length,
+    fechaAprobacion: aprob.fecha,
+    aprobadaPor: aprob.usuario,
+    fechaReapertura: reab.fecha,
+    reabiertaPor: reab.usuario,
+    rolReabrio: reab.rol ? ROL_LABEL[reab.rol] : undefined,
+    cambios: despues.slice(iReab + 1)
+      .filter((m) => m.tipoMovimiento === "editado")
+      .map((m) => ({ fecha: m.fecha, usuario: m.usuario, detalle: m.detalle?.trim() || undefined })),
+  };
+}
+
 // N.º con el que se conoce una orden. Desde que Proveeduría crea el Pedido de compra
 // en BC al enviar la orden a aprobación, TODA orden que llega acá ya existe allá: lo
 // que hay que mostrar es su N.º de BC, que es por el que se la busca, se la aprueba y
