@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { IconChevronDown } from "@/components/compras/icons";
 import { Icon } from "@/components/ds/Icon/Icon";
+import {
+  InventarioBoton, InventarioCelda, InventarioLinea, codigosConInventario,
+  useInventarioBc, useVerInventarioBc,
+} from "@/components/compras/inventario-bc";
 import { useStore } from "@/lib/compras/store";
 import {
   formatDate, money, num, numeroOrdenPlano, ordenAlmacenDestino, ordenConsumoDirecto,
@@ -26,6 +30,12 @@ export function OrdenFila({
 }) {
   const { proveedores, pedidos, movimientos } = useStore();
   const [verLineas, setVerLineas] = useState(false);
+
+  // El stock de BC solo se pide con las líneas abiertas Y el interruptor prendido:
+  // mirar el inventario es opcional y son consultas a BC por cada material.
+  const [verInv] = useVerInventarioBc();
+  const codigosInv = useMemo(() => codigosConInventario(orden.lineas), [orden.lineas]);
+  const { stock, estado: estadoInv } = useInventarioBc(codigosInv, verLineas && verInv);
 
   const articulos = orden.lineas.filter((l) => l.tipo === "articulo");
   const cd = ordenConsumoDirecto(orden);
@@ -97,6 +107,10 @@ export function OrdenFila({
         </button>
       </div>
 
+      {/* El inventario de BC es opcional: se pide solo cuando alguien lo enciende. Sin
+          materiales que consultar (una orden de puro cargo) no hay nada que ofrecer. */}
+      {verLineas && codigosInv.length > 0 && <InventarioBoton estado={estadoInv} />}
+
       {/* Las mismas líneas en dos formas: apiladas en celular, tabla en PC. */}
       {verLineas && (
         <div className="oc-fila__lista">
@@ -121,6 +135,7 @@ export function OrdenFila({
                   ? `${l.obra || l.proyecto} · tarea ${l.taskNo} · consumo directo`
                   : `${l.almacen || "Sin almacén"}${l.obra ? ` · la pidió la obra ${l.obra}` : ""}`}
               </div>
+              {verInv && <InventarioLinea linea={l} stock={stock} estado={estadoInv} />}
             </div>
           ))}
         </div>
@@ -130,7 +145,13 @@ export function OrdenFila({
         <div className="ds-table-wrap oc-fila__lineas">
           <table className="ds-table">
             <thead>
-              <tr><th>Descripción</th><th>Destino</th><th>Obra</th><th className="ds-num">Cantidad</th><th className="ds-num">Precio</th><th className="ds-num">Importe</th></tr>
+              <tr>
+                <th>Descripción</th><th>Destino</th><th>Obra</th><th className="ds-num">Cantidad</th>
+                {/* Al lado de la cantidad PEDIDA: lo que se compara es "pido 15" contra
+                    "ya hay 40", y en columnas separadas por el precio no se compara. */}
+                {verInv && <th className="ds-num">En inventario (BC)</th>}
+                <th className="ds-num">Precio</th><th className="ds-num">Importe</th>
+              </tr>
             </thead>
             <tbody>
               {orden.lineas.map((l) => (
@@ -146,6 +167,7 @@ export function OrdenFila({
                       un vistazo. Antes la obra se perdía en cuanto había almacén. */}
                   <td className="ds-muted ds-body-sm">{l.obra || l.proyecto || "—"}</td>
                   <td className="ds-num">{num.format(l.cantidad)} {l.unidad}</td>
+                  {verInv && <td className="ds-num"><InventarioCelda linea={l} stock={stock} estado={estadoInv} /></td>}
                   <td className="ds-num">{money(l.precioUnitario, orden.currencyCode)}</td>
                   <td className="ds-num ds-strong">{money(ordenLineaImporte(l), orden.currencyCode)}</td>
                 </tr>

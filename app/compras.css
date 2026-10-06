@@ -2842,3 +2842,66 @@
 .oc-scope button.oc-det__sol:hover .oc-det__sol-ir { color: var(--ds-color-green-200); }
 /* Tipo y estado de la solicitud, debajo del nombre en la ficha del panel. */
 .oc-scope .oc-det__sol-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* ---- "¿Esto ya lo tenemos?": el inventario de BC dentro de las líneas ----
+   Va apagado y se enciende con el botón de esta barra. Vive en la bandeja de
+   aprobación (la tarjeta de la lista y el riel de revisión). */
+.oc-scope .oc-inv__barra {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4) 0;
+}
+.oc-scope .oc-inv__barra .ds-btn { gap: 6px; }
+.oc-scope .oc-inv__aviso { font-size: var(--ds-font-size-body-sm); color: var(--color-ds-red-ink); }
+
+/* El dato en la celda de la tabla: el total arriba, y debajo cuánto hay en el
+   almacén al que va ESA línea (el total dice si lo tenemos; esto, si lo tenemos
+   donde hace falta). */
+.oc-scope .oc-inv__dato { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+/* En la tabla la columna es numérica: alineada a la derecha como las demás. */
+.oc-scope .ds-num .oc-inv__dato { align-items: flex-end; }
+.oc-scope .oc-inv__total {
+  font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums;
+  /* Cero no se pinta de rojo: no hay nada malo en comprar algo que no se tiene.
+     Solo se destaca el caso que cambia una decisión —ya hay existencias—. */
+  color: var(--ds-color-gray-400);
+}
+.oc-scope .oc-inv__total.is-hay { color: var(--color-ds-green-ink); }
+.oc-scope .oc-inv__dest, .oc-scope .oc-inv__desglose {
+  font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); line-height: 1.4;
+}
+
+/* La misma lectura apilada (celular y riel), donde no hay tooltip: el desglose
+   por almacén se escribe entero. */
+.oc-scope .oc-inv__fila {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: var(--ds-space-2); padding-top: var(--ds-space-2);
+  border-top: 1px dashed var(--ds-color-gray-100);
+  font-size: var(--ds-font-size-body-sm);
+}
+.oc-scope .oc-inv__rot { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); line-height: 1.35; }
+
+/* Dónde está el material: una línea por almacén, el código a la izquierda y la
+   cantidad a la derecha. En dos columnas donde haya ancho (el riel y la hoja de
+   celular son angostos y caen a una sola), porque un artículo repartido en veinte
+   almacenes de obra es lo normal acá. */
+.oc-scope .oc-inv__alm {
+  width: 100%; margin: 2px 0 0; padding: 0; list-style: none;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); column-gap: var(--ds-space-5);
+  font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400);
+}
+.oc-scope .oc-inv__alm-fila {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-space-3);
+  padding: 3px 0; border-bottom: 1px dotted var(--ds-color-gray-100); line-height: 1.4;
+}
+.oc-scope .oc-inv__alm-cod { min-width: 0; }
+/* La variante cuelga del código, no compite con él. */
+.oc-scope .oc-inv__alm-var { color: var(--ds-color-gray-300); }
+.oc-scope .oc-inv__alm-var::before { content: "·"; margin: 0 5px; }
+.oc-scope .oc-inv__alm-cant { flex: none; color: var(--ds-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.oc-scope .oc-inv__alm-mas {
+  align-self: flex-start; margin-top: 4px; padding: 0;
+  border: 0; background: none; cursor: pointer; font: inherit;
+  font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold);
+  color: var(--color-ds-green-ink); text-decoration: underline; text-underline-offset: 3px;
+}
+.oc-scope .oc-inv__alm-mas:hover { color: var(--ds-color-green-200); }

@@ -6,6 +6,9 @@ import { Badge } from "@/components/compras/ui";
 import { Icon, IconName } from "@/components/ds/Icon/Icon";
 import { Timeline } from "@/components/compras/timeline";
 import { AprobarControl } from "@/components/compras/aprobar-control";
+import {
+  InventarioBoton, InventarioLinea, codigosConInventario, useInventarioBc, useVerInventarioBc,
+} from "@/components/compras/inventario-bc";
 import { useStore } from "@/lib/compras/store";
 import {
   bcEstadoBadge, formatDate, formatDateTime, money, num, numeroOrden, ordenAlmacenDestino, ordenBadge,
@@ -43,6 +46,12 @@ export function AprobacionDetalle({
   const { proveedores, pedidos, movimientos, bcEstados, cargandoExtra, cargarMovimientos } = useStore();
   const [tab, setTab] = useState<Tab>(tabInicial);
   const marco = useRef<HTMLElement>(null);
+
+  // Cuánto hay de cada material en BC. Es opcional —el mismo interruptor que en la
+  // lista— y solo se consulta estando en "Líneas", que es donde se muestra.
+  const [verInv] = useVerInventarioBc();
+  const codigosInv = useMemo(() => codigosConInventario(orden.lineas), [orden.lineas]);
+  const { stock, estado: estadoInv } = useInventarioBc(codigosInv, tab === "lineas" && verInv);
 
   useEffect(() => { void cargarMovimientos([{ entidad: "orden", id: orden.id }]); }, [orden.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -252,6 +261,7 @@ export function AprobacionDetalle({
               <span className="oc-det__rot">Total de la orden · IVA incluido</span>
               <span className="oc-det__total-num">{money(ordenTotalConIva(orden), orden.currencyCode)}</span>
             </div>
+            {codigosInv.length > 0 && <InventarioBoton estado={estadoInv} />}
             {orden.lineas.map((l, i) => (
               <div key={l.id} className="oc-det__linea">
                 <div className="oc-det__linea-tit">
@@ -295,6 +305,7 @@ export function AprobacionDetalle({
                     Almacén {l.almacen || "—"}{l.obra ? ` · la pidió la obra ${l.obra}` : ""}
                   </div>
                 )}
+                {verInv && <InventarioLinea linea={l} stock={stock} estado={estadoInv} />}
               </div>
             ))}
           </div>
