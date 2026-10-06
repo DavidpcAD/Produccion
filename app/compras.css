@@ -2419,19 +2419,11 @@
 }
 
 /* PC angosto (una ventana de ~1000px, que es lo normal con el navegador a medias):
-   sigue siendo el diseño de escritorio, pero el riel adelgaza y el distintivo baja a
-   su propio renglón en vez de comerle el ancho al nombre del proveedor. */
+   el riel adelgaza. Cómo se acomoda la TARJETA de la orden ya no se decide acá: no
+   depende del ancho de la ventana sino del de su propia columna (ver el bloque de
+   @container al final del archivo). */
 @media (min-width: 901px) and (max-width: 1279px) {
   .oc-scope .oc-bandeja { grid-template-columns: minmax(0, 1fr) 400px; }
-  .oc-scope .oc-fila__abrir { flex-wrap: wrap; row-gap: var(--ds-space-2); }
-  /* 200px de base: con 260 el monto no entraba al lado y se caía al renglón de
-     abajo, que es justo lo que se quería evitar. */
-  .oc-scope .oc-fila__id { flex: 1 1 200px; }
-  .oc-scope .oc-fila__total { order: 2; width: auto; min-width: 130px; margin-left: auto; }
-  .oc-scope .oc-fila__marcas { order: 3; width: auto; }
-  .oc-scope .oc-det__cuerpo, .oc-scope .oc-det__head, .oc-scope .oc-det__tabs, .oc-scope .oc-det__pie {
-    padding-left: var(--ds-space-4); padding-right: var(--ds-space-4);
-  }
 }
 
 /* ---- El riel deja de ser columna y sube desde abajo ---- */
@@ -2682,11 +2674,19 @@
 .oc-scope .oc-prov-orden__chips { display: flex; flex-wrap: wrap; gap: 5px; }
 
 /* ---- La tercera columna. Si no hay lugar para las tres, el proveedor ocupa el
-   lugar del riel y se vuelve a la orden con "Volver". ---- */
-@media (min-width: 1500px) {
+   lugar del riel y se vuelve a la orden con "Volver".
+
+   1700 y no 1500: las dos columnas de la derecha se llevan 860px fijos, y el menú
+   de la izquierda, abierto, otros ~240. En una ventana de 1500 a la lista le
+   quedaban ~400px —el N.º de orden partido en dos renglones, el nombre del
+   proveedor hecho tiras y el monto cortado por el `overflow: hidden` de la
+   tarjeta—. A 1700 la lista arranca en ~600 y de ahí para arriba, que es donde
+   mirar las tres cosas a la vez de verdad sirve. Abajo de eso el proveedor ocupa
+   el lugar del riel, que es el mismo trato que ya había. ---- */
+@media (min-width: 1700px) {
   .oc-scope .oc-bandeja.tiene-central { grid-template-columns: minmax(0, 1fr) 380px 480px; }
 }
-@media (min-width: 901px) and (max-width: 1499px) {
+@media (min-width: 901px) and (max-width: 1699px) {
   .oc-scope .oc-bandeja.tiene-central { grid-template-columns: minmax(0, 1fr) 440px; }
   .oc-scope .oc-bandeja.tiene-central .oc-riel:not(.oc-riel--central) { display: none; }
 }
@@ -2905,3 +2905,61 @@
   color: var(--color-ds-green-ink); text-decoration: underline; text-underline-offset: 3px;
 }
 .oc-scope .oc-inv__alm-mas:hover { color: var(--ds-color-green-200); }
+
+/* ==========================================================================
+   APROBACIÓN · LA COLUMNA MANDA, NO LA VENTANA
+   La bandeja es una rejilla de columnas fijas: abrir el panel del proveedor le
+   quita 380px a la lista SIN que la ventana cambie de ancho. Con media queries
+   —que solo saben de la ventana— la tarjeta seguía creyéndose ancha: el bloque
+   de identificación (N.º, proveedor, fecha · líneas) se quedaba en 0px, el texto
+   se partía letra por letra y el monto se salía de la tarjeta, donde el
+   `overflow: hidden` se lo comía. Medido en una ventana de 1500 con las tres
+   columnas: `.oc-fila__id` = 0.
+   `container-type: inline-size` hace medible el ancho de la columna, y la
+   tarjeta se acomoda a ÉL. Va de 901 para arriba porque abajo de eso la pastilla
+   de selección es `position: fixed` DENTRO de la lista y la contención la dejaría
+   flotando respecto de la lista, no de la pantalla.
+   Este bloque va AL FINAL a propósito: las reglas de @container no suman
+   especificidad, así que para ganarle a las de arriba (el ancho fijo del monto en
+   el bloque de 901, p. ej.) tienen que venir después.
+   ========================================================================== */
+@media (min-width: 901px) {
+  .oc-scope .oc-bandeja__lista { container: oc-lista / inline-size; }
+  .oc-scope .oc-riel { container: oc-riel / inline-size; }
+}
+
+/* 720px es lo que pide la tarjeta entera en un renglón: identificación (200 como
+   mínimo legible) + distintivos (186) + monto (180) + los dos huecos de 16, más
+   la casilla, el chevron y el relleno de la tarjeta (~123). Abajo de eso el monto
+   sube al primer renglón —pegado a la derecha— y los distintivos bajan al suyo,
+   en vez de comerle el ancho al nombre del proveedor. */
+@container oc-lista (max-width: 720px) {
+  .oc-scope .oc-fila__abrir { flex-wrap: wrap; row-gap: var(--ds-space-2); }
+  /* 200px de base: con 260 el monto no entraba al lado y se caía al renglón de
+     abajo, que es justo lo que se quería evitar. */
+  .oc-scope .oc-fila__id { flex: 1 1 200px; }
+  .oc-scope .oc-fila__total { order: 2; width: auto; min-width: 130px; margin-left: auto; }
+  /* Renglón propio y ENCOGIBLE. Con `flex: 0 0 auto` (lo que hereda) la tira de
+     distintivos se quedaba en su ancho natural —"Consumo directo" + "Sin lanzar en
+     BC" piden 276px— y se salía de una tarjeta de 221, donde el `overflow: hidden`
+     le cortaba el final. Con base 100% baja sola y los distintivos se parten entre
+     sí. Vacía no ocupa: si no, deja un renglón en blanco de puro row-gap. */
+  .oc-scope .oc-fila__marcas { order: 3; flex: 1 1 100%; width: auto; min-width: 0; }
+  .oc-scope .oc-fila__marcas:empty { display: none; }
+}
+
+/* Más angosta todavía (la lista con el panel del proveedor abierto en una ventana
+   de 1700): el rótulo largo de la ficha empuja a las demás a un tercer renglón.
+   Es el mismo rótulo corto que ya usa el celular. */
+@container oc-lista (max-width: 560px) {
+  .oc-scope .oc-ficha__largo { display: none; }
+  .oc-scope .oc-ficha__corto { display: inline; }
+}
+
+/* El riel, igual: con las tres columnas mide 380 —más angosto que los 400 del PC
+   chico— y hasta ahora conservaba el relleno de 24 de la versión ancha. */
+@container oc-riel (max-width: 420px) {
+  .oc-scope .oc-det__cuerpo, .oc-scope .oc-det__head, .oc-scope .oc-det__tabs, .oc-scope .oc-det__pie {
+    padding-left: var(--ds-space-4); padding-right: var(--ds-space-4);
+  }
+}
