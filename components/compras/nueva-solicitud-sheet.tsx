@@ -176,8 +176,11 @@ const F_TIPOS: { v: FTipo; label: string }[] = [
 const ordenarMatches = (items: Item[], q: string) => buscarOrdenado(items, q, (i) => [i.title, i.sub ?? ""]);
 const filtrar = (items: Item[], q: string, max = 40) => ordenarMatches(items, q).slice(0, max);
 const MAX_MAT = 60; // resultados visibles del buscador de materiales
-// A partir de cuántas variantes se muestra el buscador dentro del selector.
+// A partir de cuántas opciones (variantes, actividades) se muestra el buscador
+// dentro del selector. Con pocas no vale la pena el campo.
 const MIN_BUSCAR_VAR = 6;
+// Campo de búsqueda ARRIBA de una lista desplegada (variantes, actividades).
+const BUSCADOR_LISTA: React.CSSProperties = { width: "100%", margin: "2px 0 8px", height: 38, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", padding: "0 14px", fontSize: 14, outline: "none" };
 // Ningún TIPO se queda fuera de la ventana visible: si entre los primeros MAX no
 // entró ningún servicio (o ningún no inventariable) pero sí hay coincidencias de
 // ese tipo, se agregan las mejores al final. Pasaba con términos muy cortos ("s"),
@@ -441,8 +444,7 @@ function VarianteBtn({ variantes, value, onPick }: {
       <Popover anchorRef={wrapRef} open={open} onClose={() => { setOpen(false); setQ(""); }} minWidth={260}>
         <div style={{ width: "100%", padding: 8 }}>
           {conBuscador && (
-            <input ref={buscaRef} value={q} autoFocus placeholder="Buscar variante…" onChange={(e) => setQ(e.target.value)}
-              style={{ width: "100%", margin: "2px 0 8px", height: 38, borderRadius: 999, border: "1.5px solid var(--ds-color-gray-200)", background: "var(--ds-surface)", padding: "0 14px", fontSize: 14, outline: "none" }} />
+            <input ref={buscaRef} value={q} autoFocus placeholder="Buscar variante…" onChange={(e) => setQ(e.target.value)} style={BUSCADOR_LISTA} />
           )}
           <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 260 }}>
             {variantes.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin variantes.</div>}
@@ -622,11 +624,16 @@ function MaterialSearch({ items, onAdd, compact }: {
 }
 
 // ─── Actividad (Job Task) de la obra — para Consumo inmediato. Trae las tareas de
-//     POSTEO del proyecto (jobNo = código de obra) desde BC. ──────────────────────
+//     POSTEO del proyecto (jobNo = código de obra) desde BC.
+//     Una obra trae decenas de tareas y la lista venía sin filtro: había que
+//     desplazarse entera para dar con "3.7 · Pozo Potable". Ahora, igual que en el
+//     selector de variante, hay un campo arriba de la lista: se escribe el número
+//     o parte del nombre y la lista se acorta (pedido de obra, 2026-10-07). ──────
 function TareaPicker({ obra, value, valueNombre, onPick }: {
   obra?: string; value?: string; valueNombre?: string; onPick: (taskNo: string, nombre: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const [tasks, setTasks] = useState<{ jobTaskNo: string; descripcion: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -646,9 +653,14 @@ function TareaPicker({ obra, value, valueNombre, onPick }: {
     return () => { cancel = true; };
   }, [obra]);
   const has = !!value;
+  const conBuscador = tasks.length > MIN_BUSCAR_VAR;
+  // Busca por número de tarea Y por nombre, por palabras y sin tildes: "pozo" y
+  // "3.7" llegan a la misma actividad. El orden es por relevancia (buscarOrdenado).
+  const lista = useMemo(() => buscarOrdenado(tasks, q, (t) => [t.jobTaskNo, t.descripcion]), [tasks, q]);
+  const cerrar = () => { setOpen(false); setQ(""); };
   return (
     <div ref={ref} style={{ display: "inline-flex", minWidth: 0, flex: 1 }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="ds-body-sm"
+      <button type="button" onClick={() => (open ? cerrar() : setOpen(true))} className="ds-body-sm"
         style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 40, padding: "0 12px", borderRadius: 10, cursor: "pointer",
           background: "var(--ds-surface)", border: `1.5px solid ${has ? "var(--ds-color-green-100)" : "var(--ds-color-gray-200)"}`, color: has ? "var(--ds-color-ink)" : "var(--ds-color-gray-400)", textAlign: "left" }}>
         <Icon name="calculator" size="sm" color="currentColor" />
@@ -656,17 +668,24 @@ function TareaPicker({ obra, value, valueNombre, onPick }: {
           {has ? `${value} · ${valueNombre ?? ""}` : "Elegí actividad (tarea)…"}
         </span>
       </button>
-      <Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} minWidth={320}>
-        <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 300, padding: 6 }}>
-          {loading && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Cargando actividades…</div>}
-          {!loading && tasks.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin actividades para esta obra.</div>}
-          {!loading && tasks.map((t) => (
-            <button key={t.jobTaskNo} type="button" onClick={() => { onPick(t.jobTaskNo, t.descripcion); setOpen(false); }}
-              className="nsl-opt row" style={{ gap: 10, alignItems: "center", width: "100%", textAlign: "left", padding: "10px 12px", border: 0, borderRadius: 10, cursor: "pointer", background: t.jobTaskNo === value ? "var(--ds-color-gray-100)" : "transparent" }}>
-              <span className="ds-label ds-strong" style={{ minWidth: 36, flexShrink: 0 }}>{t.jobTaskNo}</span>
-              <span className="ds-body-sm">{t.descripcion}</span>
-            </button>
-          ))}
+      <Popover anchorRef={ref} open={open} onClose={cerrar} minWidth={320}>
+        <div style={{ width: "100%", padding: 8 }}>
+          {conBuscador && (
+            <input value={q} autoFocus placeholder="Buscar actividad por número o nombre…" aria-label="Buscar actividad"
+              onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") cerrar(); }} style={BUSCADOR_LISTA} />
+          )}
+          <div className="nsl-list" style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: 300 }}>
+            {loading && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Cargando actividades…</div>}
+            {!loading && tasks.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Sin actividades para esta obra.</div>}
+            {!loading && tasks.length > 0 && lista.length === 0 && <div className="ds-muted ds-body-sm" style={{ padding: 12, textAlign: "center" }}>Ninguna actividad coincide con “{q}”.</div>}
+            {!loading && lista.map((t) => (
+              <button key={t.jobTaskNo} type="button" onClick={() => { onPick(t.jobTaskNo, t.descripcion); cerrar(); }}
+                className="nsl-opt row" style={{ gap: 10, alignItems: "center", width: "100%", textAlign: "left", padding: "10px 12px", border: 0, borderRadius: 10, cursor: "pointer", background: t.jobTaskNo === value ? "var(--ds-color-gray-100)" : "transparent" }}>
+                <span className="ds-label ds-strong" style={{ minWidth: 36, flexShrink: 0 }}>{t.jobTaskNo}</span>
+                <span className="ds-body-sm">{t.descripcion}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </Popover>
     </div>
