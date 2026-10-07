@@ -7,7 +7,8 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
 import { useStore } from "@/lib/compras/store";
-import { destinoLabel, num, pedidoLineaDadaDeBaja, pedidoLineaPorRecibir, recibidoDeLineaPedido, tipoSolicitudBadge, destinoDeLinea } from "@/lib/compras/helpers";
+import { useSession } from "@/hooks/useSession";
+import { destinoLabel, ingenieroVeSoloLoSuyo, num, pedidoEsDelUsuario, pedidoLineaDadaDeBaja, pedidoLineaPorRecibir, recibidoDeLineaPedido, tipoSolicitudBadge, destinoDeLinea } from "@/lib/compras/helpers";
 import type { TipoSolicitud } from "@/lib/compras/types";
 
 type Fila = {
@@ -21,8 +22,17 @@ type Fila = {
 };
 
 export default function SeguimientoPage() {
-  const { pedidos, ordenes } = useStore();
+  const { pedidos: pedidosAll, ordenes } = useStore();
+  const me = useSession();
   const router = useRouter();
+
+  // Un ingeniero de obra sigue SOLO lo suyo: sus solicitudes, nunca las de los demás
+  // (decisión 2026-10-07). El Super Admin ve todas. `recibidoDeLineaPedido` puede seguir
+  // mirando todas las órdenes: una línea solo calza con las órdenes de SU propio pedido.
+  const pedidos = useMemo(
+    () => (ingenieroVeSoloLoSuyo(me) ? pedidosAll.filter((p) => pedidoEsDelUsuario(p, me)) : pedidosAll),
+    [pedidosAll, me],
+  );
 
   // OJO con "Por recibir": las solicitudes ARCHIVADAS siguen en la lista a propósito.
   // Archivarlas no cancela las órdenes que ya salieron (si le ordenaron 10 y recibió 4,

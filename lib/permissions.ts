@@ -139,7 +139,12 @@ export type Modulo =
   //     lo mismo que un ingeniero, solo en "Mis solicitudes".
   //   · 'recepcion' RECIBE el material y sus facturas ("Órdenes por recibir" /
   //     "Recibidas"). Lo lleva Fábrica de Maderas, que pide Y recibe lo suyo.
-  | 'bodega' | 'recepcion' | 'admin';
+  | 'bodega' | 'recepcion' | 'admin'
+  // 'cuadrillas' es su PROPIO módulo, aparte de 'ingenieria'. Antes Cuadrillas
+  // colgaba del módulo 'ingenieria' —el mismo de Órdenes de Compra— así que todo
+  // ingeniero de obra la veía. No le corresponde: la llevan el Super Admin y el rol
+  // legacy "Jefe de cuadrillas" (que entra por nivel, sin módulo de Producción).
+  | 'cuadrillas';
 
 /** ── Interruptor de "Avance de obra" ──────────────────────────────────────
  *  El módulo está incompleto, así que NO sale a producción todavía: en `false`
@@ -150,7 +155,7 @@ export type Modulo =
 export const AVANCE_OBRA_ACTIVO = false;
 
 const MODULOS_BASE: Modulo[] =
-  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin'];
+  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas'];
 
 /** Módulos publicados (los apagados no salen para nadie). */
 export const MODULOS_TODOS: Modulo[] =
@@ -169,6 +174,7 @@ const NOMBRE_MODULO: Record<Modulo, string> = {
   bodega: 'Órdenes de Compra',
   recepcion: 'Recibir material',
   admin: 'Administración',
+  cuadrillas: 'Cuadrillas',
 };
 
 /** Pantallas que comparten módulo pero tienen nombre propio. Casi todas caen en
@@ -255,8 +261,9 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   if (n.startsWith('superadmin') || n === 'super admin' || n === 'administrador' ||
       t === 'super admin' || t === 'superadmin' || t === 'superadministrador') return '*';
   if (n === 'presupuestista') return ['presupuesto'];
-  // Ingeniería = Órdenes de Compra + Cuadrillas ('ingenieria') y Avance de obra
-  // ('avance'). Si Avance está apagado, computeAllowedModules lo saca.
+  // Ingeniería = Órdenes de Compra ('ingenieria') y Avance de obra ('avance'). Si
+  // Avance está apagado, computeAllowedModules lo saca. NO lleva 'cuadrillas' a
+  // propósito: el ingeniero de obra no administra cuadrillas (decisión 2026-10-07).
   if (n === 'ingenieria' || n === 'ingeniería' || n === 'ingeniero' || n.startsWith('ingeniero ')) return ['ingenieria', 'avance'];
   if (n === 'administracion' || n === 'administración') {
     // Digitación (jessieCor): decisión de David 21/08/2026 — este rol pasa a ser SOLO
@@ -363,7 +370,11 @@ export function getRouteModule(pathname: string): Modulo {
   // Aprobación OC es solo de Super Admin (no de los ingenieros).
   if (p.startsWith('/compras/aprobacion')) return 'admin';
   if (p.startsWith('/avance')) return 'avance';
-  if (p.startsWith('/cuadrillas') || p.startsWith('/encargados') || p.startsWith('/compras')) return 'ingenieria';
+  // Cuadrillas es su PROPIO módulo: el ingeniero de obra NO la ve (en Compras ve solo
+  // lo suyo). La abren el Super Admin y el rol legacy "Jefe de cuadrillas" (por nivel).
+  // /encargados y /compras siguen siendo del módulo 'ingenieria'.
+  if (p.startsWith('/cuadrillas')) return 'cuadrillas';
+  if (p.startsWith('/encargados') || p.startsWith('/compras')) return 'ingenieria';
   if (p.startsWith('/concreto')) return 'concreto';
   if (p.startsWith('/desembolsos')) return 'desembolsos';
   // Marcaje va con Reporte H4: es la misma familia (marcas de los relojes de H4) y

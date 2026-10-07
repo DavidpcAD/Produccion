@@ -8,7 +8,7 @@ import { IconChevronDown, IconDelivery } from "@/components/compras/icons";
 import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
 import { AlcanceOrdenes } from "@/components/compras/alcance-ordenes";
-import { almacenesDeRecepcion, formatDate, money, numeroOrden, ordenesDelAlcance, type AlcanceRecepcion } from "@/lib/compras/helpers";
+import { almacenesDeRecepcion, formatDate, ingenieroVeSoloLoSuyo, money, numeroOrden, ordenesDelAlcance, type AlcanceRecepcion } from "@/lib/compras/helpers";
 
 // Bodega (recibe): historial de lo que se recibió, con quién lo recibió.
 // Pensada para celular/tablet: tarjetas grandes, sin tablas anchas.
@@ -17,7 +17,11 @@ export default function RecibidasPage() {
   const me = useSession();
   const router = useRouter();
   // Mismo selector que "Órdenes por recibir", y las recepciones siguen a las órdenes.
-  const [alcance, setAlcance] = useState<AlcanceRecepcion>("todas");
+  // Un ingeniero de obra ve SOLO lo suyo (lo que salió de sus solicitudes): sin selector,
+  // vista fija en "mis solicitudes" (decisión 2026-10-07).
+  const soloMias = ingenieroVeSoloLoSuyo(me);
+  const [alcanceSel, setAlcance] = useState<AlcanceRecepcion>("todas");
+  const alcance: AlcanceRecepcion = soloMias ? "mias" : alcanceSel;
   const esFabrica = almacenesDeRecepcion(me) !== null;
   const ordenes = useMemo(() => ordenesDelAlcance(ordenesAll, pedidos, me, alcance), [ordenesAll, pedidos, me, alcance]);
   const recepciones = useMemo(() => {
@@ -74,7 +78,11 @@ export default function RecibidasPage() {
           </div>
         </div>
 
-        <div className="mt-2"><AlcanceOrdenes valor={alcance} onChange={setAlcance} conFabrica={esFabrica} /></div>
+        {/* El ingeniero no elige alcance: ve solo lo suyo. El selector queda para
+            Bodega/Fábrica, que sí tienen motivo para ver todas. */}
+        {!soloMias && (
+          <div className="mt-2"><AlcanceOrdenes valor={alcance} onChange={setAlcance} conFabrica={esFabrica} /></div>
+        )}
 
         <div className="tiles mt-2">
           <Tile value={lista.length} label="Recepciones" accent="var(--ds-color-green-100)" />

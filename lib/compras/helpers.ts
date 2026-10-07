@@ -265,6 +265,18 @@ export function veTodoEnCompras(me: Sesion): boolean {
   return me.modules?.length ? me.modules.includes('admin') : (me.nivelAdmin ?? 0) >= 4;
 }
 
+/** Un INGENIERO DE OBRA dentro de Órdenes de Compra: entra por el módulo 'ingenieria'
+ *  pero NO es Super Admin ('admin'). En las pantallas de Compras tiene que ver SOLO lo
+ *  suyo —sus solicitudes y las órdenes que salieron de ellas—, nunca lo de los demás
+ *  ingenieros (decisión 2026-10-07). Proveeduría y Aprobación son Super Admin y siguen
+ *  viendo todo; Bodega/Fábrica llevan 'recepcion', no 'ingenieria'. Sin rol de
+ *  Producción (`modules` ausente) NO aplica: ese cae al criterio viejo por nivel. */
+export function ingenieroVeSoloLoSuyo(me: Sesion): boolean {
+  const m = me?.modules;
+  if (!m?.length) return false;
+  return m.includes('ingenieria') && !m.includes('admin');
+}
+
 /** Almacenes en los que recibe este usuario, o `null` si recibe TODO lo que llega.
  *  Fábrica de Maderas es un satélite: recibe lo que entra a SUS bodegas. Bodega (la
  *  bodega central), Ingeniería y Super Admin reciben TODO — si no, el material de los

@@ -10,11 +10,16 @@ export type PanoramaBc = { sinFacturar: BcSinFacturar; sinFecha: BcSinFecha };
 // después: la pantalla se pinta completa y las tarjetas se rellenan cuando BC contesta.
 // Si no contesta, se DICE. Un ₡0 en rojo porque se cayó la red manda a alguien a
 // celebrar algo que no pasó, o peor, a dejar de revisarlo.
-export function usePanoramaBc() {
+// `enabled` apaga la consulta cuando la pantalla NO quiere los números de BC —p. ej. el
+// Resumen recortado a un ingeniero, donde esos totales son de toda la empresa y no se
+// pueden mostrar. Apagado devuelve el mismo hueco "sin datos y sin error" (ni cargando),
+// para que quien llama no tenga que distinguir este caso.
+export function usePanoramaBc(enabled = true) {
   const [datos, setDatos] = useState<PanoramaBc | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let vivo = true;
     fetch(`/api/compras/bc/recibido-sin-facturar?hoy=${todayISO()}`)
       .then(async (r) => {
@@ -25,7 +30,7 @@ export function usePanoramaBc() {
       .then((d) => { if (vivo) setDatos(d); })
       .catch((e) => { if (vivo) setError(String(e?.message ?? e)); });
     return () => { vivo = false; };
-  }, []);
+  }, [enabled]);
 
-  return { datos, error, cargando: !datos && !error };
+  return { datos, error, cargando: enabled && !datos && !error };
 }

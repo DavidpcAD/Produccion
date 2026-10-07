@@ -9,7 +9,7 @@ import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
 import { AlcanceOrdenes } from "@/components/compras/alcance-ordenes";
 import {
-  almacenesDeRecepcion, formatDate, money, numeroOrden, ordenAvance, ordenEsDirecta, ordenEsParcial,
+  almacenesDeRecepcion, formatDate, ingenieroVeSoloLoSuyo, money, numeroOrden, ordenAvance, ordenEsDirecta, ordenEsParcial,
   ordenPedidos, ordenRecibidoPct, ordenSubtotal, ordenTotalConIva, ordenesDelAlcance, type AlcanceRecepcion,
 } from "@/lib/compras/helpers";
 
@@ -27,8 +27,13 @@ export default function FacturacionPage() {
   const [filtro, setFiltro] = useState<Filtro>("porRecibir");
   const listaRef = useRef<HTMLDivElement>(null);
 
-  // Todas por defecto —lo que pidieron Maderas y Bryan— y se acota con el selector.
-  const [alcance, setAlcance] = useState<AlcanceRecepcion>("todas");
+  // Un ingeniero de obra solo recibe lo SUYO: las órdenes que salieron de sus propias
+  // solicitudes, nunca las de los demás (decisión 2026-10-07). Para él no hay selector —
+  // la vista queda fija en "mis solicitudes". Bodega y Fábrica siguen con "Todas" por
+  // defecto —lo que pidieron Maderas y Bryan— y acotan con el selector.
+  const soloMias = ingenieroVeSoloLoSuyo(me);
+  const [alcanceSel, setAlcance] = useState<AlcanceRecepcion>("todas");
+  const alcance: AlcanceRecepcion = soloMias ? "mias" : alcanceSel;
   const esFabrica = almacenesDeRecepcion(me) !== null;
   const ordenes = useMemo(() => ordenesDelAlcance(ordenesAll, pedidos, me, alcance), [ordenesAll, pedidos, me, alcance]);
 
@@ -79,9 +84,10 @@ export default function FacturacionPage() {
 
   // Aviso de que la lista está acotada por el SELECTOR (no porque no haya nada):
   // la salida es quitar el filtro, no mandar a la persona a buscar a otra pestaña.
-  const pistaAlcance = alcance !== "todas"
-    ? <> Estás viendo solo {alcance === "fabrica" ? "las de tu fábrica" : "las de tus solicitudes"} — <button type="button" className="link-btn" onClick={() => setAlcance("todas")}>ver todas</button></>
-    : null;
+  // Para el ingeniero la vista está fija en lo suyo: no se ofrece "ver todas" (no puede).
+  const pistaAlcance = soloMias || alcance === "todas"
+    ? null
+    : <> Estás viendo solo {alcance === "fabrica" ? "las de tu fábrica" : "las de tus solicitudes"} — <button type="button" className="link-btn" onClick={() => setAlcance("todas")}>ver todas</button></>;
 
   return (
     <AppShell role="facturacion">
@@ -93,7 +99,11 @@ export default function FacturacionPage() {
           </div>
         </div>
 
-        <div className="mt-2"><AlcanceOrdenes valor={alcance} onChange={setAlcance} conFabrica={esFabrica} /></div>
+        {/* El ingeniero no elige alcance: ve solo lo suyo y punto. El selector queda para
+            Bodega/Fábrica, que sí tienen motivo para ver todas. */}
+        {!soloMias && (
+          <div className="mt-2"><AlcanceOrdenes valor={alcance} onChange={setAlcance} conFabrica={esFabrica} /></div>
+        )}
 
         {/* Los paneles FILTRAN la lista de abajo (mismo gesto que en Órdenes de
             Proveeduría): "¿cuáles vienen a medias?" se contesta tocando el panel. */}

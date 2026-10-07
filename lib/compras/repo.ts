@@ -1375,9 +1375,39 @@ export async function listObras(): Promise<ObraLite[]> {
 }
 
 export type MatrizCelda = { idObra: number; idClasificacion: number; estado: string };
-export async function matrizCeldas(): Promise<MatrizCelda[]> {
+/**
+ * Celdas de la matriz obra × clasificación, con su estado.
+ *
+ * `autor` recorta a las solicitudes de UNA persona (un ingeniero de obra que ve solo lo
+ * suyo, decisión 2026-10-07). La vista `vw_MatrizObraClasificacion` NO lleva autor, así
+ * que para el recorte se replica su MISMO cuerpo acá con el filtro por `creadoPor`
+ * (username estable) o `solicitante` (nombre, para pedidos viejos). Sin `autor` se usa la
+ * vista tal cual, como siempre. OJO: si cambia la vista en la migración
+ * (migrations/2026-08-19_compras_a_pro.sql), cambiar también este SELECT.
+ */
+export async function matrizCeldas(autor?: { username?: string; nombre?: string }): Promise<MatrizCelda[]> {
   const pool = await getPool();
-  const r = await pool.request().query("SELECT idObra, idClasificacion, estado FROM dbo.vw_MatrizObraClasificacion");
+  if (!autor || (!autor.username && !autor.nombre)) {
+    const r = await pool.request().query("SELECT idObra, idClasificacion, estado FROM dbo.vw_MatrizObraClasificacion");
+    return r.recordset.map((x) => ({ idObra: x.idObra, idClasificacion: x.idClasificacion, estado: x.estado ?? "" }));
+  }
+  const r = await pool.request()
+    .input("username", sql.NVarChar(100), autor.username ?? "")
+    .input("nombre", sql.NVarChar(100), autor.nombre ?? "")
+    .query(`
+      WITH p AS (
+        SELECT o.idObra, pc.idClasificacion,
+          CASE e.estado WHEN 'Cerrado' THEN 4 WHEN 'En orden' THEN 3 WHEN 'Aprobado' THEN 2 WHEN 'Borrador' THEN 1 ELSE 0 END AS rk
+        FROM dbo.PedidoCompra pc
+        JOIN dbo.Estado e ON e.idEstado = pc.idEstado
+        JOIN dbo.Obra o   ON o.numeroObra = pc.obra
+        WHERE pc.esEliminada = 0 AND pc.idClasificacion IS NOT NULL
+          AND ((@username <> '' AND pc.creadoPor = @username) OR (@nombre <> '' AND pc.solicitante = @nombre))
+      )
+      SELECT idObra, idClasificacion,
+        CASE MAX(rk) WHEN 4 THEN 'ENTREGADO' WHEN 3 THEN 'COMPRADO' WHEN 2 THEN 'PEDIDO' WHEN 1 THEN 'BORRADOR' ELSE NULL END AS estado
+      FROM p
+      GROUP BY idObra, idClasificacion`);
   return r.recordset.map((x) => ({ idObra: x.idObra, idClasificacion: x.idClasificacion, estado: x.estado ?? "" }));
 }
 

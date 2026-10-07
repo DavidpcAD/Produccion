@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { useStore } from "@/lib/compras/store";
 import { PantallaSkeleton } from "@/components/compras/pantalla-skeleton";
 import type { Role } from "@/lib/compras/types";
-import { devolucionesCount } from "@/lib/compras/helpers";
+import { devolucionesCount, ingenieroVeSoloLoSuyo } from "@/lib/compras/helpers";
 import {
   IconList, IconOptions, IconDuplicate, IconMatrix, IconTrack,
   IconReceipt, IconCheck, IconDelivery, IconFolder, IconPlus,
@@ -106,8 +106,22 @@ export function AppShell({ role, children }: { role: Role; children: React.React
     // son lista de tarjetas + riel al lado. El detalle de UNA orden sí sigue siendo
     // la pantalla de siempre.
     const esBandeja = pathname === "/compras/aprobacion" || pathname === "/compras/aprobacion/todas";
-    const forma = pathname.endsWith("/resumen") ? "paneles" : esBandeja ? "bandeja" : "tabla";
-    return <PantallaSkeleton tiles={TILES_POR_ROL[role]} forma={forma} conTabs={ROLE_META[role].nav.length > 1 && role !== "ingenieria" && role !== "aprobacion"} />;
+    // Las dos listas de recepción (Órdenes por recibir / Recibidas) son TARJETAS, no una
+    // tabla, y llevan fichas arriba: el esqueleto tiene que dibujar eso, no una tabla.
+    const esRecepLista = pathname === "/compras/facturacion" || pathname === "/compras/facturacion/recibidas";
+    const soloMias = ingenieroVeSoloLoSuyo(baseSession);
+    const forma = pathname.endsWith("/resumen") ? "paneles"
+      : esBandeja ? "bandeja"
+      : esRecepLista ? "tarjetas"
+      : "tabla";
+    // Fichas REALES de cada pantalla, para que el esqueleto no prometa otra cantidad y
+    // salte al cargar: el Resumen del ingeniero recortado lleva 4 (sin la tarjeta de BC),
+    // el del Super Admin 5; Órdenes por recibir 4; Recibidas 3.
+    const tiles = pathname.endsWith("/resumen") ? (soloMias ? 4 : 5)
+      : esRecepLista ? (pathname.endsWith("/recibidas") ? 3 : 4)
+      : TILES_POR_ROL[role];
+    const conTabs = ROLE_META[role].nav.length > 1 && role !== "ingenieria" && role !== "aprobacion";
+    return <PantallaSkeleton tiles={tiles} forma={forma} conTabs={conTabs} tabs={ROLE_META[role].nav.length} />;
   }
 
   // La carga inicial falló (base en pausa, red, 500…). Decirlo, porque la alternativa es

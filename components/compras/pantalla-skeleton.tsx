@@ -48,6 +48,7 @@ export function PantallaSkeleton({
   tiles = 5,
   filas = 8,
   conTabs = false,
+  tabs,
   forma = "tabla",
 }: {
   /** Cuántas tarjetas de resumen (KPI) tiene la pantalla. 0 = no lleva. */
@@ -55,11 +56,15 @@ export function PantallaSkeleton({
   filas?: number;
   /** La fila de pestañas del módulo (Proveeduría, Bodega…). Ingeniería no la lleva. */
   conTabs?: boolean;
-  /** Qué va DEBAJO de las tarjetas: la tabla de una lista, los paneles del Resumen o
-   *  la bandeja de Aprobación (lista de tarjetas + riel al lado). Con la forma
-   *  equivocada el esqueleto deja de servir: promete una cosa y aparece otra, que es
-   *  justo el salto que se quería evitar. */
-  forma?: "tabla" | "paneles" | "bandeja";
+  /** Cuántas pestañas dibujar cuando `conTabs` — para que el esqueleto tenga las MISMAS
+   *  que la pantalla (Bodega 2, Contabilidad 4…), no un número fijo que salta al cargar. */
+  tabs?: number;
+  /** Qué va DEBAJO de las tarjetas: la tabla de una lista, los paneles del Resumen, la
+   *  bandeja de Aprobación (lista de tarjetas + riel al lado) o la lista de TARJETAS de
+   *  recepción (Órdenes por recibir / Recibidas). Con la forma equivocada el esqueleto
+   *  deja de servir: promete una cosa y aparece otra, que es justo el salto que se quería
+   *  evitar. */
+  forma?: "tabla" | "paneles" | "bandeja" | "tarjetas";
 }) {
   if (forma === "bandeja") {
     return (
@@ -116,11 +121,69 @@ export function PantallaSkeleton({
     );
   }
 
+  // Lista de TARJETAS (Órdenes por recibir / Recibidas): tabs + fichas + buscador + una
+  // columna de tarjetas grandes, como en la pantalla real —NO la tabla, que era lo que el
+  // esqueleto dibujaba antes y hacía que al cargar saltara todo de golpe.
+  if (forma === "tarjetas") {
+    return (
+      <div className="px-4 py-6 sm:px-6 md:px-8" role="status" aria-label="Cargando…">
+        {conTabs && (
+          <div className="mb-6 flex flex-wrap items-center gap-1.5 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-1 w-fit">
+            {Array.from({ length: tabs ?? 4 }).map((_, i) => (
+              <Skeleton key={i} width={132} height={26} radius="var(--ds-radius-md)" />
+            ))}
+          </div>
+        )}
+        <main className="page page--wide">
+          <AvisoLento />
+          <div className="page__head">
+            <div className="page__title" style={{ flex: 1, minWidth: 0, display: "grid", gap: 10 }}>
+              <Skeleton width="min(320px, 70%)" height={26} />
+              <Skeleton width="min(560px, 100%)" height={13} radius="var(--ds-radius-sm)" />
+            </div>
+          </div>
+
+          {tiles > 0 && (
+            <div className="tiles mt-2">
+              {Array.from({ length: tiles }).map((_, i) => (
+                <Card key={i} style={{ display: "grid", gap: 8 }}>
+                  <Skeleton width={56} height={28} />
+                  <Skeleton width="72%" height={12} radius="var(--ds-radius-sm)" />
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4">
+            <Skeleton width="100%" height={48} radius="var(--ds-radius-lg)" />
+          </div>
+
+          <div className="mt-4" style={{ display: "grid", gap: 12 }}>
+            {Array.from({ length: filas }).map((_, f) => (
+              <Card key={f} style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <Skeleton width={44} height={44} radius="var(--ds-radius-full)" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 8 }}>
+                  <Skeleton width={`${34 - (f % 3) * 4}%`} height={14} radius="var(--ds-radius-sm)" />
+                  <Skeleton width={`${58 - (f % 4) * 6}%`} height={11} radius="var(--ds-radius-sm)" />
+                  <Skeleton width={120} height={20} pill />
+                </div>
+                <div style={{ display: "grid", gap: 8, justifyItems: "end", flexShrink: 0 }}>
+                  <Skeleton width={96} height={14} radius="var(--ds-radius-sm)" />
+                  <Skeleton width={128} height={36} pill />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-6 sm:px-6 md:px-8" role="status" aria-label="Cargando…">
       {conTabs && (
         <div className="mb-6 flex flex-wrap items-center gap-1.5 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-1 w-fit">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: tabs ?? 4 }).map((_, i) => (
             <Skeleton key={i} width={96} height={26} radius="var(--ds-radius-md)" />
           ))}
         </div>

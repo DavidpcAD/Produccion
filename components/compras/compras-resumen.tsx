@@ -8,8 +8,8 @@ import { variacion, diasDesde, MESES_CORTOS } from "@/lib/compras/kpis";
 import type { KpisCompras } from "@/lib/compras/kpis";
 import { usePanoramaBc } from "@/lib/compras/use-panorama-bc";
 import { loQueEstaEnTuCancha, DE_QUIEN_LABEL } from "@/lib/compras/cancha";
-import { useStore } from "@/lib/compras/store";
 import { useSession } from "@/hooks/useSession";
+import type { Orden, Pedido } from "@/lib/compras/types";
 import type { FilaProv } from "@/lib/compras/proveedores-resumen";
 
 // EL RESUMEN DE ÓRDENES DE COMPRA: el panorama en paneles. Cinco tarjetas KPI arriba
@@ -34,14 +34,25 @@ const compacto = (v: number, moneda: string) => {
   return money(v, moneda);
 };
 
-// `k` llega hecho desde la pantalla a propósito: si el panel lo calculara por su cuenta
-// y otra pantalla usara los mismos números, dos cálculos separados para el mismo rótulo
-// es como se empieza a desconfiar de un tablero.
-export function ComprasResumen({ k, filas }: { k: KpisCompras; filas: FilaProv[] }) {
-  const { ordenes, pedidos } = useStore();
+// `k`, `filas`, `ordenes` y `pedidos` llegan hechos desde la pantalla a propósito: ahí
+// se decide el UNIVERSO (todo, o solo lo del ingeniero que mira) y se recorta una sola
+// vez, así todos los paneles cuentan lo mismo. Si el panel calculara por su cuenta y
+// otra pantalla usara los mismos números, dos cálculos separados para el mismo rótulo es
+// como se empieza a desconfiar de un tablero.
+//
+// `scoped` = la vista está recortada a UNA persona (un ingeniero de obra viendo lo suyo).
+// Con eso apagamos las tarjetas que salen de Business Central —"Llegó pero nadie lo
+// facturó" y el aviso de "sin fecha de entrega"—, que son de TODA la empresa y no se
+// pueden recortar por persona: mostrarlas sería dejar ver lo de otros.
+export function ComprasResumen({ k, filas, ordenes, pedidos, scoped }: {
+  k: KpisCompras; filas: FilaProv[]; ordenes: Orden[]; pedidos: Pedido[]; scoped: boolean;
+}) {
   const me = useSession();
   const router = useRouter();
-  const bc = usePanoramaBc();
+  // Con la vista recortada a una persona no consultamos BC: esos números son de toda la
+  // empresa. `bc` queda vacío y la tarjeta "Pendiente por entregar" cae a su aviso local
+  // (la antigüedad de la orden más vieja), que sí es de esta persona.
+  const bc = usePanoramaBc(!scoped);
   const hoy = todayISO();
   const cancha = useMemo(() => loQueEstaEnTuCancha(ordenes, pedidos, k.moneda, me), [ordenes, pedidos, k.moneda, me]);
 
@@ -128,8 +139,13 @@ export function ComprasResumen({ k, filas }: { k: KpisCompras; filas: FilaProv[]
               + `Las demás traen la fecha de la orden, que BC rellena solo: tampoco es una fecha que alguien haya prometido.`
             : undefined}
         />
-        <TarjetaSinFacturar datos={bc.datos?.sinFacturar ?? null} error={bc.error} cargando={bc.cargando}
-          corto={corto} fmt={fmt} />
+        {/* "Llegó pero nadie lo facturó" es de TODA la empresa (sale de BC, no de las
+            órdenes de esta persona), así que en la vista recortada a un ingeniero no va:
+            sería dejarle ver lo de otros. */}
+        {!scoped && (
+          <TarjetaSinFacturar datos={bc.datos?.sinFacturar ?? null} error={bc.error} cargando={bc.cargando}
+            corto={corto} fmt={fmt} />
+        )}
       </div>
 
       <div className="resumen__grid">
