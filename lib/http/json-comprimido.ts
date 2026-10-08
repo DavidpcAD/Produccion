@@ -24,12 +24,12 @@ const gzip = promisify(gzipCb);
  * 26.7 KB → 6.7 KB), así que no es que falte la opción: es que la compresión de
  * Next no toca el cuerpo de un route handler. O sea que hoy TODA respuesta de
  * /api/* viaja cruda. Para `/api/compras/bootstrap`, que en AdelantePRO son
- * ~5 MB (634 órdenes con sus 2 049 líneas, 465 pedidos, 1 868 recepciones), son
- * ~5 MB por cada entrada a cualquier pantalla de Compras.
+ * ~5.7 MB (822 órdenes con sus 2 568 líneas, 594 pedidos, 625 recepciones),
+ * son ~5.7 MB por cada entrada a cualquier pantalla de Compras.
  *
  * CUÁNTO CUESTA COMPRIMIR
  * -----------------------
- * Medido con un JSON del tamaño y la forma de las 634 órdenes de producción:
+ * Medido con un JSON del tamaño y la forma de las órdenes de producción:
  *
  *     gzip 1 → 6.6x en 2 ms  ·  gzip 4 → 8.0x en 3 ms  ·  gzip 6 → 9.8x en 5 ms
  *
@@ -67,6 +67,12 @@ const gzip = promisify(gzipCb);
  * que escribe en esas tablas la mantenga (y a `dbo.OrdenCompra*` también le
  * escribe la app de proveeduría, que es otro repo).
  *
+ * OJO con lo que ahorra el 304: ahorra el VIAJE y el parseo del cliente, NO el
+ * trabajo del servidor —arma el cuerpo, lo hashea y recién ahí compara—. Para
+ * ahorrar también ese trabajo cuando varias pestañas caen juntas está la foto
+ * compartida del servidor (lib/compras/cache-bootstrap.ts), que reusa este mismo
+ * `armarCuerpo` y por eso guarda exactamente lo que acá se mandaría.
+ *
  * Si entra otra persona en el mismo navegador no hay nada que pueda ver del
  * anterior: la respuesta es `no-store` (no queda guardada) y la huella vive en
  * memoria de la página, que se va con ella.
@@ -75,6 +81,37 @@ const gzip = promisify(gzipCb);
 /** Debajo de esto gzip agrega más de lo que quita. */
 const MINIMO_BYTES = 1400;
 
+/** El cuerpo ya serializado y su huella. Se separa del envío para que la foto
+ *  compartida (cache-bootstrap) guarde EXACTAMENTE lo que esta función mandaría:
+ *  la huella sale del mismo `cuerpo` real, nunca de un atajo. */
+export interface CuerpoListo {
+  cuerpo: string;
+  etag: string;
+  /** gzip del cuerpo, o `null` si no compensa (cuerpo chico) o falló. */
+  gzip: Uint8Array<ArrayBuffer> | null;
+}
+
+function huella(cuerpo: string): string {
+  return `W/"${createHash('sha1').update(cuerpo).digest('base64url')}"`;
+}
+
+/** Comprime si vale la pena; `null` si el cuerpo es chico o gzip falla. */
+async function comprimir(cuerpo: string): Promise<Uint8Array<ArrayBuffer> | null> {
+  if (Buffer.byteLength(cuerpo) < MINIMO_BYTES) return null;
+  try {
+    return new Uint8Array(await gzip(cuerpo, { level: 6 }));
+  } catch {
+    return null;
+  }
+}
+
+/** Serializa, hashea y (si compensa) comprime UNA vez. Es la parte cara, la que
+ *  la foto compartida del servidor evita repetir. */
+export async function armarCuerpo(data: unknown): Promise<CuerpoListo> {
+  const cuerpo = JSON.stringify(data);
+  return { cuerpo, etag: huella(cuerpo), gzip: await comprimir(cuerpo) };
+}
+
 /** ¿Quien llama trajo su propio Cache-Control? Sin mirar mayúsculas: las
  *  cabeceras no distinguen, pero un objeto de JavaScript sí, y con
  *  `Cache-Control` escrito distinto se colarían dos directivas peleadas. */
@@ -82,26 +119,27 @@ function traeCacheControl(h?: Record<string, string>): boolean {
   return !!h && Object.keys(h).some((k) => k.toLowerCase() === 'cache-control');
 }
 
-export async function jsonComprimido(
+/** Envía un cuerpo YA armado: 304 si el cliente ya lo tiene, gzip si lo acepta,
+ *  crudo si no. Lo usan tanto `jsonComprimido` (arma en el momento) como la ruta
+ *  de bootstrap (arma una vez y lo reparte entre pestañas). */
+export function responder(
   req: Request,
-  data: unknown,
+  listo: CuerpoListo,
   init?: { status?: number; headers?: Record<string, string> },
-): Promise<NextResponse> {
-  const cuerpo = JSON.stringify(data);
-  const etag = `W/"${createHash('sha1').update(cuerpo).digest('base64url')}"`;
+): NextResponse {
+  const status = init?.status ?? 200;
   const cabeceras: Record<string, string> = {
     'content-type': 'application/json; charset=utf-8',
     // Que las cachés intermedias no le sirvan la versión comprimida a un cliente
     // que no la pidió.
     vary: 'Accept-Encoding',
-    etag,
+    etag: listo.etag,
     // `no-store`: la respuesta NO se guarda en el disco del navegador. El 304 de
     // abajo NO depende de la caché del navegador — la huella la guarda el cliente
     // en memoria y la manda a mano (ver lib/compras/api.ts). Se eligió así a
     // propósito: con `no-cache` el navegador guardaría en disco los precios y los
-    // proveedores de todas las órdenes, cosa que hoy no pasa (el store solo
-    // persiste en localStorage en modo mock), y estas pantallas se usan en
-    // tabletas compartidas de obra.
+    // proveedores de todas las órdenes, cosa que estas pantallas evitan porque se
+    // usan en tabletas compartidas de obra.
     ...(traeCacheControl(init?.headers) ? {} : { 'cache-control': 'no-store' }),
     ...(init?.headers ?? {}),
   };
@@ -109,23 +147,24 @@ export async function jsonComprimido(
   // ¿El cliente ya tiene exactamente esto? 304 y se acabó. Solo para respuestas
   // buenas: un error no se cachea.
   const traia = req.headers.get('if-none-match');
-  const status = init?.status ?? 200;
-  if (traia && status === 200 && traia.split(',').some((t) => t.trim() === etag)) {
+  if (traia && status === 200 && traia.split(',').some((t) => t.trim() === listo.etag)) {
     return new NextResponse(null, { status: 304, headers: cabeceras });
   }
 
   const acepta = (req.headers.get('accept-encoding') ?? '').toLowerCase().includes('gzip');
-  if (!acepta || Buffer.byteLength(cuerpo) < MINIMO_BYTES) {
-    return new NextResponse(cuerpo, { status, headers: cabeceras });
+  if (!acepta || !listo.gzip) {
+    return new NextResponse(listo.cuerpo, { status, headers: cabeceras });
   }
+  return new NextResponse(listo.gzip, {
+    status,
+    headers: { ...cabeceras, 'content-encoding': 'gzip', 'content-length': String(listo.gzip.length) },
+  });
+}
 
-  try {
-    const comprimido = await gzip(cuerpo, { level: 6 });
-    return new NextResponse(new Uint8Array(comprimido), {
-      status,
-      headers: { ...cabeceras, 'content-encoding': 'gzip', 'content-length': String(comprimido.length) },
-    });
-  } catch {
-    return new NextResponse(cuerpo, { status, headers: cabeceras });
-  }
+export async function jsonComprimido(
+  req: Request,
+  data: unknown,
+  init?: { status?: number; headers?: Record<string, string> },
+): Promise<NextResponse> {
+  return responder(req, await armarCuerpo(data), init);
 }

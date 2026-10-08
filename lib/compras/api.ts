@@ -1,5 +1,6 @@
 // Cliente del front-end para las API routes (modo API).
 import type { Movimiento, Orden, Pedido, Recepcion, NotaCreditoLinea } from "./types";
+import { aplicarPermisoServidor } from "./cache-local";
 
 export const USE_API = process.env.NEXT_PUBLIC_USE_API === "1";
 
@@ -66,6 +67,9 @@ export const api = {
       headers: huella ? { "If-None-Match": huella } : undefined,
       cache: "no-store",
     });
+    // El interruptor de la caché local (PASO 3) viaja en cada respuesta, también
+    // en el 304, para que apagarla tenga efecto sin una recarga completa.
+    aplicarPermisoServidor(res.headers.get("x-compras-cache-local"));
     if (res.status === 304) return null;
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -74,6 +78,12 @@ export const api = {
     etagBootstrap = res.headers.get("etag");
     return res.json();
   },
+
+  /** Siembra la huella en memoria con la de la caché local, para que la primera
+   *  revalidación mande `If-None-Match` y reciba un 304 si nada cambió. */
+  sembrarEtag: (etag: string) => { etagBootstrap = etag; },
+  /** La huella vigente (para guardar en la caché local lo que se acaba de recibir). */
+  etagActual: (): string | null => etagBootstrap,
   /** Primera carga de Aprobación: solo la cola de pendientes, para pintar ya. Si el
    *  servidor no la pudo recortar (alcance "mis solicitudes"), viene sin `parcial`. */
   bootstrapCola: (): Promise<{ ordenes?: Orden[]; parcial?: boolean }> =>

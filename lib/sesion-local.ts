@@ -19,7 +19,14 @@
 // proteger nada.
 
 /** Claves exactas que se van al cerrar sesión. */
-const CLAVES = ['adelante_oc_usuario', 'adelante_oc_role', 'adelante_oc_pedido_borrador'];
+const CLAVES = [
+  'adelante_oc_usuario',
+  'adelante_oc_role',
+  'adelante_oc_pedido_borrador',
+  // La caché local del bootstrap (precios, proveedores, obras): es de la persona,
+  // no del aparato, así que se va con ella (ver lib/compras/cache-local.ts).
+  'adelante_oc_cache_v1',
+];
 
 /** Prefijos que se van (los borradores de plantilla llevan el id pegado). */
 const PREFIJOS = ['adelante_oc_plantilla_borrador:'];

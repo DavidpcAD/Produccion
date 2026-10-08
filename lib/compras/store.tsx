@@ -12,6 +12,7 @@ import { nextNumero, nowISO, numeroOrden, ordenEstaCompleta, PERSONA_POR_ROL, to
 import { useSession } from "@/hooks/useSession";
 import { api, USE_API as USE_API_BUILD } from "./api";
 import type { Bootstrap, EstadoBcOrden, SincronizacionBc } from "./api";
+import { leerCacheLocal, guardarCacheLocal } from "./cache-local";
 
 export interface NewPedidoInput {
   tipoSolicitud: TipoSolicitud;
@@ -242,12 +243,18 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
   // Compras y volver—, así que sin esto un store recién montado preguntaba "¿cambió
   // algo?" con las listas vacías, le contestaban 304 y se quedaba sin pedidos.
   const tieneTodo = useRef(false);
+  // El usuario como ref: se necesita de forma SÍNCRONA al guardar/leer la caché
+  // local (PASO 3), antes de que el `setUsuario` del arranque se propague al estado.
+  const usuarioRef = useRef<string | null>(null);
 
-  /** Guarda lo que trajo el bootstrap completo. Con `null` (304) no toca nada. */
+  /** Guarda lo que trajo el bootstrap completo. Con `null` (304) no toca nada.
+   *  También deja la copia en el navegador (PASO 3), para que la próxima apertura
+   *  pinte sin esperar a la base. */
   function guardarTodo(b: Bootstrap | null): void {
     if (!b) return;
     tieneTodo.current = true;
     setData((d) => ({ ...d, pedidos: b.pedidos, ordenes: b.ordenes, recepciones: b.recepciones, movimientos: b.movimientos }));
+    guardarCacheLocal(usuarioRef.current, api.etagActual(), b);
   }
 
   /** Trae la data SIEMPRE. Es lo que usan las acciones (crear, aprobar, recibir…):
@@ -318,6 +325,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     const r = localStorage.getItem("adelante_oc_role") as Role | null;
     if (r) setRole(r);
     const u = localStorage.getItem("adelante_oc_usuario");
+    usuarioRef.current = u;
     if (u) setUsuario(u);
     if (!USE_API) {
       try {
@@ -327,9 +335,23 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     }
     setHydrated(true);
     if (USE_API) {
-      cargaInicial()
-        .catch((e) => { console.error("bootstrap", e); setErrorCarga(String(e?.message ?? e)); })
-        .finally(() => { setCargando(false); });
+      // PASO 3: si el navegador guardó una copia buena de ESTE usuario, se pinta de
+      // una y se revalida por detrás con If-None-Match (304 si nada cambió, 200 si
+      // sí). Así abrir no es en cero. Si no hay copia, la carga normal de siempre.
+      const copia = leerCacheLocal(u);
+      if (copia) {
+        tieneTodo.current = true;
+        api.sembrarEtag(copia.etag);
+        setData((d) => ({ ...d, pedidos: copia.data.pedidos, ordenes: copia.data.ordenes, recepciones: copia.data.recepciones, movimientos: copia.data.movimientos }));
+        setCargando(false);
+        // Revalida ya. Si falla (sin red), se queda lo pintado: mejor lo último
+        // conocido que una pantalla en blanco.
+        cargarDesdeApi().catch((e) => console.error("revalidación bootstrap", e));
+      } else {
+        cargaInicial()
+          .catch((e) => { console.error("bootstrap", e); setErrorCarga(String(e?.message ?? e)); })
+          .finally(() => { setCargando(false); });
+      }
     }
   }, []);
 
@@ -341,6 +363,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
 
   useEffect(() => {
     if (!hydrated) return;
+    usuarioRef.current = usuario;
     if (role) localStorage.setItem("adelante_oc_role", role);
     else localStorage.removeItem("adelante_oc_role");
     if (usuario) localStorage.setItem("adelante_oc_usuario", usuario);
