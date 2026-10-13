@@ -53,6 +53,7 @@ const navItems: NavItemDef[] = [
     section: '/bc',
     children: [
       { href: '/bc/integracion', label: 'Integración BC' },
+      { href: '/bc/inventario', label: 'Inventario de materiales' },
       { href: '/bc/presupuestos', label: 'Presupuestos por obra' },
     ],
   },
