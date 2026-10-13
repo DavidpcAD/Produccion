@@ -17,7 +17,9 @@ export async function POST(req: Request) {
 
   try {
     const { orderNo, vendorInvoiceNo, lineas } = await req.json();
-    const postedNo = await bcFacturarRecibido(orderNo, vendorInvoiceNo, lineas ?? []);
+    // g.usuario = nombre del usuario logueado (del token, nunca del body). Se firma
+    // en BC como "Realizado Por" de la factura registrada.
+    const postedNo = await bcFacturarRecibido(orderNo, vendorInvoiceNo, lineas ?? [], "", g.usuario);
     return NextResponse.json({ ok: true, postedNo });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: mensajeParaCliente(e) }, { status: 502 });

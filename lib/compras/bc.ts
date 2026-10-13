@@ -2126,9 +2126,32 @@ export async function bcResyncPedidoLines(orderNo: string, lineas: NuevaLineaBc[
   return { patched, sinMatch, jobError };
 }
 
+// Firma "Realizado Por" en el pedido ANTES de registrar: BC copia ese campo a la
+// factura registrada, así queda constancia de QUIÉN la registró (el usuario que hizo
+// login en la app, no la cuenta de servicio S2S con la que viajan todas las llamadas).
+// Debe ir antes del Post*, porque el registro lee el campo para copiarlo al documento.
+// Vía el codeunit custom AdelantePO_SetRealizadoPor; devuelve el nombre tal como quedó
+// guardado (BC lo recorta a 50). NO es crítico: quien la usa la envuelve en try/catch,
+// de modo que si la extensión todavía no expone la acción (404) o falla por lo que sea,
+// la factura se registra igual y solo se pierde la firma (nunca se inventa un nombre).
+export async function bcSetRealizadoPor(orderNo: string, realizadoPor: string): Promise<string> {
+  if (!orderNo) throw new Error("Falta el número de pedido para firmar quién registra.");
+  const cid = await getStdCompanyId();
+  const url = `${odataRoot()}/AdelantePO_SetRealizadoPor?company=${encodeURIComponent(cid)}`;
+  const res = await bcFetch(url, {
+    method: "POST", cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderNo, realizadoPor }),
+  });
+  if (!res.ok) throw new Error(`BC firmar registrador ${res.status}: ${(await res.text()).slice(0, 250)}`);
+  const d: any = await res.json().catch(() => ({}));
+  return d?.value ?? realizadoPor;
+}
+
 // Registra (Recibir + Facturar) una factura parcial del pedido en BC con todos sus
 // movimientos contables, vía el web service custom AdelantePO_PostInvoice.
 // lines = cantidades recibidas en ESTA factura por item ({itemNo, qty}).
+// `realizadoPor` = usuario logueado que registra; se firma en BC antes del Post.
 export async function bcRegistrarFactura(
   orderNo: string,
   vendorInvoiceNo: string,
@@ -2137,6 +2160,7 @@ export async function bcRegistrarFactura(
   // Cargo de transporte de ESTA factura/viaje (opcional). Se agrega a la OC y se
   // reparte entre lo que se recibe en este registro, según `metodo`.
   cargo?: { itemChargeNo: string; descripcion?: string; monto: number; metodo?: string },
+  realizadoPor = "", // usuario logueado que registra; se firma en BC antes del Post.
 ): Promise<string> {
   if (!orderNo) throw new Error("Falta el número de pedido de BC.");
   if (!vendorInvoiceNo) throw new Error("Falta el N.º de factura del proveedor.");
@@ -2148,6 +2172,12 @@ export async function bcRegistrarFactura(
     await bcAddChargeLine(orderNo, cargo.itemChargeNo, cargo.descripcion || "Transporte", 1, cargo.monto);
     try { await bcAssignItemCharges(orderNo, (cargo.metodo || "Amount").trim() || "Amount"); }
     catch (e) { console.warn(`BC asignar cargo de transporte en ${orderNo} falló:`, e); }
+  }
+  // Firma de quién registra (el usuario logueado), antes del Post para que BC la
+  // copie a la factura registrada. Secundaria: si falla, se registra igual.
+  if (realizadoPor) {
+    try { await bcSetRealizadoPor(orderNo, realizadoPor); }
+    catch (e) { console.warn(`BC firmar registrador en ${orderNo} falló:`, e); }
   }
   const url = `${odataRoot()}/AdelantePO_PostInvoice?company=${encodeURIComponent(cid)}`;
   const res = await bcFetch(url, {
@@ -2180,10 +2210,16 @@ export async function bcRecibir(orderNo: string, lines: { itemNo: string; qty: n
 // MODO 2 — Solo FACTURA de lo ya recibido (Kattya revisa y registra después).
 // Factura en BC lo que estaba recibido-no-facturado (Receive=false, Invoice=true)
 // vía AdelantePO_PostInvoiceOfReceived.
-export async function bcFacturarRecibido(orderNo: string, vendorInvoiceNo: string, lines: { itemNo: string; qty: number; variantCode?: string }[], postingDate = ""): Promise<string> {
+export async function bcFacturarRecibido(orderNo: string, vendorInvoiceNo: string, lines: { itemNo: string; qty: number; variantCode?: string }[], postingDate = "", realizadoPor = ""): Promise<string> {
   if (!orderNo) throw new Error("Falta el número de pedido de BC.");
   if (!vendorInvoiceNo) throw new Error("Falta el N.º de factura del proveedor.");
   const cid = await getStdCompanyId();
+  // Firma de quién registra (el usuario logueado), antes del Post para que BC la
+  // copie a la factura registrada. Secundaria: si falla, se registra igual.
+  if (realizadoPor) {
+    try { await bcSetRealizadoPor(orderNo, realizadoPor); }
+    catch (e) { console.warn(`BC firmar registrador en ${orderNo} falló:`, e); }
+  }
   const url = `${odataRoot()}/AdelantePO_PostInvoiceOfReceived?company=${encodeURIComponent(cid)}`;
   const res = await bcFetch(url, {
     method: "POST", cache: "no-store",

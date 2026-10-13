@@ -21,7 +21,9 @@ export async function POST(req: Request) {
     const cargoValido = cargo && cargo.itemChargeNo && Number(cargo.monto) > 0
       ? { itemChargeNo: String(cargo.itemChargeNo), descripcion: cargo.descripcion ? String(cargo.descripcion) : undefined, monto: Number(cargo.monto), metodo: cargo.metodo ? String(cargo.metodo) : undefined }
       : undefined;
-    const postedNo = await bcRegistrarFactura(orderNo, vendorInvoiceNo, lineas ?? [], postingDate ?? "", cargoValido);
+    // g.usuario = nombre del usuario logueado (del token, nunca del body). Se firma
+    // en BC como "Realizado Por" de la factura registrada.
+    const postedNo = await bcRegistrarFactura(orderNo, vendorInvoiceNo, lineas ?? [], postingDate ?? "", cargoValido, g.usuario);
     return NextResponse.json({ ok: true, postedNo });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: mensajeParaCliente(e) }, { status: 502 });
