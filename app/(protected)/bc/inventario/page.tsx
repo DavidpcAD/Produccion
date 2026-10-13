@@ -19,9 +19,14 @@ interface Item {
   categoria?: string;
 }
 
+interface FilaAlmacen { almacen: string; variante: string; cantidad: number; unidad: string }
+interface ExistenciaTotal { total: number; almacenes: FilaAlmacen[]; unidad: string }
+type StockMap = Record<string, ExistenciaTotal>;
+type StockEstado = 'cargando' | 'ok' | 'error';
+
 const num = new Intl.NumberFormat('es-CR', { maximumFractionDigits: 2 });
 
-// Cuántas filas se dibujan a la vez. El catálogo de BC trae ~5.500 artículos y
+// Cuántas filas se dibujan a la vez. El catálogo de BC trae ~5.700 artículos y
 // pintarlos todos (cada fila con su animación) traba el navegador; el presupuestista
 // busca un material concreto, así que se muestran los primeros y se acota buscando.
 const TOPE_FILAS = 200;
@@ -32,6 +37,7 @@ const TIPOS: { tipo: Tipo; label: string; badge: string }[] = [
   { tipo: 'no-inventario', label: 'No inventariable', badge: 'bg-ds-gray-100 text-ds-gray-500' },
 ];
 const tipoMeta = (t: Tipo) => TIPOS.find((x) => x.tipo === t) ?? TIPOS[0];
+const mueveStock = (t: Tipo) => t === 'inventario';
 
 function Badge({ tipo }: { tipo: Tipo }) {
   const m = tipoMeta(tipo);
@@ -42,53 +48,42 @@ function Badge({ tipo }: { tipo: Tipo }) {
   );
 }
 
-// ─── Existencias de un artículo (se piden al abrir la ficha) ──────────────────
-interface FilaAlmacen { almacen: string; variante: string; cantidad: number; unidad: string }
-interface Existencias { tipo: string; base: string; conocido: boolean; total: number | null; almacenes: FilaAlmacen[] }
+// Celda de cantidad (existencia total en BC) en la tabla.
+function CeldaCantidad({ item, stock, estado }: { item: Item; stock: StockMap; estado: StockEstado }) {
+  if (!mueveStock(item.tipo)) return <span className="text-ds-gray-300">—</span>;
+  if (estado === 'cargando') return <span className="text-ds-gray-300">…</span>;
+  if (estado === 'error') return <span className="text-ds-gray-300" title="Business Central no respondió">s/d</span>;
+  const g = stock[item.code];
+  const total = g?.total ?? 0;
+  const unidad = g?.unidad || item.unidad;
+  return (
+    <span className={total > 0 ? 'font-semibold text-ds-green-ink' : 'text-ds-gray-400'}>
+      {num.format(total)} {unidad}
+    </span>
+  );
+}
 
-function FichaExistencias({ item }: { item: Item }) {
-  const [stock, setStock] = useState<Existencias | null>(null);
-  const [estado, setEstado] = useState<'cargando' | 'ok' | 'error'>('cargando');
-
-  useEffect(() => {
-    let vivo = true;
-    setEstado('cargando');
-    setStock(null);
-    fetch(`/api/bc/existencias?item=${encodeURIComponent(item.code)}`)
-      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
-      .then(({ ok, d }) => {
-        if (!vivo) return;
-        if (!ok) throw new Error(d?.error || 'Sin datos');
-        setStock(d);
-        setEstado('ok');
-      })
-      .catch(() => { if (vivo) setEstado('error'); });
-    return () => { vivo = false; };
-  }, [item.code]);
-
+// La ficha de existencias dentro del modal: usa el mapa ya cargado (no pide de nuevo).
+function FichaExistencias({ item, stock, estado }: { item: Item; stock: StockMap; estado: StockEstado }) {
+  if (!mueveStock(item.tipo)) {
+    return <p className="text-body-sm text-ds-gray-400">No mueve inventario: no hay existencias que mostrar.</p>;
+  }
   if (estado === 'cargando') {
     return <p className="text-body-sm text-ds-gray-400">Consultando existencias en Business Central…</p>;
   }
-  if (estado === 'error' || !stock) {
+  if (estado === 'error') {
     return <p className="text-body-sm text-ds-gray-400">Business Central no respondió por las existencias.</p>;
   }
-  if (stock.tipo === 'servicio' || stock.tipo === 'no-inventario') {
-    return <p className="text-body-sm text-ds-gray-400">No mueve inventario: no hay existencias que mostrar.</p>;
-  }
-  if (!stock.conocido && !stock.almacenes.length) {
-    return <p className="text-body-sm text-ds-gray-400">Business Central no tiene ficha de este artículo.</p>;
-  }
-  if (stock.total == null) {
-    return <p className="text-body-sm text-ds-gray-400">No se pudo leer el inventario.</p>;
-  }
-
+  const g = stock[item.code];
+  const total = g?.total ?? 0;
+  const almacenes = g?.almacenes ?? [];
   return (
     <div className="space-y-2">
       <div className="flex items-baseline gap-2">
         <span className="text-label uppercase tracking-wide text-ds-gray-500">Existencia total</span>
-        <span className="font-semibold text-ds-ink">{num.format(stock.total)} {stock.base || item.unidad}</span>
+        <span className="font-semibold text-ds-ink">{num.format(total)} {g?.unidad || item.unidad}</span>
       </div>
-      {stock.almacenes.length === 0 ? (
+      {almacenes.length === 0 ? (
         <p className="text-body-sm text-ds-gray-400">Sin existencias en ningún almacén de BC.</p>
       ) : (
         <div className="overflow-hidden rounded-ds-lg border border-ds-gray-200">
@@ -100,13 +95,13 @@ function FichaExistencias({ item }: { item: Item }) {
               </tr>
             </thead>
             <tbody>
-              {stock.almacenes.map((a, i) => (
+              {almacenes.map((a, i) => (
                 <tr key={`${a.almacen}-${a.variante}-${i}`} className="border-t border-ds-gray-100">
                   <td className="px-3 py-2 text-ds-ink">
                     {a.almacen || 'Sin almacén'}
                     {a.variante && <span className="ml-2 text-ds-gray-400">variante {a.variante}</span>}
                   </td>
-                  <td className="px-3 py-2 text-right font-semibold text-ds-ink">{num.format(a.cantidad)} {a.unidad || stock.base}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-ds-ink">{num.format(a.cantidad)} {a.unidad || g?.unidad || item.unidad}</td>
                 </tr>
               ))}
             </tbody>
@@ -121,6 +116,8 @@ export default function InventarioBcPage() {
   const { toast } = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stock, setStock] = useState<StockMap>({});
+  const [stockEstado, setStockEstado] = useState<StockEstado>('cargando');
   const [filtro, setFiltro] = useState('');
   const [tipo, setTipo] = useState<Tipo | 'todos'>('todos');
   const [sel, setSel] = useState<Item | null>(null);
@@ -141,6 +138,24 @@ export default function InventarioBcPage() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
+  // Las existencias (columna Cantidad) van aparte: el catálogo se dibuja de una y el
+  // stock —que son ~45 consultas a BC agregadas en el servidor— llega después y
+  // rellena la columna. Cacheado 5 min del lado del servidor.
+  useEffect(() => {
+    let vivo = true;
+    setStockEstado('cargando');
+    fetch('/api/bc/existencias-totales', { credentials: 'include' })
+      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!vivo) return;
+        if (!ok || !d?.hayDatos) throw new Error(d?.error || 'Sin datos');
+        setStock((d.items ?? {}) as StockMap);
+        setStockEstado('ok');
+      })
+      .catch(() => { if (vivo) setStockEstado('error'); });
+    return () => { vivo = false; };
+  }, []);
+
   const filtrados = useMemo(() => {
     const f = filtro.trim();
     return items
@@ -156,7 +171,7 @@ export default function InventarioBcPage() {
     <PageShell>
       <PageHeader
         title="Inventario de materiales (BC)"
-        subtitle="Catálogo de artículos de Business Central: material, unidad y costo unitario. Abrí una fila para ver las existencias por almacén."
+        subtitle="Catálogo de artículos de Business Central: material, unidad, existencia y costo unitario. Abrí una fila para ver las existencias por almacén."
       />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -209,6 +224,12 @@ export default function InventarioBcPage() {
           { key: 'categoria', header: 'Partida', render: (i) => i.categoria || <span className="text-ds-gray-300">—</span> },
           { key: 'tipo', header: 'Tipo', render: (i) => <Badge tipo={i.tipo} /> },
           { key: 'unidad', header: 'Unidad', className: 'whitespace-nowrap', render: (i) => i.unidad || '—' },
+          {
+            key: 'cantidad',
+            header: 'Cantidad',
+            className: 'text-right whitespace-nowrap',
+            render: (i) => <CeldaCantidad item={i} stock={stock} estado={stockEstado} />,
+          },
           {
             key: 'lastDirectCost',
             header: 'Costo unitario',
@@ -269,7 +290,7 @@ export default function InventarioBcPage() {
 
             <div className="border-t border-ds-gray-100 pt-4">
               <h4 className="mb-2 text-label uppercase tracking-wide text-ds-gray-500">Existencias en BC</h4>
-              <FichaExistencias item={sel} />
+              <FichaExistencias item={sel} stock={stock} estado={stockEstado} />
             </div>
           </div>
         )}

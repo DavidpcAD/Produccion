@@ -582,6 +582,55 @@ export async function bcExistencias(opts: { itemNo?: string; locationCode?: stri
   }));
 }
 
+// ─── Existencias TOTALES de todo el catálogo ────────────────────────────────────
+// El stock de CADA artículo, para mostrarlo como columna en el inventario del
+// presupuestista. `inventoryByLocation` exige filtro (itemNo o locationCode) y no da
+// el inventario completo de una, así que —igual que la pantalla de Inventarios de
+// Compras— se pide POR ALMACÉN (unas 45 llamadas) y se agrega por ítem: escala con
+// el #almacenes, no con los ~5.500 productos. Se arma UNA vez y se cachea 5 min
+// (bcExistencias va `no-store`, así que sin esto cada visita rehace las 45 llamadas);
+// `enVuelo` comparte la construcción entre dos pantallas que abren a la vez.
+export type ExistenciaTotal = { total: number; almacenes: { almacen: string; variante: string; cantidad: number; unidad: string }[]; unidad: string };
+const TOTALES_TTL_MS = 5 * 60_000;
+let totalesCache: { at: number; map: Map<string, ExistenciaTotal> } | null = null;
+let totalesEnVuelo: Promise<Map<string, ExistenciaTotal>> | null = null;
+
+export async function bcExistenciasTotales(): Promise<Map<string, ExistenciaTotal>> {
+  if (totalesCache && Date.now() - totalesCache.at < TOTALES_TTL_MS) return totalesCache.map;
+  if (totalesEnVuelo) return totalesEnVuelo;
+  totalesEnVuelo = construirTotales()
+    .then((map) => { if (map.size) totalesCache = { at: Date.now(), map }; return map; })
+    .finally(() => { totalesEnVuelo = null; });
+  return totalesEnVuelo;
+}
+
+async function construirTotales(): Promise<Map<string, ExistenciaTotal>> {
+  const locs = (await bcAlmacenes()).map((a) => a.codigo).filter(Boolean);
+  const map = new Map<string, ExistenciaTotal>();
+  let i = 0;
+  const LIMITE = 6; // mismas 6 en vuelo que usa Inventarios de Compras
+  const worker = async () => {
+    while (i < locs.length) {
+      const loc = locs[i++];
+      try {
+        const filas = await bcExistencias({ locationCode: loc });
+        for (const e of filas) {
+          const it = e.itemNo; if (!it) continue;
+          const cant = Number(e.cantidad) || 0;
+          let g = map.get(it);
+          if (!g) { g = { total: 0, almacenes: [], unidad: e.unidad || "" }; map.set(it, g); }
+          if (!g.unidad && e.unidad) g.unidad = e.unidad;
+          g.total += cant;
+          if (cant !== 0) g.almacenes.push({ almacen: e.locationCode, variante: e.variantCode, cantidad: cant, unidad: e.unidad });
+        }
+      } catch { /* salta este almacén; los demás igual suman */ }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(LIMITE, locs.length || 1) }, worker));
+  for (const g of map.values()) g.almacenes.sort((a, b) => b.cantidad - a.cantidad);
+  return map;
+}
+
 export type BcJobTask = { jobNo: string; jobTaskNo: string; descripcion: string; tipo: string };
 
 // Catálogo de tareas de obra (Job Task) vía la API custom Adelante `jobTasks`
