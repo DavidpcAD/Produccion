@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { bcProductionConfigured, RegistrarNoDisponible, registrarObra } from '@/lib/bc/production-lines';
+import { ObraBloqueada, construirPreview, exigirObraSana } from '@/lib/bc/integracion';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,9 +36,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Fecha inválida (YYYY-MM-DD)' }, { status: 400 });
   }
   try {
+    // Registrar postea TODO lo pendiente de la obra. Si alguna línea arrastra
+    // presupuesto que ninguna cantidad pidió (Cantidad máxima ≠ Cantidad, típico
+    // de "Traer tareas de proyecto"), el asiento sale inflado. Se corta ACÁ, antes
+    // de llamar a BC. Ver lib/bc/riesgo.ts y docs/integracion-bc-registrar.md.
+    exigirObraSana(await construirPreview(obra));
     const resultado = await registrarObra(obra, fecha);
     return NextResponse.json({ obra, fecha, resultado });
   } catch (e) {
+    if (e instanceof ObraBloqueada) {
+      return NextResponse.json(
+        { error: e.message, bloqueada: true, monto_en_riesgo: e.monto_en_riesgo },
+        { status: 409 },
+      );
+    }
     if (e instanceof RegistrarNoDisponible) {
       return NextResponse.json({ error: e.message }, { status: 501 });
     }

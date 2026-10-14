@@ -8,6 +8,7 @@ import {
   leerLineasObras,
   registrarDisponible,
 } from './production-lines';
+import { type MotivoRiesgo, evaluarRiesgo } from './riesgo';
 
 /**
  * Integración ObrasControl → Business Central (comparación OC vs BC por partida).
@@ -43,6 +44,13 @@ export interface BcPartidaPreview {
   monto_a_registrar: number;
   /** true si al reportar subiría (oc_pct > bc_pct + umbral). */
   se_reportaria: boolean;
+  /** ₡ que BC postearía por esta línea al Registrar (su Importe pendiente). */
+  pendiente_bc: number;
+  /** ₡ de ese pendiente que la Cantidad NO justifica (ver lib/bc/riesgo.ts). */
+  riesgo: number;
+  /** true si BC postearía de más por esta línea: bloquea la obra. */
+  inconsistente: boolean;
+  motivo_riesgo: MotivoRiesgo;
 }
 
 /** Respuesta del preview de una obra (detalle). */
@@ -56,6 +64,11 @@ export interface BcPreview {
   n_cambios: number;
   ya_registrado: boolean;
   produccion_inicializada: boolean;
+  /** true si alguna línea haría que BC postee de más: la app no toca esta obra. */
+  bloqueada: boolean;
+  n_inconsistentes: number;
+  /** ₡ que BC postearía de más si se registrara esta obra tal como está. */
+  monto_en_riesgo: number;
 }
 
 export type EstadoBcObra = 'en_ejecucion' | 'en_espera' | 'finalizada';
@@ -69,6 +82,9 @@ export interface BcResumenObra {
   n_cambios: number;
   ya_registrado: boolean;
   produccion_inicializada: boolean;
+  bloqueada: boolean;
+  n_inconsistentes: number;
+  monto_en_riesgo: number;
 }
 
 /** Respuesta del listado de integración BC. */
@@ -78,6 +94,28 @@ export interface BcResumen {
   obras: BcResumenObra[];
   total_registrado: number;
   total_a_registrar: number;
+  /** Obras bloqueadas por líneas inconsistentes (ver lib/bc/riesgo.ts). */
+  n_bloqueadas: number;
+  total_en_riesgo: number;
+}
+
+/**
+ * La obra tiene líneas que harían que BC postee más de lo que la Cantidad pide.
+ * La app se niega a escribir o a registrar: hay que arreglarlo en BC primero.
+ */
+export class ObraBloqueada extends Error {
+  constructor(
+    readonly obra: string,
+    readonly n_lineas: number,
+    readonly monto_en_riesgo: number,
+  ) {
+    super(
+      `La obra ${obra} tiene ${n_lineas} línea(s) de producción inconsistentes en BC: ` +
+        `registrarla postearía ₡${Math.round(monto_en_riesgo).toLocaleString('es-CR')} que ninguna cantidad pidió. ` +
+        'Corregí la Cantidad máxima de esas líneas en BC antes de reportar o registrar desde la app.',
+    );
+    this.name = 'ObraBloqueada';
+  }
 }
 
 /** Resultado de reportar una partida. */
@@ -164,6 +202,9 @@ interface CalculoObra {
   monto_registrado: number;
   n_cambios: number;
   produccion_inicializada: boolean;
+  bloqueada: boolean;
+  n_inconsistentes: number;
+  monto_en_riesgo: number;
 }
 
 /** Compara el roll-up de OC con las líneas Posting de BC de una obra. */
@@ -173,6 +214,8 @@ function calcularObra(oc: Map<string, number>, lineas: LineaBC[]): CalculoObra {
   let registrado = 0;
   let unitTotal = 0; // Σ precio unitario → si 0, producción sin inicializar
   let nCambios = 0;
+  let nInconsistentes = 0;
+  let enRiesgo = 0;
   for (const l of lineas) {
     if (l.Task_Type === 'Total') continue; // las Total las recalcula BC
     unitTotal += Number(l.Unit_Amount) || 0;
@@ -185,6 +228,14 @@ function calcularObra(oc: Map<string, number>, lineas: LineaBC[]): CalculoObra {
     const reg = Number(l.Registered_Quantity) || 0;
     const unit = Number(l.Unit_Amount) || 0;
     const montoARegistrar = Math.max(0, targetQty - reg) * unit;
+    // ¿BC postearía por esta línea más de lo que la Cantidad justifica? Si sí, la
+    // obra entera queda bloqueada: el Registrar de BC postea TODO lo pendiente de
+    // la obra, no solo las partidas que la app tocó. Ver lib/bc/riesgo.ts.
+    const riesgo = evaluarRiesgo(l);
+    if (riesgo.inconsistente) {
+      nInconsistentes++;
+      enRiesgo += riesgo.riesgo;
+    }
     if (seReportaria) nCambios++;
     total += montoARegistrar;
     registrado += Number(l.Registered_Amount) || 0;
@@ -199,6 +250,10 @@ function calcularObra(oc: Map<string, number>, lineas: LineaBC[]): CalculoObra {
       registrado_qty: reg,
       monto_a_registrar: Math.round(montoARegistrar * 100) / 100,
       se_reportaria: seReportaria,
+      pendiente_bc: Math.round(riesgo.pendiente_bc * 100) / 100,
+      riesgo: Math.round(riesgo.riesgo * 100) / 100,
+      inconsistente: riesgo.inconsistente,
+      motivo_riesgo: riesgo.motivo,
     });
   }
   partidas.sort((a, b) => a.partida.localeCompare(b.partida, 'es', { numeric: true }));
@@ -208,6 +263,9 @@ function calcularObra(oc: Map<string, number>, lineas: LineaBC[]): CalculoObra {
     monto_registrado: Math.round(registrado * 100) / 100,
     n_cambios: nCambios,
     produccion_inicializada: unitTotal > 0,
+    bloqueada: nInconsistentes > 0,
+    n_inconsistentes: nInconsistentes,
+    monto_en_riesgo: Math.round(enRiesgo * 100) / 100,
   };
 }
 
@@ -225,6 +283,9 @@ export async function construirPreview(obra: string): Promise<BcPreview> {
     n_cambios: c.n_cambios,
     ya_registrado: c.n_cambios === 0,
     produccion_inicializada: c.produccion_inicializada,
+    bloqueada: c.bloqueada,
+    n_inconsistentes: c.n_inconsistentes,
+    monto_en_riesgo: c.monto_en_riesgo,
   };
 }
 
@@ -242,6 +303,8 @@ export async function construirResumen(): Promise<BcResumen> {
   const filas: BcResumenObra[] = [];
   let totReg = 0;
   let totAReg = 0;
+  let nBloqueadas = 0;
+  let totRiesgo = 0;
   for (const obra of obras) {
     const estado = estados.get(obra) ?? 'en_ejecucion';
     const c = calcularObra(porObra.get(obra) as Map<string, number>, lineasPorObra.get(obra) ?? []);
@@ -250,6 +313,10 @@ export async function construirResumen(): Promise<BcResumen> {
     if (estado === 'finalizada' && c.n_cambios === 0) continue;
     totReg += c.monto_registrado;
     totAReg += c.total_a_registrar;
+    if (c.bloqueada) {
+      nBloqueadas++;
+      totRiesgo += c.monto_en_riesgo;
+    }
     filas.push({
       obra,
       estado,
@@ -258,6 +325,9 @@ export async function construirResumen(): Promise<BcResumen> {
       n_cambios: c.n_cambios,
       ya_registrado: c.n_cambios === 0,
       produccion_inicializada: c.produccion_inicializada,
+      bloqueada: c.bloqueada,
+      n_inconsistentes: c.n_inconsistentes,
+      monto_en_riesgo: c.monto_en_riesgo,
     });
   }
   filas.sort((a, b) => a.obra.localeCompare(b.obra, 'es', { numeric: true }));
@@ -267,7 +337,21 @@ export async function construirResumen(): Promise<BcResumen> {
     obras: filas,
     total_registrado: Math.round(totReg * 100) / 100,
     total_a_registrar: Math.round(totAReg * 100) / 100,
+    n_bloqueadas: nBloqueadas,
+    total_en_riesgo: Math.round(totRiesgo * 100) / 100,
   };
+}
+
+/**
+ * Verifica que la obra se pueda tocar. Lanza ObraBloqueada si alguna línea haría
+ * que BC postee presupuesto que ninguna cantidad pidió. Se corre ANTES de todo
+ * write: el Registrar de BC postea lo pendiente de la obra ENTERA, así que una
+ * línea envenenada contamina cualquier cosa que hagamos sobre esa obra.
+ */
+export function exigirObraSana(preview: BcPreview): void {
+  if (preview.bloqueada) {
+    throw new ObraBloqueada(preview.obra, preview.n_inconsistentes, preview.monto_en_riesgo);
+  }
 }
 
 /**
@@ -280,8 +364,11 @@ export async function reportarObra(
 ): Promise<BcReporteResultado[]> {
   const set = filtro ? new Set(filtro.map((p) => p.toUpperCase())) : null;
   const preview = await construirPreview(obra);
+  exigirObraSana(preview);
   const aReportar = preview.partidas.filter(
-    (p) => p.se_reportaria && (!set || set.has(p.partida.toUpperCase())),
+    // La guarda por línea es redundante con exigirObraSana (que ya cortó arriba),
+    // y así queda: ninguna ruta de este archivo escribe sobre una línea marcada.
+    (p) => p.se_reportaria && !p.inconsistente && (!set || set.has(p.partida.toUpperCase())),
   );
   const resultados: BcReporteResultado[] = [];
   for (const p of aReportar) {

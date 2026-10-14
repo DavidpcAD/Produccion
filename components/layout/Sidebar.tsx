@@ -88,6 +88,24 @@ const navItems: NavItemDef[] = [
     ],
   },
   {
+    // Mantenimiento (Control de Reparaciones): app de Steven embebida (iframe) bajo
+    // /mantenimiento. Cada submenú abre una sección de su app dentro del marco. Solo
+    // lo ve el rol "Mantenimiento" (y Super Admin), por el módulo 'mantenimiento'.
+    // "Solicitudes" (su órdenes de compra) NO va: eso lo cubre Órdenes de Compra de
+    // Produccion, que este rol también tiene. Ver app/(protected)/mantenimiento.
+    href: '/mantenimiento', label: 'Mantenimiento', icon: 'traslado', minLevel: 4,
+    section: '/mantenimiento',
+    children: [
+      { href: '/mantenimiento', label: 'Panel', exact: true },
+      { href: '/mantenimiento/inspeccion', label: 'Inspección diaria' },
+      { href: '/mantenimiento/equipos', label: 'Equipos' },
+      { href: '/mantenimiento/ordenes', label: 'Órdenes de trabajo' },
+      { href: '/mantenimiento/planes', label: 'Preventivo' },
+      { href: '/mantenimiento/repuestos', label: 'Repuestos' },
+      { href: '/mantenimiento/reportes', label: 'Reportes' },
+    ],
+  },
+  {
     href: '/compras/ingenieria', label: 'Órdenes de Compra', icon: 'entrega', minLevel: 4,
     section: '/compras/ingenieria',
     // Aprobación cuelga de /compras/aprobacion, no del prefijo de la sección: sin

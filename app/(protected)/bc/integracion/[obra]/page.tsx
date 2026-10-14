@@ -10,6 +10,7 @@ import { useConfirm } from '@/components/ui/Confirm';
 import { useSession } from '@/hooks/useSession';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { formatCRC } from '@/lib/utilidades/format';
+import { type MotivoRiesgo, explicarRiesgo } from '@/lib/bc/riesgo';
 
 interface Partida {
   partida: string;
@@ -19,6 +20,10 @@ interface Partida {
   delta: number | null;
   monto_a_registrar: number;
   se_reportaria: boolean;
+  pendiente_bc: number;
+  riesgo: number;
+  inconsistente: boolean;
+  motivo_riesgo: MotivoRiesgo;
 }
 interface Preview {
   obra: string;
@@ -29,6 +34,9 @@ interface Preview {
   n_cambios: number;
   ya_registrado: boolean;
   produccion_inicializada: boolean;
+  bloqueada: boolean;
+  n_inconsistentes: number;
+  monto_en_riesgo: number;
 }
 
 export default function DetalleBcPage() {
@@ -157,11 +165,30 @@ export default function DetalleBcPage() {
         </EstadoVacio>
       )}
 
+      {!loading && preview?.bloqueada && (
+        <div className="rounded-ds-lg border border-ds-red bg-ds-red-soft p-4 shadow-ds-01">
+          <p className="font-semibold text-ds-red-ink">
+            Obra bloqueada — {preview.n_inconsistentes} línea(s) de producción inconsistentes en BC
+          </p>
+          <p className="mt-1 text-body-sm text-ds-ink">
+            Registrar esta obra postearía <strong>{formatCRC(preview.monto_en_riesgo)}</strong> que ninguna
+            cantidad pidió. Pasa cuando las líneas se crean con «Traer tareas de proyecto»: llegan con
+            Cantidad máxima 1,00 y Cantidad 0, y el Importe pendiente nace con el presupuesto completo.
+            La app no va a escribir ni registrar nada de esta obra hasta que se corrija la Cantidad
+            máxima de esas líneas en BC.
+          </p>
+        </div>
+      )}
+
       {!loading && preview && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
             <div className="text-body-sm">
-              {!preview.produccion_inicializada ? (
+              {preview.bloqueada ? (
+                <span className="font-medium text-ds-red-ink">
+                  Bloqueada — arreglá las líneas en BC antes de reportar o registrar
+                </span>
+              ) : !preview.produccion_inicializada ? (
                 <span className="font-medium text-ds-red-ink">
                   Producción no inicializada en BC — primero “Importar avance de Excel”
                 </span>
@@ -179,7 +206,8 @@ export default function DetalleBcPage() {
                 <Button
                   onClick={reportar}
                   loading={busy === 'reportar'}
-                  disabled={busy !== null || preview.ya_registrado || !preview.produccion_inicializada}
+                  disabled={busy !== null || preview.bloqueada || preview.ya_registrado || !preview.produccion_inicializada}
+                  title={preview.bloqueada ? 'Obra bloqueada: hay líneas que harían postear de más en BC' : undefined}
                 >
                   {`Reportar (${preview.n_cambios})`}
                 </Button>
@@ -187,8 +215,8 @@ export default function DetalleBcPage() {
                   variant="secondary"
                   onClick={registrar}
                   loading={busy === 'registrar'}
-                  disabled={busy !== null || !preview.registrar_disponible}
-                  title={preview.registrar_disponible ? 'Postea la producción en BC' : 'Pendiente: el partner de BC debe publicar el web service de Registrar'}
+                  disabled={busy !== null || preview.bloqueada || !preview.registrar_disponible}
+                  title={preview.bloqueada ? 'Obra bloqueada: hay líneas que harían postear de más en BC' : preview.registrar_disponible ? 'Postea la producción en BC' : 'Pendiente: el partner de BC debe publicar el web service de Registrar'}
                 >
                   Registrar
                 </Button>
@@ -206,13 +234,24 @@ export default function DetalleBcPage() {
                   <th className="px-4 py-3 text-right">BC %</th>
                   <th className="px-4 py-3 text-right">Δ</th>
                   <th className="px-4 py-3 text-right">Monto a registrar</th>
+                  <th className="px-4 py-3 text-right">Postearía BC</th>
                 </tr>
               </thead>
               <tbody>
                 {preview.partidas.map((p) => (
-                  <tr key={p.partida} className={`border-b border-ds-gray-100 last:border-0 ${p.se_reportaria ? 'bg-ds-yellow/10' : ''}`}>
+                  <tr
+                    key={p.partida}
+                    className={`border-b border-ds-gray-100 last:border-0 ${
+                      p.inconsistente ? 'bg-ds-red-soft' : p.se_reportaria ? 'bg-ds-yellow/10' : ''
+                    }`}
+                  >
                     <td className="px-4 py-3 font-mono text-ds-ink">{p.partida}</td>
-                    <td className="px-4 py-3 text-ds-ink">{p.nombre}</td>
+                    <td className="px-4 py-3 text-ds-ink">
+                      {p.nombre}
+                      {p.inconsistente && (
+                        <span className="block text-label text-ds-red-ink">{explicarRiesgo(p.motivo_riesgo)}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right text-ds-ink">{p.oc_pct == null ? '—' : p.oc_pct.toFixed(1)}</td>
                     <td className="px-4 py-3 text-right text-ds-ink">{p.bc_pct.toFixed(1)}</td>
                     <td className={`px-4 py-3 text-right ${p.se_reportaria ? 'font-semibold text-ds-yellow-ink' : 'text-ds-gray-400'}`}>
@@ -220,6 +259,9 @@ export default function DetalleBcPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-ds-ink">
                       {p.monto_a_registrar > 0 ? formatCRC(p.monto_a_registrar) : '—'}
+                    </td>
+                    <td className={`px-4 py-3 text-right ${p.inconsistente ? 'font-semibold text-ds-red-ink' : 'text-ds-gray-400'}`}>
+                      {p.pendiente_bc > 0 ? formatCRC(p.pendiente_bc) : '—'}
                     </td>
                   </tr>
                 ))}

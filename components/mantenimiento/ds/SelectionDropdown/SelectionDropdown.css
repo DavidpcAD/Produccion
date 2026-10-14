@@ -1,0 +1,249 @@
+/* SelectionDropdown — DOS contenedores separados (Figma: Nav » selectionDropdown).
+   1) Header card (siempre visible)
+   2) Items card (visible cuando isOpen, separado por margin-top 16) */
+
+.ds-sd {
+  position:      relative;
+  width:         372px;
+  background:    transparent;
+  display:       flex;
+  flex-direction: column;
+}
+
+/* CARD 1 — Header con label + ToggleCards. Propia shadow. */
+.ds-sd__header-card {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  width:           100%;
+  height:          70px;
+  padding:         var(--ds-space-3) var(--ds-space-3) var(--ds-space-3) var(--ds-space-5);
+  /* 12px right/top/bottom, 20px left */
+  background:      var(--ds-color-white);
+  border-radius:   var(--ds-radius-xl);          /* 32px */
+  box-shadow:      var(--ds-shadow-01);
+}
+
+/* Label gris del header (body/regular 16px, gray-300) */
+.ds-sd__label {
+  flex:           1 0 0;
+  min-width:      0;
+  font-family:    var(--ds-font-family);
+  font-size:      var(--ds-font-size-body-md);     /* 16px */
+  line-height:    var(--ds-line-height-body-md);   /* 24px */
+  font-weight:    var(--ds-font-weight-regular);   /* 400 */
+  color:          var(--ds-color-gray-300);        /* #aaafb6 */
+  letter-spacing: 0;
+  white-space:    nowrap;
+  overflow:       hidden;
+  text-overflow:  ellipsis;
+}
+
+/* Wrapper animado — solo clip de altura (sin fondo, sin borde). */
+.ds-sd__items-wrapper {
+  overflow: hidden;
+}
+
+/* CARD 2 — Items list. Separado del header por 16px de margin-top (animado). */
+.ds-sd__items-card {
+  width:         100%;
+  background:    var(--ds-color-white);
+  border-radius: var(--ds-radius-xl);
+  box-shadow:    var(--ds-shadow-01);
+}
+
+/* Inner padding de la lista de items */
+.ds-sd__items-inner {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--ds-space-4);               /* Figma spacing/spacing 16 entre pills */
+  padding:        var(--ds-space-3);               /* 12px todos los lados */
+}
+
+/* Cada item: pill negro 58px tipo TabsMenu.
+   Figma: wrapper de 82px con 12px padding → pill interno = 82-12-12 = 58px */
+.ds-sd__item {
+  width:          100%;
+  height:         58px;
+  padding:        0 40px;                         /* sin padding vertical — flexbox centra */
+  border:         none;
+  border-radius:  var(--ds-radius-xl);             /* 32px */
+  background:     var(--ds-color-black);
+  color:          var(--ds-color-white);
+  font-family:    var(--ds-font-family);
+  font-size:      var(--ds-font-size-body-md);     /* 16px */
+  line-height:    var(--ds-line-height-body-md);   /* 24px */
+  font-weight:    var(--ds-font-weight-semibold);  /* 600 */
+  letter-spacing: 0;
+  text-align:     center;
+  cursor:         pointer;
+  display:        flex;
+  align-items:    center;
+  justify-content: center;
+  flex-shrink:    0;
+  -webkit-tap-highlight-color: transparent;
+  transition:     box-shadow 160ms ease;
+}
+
+/* Hover = mismo aspecto que tabsMenu state="pressed":
+   halo negro semitransparente de 8px alrededor del pill. */
+.ds-sd__item:hover {
+  box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.ds-dd__trigger-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--ds-color-yellow);
+  color: var(--ds-color-black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ds-dd__trigger-label {
+  flex: 1;
+  text-align: left;
+}
+
+.ds-dd__caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-white);
+  opacity: 0.7;
+}
+
+.ds-dd--open .ds-dd__trigger {
+  background: var(--ds-color-gray-500);
+}
+
+.ds-dd__panel {
+  position: absolute;
+  bottom: calc(100% + var(--ds-space-2));
+  left: 0;
+  right: 0;
+  max-height: 360px;
+  background: var(--ds-color-white);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-03-big);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.ds-dd__search {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin: var(--ds-space-3);
+  padding: 0 var(--ds-space-4);
+  height: 48px;
+  border-radius: var(--ds-radius-2xl);
+  background: var(--ds-color-surface);
+  color: var(--ds-color-gray-500);
+  flex-shrink: 0;
+}
+
+.ds-dd__search-input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  font-family: inherit;
+  font-size: var(--ds-font-size-body-md);
+  background: transparent;
+  color: var(--ds-color-black);
+  height: 100%;
+}
+
+.ds-dd__search-input::placeholder {
+  color: var(--ds-color-gray-400);
+}
+
+.ds-dd__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--ds-space-2) var(--ds-space-2);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ds-dd__list > li {
+  list-style: none;
+}
+
+.ds-dd__list > li + li {
+  border-top: 1px solid var(--ds-color-gray-100);
+}
+
+.ds-dd__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  width: 100%;
+  padding: var(--ds-space-3) var(--ds-space-2);
+  border: 0;
+  background: transparent;
+  border-radius: var(--ds-radius-md);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.ds-dd__item:hover {
+  background: var(--ds-color-surface);
+}
+
+.ds-dd__item-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  height: 32px;
+  padding: 0 var(--ds-space-2);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-color-yellow);
+  color: var(--ds-color-black);
+  font-size: var(--ds-font-size-body-sm);
+  font-weight: var(--ds-font-weight-semibold);
+  letter-spacing: var(--ds-letter-spacing-wide);
+}
+
+.ds-dd__item-name {
+  flex: 1;
+  font-size: var(--ds-font-size-body-md);
+  line-height: var(--ds-line-height-body-md);
+  color: var(--ds-color-black);
+  font-weight: var(--ds-font-weight-regular);
+  word-break: break-word;
+}
+
+.ds-dd__item-add {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--ds-color-green-100);
+  color: var(--ds-color-black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--ds-shadow-01);
+}
+
+.ds-dd__item:hover .ds-dd__item-add {
+  background: var(--ds-color-green-200);
+  color: var(--ds-color-white);
+}
+
+.ds-dd__empty {
+  padding: var(--ds-space-5) var(--ds-space-4);
+  text-align: center;
+  font-size: var(--ds-font-size-body-sm);
+  color: var(--ds-color-gray-500);
+}
+

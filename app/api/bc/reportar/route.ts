@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getSession } from '@/lib/auth';
 import { bcProductionConfigured } from '@/lib/bc/production-lines';
-import { reportarObra } from '@/lib/bc/integracion';
+import { ObraBloqueada, reportarObra } from '@/lib/bc/integracion';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,6 +37,13 @@ export async function POST(req: NextRequest) {
     const resultados = await reportarObra(obra, partidas);
     return NextResponse.json({ obra, resultados });
   } catch (e) {
+    // Obra con líneas que harían postear de más en BC: no se tocó nada.
+    if (e instanceof ObraBloqueada) {
+      return NextResponse.json(
+        { error: e.message, bloqueada: true, monto_en_riesgo: e.monto_en_riesgo },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
   }
 }

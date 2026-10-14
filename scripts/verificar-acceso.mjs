@@ -59,6 +59,7 @@ const ROLES: [string, string][] = [
   ['Ingenieria', 'Infra'], ['Ingenieria', 'Acabados'], ['Ingenieria', 'Electrico'],
   ['Ingenieria', 'Obra Gris'], ['Ingenieria', 'PostVenta'],
   ['Presupuestista', 'General'],
+  ['Mantenimiento', 'General'],
 ];
 
 let fallas = 0;
@@ -90,7 +91,7 @@ for (const [nombre, tipo] of ROLES) {
 }
 
 console.log(fallas === 0
-  ? '\\nTodo en orden: el menú y el proxy dicen lo mismo para los 12 roles.'
+  ? \`\\nTodo en orden: el menú y el proxy dicen lo mismo para los \${ROLES.length} roles.\`
   : \`\\n\${fallas} problema(s). El menú y el proxy NO dicen lo mismo.\`);
 process.exit(fallas === 0 ? 0 : 1);
 `);

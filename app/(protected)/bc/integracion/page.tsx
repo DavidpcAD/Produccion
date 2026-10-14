@@ -17,25 +17,34 @@ interface ResumenObra {
   n_cambios: number;
   ya_registrado: boolean;
   produccion_inicializada: boolean;
+  bloqueada: boolean;
+  n_inconsistentes: number;
+  monto_en_riesgo: number;
 }
 interface Resumen {
   registrar_disponible: boolean;
   obras: ResumenObra[];
   total_registrado: number;
   total_a_registrar: number;
+  n_bloqueadas: number;
+  total_en_riesgo: number;
 }
 
 type Col = 'obra' | 'registrado' | 'a_registrar';
 
 // Estado de REGISTRO de la obra (el que pinta la columna "Estado"), para filtrar.
-type EstadoReg = 'por_reportar' | 'al_dia' | 'sin_inicializar';
+// "bloqueada" manda sobre todo lo demás: es la obra que NO se puede tocar porque
+// BC postearía presupuesto que nadie pidió (ver lib/bc/riesgo.ts).
+type EstadoReg = 'bloqueada' | 'por_reportar' | 'al_dia' | 'sin_inicializar';
 function estadoReg(o: ResumenObra): EstadoReg {
+  if (o.bloqueada) return 'bloqueada';
   if (!o.produccion_inicializada) return 'sin_inicializar';
   if (o.ya_registrado) return 'al_dia';
   return 'por_reportar';
 }
 const ESTADOS_REG: { key: EstadoReg | 'todas'; label: string }[] = [
   { key: 'todas', label: 'Todas' },
+  { key: 'bloqueada', label: 'Bloqueadas' },
   { key: 'por_reportar', label: 'Por reportar' },
   { key: 'al_dia', label: 'Al día' },
   { key: 'sin_inicializar', label: 'Sin inicializar' },
@@ -93,7 +102,7 @@ export default function IntegracionBcPage() {
 
   // Conteo por estado de registro (sobre todas las obras, para los chips).
   const conteosEstado = useMemo(() => {
-    const c: Record<EstadoReg, number> = { por_reportar: 0, al_dia: 0, sin_inicializar: 0 };
+    const c: Record<EstadoReg, number> = { bloqueada: 0, por_reportar: 0, al_dia: 0, sin_inicializar: 0 };
     for (const o of resumen?.obras ?? []) c[estadoReg(o)]++;
     return c;
   }, [resumen]);
@@ -149,6 +158,19 @@ export default function IntegracionBcPage() {
 
       {error && !loading && (
         <p className="text-body-sm text-ds-red-ink">{error}</p>
+      )}
+
+      {!loading && (resumen?.n_bloqueadas ?? 0) > 0 && (
+        <div className="rounded-ds-lg border border-ds-red bg-ds-red-soft p-4 shadow-ds-01">
+          <p className="font-semibold text-ds-red-ink">
+            {resumen?.n_bloqueadas} obra(s) bloqueadas — BC postearía {formatCRC(resumen?.total_en_riesgo ?? 0)} de más
+          </p>
+          <p className="mt-1 text-body-sm text-ds-ink">
+            Tienen líneas de producción cuyo Importe pendiente no corresponde a la Cantidad (pasa cuando
+            se crean con «Traer tareas de proyecto»). La app no reporta ni registra esas obras hasta que
+            se corrija la Cantidad máxima en BC.
+          </p>
+        </div>
       )}
 
       <div className="flex flex-wrap gap-6 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
@@ -227,7 +249,11 @@ export default function IntegracionBcPage() {
                     {o.monto_a_registrar > 0 ? formatCRC(o.monto_a_registrar) : '—'}
                   </td>
                   <td className="px-4 py-3 text-center text-body-sm">
-                    {!o.produccion_inicializada ? (
+                    {o.bloqueada ? (
+                      <span className="font-semibold text-ds-red-ink">
+                        Bloqueada · {formatCRC(o.monto_en_riesgo)}
+                      </span>
+                    ) : !o.produccion_inicializada ? (
                       <span className="text-ds-red-ink">Sin inicializar</span>
                     ) : o.ya_registrado ? (
                       <span className="text-ds-green-ink">Al día</span>

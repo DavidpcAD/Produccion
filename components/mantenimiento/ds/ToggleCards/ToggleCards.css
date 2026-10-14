@@ -1,0 +1,58 @@
+/* ToggleCards — botón negro con ícono. Sizes big/small. Solo tokens var(--ds-*). */
+
+.ds-toggle {
+  width: 60px;
+  border: 0;
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-color-black);
+  color: var(--ds-color-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--ds-shadow-03-big);
+  padding: 0;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ds-toggle--big {
+  height: 88px;
+  width: 60px;
+}
+
+.ds-toggle--small {
+  height: 50px;
+  width: 60px;
+}
+
+/* Figma pressed: stays black, 8px solid black outward stroke ring.
+ * Also triggers on :active for instant feedback while pressing.
+ * Excluded on disabled so a disabled toggle doesn't show the ring. */
+.ds-toggle--pressed:not(.ds-toggle--disabled),
+.ds-toggle:not(.ds-toggle--disabled):active {
+  box-shadow:
+    0 0 0 8px rgba(0, 0, 0, 0.8),
+    var(--ds-shadow-03-big);
+}
+
+.ds-toggle--disabled {
+  background: var(--ds-color-gray-200);
+  color: var(--ds-color-gray-400);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Pressed + Disabled — Figma: mismo fondo gris-200, borde 2px gris-100, shadow restaurado */
+.ds-toggle--pressed.ds-toggle--disabled {
+  border: 2px solid var(--ds-color-gray-100);
+  box-shadow: var(--ds-shadow-03-big);
+}
+
+/* Icon wrapper para el crossfade en cambios de visibility (chevrons ↔ arrow). */
+.ds-toggle__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+

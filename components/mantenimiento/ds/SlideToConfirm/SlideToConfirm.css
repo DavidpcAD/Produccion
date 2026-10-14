@@ -1,0 +1,64 @@
+/* ============================================================
+   SlideToConfirm (ds-stc) — green knob grows from the left,
+   black track shows a trailing chevron hint that fades out.
+   ============================================================ */
+
+.ds-stc {
+  position:      relative;
+  width:         100%;
+  /* touch-action: none so mobile pan-y doesn't kill the drag mid-gesture. */
+  touch-action:  none;
+  user-select:   none;
+}
+
+/* Black track — fills the full width behind the knob. */
+.ds-stc__track {
+  position:   absolute;
+  inset:      0;
+  background: var(--ds-color-black);
+  overflow:   hidden;
+}
+
+/* Trailing chevron — fades out (opacity from MotionValue) as the knob crosses. */
+.ds-stc__hint {
+  position:        absolute;
+  right:           28px;
+  top:             50%;
+  translate:       0 -50%;
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  color:           var(--ds-color-white);
+}
+
+/* Green knob — anchored leading, width = knobWidth + dragX (MotionValue). */
+.ds-stc__knob {
+  position:        absolute;
+  left:            0;
+  top:             0;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             10px;
+  background:      var(--ds-color-green-100);
+  color:           var(--ds-color-black);
+}
+
+.ds-stc__label {
+  display:        flex;
+  align-items:    center;
+  gap:            10px;
+}
+
+.ds-stc__label > span {
+  font-family:    var(--ds-font-family);
+  font-size:      var(--ds-font-size-body-md);
+  font-weight:    var(--ds-font-weight-semibold);
+  letter-spacing: 0.5px;
+}
+
+.ds-stc__inner-chevron,
+.ds-stc__check {
+  display:     inline-flex;
+  align-items: center;
+}

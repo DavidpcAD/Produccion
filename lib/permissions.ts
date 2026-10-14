@@ -52,6 +52,9 @@ const MODULE_LEVEL: Record<string, number> = {
   // Recepción de material y facturas. Mismo criterio que bodega: no eleva el nivel.
   recepcion: 1,
   admin: 4,
+  // Mantenimiento es operativo: no debe elevar el nivel del usuario (con 4 vería
+  // todo lo demás). El rol "Mantenimiento" queda en nivel 1, igual que Bodega.
+  mantenimiento: 1,
 };
 
 /** Calcula el nivelAdmin efectivo a partir de los roles del usuario.
@@ -115,6 +118,10 @@ export function getRouteLevel(pathname: string): number {
   if (pathname.startsWith('/presupuesto')) return 2;
   if (pathname.startsWith('/concreto')) return 2;
   if (pathname.startsWith('/desembolsos')) return 2;
+  // Mantenimiento: el acceso real lo da el MÓDULO del rol (gobierna para quien
+  // tiene rol de Producción). El nivel 4 solo cierra la puerta a los usuarios
+  // SIN rol de Producción —que caen por nivel— para que nadie llegue por URL.
+  if (pathname.startsWith('/mantenimiento')) return 4;
   if (pathname.startsWith('/utilidades')) return 2;
   if (pathname.startsWith('/avance')) return 2;
   if (pathname.startsWith('/marcaje')) return 2;
@@ -144,7 +151,11 @@ export type Modulo =
   // colgaba del módulo 'ingenieria' —el mismo de Órdenes de Compra— así que todo
   // ingeniero de obra la veía. No le corresponde: la llevan el Super Admin y el rol
   // legacy "Jefe de cuadrillas" (que entra por nivel, sin módulo de Producción).
-  | 'cuadrillas';
+  | 'cuadrillas'
+  // Mantenimiento (Control de Reparaciones): equipos, OTs, preventivo, repuestos.
+  // Módulo propio del rol "Mantenimiento" (idApp 10); nadie más lo ve salvo Super
+  // Admin. El app en sí se embebe (ver app/(protected)/mantenimiento).
+  | 'mantenimiento';
 
 /** ── Interruptor de "Avance de obra" ──────────────────────────────────────
  *  El módulo está incompleto, así que NO sale a producción todavía: en `false`
@@ -155,7 +166,7 @@ export type Modulo =
 export const AVANCE_OBRA_ACTIVO = false;
 
 const MODULOS_BASE: Modulo[] =
-  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas'];
+  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas', 'mantenimiento'];
 
 /** Módulos publicados (los apagados no salen para nadie). */
 export const MODULOS_TODOS: Modulo[] =
@@ -175,6 +186,7 @@ const NOMBRE_MODULO: Record<Modulo, string> = {
   recepcion: 'Recibir material',
   admin: 'Administración',
   cuadrillas: 'Cuadrillas',
+  mantenimiento: 'Mantenimiento',
 };
 
 /** Pantallas que comparten módulo pero tienen nombre propio. Casi todas caen en
@@ -280,6 +292,12 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   // El mismo rol si en RH quedó con todo en el NOMBRE ("Administracion Locales")
   // en vez de nombre + tipo.
   if (n.startsWith('administracion') && n.includes('local')) return ['bodega'];
+  // Mantenimiento (ingeniero de mantenimiento, ej. Steven): su módulo propio
+  // 'mantenimiento' (Control de Reparaciones) MÁS 'bodega' para pedir material de
+  // repuestos en "Mis solicitudes" —como dice la descripción del rol en RH—. No
+  // recibe material ni entra a proveeduría/aprobación. Se matchea por NOMBRE (el
+  // tipo del rol es "General"), igual que presupuestista/bodega.
+  if (n === 'mantenimiento') return ['mantenimiento', 'bodega'];
   // Bodega (hoy solo jerson): pide material como un ingeniero Y recibe el material.
   // Nada más: no entra a proveeduría, aprobación ni a las herramientas del ingeniero.
   if (n === 'bodega') return ['bodega', 'recepcion'];
@@ -377,6 +395,9 @@ export function getRouteModule(pathname: string): Modulo {
   if (p.startsWith('/encargados') || p.startsWith('/compras')) return 'ingenieria';
   if (p.startsWith('/concreto')) return 'concreto';
   if (p.startsWith('/desembolsos')) return 'desembolsos';
+  // Mantenimiento: la página /mantenimiento y sus sub-rutas (la app de Steven
+  // embebida; su API vive en SU propio deploy, no en Produccion).
+  if (p.startsWith('/mantenimiento')) return 'mantenimiento';
   // Marcaje va con Reporte H4: es la misma familia (marcas de los relojes de H4) y
   // no cuelga de ningún menú — se entra escribiendo la dirección. Sin esto caía en
   // 'dashboard', o sea abierto a cualquiera con rol de Producción.
@@ -455,6 +476,11 @@ const RUTAS_DE_ENTRADA: { href: string; minLevel: number }[] = [
   { href: '/bc/integracion', minLevel: 2 },
   { href: '/avance', minLevel: 2 },
   { href: '/concreto/dashboard', minLevel: 2 },
+  // Mantenimiento va ANTES de Órdenes de Compra: el rol "Mantenimiento" también
+  // lleva 'bodega' (pedir material), así que sin esto aterrizaría en "Mis
+  // solicitudes" en vez de en su app. Va DESPUÉS de los módulos de Presupuesto
+  // para que el Super Admin siga entrando en /proyectos, no en Mantenimiento.
+  { href: '/mantenimiento', minLevel: 4 },
   { href: '/compras/ingenieria', minLevel: 4 },
   { href: '/compras/aprobacion', minLevel: 4 },
   { href: '/compras/facturacion', minLevel: 4 },

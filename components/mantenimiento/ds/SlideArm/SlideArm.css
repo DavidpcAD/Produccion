@@ -1,0 +1,19 @@
+/* ============================================================
+   SlideArm (ds-sa) — wraps SlideToConfirm so a tap on the
+   collapsed green pill arms it into a full-width slider with a
+   cancel X above.
+   ============================================================ */
+
+.ds-sa {
+  position: relative;
+  width:    100%;
+}
+
+.ds-sa__shell {
+  position:    relative;
+  margin-left: auto; /* anchored trailing — the pill grows leftward */
+}
+
+.ds-sa__cancel {
+  position: absolute;
+}
