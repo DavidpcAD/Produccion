@@ -68,6 +68,9 @@ jobs:
           mkdir -p deploy-package/.next
           cp -r .next/static deploy-package/.next/static
           if [ -d public ]; then cp -r public deploy-package/public; fi
+          # Las migraciones viajan al wwwroot para que la app las auto-aplique al
+          # arrancar en producción (ver instrumentation.ts + lib/migraciones.ts).
+          if [ -d migrations ]; then cp -r migrations deploy-package/migrations; fi
 
       - name: Deploy a Azure Web App
         uses: azure/webapps-deploy@v3
