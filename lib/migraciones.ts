@@ -29,7 +29,10 @@ function listarArchivos(): string[] {
   try {
     return readdirSync(DIR)
       .filter((f) => f.toLowerCase().endsWith('.sql'))
-      .filter((f) => f >= CUTOFF) // AAAA-MM-DD… ⇒ orden lexical == cronológico
+      // Solo migraciones con prefijo de fecha AAAA-MM-DD_ y >= CUTOFF. El prefijo
+      // de fecha evita que un .sql suelto (sin fecha) se cuele; el orden lexical
+      // de esos nombres == cronológico.
+      .filter((f) => /^\d{4}-\d{2}-\d{2}_/.test(f) && f >= CUTOFF)
       .sort();
   } catch {
     return []; // sin carpeta migrations (ej. build sin empaquetarla): no-op seguro
