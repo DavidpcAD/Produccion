@@ -112,7 +112,12 @@ export default function LoginPage() {
   useEffect(() => {
     fetch('/api/auth/dev-users')
       .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d?.data?.length) setDevUsers(d.data); })
+      .then(d => {
+        if (!d?.data?.length) return;
+        setDevUsers(d.data);
+        // Un solo usuario (DEV_LOGIN_USERS): ya queda elegido, es solo "Entrar (dev)".
+        if (d.data.length === 1) setDevUserId(String(d.data[0].idUsuario));
+      })
       .catch(() => {});
   }, []);
 

@@ -13,7 +13,14 @@ export async function GET() {
   }
   try {
     const usuarios = await listUsuariosParaDev();
-    return NextResponse.json({ data: usuarios });
+    // Opcional, por máquina: DEV_LOGIN_USERS=stevencv,otro en .env.local deja en la
+    // lista solo esos usernames. Sin la variable se listan todos (como siempre).
+    const soloEstos = (process.env.DEV_LOGIN_USERS ?? '')
+      .split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
+    const data = soloEstos.length
+      ? usuarios.filter(u => soloEstos.includes(u.username.toLowerCase()))
+      : usuarios;
+    return NextResponse.json({ data });
   } catch (err) {
     console.error('/api/auth/dev-users error:', err);
     return NextResponse.json({ error: 'Error consultando usuarios' }, { status: 500 });
