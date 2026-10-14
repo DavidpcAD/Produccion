@@ -1,5 +1,9 @@
 'use client';
 import type { ReactNode } from 'react';
+// El DS de la app de Steven (superset del de Produccion: agrega --ds-bg, --ds-surface,
+// --ds-text, --ds-nav-bg, etc. que usan SUS componentes). Importado acá, Next lo carga
+// SOLO en las rutas /mantenimiento/*, sin tocar el resto de Produccion.
+import '@/components/mantenimiento/ds/design-system.css';
 import { DataStoreProvider } from '@/lib/mantenimiento/store';
 import { ToastProvider } from '@/components/mantenimiento/local/Toast';
 
