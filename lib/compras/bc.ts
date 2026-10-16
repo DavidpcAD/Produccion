@@ -1674,6 +1674,30 @@ export async function bcItemsConVariantes(codes: string[]): Promise<Set<string> 
   } catch { return null; }
 }
 
+/** De una lista de artículos, cuáles EXISTEN hoy en BC. `null` = no se pudo saber.
+ *  Se usa como guard al crear el pedido: un código que ya NO existe en BC (lo borraron
+ *  o lo renombraron — NO es lo mismo que "bloqueado") hace que BC rechace la línea, y
+ *  como el encabezado se crea ANTES que las líneas, la orden quedaría a medias. Caso
+ *  real: las brocas M08-0818/M08-0819 que venían de una plantilla vieja y ya no están
+ *  en BC. `null` (BC no respondió) NO se lee como "no existe": mejor dejar pasar que
+ *  bloquear un pedido bueno por una consulta caída. Mismo patrón que bcItemsConVariantes. */
+export async function bcItemsExistentes(codes: string[]): Promise<Set<string> | null> {
+  const unicos = [...new Set((codes ?? []).map((c) => (c ?? "").trim()).filter(Boolean))];
+  if (!unicos.length) return new Set();
+  try {
+    const cid = await getStdCompanyId();
+    const out = new Set<string>();
+    for (let i = 0; i < unicos.length; i += 15) {
+      const filtro = unicos.slice(i, i + 15).map((c) => `number eq '${odataStr(c)}'`).join(" or ");
+      const res = await bcFetch(`${stdRoot()}/companies(${cid})/items?$select=number&$filter=${encodeURIComponent(filtro)}&$top=500`, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { value?: { number?: string }[] };
+      for (const it of (data.value ?? [])) { const n = String(it.number ?? "").trim(); if (n) out.add(n); }
+    }
+    return out;
+  } catch { return null; }
+}
+
 export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: string; locationCode?: string; lineas: NuevaLineaBc[]; cargos?: CargoBc[]; flete?: { monto: number; descripcion?: string } }): Promise<{ number: string; id: string; omitidas: string[]; creadas: number; lineError?: string; cargoError?: string; cargosCreados: number; jobError?: string }> {
   if (!input?.vendorNo) throw new Error("Falta el proveedor (vendorNo).");
   const lineas = (input.lineas ?? []).filter((l) => l.itemNo && l.cantidad > 0);
@@ -1709,6 +1733,20 @@ export async function bcCrearPedido(input: { vendorNo: string; currencyCode?: st
     const faltan = conVariantes ? [...new Set(sinVariante.filter((i) => conVariantes.has(i)))] : [];
     if (faltan.length) {
       throw new Error(`El artículo ${faltan.join(", ")} tiene variantes en Business Central y la orden no dice cuál. Elegí la variante en la orden (proveeduría) y reintentá. (No se creó nada en BC.)`);
+    }
+  }
+  // GUARD (antes de tocar BC): ARTÍCULO INEXISTENTE. Un código que ya no existe en BC
+  // (borrado o renombrado) NO lo frena ningún filtro del armado —el de bloqueados solo
+  // ve los que BC marca como bloqueados— así que llegaba hasta acá y BC rechazaba la
+  // línea. Como el encabezado se crea ANTES que las líneas, la orden quedaba a medias.
+  // Mejor no crear nada y nombrar los códigos muertos. Los ACTIVOS FIJOS no son items
+  // (otro catálogo), así que no se validan acá. `null` = no se pudo verificar → no frena.
+  const codigosItem = [...new Set(lineas.filter((l) => !l.esActivo).map((l) => l.itemNo))];
+  if (codigosItem.length) {
+    const existen = await bcItemsExistentes(codigosItem);
+    const faltan = existen ? codigosItem.filter((c) => !existen.has(c)) : [];
+    if (faltan.length) {
+      throw new Error(`El artículo ${faltan.join(", ")} ya no existe en Business Central, así que no se puede comprar. Cambiá esas líneas por el código vigente (o pedí a Inventarios que lo cree) y reintentá. (No se creó nada en BC.)`);
     }
   }
   const cid = await getStdCompanyId(); // MISMA compañía que items/vendors (API estándar)
