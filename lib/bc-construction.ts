@@ -291,11 +291,14 @@ export async function setTasasWork(worksNo: string, tasas: TasasWork): Promise<v
   });
 }
 
-// Sube la versión de presupuesto (líneas venta/costo/indirecto) vía el singleton bulk,
-// y registra la versión. Devuelve la versión creada y los totales recalculados.
-export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[], _verBase?: string | null): Promise<{ versionCode: string; resultado: string; enviadas: number; totals: WorkTotals | null }> {
-  const versionCode = await nextVersionDisponible(worksNo);
-  const lineasJSON = JSON.stringify(lineas.map((l, i) => ({
+// Versión base de BC (presupuesto "básico", sin reestudio). El módulo de construcción
+// de BC (GomJob) la necesita como referencia: al registrar un reestudio busca la línea
+// base en esta versión para calcular la variación.
+const VERSION_BASE = 'NO';
+
+// Arma el JSON de líneas que consume el singleton bulk (workLineBulks).
+function lineasBulkJSON(worksNo: string, versionCode: string, lineas: BulkLine[], reStudy: boolean): string {
+  return JSON.stringify(lineas.map((l, i) => ({
     worksNo, versionCode,
     lineNo: l.lineNo ?? (i + 1),
     lineType: l.lineType,
@@ -310,25 +313,83 @@ export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[
     idEncargado: l.idEncargado ?? null,
     IDVisibles: l.IDVisibles ?? null,
     quantityToProduce: l.quantityToProduce ?? 0,
-    reStudy: true,
+    reStudy,
   })));
+}
 
+// Empuja un lote de líneas a una versión vía el singleton bulk; devuelve el "resultado"
+// que arma el codeunit. OJO: el codeunit comitea línea por línea, así que si lanza a
+// mitad de camino quedan líneas sueltas ya guardadas (ver borrarLineasVersion).
+async function cargarLineasBulk(worksNo: string, versionCode: string, lineas: BulkLine[], reStudy: boolean): Promise<string> {
   const bulk = await firstRecord('workLineBulks');
-  const patchResp = await req(`workLineBulks(${bulk.id})`, {
+  const resp = await req(`workLineBulks(${bulk.id})`, {
     method: 'PATCH', headers: { 'If-Match': bulk.etag },
-    body: JSON.stringify({ worksNo, lineasJSON, ejecutar: true }),
+    body: JSON.stringify({ worksNo, lineasJSON: lineasBulkJSON(worksNo, versionCode, lineas, reStudy), ejecutar: true }),
   });
-  const resultado = String((patchResp as { resultado?: unknown })?.resultado ?? '');
+  return String((resp as { resultado?: unknown })?.resultado ?? '');
+}
 
+// Registra la versión (REESTUDIO+n). Si ya existía (carrera), no es fatal: las líneas
+// ya se cargaron.
+async function registrarVersion(worksNo: string, versionCode: string, reStudy: boolean): Promise<void> {
   try {
     await req('workVersions', {
       method: 'POST',
-      body: JSON.stringify({ worksNo, versionCode, createDateTime: new Date().toISOString(), reStudy: true }),
+      body: JSON.stringify({ worksNo, versionCode, createDateTime: new Date().toISOString(), reStudy }),
     });
   } catch (e) {
-    // Si la versión ya existía (carrera), no es fatal: las líneas ya se cargaron.
     if (!/already exists/i.test(e instanceof Error ? e.message : '')) throw e;
   }
+}
+
+// Borra TODAS las líneas de una versión de la obra (workLines, DeleteAllowed=true).
+// Para recuperar una subida que quedó a medias antes de reintentar.
+async function borrarLineasVersion(worksNo: string, versionCode: string): Promise<number> {
+  const body = await req(
+    `workLines?$filter=${encodeURIComponent(`worksNo eq '${odataStr(worksNo)}' and versionCode eq '${odataStr(versionCode)}'`)}&$top=5000`,
+    { method: 'GET' });
+  const ids = ((body?.value ?? []) as Array<{ id?: string; systemId?: string }>)
+    .map((l) => l.id ?? l.systemId).filter(Boolean) as string[];
+  for (const id of ids) await req(`workLines(${id})`, { method: 'DELETE' });
+  return ids.length;
+}
+
+// ¿Es el error de "falta la versión base"? GomJob lo tira al insertar la primera
+// partida de COSTO de un reestudio cuando la obra nunca tuvo presupuesto base:
+//   "The Work Line does not exist. ... Version Code='NO', Line Type='Indirect Cost' ..."
+function esBaseFaltante(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /work line does not exist/i.test(msg) && /version code=\s*'?\s*no\s*'?/i.test(msg);
+}
+
+// Sube la versión de presupuesto (líneas venta/costo/indirecto) vía el singleton bulk,
+// y registra la versión. Devuelve la versión creada y los totales recalculados.
+//
+// Guardrail "obra sin base": el app sube siempre como REESTUDIO+n con reStudy=true, y
+// GomJob exige que exista la versión base 'NO'. En una obra nueva que nunca se
+// presupuestó en BC esa base no existe y la subida muere en la primera partida de costo
+// (esBaseFaltante). Cuando pasa, se limpia lo que el bulk dejó a medias, se SIEMBRA la
+// base 'NO' (sin reestudio → no busca nada) y se reintenta el reestudio. El camino feliz
+// (obra que ya tiene base) no cambia: solo se activa ante ese error puntual.
+// Caso real que lo motivó: VC-F.16 (2026-10-16).
+export async function subirVersionPresupuesto(worksNo: string, lineas: BulkLine[], _verBase?: string | null): Promise<{ versionCode: string; resultado: string; enviadas: number; totals: WorkTotals | null }> {
+  const versionCode = await nextVersionDisponible(worksNo);
+
+  let resultado: string;
+  try {
+    resultado = await cargarLineasBulk(worksNo, versionCode, lineas, true);
+  } catch (e) {
+    if (!esBaseFaltante(e)) throw e;
+    // Recuperación: la obra no tiene la base 'NO'. Limpiar las líneas parciales (de
+    // esta versión y de la base, por si un intento previo dejó algo), sembrar la base
+    // SIN reestudio y reintentar el reestudio una vez.
+    await borrarLineasVersion(worksNo, versionCode);
+    await borrarLineasVersion(worksNo, VERSION_BASE);
+    await cargarLineasBulk(worksNo, VERSION_BASE, lineas, false);
+    resultado = await cargarLineasBulk(worksNo, versionCode, lineas, true);
+  }
+
+  await registrarVersion(worksNo, versionCode, true);
 
   const work = await getWork(worksNo);
   return { versionCode, resultado, enviadas: lineas.length, totals: work ? { salesLineAmount: work.salesLineAmount, costLineAmount: work.costLineAmount, indirectCostLineAmount: work.indirectCostLineAmount, result: work.result } : null };
