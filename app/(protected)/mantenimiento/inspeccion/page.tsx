@@ -11,18 +11,18 @@ import { useAppStore } from "@/lib/mantenimiento/store";
 import { useToast } from "@/components/mantenimiento/local/Toast";
 import { EstadoCarga } from "@/components/mantenimiento/local/EstadoCarga";
 import { Button } from "@/components/mantenimiento/ds/Button/Button";
-import { FormField, CheckBox } from "@/components/mantenimiento/ds/Form/Form";
+import { Icon } from "@/components/mantenimiento/ds/Icon/Icon";
 import { FormSelect } from "@/components/mantenimiento/local/FormExtras";
 import { PhotoGallery } from "@/components/mantenimiento/local/PhotoGallery";
+import {
+  ChecklistInspeccion,
+  EquipoResumen,
+  faltantesChecklist,
+  type EstadoRespuesta,
+  type RespuestaChecklist
+} from "@/components/mantenimiento/local/ChecklistInspeccion";
 import { apiGet, apiPost, aplanarDocs, subirArchivo } from "@/lib/mantenimiento/api";
 import type { ChecklistDiarioItem } from "@/lib/mantenimiento/types";
-
-interface RespuestaLocal {
-  itemId: string;
-  titulo: string;
-  hecho: boolean;
-  observacion: string;
-}
 
 export default function InspeccionDiariaPage() {
   const { equipos, cargando, errorCarga } = useAppStore();
@@ -31,7 +31,7 @@ export default function InspeccionDiariaPage() {
   const [equipoId, setEquipoId] = useState("");
   const [horometro, setHorometro] = useState("");
   const [items, setItems] = useState<ChecklistDiarioItem[]>([]);
-  const [respuestas, setRespuestas] = useState<RespuestaLocal[]>([]);
+  const [respuestas, setRespuestas] = useState<RespuestaChecklist[]>([]);
   const [fotos, setFotos] = useState<string[]>([]);
   const [cargandoChecklist, setCargandoChecklist] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -52,15 +52,15 @@ export default function InspeccionDiariaPage() {
       .then((r) => {
         const lista = aplanarDocs<ChecklistDiarioItem>(r);
         setItems(lista);
-        setRespuestas(lista.map((i) => ({ itemId: i.id, titulo: i.titulo, hecho: false, observacion: "" })));
+        setRespuestas(lista.map((i) => ({ itemId: i.id, titulo: i.titulo, estado: "pendiente", observacion: "" })));
       })
       .catch((err) => toast.error((err as Error).message))
       .finally(() => setCargandoChecklist(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [equipoId]);
 
-  function marcarItem(itemId: string, hecho: boolean) {
-    setRespuestas((actual) => actual.map((r) => (r.itemId === itemId ? { ...r, hecho } : r)));
+  function marcarItem(itemId: string, estado: EstadoRespuesta) {
+    setRespuestas((actual) => actual.map((r) => (r.itemId === itemId ? { ...r, estado } : r)));
   }
 
   function anotarObservacion(itemId: string, observacion: string) {
@@ -80,17 +80,29 @@ export default function InspeccionDiariaPage() {
     setFotos((actual) => actual.filter((_, i) => i !== indice));
   }
 
+  const { sinResponder, fallasSinDetalle } = faltantesChecklist(respuestas);
+  const fallas = respuestas.filter((r) => r.estado === "falla").length;
+  const listo = sinResponder === 0 && fallasSinDetalle === 0;
+
   async function guardar() {
     if (!equipoId) {
       toast.error("Elegí un equipo.");
       return;
     }
+    if (!listo) return;
     setEnviando(true);
     try {
       await apiPost("/api/inspeccionesDiarias", {
         equipoId,
         horometro: horometro === "" ? null : Number(horometro),
-        checklist: respuestas,
+        // Mismo formato de siempre para el backend y el historial del equipo:
+        // Bien -> hecho; Falla -> no hecho + qué se encontró.
+        checklist: respuestas.map((r) => ({
+          itemId: r.itemId,
+          titulo: r.titulo,
+          hecho: r.estado === "bien",
+          observacion: r.estado === "falla" ? r.observacion.trim() : ""
+        })),
         fotos
       });
       toast.exito("Inspección guardada.");
@@ -125,58 +137,41 @@ export default function InspeccionDiariaPage() {
 
       {equipo && (
         <>
-          <div
-            style={{
-              background: "var(--ds-surface)",
-              borderRadius: "var(--ds-radius-lg)",
-              boxShadow: "var(--ds-shadow-01)",
-              padding: "var(--ds-space-5)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--ds-space-3)"
-            }}
-          >
-            <div style={{ fontWeight: "var(--ds-font-weight-semibold)" }}>{equipo.nombre}</div>
-            <div style={{ color: "var(--ds-color-gray-500)", fontSize: "var(--ds-font-size-body-sm)" }}>
-              {equipo.codigo} — {equipo.marca} {equipo.modelo} {equipo.placa && `— Placa ${equipo.placa}`}
+          <EquipoResumen equipo={equipo} horometro={horometro} onHorometro={setHorometro} />
+
+          {cargandoChecklist ? (
+            <div className="mnt-insp-card" style={{ color: "var(--ds-color-gray-400)" }}>Cargando checklist…</div>
+          ) : items.length === 0 ? (
+            <div className="mnt-insp-card" style={{ color: "var(--ds-color-gray-400)" }}>
+              Este equipo todavía no tiene un checklist cargado -- pedile al administrador que lo complete desde la ficha del equipo.
             </div>
-            <FormField label="Horómetro" type="number" value={horometro} onChange={(e) => setHorometro(e.target.value)} />
-          </div>
+          ) : (
+            <ChecklistInspeccion items={items} respuestas={respuestas} onEstado={marcarItem} onObservacion={anotarObservacion} />
+          )}
 
-          <div style={{ background: "var(--ds-surface)", borderRadius: "var(--ds-radius-lg)", boxShadow: "var(--ds-shadow-01)", padding: "var(--ds-space-5)" }}>
-            <div style={{ fontWeight: "var(--ds-font-weight-semibold)", marginBottom: "var(--ds-space-3)" }}>Checklist diario (antes de arrancar)</div>
-            {cargandoChecklist ? (
-              <div style={{ color: "var(--ds-color-gray-400)" }}>Cargando…</div>
-            ) : items.length === 0 ? (
-              <div style={{ color: "var(--ds-color-gray-400)" }}>Este equipo todavía no tiene un checklist cargado -- pedile al administrador que lo complete desde la ficha del equipo.</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-3)" }}>
-                {items.map((item) => {
-                  const respuesta = respuestas.find((r) => r.itemId === item.id);
-                  return (
-                    <div key={item.id} style={{ borderBottom: "1px solid var(--ds-color-gray-100)", paddingBottom: "var(--ds-space-3)" }}>
-                      <CheckBox label={item.titulo} checked={!!respuesta?.hecho} onChange={(v) => marcarItem(item.id, v)} />
-                      {item.detalle && <div style={{ color: "var(--ds-color-gray-400)", fontSize: "var(--ds-font-size-body-sm)", margin: "4px 0 8px 28px" }}>{item.detalle}</div>}
-                      <div style={{ marginLeft: 28 }}>
-                        <FormField
-                          label="Observación (opcional)"
-                          value={respuesta?.observacion ?? ""}
-                          onChange={(e) => anotarObservacion(item.id, e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div style={{ background: "var(--ds-surface)", borderRadius: "var(--ds-radius-lg)", boxShadow: "var(--ds-shadow-01)", padding: "var(--ds-space-5)" }}>
+          <section className="mnt-insp-card">
             <div style={{ fontWeight: "var(--ds-font-weight-semibold)", marginBottom: "var(--ds-space-3)" }}>Foto del estado del equipo</div>
             <PhotoGallery fotos={fotos} onAdd={agregarFoto} onRemove={quitarFoto} />
-          </div>
+          </section>
 
-          <Button label={enviando ? "Guardando…" : "Guardar inspección"} color="green" onClick={guardar} state={enviando ? "disabled" : "standard"} />
+          <div className="mnt-insp-guardar">
+            <span className={`mnt-insp-guardar__estado${listo ? " mnt-insp-guardar__estado--listo" : ""}`} role="status">
+              <Icon name={listo ? "completado" : "pendiente"} size="md" />
+              {sinResponder > 0
+                ? `Faltan ${sinResponder} ${sinResponder === 1 ? "punto" : "puntos"} por revisar`
+                : fallasSinDetalle > 0
+                  ? `Contá qué encontraste en ${fallasSinDetalle === 1 ? "la falla" : `las ${fallasSinDetalle} fallas`}`
+                  : fallas > 0
+                    ? `Listo para guardar · ${fallas} ${fallas === 1 ? "falla reportada" : "fallas reportadas"}`
+                    : "Listo para guardar"}
+            </span>
+            <Button
+              label={enviando ? "Guardando…" : "Guardar inspección"}
+              color="green"
+              onClick={guardar}
+              state={enviando || !listo ? "disabled" : "standard"}
+            />
+          </div>
         </>
       )}
     </div>

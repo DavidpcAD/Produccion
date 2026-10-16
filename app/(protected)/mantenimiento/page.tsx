@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAppStore } from "@/lib/mantenimiento/store";
 import { StatTile } from "@/components/mantenimiento/local/StatTile";
 import { MiniBarChart } from "@/components/mantenimiento/local/MiniBarChart";
+import { InspeccionesSemana } from "@/components/mantenimiento/local/InspeccionesSemana";
 import { Pill } from "@/components/mantenimiento/local/Table";
 import { EstadoCarga } from "@/components/mantenimiento/local/EstadoCarga";
 import { Icon } from "@/components/mantenimiento/ds/Icon/Icon";
@@ -64,6 +65,8 @@ export default function DashboardPage() {
         <StatTile label="MTTR correctivo" value={`${mttrHoras} h`} icon="incompleto" tone="black" />
         <StatTile label="Costo total registrado" value={`₡${costoTotalMes.toLocaleString("es-CR")}`} icon="calculator" tone="black" />
       </div>
+
+      <InspeccionesSemana />
 
       <div style={{ display: "flex", gap: "var(--ds-space-4)", flexWrap: "wrap" }}>
         <div style={{ background: "var(--ds-surface)", borderRadius: "var(--ds-radius-lg)", boxShadow: "var(--ds-shadow-01)", padding: "var(--ds-space-5)", flex: 1, minWidth: 320 }}>
