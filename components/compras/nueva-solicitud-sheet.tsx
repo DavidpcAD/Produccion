@@ -1384,11 +1384,19 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // algo nuevo (plantilla, copiar pedido) y en FALSE al EDITAR un pedido que ya existe:
   // ahí la línea está guardada en la base y descartarla al abrir el drawer la borraría
   // al guardar. Eso lo decide el ingeniero quitándola él, no la app por su cuenta.
-  function armarGruposFilas(lineasIn: PlantillaLinea[], bodega: boolean, descartarBloqueados = true): { grupos: Grupo[]; rows: Row[]; extras: Articulo[]; bloqueadas: string[] } {
+  function armarGruposFilas(lineasIn: PlantillaLinea[], bodega: boolean, descartarBloqueados = true, sonActivos = false): { grupos: Grupo[]; rows: Row[]; extras: Articulo[]; bloqueadas: string[]; inexistentes: string[] } {
     const extras: Articulo[] = [];
     const rows: Row[] = [];
     const nuevosGrupos: Grupo[] = [];
     const bloqueadas: string[] = [];
+    const inexistentes: string[] = [];
+    // ¿Descartar los códigos que ya no existen en BC? Solo si (1) es un armado NUEVO
+    // (plantilla / copiar; al editar un pedido guardado la línea vive en la base y la
+    // quita el ingeniero, no la app), (2) NO son activos fijos (su catálogo es otro y se
+    // carga aparte, así que "no está acá" no significa "no existe"), y (3) el catálogo de
+    // BC SÍ cargó (`bcArt` != null): si BC no respondió estamos en el respaldo del store
+    // y "no encontrado" no prueba nada. Mismo cuidado que la lista `null` de bloqueados.
+    const verificarExistencia = descartarBloqueados && !sonActivos && bcArt != null;
     const porObra = new Map<string, string>(); // obraCodigo ("" = sin obra) -> grupoKey
     for (const pl2 of lineasIn) {
       if (!pl2.code) continue;
@@ -1416,6 +1424,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         }
       }
       if (!a) {
+        // No está en el catálogo y su base (variante pegada) tampoco. Si corresponde
+        // verificar (ver `verificarExistencia`), el código YA NO EXISTE en BC: se descarta
+        // igual que un bloqueado —quien llama avisa— en vez de sintetizar una línea
+        // fantasma con la descripción vieja, que BC rechazaría al enviar (brocas M08-0818/
+        // M08-0819). Si no, se sintetiza como hasta ahora para no perder la línea.
+        if (verificarExistencia) { inexistentes.push(pl2.code); continue; }
         a = { id: pl2.code, code: pl2.code, descripcion: pl2.descripcion || pl2.code, unidad: pl2.unidad || "UND", almacenDefault: "", precioReferencia: 0, tipo: "inventario" };
         extras.push(a);
       }
@@ -1449,7 +1463,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         // la corrección lo borraba.
         notas: pl2.notas });
     }
-    return { grupos: nuevosGrupos, rows, extras, bloqueadas };
+    return { grupos: nuevosGrupos, rows, extras, bloqueadas, inexistentes };
   }
 
   /** Aviso de los materiales que se dejaron fuera por estar bloqueados en BC. Se dice
@@ -1461,6 +1475,16 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     toast(`${lista.length} material(es) de ${origen} están BLOQUEADOS en Business Central y no se agregaron: ${lista.join(", ")}. Buscá el material que los reemplaza.`, "info");
   }
 
+  /** Aviso de los materiales que se dejaron fuera porque su código YA NO EXISTE en BC
+   *  (borrado o renombrado — distinto de "bloqueado"). Igual que con los bloqueados, se
+   *  dice SIEMPRE: la línea fantasma reventaría al enviar a BC, así que mejor avisar al
+   *  armar para que el ingeniero busque el código vigente. */
+  function avisarInexistentes(inexistentes: string[], origen: "la plantilla" | "el pedido copiado") {
+    if (!inexistentes.length) return;
+    const lista = [...new Set(inexistentes)];
+    toast(`${lista.length} material(es) de ${origen} YA NO EXISTEN en Business Central y no se agregaron: ${lista.join(", ")}. Buscá el código vigente o pedí a Inventarios que lo cree.`, "info");
+  }
+
   // Carga una plantilla: agrupa sus materiales por obra → una tarjeta por obra.
   // Bodega: todo a un único grupo (SOLO), sin obra.
   function aplicarPlantilla(pl: Plantilla) {
@@ -1468,9 +1492,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     // plantilla de bodega es material de obra que va al Almacén General, así que sus
     // líneas también van en una tarjeta de obra. Grupo único (sin obra) solo en repuesto.
     const bodega = esBodega(pl);
-    const { grupos: nuevosGrupos, rows, extras, bloqueadas } = armarGruposFilas(pl.lineas, sinObra);
+    const { grupos: nuevosGrupos, rows, extras, bloqueadas, inexistentes } = armarGruposFilas(pl.lineas, sinObra);
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
     avisarBloqueadas(bloqueadas, "la plantilla");
+    avisarInexistentes(inexistentes, "la plantilla");
     // La plantilla puede traer el mismo material repetido en la misma obra: se
     // unifican (suma cantidades) para no cargar líneas duplicadas.
     const { rows: dedup, merged } = mergeDedup(rows);
@@ -1481,10 +1506,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       setGrupos(sinObra ? [] : nuevosGrupos);
       setLineas(finalRows);
       toast(`Plantilla "${pl.nombre}" cargada (${finalRows.length} materiales)${merged ? ` · ${merged} repetido${merged > 1 ? "s" : ""} unificado${merged > 1 ? "s" : ""}` : ""}`, "success");
-    // Si la plantilla sí traía materiales pero TODOS estaban bloqueados, el aviso de
-    // arriba ya lo explicó: decir "no tiene materiales" mandaría a buscar el problema
-    // donde no está.
-    } else if (!bloqueadas.length) toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
+    // Si la plantilla sí traía materiales pero TODOS estaban bloqueados o inexistentes, el
+    // aviso de arriba ya lo explicó: decir "no tiene materiales" mandaría a buscar el
+    // problema donde no está.
+    } else if (!bloqueadas.length && !inexistentes.length) toast(`La plantilla "${pl.nombre}" no tiene materiales.`, "info");
   }
 
   // Copiar pedido: siembra el drawer con las líneas de un pedido existente. Mismo
@@ -1495,9 +1520,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     // Editando un pedido que ya existe: las líneas bloqueadas se conservan (ver
     // `armarGruposFilas`). Copiando, se descartan: el pedido nuevo no debe nacer con un
     // material que BC ya no deja comprar.
-    const { grupos: gs, rows, extras, bloqueadas } = armarGruposFilas(s.lineas, soloUno, !editandoId);
+    const { grupos: gs, rows, extras, bloqueadas, inexistentes } = armarGruposFilas(s.lineas, soloUno, !editandoId, s.tipo === "activo");
     if (extras.length) setExtraArt((prev) => { const codes = new Set(prev.map((a) => a.code)); return [...prev, ...extras.filter((e) => !codes.has(e.code))]; });
     avisarBloqueadas(bloqueadas, "el pedido copiado");
+    avisarInexistentes(inexistentes, "el pedido copiado");
     const { rows: dedup } = mergeDedup(rows);
     setTipo(s.tipo);
     setDestinoMat(s.consumo ? "consumo" : "almacen");
