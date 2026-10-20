@@ -309,21 +309,13 @@ export function Sidebar({ nivelAdmin, nombre, iniciales, rol, pinned, navOpen, o
               <Link
                 href={item.href}
                 onClick={(e) => {
-                  // Encabezado con submenú = acordeón independiente. Abierto →
-                  // tocarlo lo cierra (sin navegar), sin tocar los demás. Cerrado →
-                  // lo abre (deja los demás abiertos) y solo navega si es OTRA
-                  // sección (si ya estás en esta, solo abre el submenú, no re-navega).
+                  // Encabezado con submenú = acordeón: tocarlo SOLO abre/cierra el
+                  // submenú, NUNCA navega. La navegación va por los hijos (el padre
+                  // comparte href con su 1.er hijo, p.ej. Business Central → Integración BC).
                   if (item.children && expanded && item.section) {
-                    if (openSections.has(item.section)) {
-                      e.preventDefault();
-                      toggleSection(item.section);
-                      return;
-                    }
+                    e.preventDefault();
                     toggleSection(item.section);
-                    if (activeSection === item.section) {
-                      e.preventDefault();
-                      return;
-                    }
+                    return;
                   }
                   onNavigate();
                 }}
