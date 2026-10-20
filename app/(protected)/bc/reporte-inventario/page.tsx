@@ -1,17 +1,19 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowsClockwise, DownloadSimple, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { Table } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/Toast';
+import { Icon, IconName } from '@/components/ds/Icon/Icon';
 import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 // Reporte de inventario por almacén (SOLO Super Admin). Lee el snapshot
 // dbo.InventarioAlmacen vía /api/bc/inventario/almacen. Lo importante es lo SIN
 // LIQUIDAR: material apartado al almacén de proyecto (gomJobWarehouseQuantity > 0),
 // lo que muestra la página "Almacén de proyecto" de BC. Se mantiene al día SOLO: al
-// abrir, si la foto está vieja, dispara el sync en segundo plano (sin botón).
+// abrir, si la foto está vieja, dispara el sync en segundo plano.
 
 interface Fila {
   entryNo: number;
@@ -39,20 +41,17 @@ interface Estado {
   mensaje: string | null;
 }
 
-const TOPE_FILAS = 300;
-const STALE_MS = 10 * 60 * 1000; // si la foto es más vieja que esto, se re-sincroniza sola al abrir.
+const PAGE = 50;
+const STALE_MS = 10 * 60 * 1000; // si la foto es más vieja, se re-sincroniza sola al abrir.
 const num = new Intl.NumberFormat('es-CR', { maximumFractionDigits: 2 });
+// Paleta del donut (verde de marca al frente, luego azules/neutros).
+const PALETA = ['#84cc16', '#4d7c0f', '#16a34a', '#0d9488', '#0ea5e9', '#2563eb', '#6366f1', '#a855f7', '#f59e0b'];
+const COLOR_OTROS = '#cbd5e1';
 
-function haceCuanto(iso: string | null): string {
+function fechaHora(iso: string | null): string {
   if (!iso) return '';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return '';
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return 'hace instantes';
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h} h`;
-  return `hace ${Math.floor(h / 24)} d`;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 function agrupar(filas: Fila[], key: (f: Fila) => string): { nombre: string; valor: number }[] {
@@ -61,7 +60,7 @@ function agrupar(filas: Fila[], key: (f: Fila) => string): { nombre: string; val
     const k = key(f);
     m.set(k, (m.get(k) ?? 0) + (f.cantidadProyecto || 0));
   }
-  return Array.from(m, ([nombre, valor]) => ({ nombre, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
+  return Array.from(m, ([nombre, valor]) => ({ nombre, valor })).sort((a, b) => b.valor - a.valor);
 }
 
 export default function ReporteInventarioPage() {
@@ -76,6 +75,7 @@ export default function ReporteInventarioPage() {
   const [almacenSel, setAlmacenSel] = useState('');
   const [categoriaSel, setCategoriaSel] = useState('');
   const [soloVirtuales, setSoloVirtuales] = useState(true);
+  const [page, setPage] = useState(0);
   const yaAutorefresco = useRef(false);
 
   const cargar = useCallback(async (): Promise<Estado | null> => {
@@ -108,8 +108,7 @@ export default function ReporteInventarioPage() {
     }
   }, [cargar, toast]);
 
-  // Al abrir: carga la foto y, si está vieja (o vacía), re-sincroniza SOLA una vez en
-  // segundo plano. Así el reporte siempre está al día sin que el usuario toque nada.
+  // Al abrir: carga la foto y, si está vieja (o vacía), re-sincroniza SOLA una vez.
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -124,18 +123,11 @@ export default function ReporteInventarioPage() {
     return () => { vivo = false; };
   }, [cargar, sincronizar]);
 
-  const obras = useMemo(
-    () => Array.from(new Set(filas.map((f) => f.obra).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')),
-    [filas],
-  );
-  const almacenes = useMemo(
-    () => Array.from(new Set(filas.map((f) => f.almacen).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')),
-    [filas],
-  );
-  const categorias = useMemo(
-    () => Array.from(new Set(filas.map((f) => f.categoria).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')),
-    [filas],
-  );
+  const obras = useMemo(() => Array.from(new Set(filas.map((f) => f.obra).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')), [filas]);
+  const almacenes = useMemo(() => Array.from(new Set(filas.map((f) => f.almacen).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')), [filas]);
+  const categorias = useMemo(() => Array.from(new Set(filas.map((f) => f.categoria).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')), [filas]);
+
+  const hayFiltro = !!(buscar || obraSel || almacenSel || categoriaSel) || !soloVirtuales;
 
   const filtradas = useMemo(() => {
     const q = buscar.trim();
@@ -150,19 +142,43 @@ export default function ReporteInventarioPage() {
     });
   }, [filas, buscar, obraSel, almacenSel, categoriaSel, soloVirtuales]);
 
+  const soloSinLiquidar = useMemo(() => filtradas.filter((f) => f.esVirtual), [filtradas]);
+  const totalSinLiquidar = useMemo(() => soloSinLiquidar.reduce((s, f) => s + (f.cantidadProyecto || 0), 0), [soloSinLiquidar]);
+
   const kpis = useMemo(() => ({
     movimientos: filtradas.length,
     almacenes: new Set(filtradas.map((f) => f.almacen)).size,
     cantidad: filtradas.reduce((s, f) => s + (f.cantidad || 0), 0),
-    sinLiquidar: filtradas.filter((f) => f.esVirtual).reduce((s, f) => s + (f.cantidadProyecto || 0), 0),
-  }), [filtradas]);
+    sinLiquidar: totalSinLiquidar,
+  }), [filtradas, totalSinLiquidar]);
 
-  // Gráficos: apartado SIN LIQUIDAR agrupado (responden a los filtros).
-  const soloSinLiquidar = useMemo(() => filtradas.filter((f) => f.esVirtual), [filtradas]);
-  const porAlmacen = useMemo(() => agrupar(soloSinLiquidar, (f) => f.almacen ?? '—'), [soloSinLiquidar]);
-  const porCategoria = useMemo(() => agrupar(soloSinLiquidar, (f) => f.categoria ?? 'Sin categoría'), [soloSinLiquidar]);
+  const porAlmacen = useMemo(() => agrupar(soloSinLiquidar, (f) => f.almacen ?? '—').slice(0, 10), [soloSinLiquidar]);
+  const donutCategoria = useMemo(() => {
+    const full = agrupar(soloSinLiquidar, (f) => f.categoria ?? 'Sin categoría');
+    const top = full.slice(0, 9).map((d, i) => ({ ...d, color: PALETA[i % PALETA.length] }));
+    const resto = full.slice(9).reduce((s, d) => s + d.valor, 0);
+    if (resto > 0) top.push({ nombre: 'Otros', valor: resto, color: COLOR_OTROS });
+    return top;
+  }, [soloSinLiquidar]);
 
-  const visibles = filtradas.slice(0, TOPE_FILAS);
+  const totalPag = Math.max(1, Math.ceil(filtradas.length / PAGE));
+  const pageActual = Math.min(page, totalPag - 1);
+  const visibles = filtradas.slice(pageActual * PAGE, pageActual * PAGE + PAGE);
+
+  const limpiar = () => { setBuscar(''); setObraSel(''); setAlmacenSel(''); setCategoriaSel(''); setSoloVirtuales(true); setPage(0); };
+
+  const exportar = useCallback(() => {
+    const esc = (v: unknown) => { const s = v == null ? '' : String(v); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const head = ['Almacén', 'Categoría', 'Artículo', 'Descripción', 'Obra', 'Existencia', 'Sin liquidar', 'Unidad', 'Proveedor', 'Fecha'];
+    const cuerpo = filtradas.map((f) => [f.almacen, f.categoria, f.itemNo, f.descripcion, f.obra, f.cantidad, f.cantidadProyecto, f.unidad, f.proveedor, f.fechaMovimiento ? f.fechaMovimiento.slice(0, 10) : ''].map(esc).join(';'));
+    const csv = '﻿' + [head.join(';'), ...cuerpo].join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventario-sin-liquidar-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filtradas]);
 
   const opt = (xs: string[], todos: string) => [{ value: '', label: todos }, ...xs.map((x) => ({ value: x, label: x }))];
 
@@ -170,137 +186,208 @@ export default function ReporteInventarioPage() {
     <PageShell>
       <PageHeader
         title="Reporte de inventario"
-        subtitle="Material apartado al almacén de proyecto que aún no se liquidó, tomado de Business Central. Se actualiza solo al abrir — no hay que refrescar a mano."
+        subtitle="Material apartado al almacén de proyecto que aún no se liquidó, tomado de Business Central. Se actualiza solo al abrir."
         actions={
-          <span className="inline-flex items-center gap-2 text-body-sm text-ds-gray-500">
-            <span className={`h-2 w-2 rounded-full ${actualizando ? 'animate-pulse bg-ds-yellow-ink' : 'bg-ds-green-ink'}`} />
-            {actualizando ? 'Actualizando desde BC…' : estado?.ultimaCorrida ? `Al día · ${haceCuanto(estado.ultimaCorrida)}` : 'Sin datos aún'}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-2 text-body-sm text-ds-gray-500">
+              <span className={`h-2 w-2 rounded-full ${actualizando ? 'animate-pulse bg-ds-yellow-ink' : 'bg-ds-green-ink'}`} />
+              {actualizando ? 'Actualizando desde BC…' : estado?.ultimaCorrida ? `Actualizado · ${fechaHora(estado.ultimaCorrida)}` : 'Sin datos aún'}
+            </span>
+            <button
+              type="button"
+              onClick={sincronizar}
+              disabled={actualizando}
+              title="Actualizar ahora"
+              className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3 py-2 text-body-sm font-medium text-ds-gray-600 transition-colors hover:border-ds-gray-300 disabled:opacity-50"
+            >
+              <ArrowsClockwise size={16} className={actualizando ? 'animate-spin' : ''} />
+              Actualizar
+            </button>
+          </div>
         }
       />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KpiCard titulo="Movimientos" valor={loading ? '—' : num.format(kpis.movimientos)} />
-        <KpiCard titulo="Almacenes" valor={loading ? '—' : num.format(kpis.almacenes)} />
-        <KpiCard titulo="Existencia total" valor={loading ? '—' : num.format(kpis.cantidad)} />
-        <KpiCard titulo="Apartado sin liquidar" valor={loading ? '—' : num.format(kpis.sinLiquidar)} destacado={kpis.sinLiquidar > 0} />
+        <KpiCard titulo="Movimientos" valor={loading ? '—' : num.format(kpis.movimientos)} icono="list" />
+        <KpiCard titulo="Almacenes" valor={loading ? '—' : num.format(kpis.almacenes)} icono="traslado" />
+        <KpiCard titulo="Existencia total" valor={loading ? '—' : num.format(kpis.cantidad)} icono="calculator" />
+        <KpiCard titulo="Apartado sin liquidar" valor={loading ? '—' : num.format(kpis.sinLiquidar)} icono="alert" destacado={kpis.sinLiquidar > 0} />
       </div>
 
-      {/* Filtros (Combobox del DS) */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="w-60">
-          <Input label="Buscar" placeholder="Artículo, descripción u obra" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
-        </div>
-        <div className="w-52">
-          <Combobox label="Obra" value={obraSel} onChange={setObraSel} options={opt(obras, 'Todas las obras')} placeholder="Todas las obras" />
-        </div>
-        <div className="w-52">
-          <Combobox label="Almacén" value={almacenSel} onChange={setAlmacenSel} options={opt(almacenes, 'Todos los almacenes')} placeholder="Todos los almacenes" />
-        </div>
+      {/* Filtros */}
+      <div className="flex flex-wrap items-end gap-3 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
         <div className="w-56">
-          <Combobox label="Categoría" value={categoriaSel} onChange={setCategoriaSel} options={opt(categorias, 'Todas las categorías')} placeholder="Todas las categorías" />
+          <Input label="Buscar" placeholder="Artículo, descripción u obra" value={buscar} onChange={(e) => { setBuscar(e.target.value); setPage(0); }} />
         </div>
+        <div className="w-48"><Combobox label="Obra" value={obraSel} onChange={(v) => { setObraSel(v); setPage(0); }} options={opt(obras, 'Todas las obras')} placeholder="Todas las obras" /></div>
+        <div className="w-48"><Combobox label="Almacén" value={almacenSel} onChange={(v) => { setAlmacenSel(v); setPage(0); }} options={opt(almacenes, 'Todos los almacenes')} placeholder="Todos los almacenes" /></div>
+        <div className="w-52"><Combobox label="Categoría" value={categoriaSel} onChange={(v) => { setCategoriaSel(v); setPage(0); }} options={opt(categorias, 'Todas las categorías')} placeholder="Todas las categorías" /></div>
         <div className="flex flex-col gap-1.5">
           <span className="text-label text-ds-gray-500">Vista</span>
           <button
             type="button"
-            onClick={() => setSoloVirtuales((v) => !v)}
+            onClick={() => { setSoloVirtuales((v) => !v); setPage(0); }}
             aria-pressed={soloVirtuales}
-            className={`rounded-ds border px-3 py-2 text-body-sm transition-colors ${
-              soloVirtuales ? 'border-ds-ink bg-ds-ink text-ds-surface' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-500 hover:border-ds-gray-300'
-            }`}
+            className={`rounded-ds border px-3 py-2 text-body-sm transition-colors ${soloVirtuales ? 'border-ds-ink bg-ds-ink text-ds-surface' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-500 hover:border-ds-gray-300'}`}
           >
             Solo sin liquidar
           </button>
         </div>
+        {hayFiltro && (
+          <button type="button" onClick={limpiar} className="ml-auto self-end text-body-sm font-medium text-ds-gray-500 underline-offset-2 hover:underline">
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       {/* Gráficos */}
       <div className="grid gap-3 lg:grid-cols-2">
-        <ChartBar titulo="Apartado sin liquidar · por almacén" datos={porAlmacen} loading={loading} />
-        <ChartBar titulo="Apartado sin liquidar · por categoría" datos={porCategoria} loading={loading} />
+        <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
+          <SeccionHeader icono="traslado" titulo="Apartado sin liquidar por almacén" />
+          <BarChart datos={porAlmacen} loading={loading} />
+        </div>
+        <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
+          <SeccionHeader icono="list" titulo="Apartado sin liquidar por categoría" />
+          <Donut datos={donutCategoria} total={totalSinLiquidar} loading={loading} />
+        </div>
       </div>
 
       {/* Detalle */}
-      <Table<Fila>
-        columns={[
-          { key: 'almacen', header: 'Almacén', className: 'font-semibold whitespace-nowrap', render: (f) => (
-            <span className="inline-flex items-center gap-2">
-              {f.almacen || <span className="text-ds-gray-300">—</span>}
-              {f.esVirtual && (
-                <span className="inline-flex items-center rounded-ds bg-ds-yellow-soft px-1.5 py-0.5 text-label font-medium text-ds-yellow-ink">sin liquidar</span>
-              )}
+      <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
+        <SeccionHeader
+          icono="boleta"
+          titulo="Detalle de artículos sin liquidar"
+          right={
+            <button type="button" onClick={exportar} disabled={filtradas.length === 0} className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3 py-2 text-body-sm font-medium text-ds-gray-600 transition-colors hover:border-ds-gray-300 disabled:opacity-50">
+              <DownloadSimple size={16} /> Exportar a Excel
+            </button>
+          }
+        />
+        <Table<Fila>
+          columns={[
+            { key: 'almacen', header: 'Almacén', className: 'font-semibold whitespace-nowrap', render: (f) => (
+              <span className="inline-flex items-center gap-2">
+                {f.almacen || <span className="text-ds-gray-300">—</span>}
+                {f.esVirtual && <span className="inline-flex items-center rounded-ds bg-ds-yellow-soft px-1.5 py-0.5 text-label font-medium text-ds-yellow-ink">sin liquidar</span>}
+              </span>
+            ) },
+            { key: 'categoria', header: 'Categoría', render: (f) => f.categoria || <span className="text-ds-gray-300">—</span> },
+            { key: 'itemNo', header: 'Artículo', className: 'font-mono whitespace-nowrap', render: (f) => f.itemNo },
+            { key: 'descripcion', header: 'Descripción', render: (f) => f.descripcion || <span className="text-ds-gray-300">—</span> },
+            { key: 'obra', header: 'Obra', className: 'whitespace-nowrap', render: (f) => f.obra || <span className="text-ds-gray-300">—</span> },
+            { key: 'cantidad', header: 'Existencia', className: 'text-right whitespace-nowrap', render: (f) => <span>{num.format(f.cantidad)}</span> },
+            { key: 'cantidadProyecto', header: 'Sin liquidar', className: 'text-right whitespace-nowrap', render: (f) => (
+              f.cantidadProyecto > 0 ? <span className="font-semibold text-ds-yellow-ink">{num.format(f.cantidadProyecto)}</span> : <span className="text-ds-gray-300">—</span>
+            ) },
+            { key: 'unidad', header: 'Unidad', className: 'whitespace-nowrap', render: (f) => f.unidad || '—' },
+            { key: 'proveedor', header: 'Proveedor', render: (f) => f.proveedor || <span className="text-ds-gray-300">—</span> },
+            { key: 'fechaMovimiento', header: 'Fecha', className: 'whitespace-nowrap', render: (f) => (f.fechaMovimiento ? f.fechaMovimiento.slice(0, 10) : '—') },
+          ]}
+          data={visibles}
+          keyField="entryNo"
+          loading={loading}
+          emptyMessage={soloVirtuales ? 'No hay material sin liquidar con los filtros actuales.' : 'Ningún movimiento coincide con el filtro.'}
+        />
+        {!loading && filtradas.length > 0 && (
+          <div className="mt-3 flex items-center justify-between text-body-sm text-ds-gray-500">
+            <span>
+              Mostrando {num.format(pageActual * PAGE + 1)}–{num.format(Math.min(filtradas.length, (pageActual + 1) * PAGE))} de {num.format(filtradas.length)}
             </span>
-          ) },
-          { key: 'categoria', header: 'Categoría', render: (f) => f.categoria || <span className="text-ds-gray-300">—</span> },
-          { key: 'itemNo', header: 'Artículo', className: 'font-mono whitespace-nowrap', render: (f) => f.itemNo },
-          { key: 'descripcion', header: 'Descripción', render: (f) => f.descripcion || <span className="text-ds-gray-300">—</span> },
-          { key: 'obra', header: 'Obra', className: 'whitespace-nowrap', render: (f) => f.obra || <span className="text-ds-gray-300">—</span> },
-          { key: 'cantidad', header: 'Existencia', className: 'text-right whitespace-nowrap', render: (f) => <span>{num.format(f.cantidad)}</span> },
-          { key: 'cantidadProyecto', header: 'Sin liquidar', className: 'text-right whitespace-nowrap', render: (f) => (
-            f.cantidadProyecto > 0
-              ? <span className="font-semibold text-ds-yellow-ink">{num.format(f.cantidadProyecto)}</span>
-              : <span className="text-ds-gray-300">—</span>
-          ) },
-          { key: 'unidad', header: 'Unidad', className: 'whitespace-nowrap', render: (f) => f.unidad || '—' },
-          { key: 'proveedor', header: 'Proveedor', render: (f) => f.proveedor || <span className="text-ds-gray-300">—</span> },
-          { key: 'fechaMovimiento', header: 'Fecha', className: 'whitespace-nowrap', render: (f) => (f.fechaMovimiento ? f.fechaMovimiento.slice(0, 10) : '—') },
-        ]}
-        data={visibles}
-        keyField="entryNo"
-        loading={loading}
-        emptyMessage={
-          soloVirtuales
-            ? 'No hay material sin liquidar (apartado al almacén de proyecto) con los filtros actuales.'
-            : buscar || obraSel || almacenSel || categoriaSel
-              ? 'Ningún movimiento coincide con el filtro.'
-              : 'Sin datos todavía.'
-        }
-      />
-
-      {!loading && filtradas.length > TOPE_FILAS && (
-        <p className="text-body-sm text-ds-gray-400">
-          Mostrando {num.format(TOPE_FILAS)} de {num.format(filtradas.length)} movimientos. Usá los filtros para acotar.
-        </p>
-      )}
+            {totalPag > 1 && (
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={pageActual === 0} className="inline-flex h-8 w-8 items-center justify-center rounded-ds border border-ds-gray-200 disabled:opacity-40"><CaretLeft size={16} /></button>
+                <span>{pageActual + 1} / {totalPag}</span>
+                <button type="button" onClick={() => setPage((p) => Math.min(totalPag - 1, p + 1))} disabled={pageActual >= totalPag - 1} className="inline-flex h-8 w-8 items-center justify-center rounded-ds border border-ds-gray-200 disabled:opacity-40"><CaretRight size={16} /></button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </PageShell>
   );
 }
 
-function KpiCard({ titulo, valor, destacado }: { titulo: string; valor: string; destacado?: boolean }) {
+function KpiCard({ titulo, valor, icono, destacado }: { titulo: string; valor: string; icono: IconName; destacado?: boolean }) {
   return (
-    <div className={`rounded-ds-lg border p-4 shadow-ds-01 ${destacado ? 'border-ds-yellow-ink bg-ds-yellow-soft' : 'border-ds-gray-200 bg-ds-surface'}`}>
-      <p className="text-label uppercase tracking-wide text-ds-gray-400">{titulo}</p>
-      <p className={`mt-1 text-sub-sm font-bold ${destacado ? 'text-ds-yellow-ink' : 'text-ds-ink'}`}>{valor}</p>
+    <div className={`flex items-center gap-3 rounded-ds-lg border p-4 shadow-ds-01 ${destacado ? 'border-ds-yellow-ink bg-ds-yellow-soft' : 'border-ds-gray-200 bg-ds-surface'}`}>
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-ds ${destacado ? 'bg-ds-yellow-ink/15 text-ds-yellow-ink' : 'bg-ds-gray-100 text-ds-gray-500'}`}>
+        <Icon name={icono} size="md" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-label uppercase tracking-wide text-ds-gray-400">{titulo}</p>
+        <p className={`text-sub-sm font-bold ${destacado ? 'text-ds-yellow-ink' : 'text-ds-ink'}`}>{valor}</p>
+      </div>
     </div>
   );
 }
 
-function ChartBar({ titulo, datos, loading }: { titulo: string; datos: { nombre: string; valor: number }[]; loading?: boolean }) {
-  const max = Math.max(1, ...datos.map((d) => d.valor));
+function SeccionHeader({ icono, titulo, right }: { icono: IconName; titulo: string; right?: React.ReactNode }) {
   return (
-    <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
-      <p className="mb-3 text-label uppercase tracking-wide text-ds-gray-400">{titulo}</p>
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-5 animate-pulse rounded-ds bg-ds-gray-100" />)}
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-ds bg-ds-gray-100 text-ds-gray-500"><Icon name={icono} size="sm" /></span>
+        <h2 className="text-body font-semibold text-ds-ink">{titulo}</h2>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function BarChart({ datos, loading }: { datos: { nombre: string; valor: number }[]; loading?: boolean }) {
+  const max = Math.max(1, ...datos.map((d) => d.valor));
+  if (loading) return <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-5 animate-pulse rounded-ds bg-ds-gray-100" />)}</div>;
+  if (datos.length === 0) return <p className="py-8 text-center text-body-sm text-ds-gray-400">Sin material sin liquidar</p>;
+  return (
+    <div className="space-y-2">
+      {datos.map((d) => (
+        <div key={d.nombre} className="flex items-center gap-3">
+          <span className="w-28 shrink-0 break-words text-body-sm text-ds-gray-600" title={d.nombre}>{d.nombre}</span>
+          <div className="h-5 flex-1 overflow-hidden rounded-ds bg-ds-gray-100">
+            <div className="h-full rounded-ds bg-brand" style={{ width: `${(d.valor / max) * 100}%` }} />
+          </div>
+          <span className="w-20 shrink-0 text-right font-mono text-body-sm text-ds-ink">{num.format(d.valor)}</span>
         </div>
-      ) : datos.length === 0 ? (
-        <p className="py-6 text-center text-body-sm text-ds-gray-400">Sin material sin liquidar</p>
-      ) : (
-        <div className="space-y-2">
-          {datos.map((d) => (
-            <div key={d.nombre} className="flex items-center gap-3">
-              <span className="w-32 shrink-0 break-words text-body-sm text-ds-gray-600" title={d.nombre}>{d.nombre}</span>
-              <div className="h-5 flex-1 overflow-hidden rounded-ds bg-ds-gray-100">
-                <div className="h-full rounded-ds bg-brand" style={{ width: `${(d.valor / max) * 100}%` }} />
-              </div>
-              <span className="w-20 shrink-0 text-right font-mono text-body-sm text-ds-ink">{num.format(d.valor)}</span>
-            </div>
-          ))}
+      ))}
+    </div>
+  );
+}
+
+function Donut({ datos, total, loading }: { datos: { nombre: string; valor: number; color: string }[]; total: number; loading?: boolean }) {
+  const r = 70, sw = 24, c = 2 * Math.PI * r;
+  if (loading) return <div className="h-44 animate-pulse rounded-ds bg-ds-gray-100" />;
+  if (datos.length === 0 || total <= 0) return <p className="py-8 text-center text-body-sm text-ds-gray-400">Sin material sin liquidar</p>;
+  // Offset acumulado SIN mutar en render (el React Compiler no deja reasignar).
+  const segs = datos.map((d, i) => {
+    const antes = datos.slice(0, i).reduce((s, x) => s + x.valor, 0);
+    return { ...d, len: (d.valor / total) * c, offset: (antes / total) * c };
+  });
+  return (
+    <div className="flex flex-col items-center gap-5 sm:flex-row">
+      <div className="relative shrink-0" style={{ width: 180, height: 180 }}>
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <g transform="translate(90,90) rotate(-90)">
+            <circle r={r} fill="none" stroke="#eef0f2" strokeWidth={sw} />
+            {segs.map((d) => (
+              <circle key={d.nombre} r={r} fill="none" stroke={d.color} strokeWidth={sw} strokeDasharray={`${d.len} ${c - d.len}`} strokeDashoffset={-d.offset} />
+            ))}
+          </g>
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-sub-sm font-bold text-ds-ink">{num.format(total)}</span>
+          <span className="text-label uppercase tracking-wide text-ds-gray-400">Total</span>
         </div>
-      )}
+      </div>
+      <div className="min-w-0 flex-1 space-y-1.5 self-stretch">
+        {datos.map((d) => (
+          <div key={d.nombre} className="flex items-center gap-2 text-body-sm">
+            <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: d.color }} />
+            <span className="min-w-0 flex-1 break-words text-ds-gray-600">{d.nombre}</span>
+            <span className="shrink-0 font-mono text-ds-ink">{num.format(d.valor)}</span>
+            <span className="w-12 shrink-0 text-right font-mono text-ds-gray-400">{((d.valor / total) * 100).toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
