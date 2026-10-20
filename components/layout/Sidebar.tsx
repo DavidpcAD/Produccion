@@ -58,6 +58,7 @@ const navItems: NavItemDef[] = [
       // Solo Super Admin: su ruta mapea al módulo 'admin' (ver getRouteModule), así
       // el filtro por módulo de los hijos la esconde para el resto.
       { href: '/bc/reporte-inventario', label: 'Reporte de inventario' },
+      { href: '/bc/presupuesto-liquidado', label: 'Presupuesto vs liquidado' },
     ],
   },
   {

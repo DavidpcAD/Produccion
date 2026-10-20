@@ -205,6 +205,79 @@ export async function getObrasConVersion(): Promise<Set<string>> {
   return set;
 }
 
+// ─── Presupuesto vs Liquidado (solo LECTURA) ────────────────────────────────
+// Material descompuesto (rendimiento por tarea). Solo type='item'.
+export interface DecompItemBC { taskNo: string; itemNo: string; variantCode: string; unitOfMeasure: string; description: string; performance: number }
+export async function bcDecompLines(worksNo: string, company?: string): Promise<DecompItemBC[]> {
+  const body = await req(`workDecomposedLines?$filter=${encodeURIComponent(`worksNo eq '${odataStr(worksNo)}'`)}&$top=10000`, { method: 'GET' }, company).catch(() => ({ value: [] }));
+  const rows = (body?.value ?? []) as Array<Record<string, unknown>>;
+  return rows
+    .filter((r) => String(r.type ?? '').toLowerCase() === 'item')
+    .map((r) => ({
+      taskNo: String(r.taskNo ?? ''),
+      itemNo: String(r.no ?? ''),
+      variantCode: String(r.variantCode ?? ''),
+      unitOfMeasure: String(r.unitOfMeasure ?? ''),
+      description: String(r.description ?? ''),
+      performance: Number(r.performance ?? 0),
+    }));
+}
+
+export interface WorkVersionBC { versionCode: string; reStudy: boolean; createDateTime: string }
+export async function bcWorkVersions(worksNo: string, company?: string): Promise<WorkVersionBC[]> {
+  const body = await req(`workVersions?$filter=${encodeURIComponent(`worksNo eq '${odataStr(worksNo)}'`)}&$top=1000`, { method: 'GET' }, company).catch(() => ({ value: [] }));
+  return ((body?.value ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    versionCode: String(r.versionCode ?? ''),
+    reStudy: r.reStudy === true || String(r.reStudy ?? '').toLowerCase() === 'true',
+    createDateTime: String(r.createDateTime ?? ''),
+  }));
+}
+
+// Consumido/liquidado por obra (page 50106 consumidoObraSet). La API no soporta OR,
+// así que se consulta por worksNo (filas "Extra") y por jobNo (presupuestadas) y se
+// unen por systemId. Sin filtro de "solo consumido" para ver también el saldo.
+export interface ConsumidoRowBC { itemNo: string; description: string; variantCode: string; variantDescription?: string; unitOfMeasureCode: string; jobTaskNo: string; quantityConsumed: number; category: string; quantityBudget: number }
+export async function bcConsumidoObra(worksNo: string, taskNo?: string, company?: string): Promise<ConsumidoRowBC[]> {
+  const esc = odataStr(worksNo);
+  const taskFilter = taskNo?.trim() ? ` and taskNo eq '${odataStr(taskNo.trim())}'` : '';
+  const fetchBy = async (campo: 'worksNo' | 'jobNo') => {
+    const body = await req(`consumidoObraSet?$filter=${encodeURIComponent(`${campo} eq '${esc}'${taskFilter}`)}&$top=2000`, { method: 'GET' }, company).catch(() => ({ value: [] }));
+    return (body?.value ?? []) as Array<Record<string, unknown>>;
+  };
+  const [byWorks, byJob] = await Promise.all([fetchBy('worksNo'), fetchBy('jobNo')]);
+  const seen = new Set<string>();
+  const out: ConsumidoRowBC[] = [];
+  for (const r of [...byWorks, ...byJob]) {
+    const id = String(r.systemId ?? r.SystemId ?? '');
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    out.push({
+      itemNo: String(r.no ?? ''),
+      description: String(r.description ?? ''),
+      variantCode: String(r.variantCode ?? ''),
+      variantDescription: typeof r.nomVariante === 'string' && r.nomVariante.trim() ? r.nomVariante : undefined,
+      unitOfMeasureCode: String(r.unitOfMeasure ?? 'UN'),
+      jobTaskNo: String(r.taskNo ?? ''),
+      quantityConsumed: Number(r.cantidadGastado ?? 0),
+      category: String(r.category ?? ''),
+      quantityBudget: Number(r.quantity ?? 0),
+    });
+  }
+  return out;
+}
+
+// En qué compañía de BC vive el presupuesto de la obra (principal o legacy). Undefined
+// = usar la principal por defecto. Ver bcCompanies().
+export async function companyConObra(worksNo: string): Promise<string | undefined> {
+  for (const c of bcCompanies()) {
+    try {
+      const body = await req(`workVersions?$filter=${encodeURIComponent(`worksNo eq '${odataStr(worksNo)}'`)}&$top=1`, { method: 'GET' }, c);
+      if (((body?.value ?? []) as unknown[]).length > 0) return c;
+    } catch { /* probar la siguiente compañía */ }
+  }
+  return undefined;
+}
+
 // Setea el "Área prorrateada" (m²) en la OBRA (GomJob Works) de BC. Complementa
 // setAreaProrrateadaJob (que lo pone en el Job): así el área queda en Obra + Proyecto.
 // Busca el work por N° y hace PATCH con If-Match.
