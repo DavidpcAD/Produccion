@@ -57,6 +57,18 @@
   color:     var(--ds-color-gray-500);
   font-size: var(--ds-font-size-label);
 }
+.mnt-chk__editar {
+  display:     inline-flex;
+  align-items: center;
+  gap:         6px;
+  margin-top:  var(--ds-space-2);
+  color:       var(--ds-text);
+  font-size:   var(--ds-font-size-body-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.mnt-chk__editar:hover { color: var(--ds-color-gray-500); }
+
 .mnt-chk__count {
   flex-shrink: 0;
   color:       var(--ds-color-gray-400);

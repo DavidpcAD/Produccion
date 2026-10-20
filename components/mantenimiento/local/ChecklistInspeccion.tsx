@@ -7,6 +7,7 @@
 // qué se encontró. Al guardar, Bien -> hecho: true; Falla -> hecho: false con
 // observación (mismo formato que ya espera /api/inspeccionesDiarias).
 
+import Link from "next/link";
 import { Icon } from "@/components/mantenimiento/ds/Icon/Icon";
 import { FormField } from "@/components/mantenimiento/ds/Form/Form";
 import type { ChecklistDiarioItem, Equipo } from "@/lib/mantenimiento/types";
@@ -64,12 +65,15 @@ export function ChecklistInspeccion({
   items,
   respuestas,
   onEstado,
-  onObservacion
+  onObservacion,
+  enlaceEditar
 }: {
   items: ChecklistDiarioItem[];
   respuestas: RespuestaChecklist[];
   onEstado: (itemId: string, estado: EstadoRespuesta) => void;
   onObservacion: (itemId: string, texto: string) => void;
+  /** Ruta a la ficha del equipo (sección checklist). Solo para quien puede editarlo. */
+  enlaceEditar?: string;
 }) {
   const total = items.length;
   const bien = respuestas.filter((r) => r.estado === "bien").length;
@@ -82,6 +86,12 @@ export function ChecklistInspeccion({
         <div>
           <h2 className="mnt-chk__title">Checklist antes de arrancar</h2>
           <p className="mnt-chk__sub">Revisá cada punto y marcalo como Bien o Falla.</p>
+          {enlaceEditar && (
+            <Link href={enlaceEditar} className="mnt-chk__editar">
+              <Icon name="edit" size="sm" />
+              Editar checklist de este equipo
+            </Link>
+          )}
         </div>
         <div className="mnt-chk__count" aria-label={`${bien + falla} de ${total} revisadas`}>
           <strong>{bien + falla}</strong>/{total}

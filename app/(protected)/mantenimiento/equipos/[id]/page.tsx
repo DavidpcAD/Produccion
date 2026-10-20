@@ -107,6 +107,28 @@ export default function EquipoDetallePage() {
       toast.error((err as Error).message);
     }
   }
+
+  // Sube o baja una actividad y renumera "orden" 0..n-1 en todas: al quitar
+  // actividades o al agregarlas (orden = cantidad actual) pueden quedar
+  // números repetidos, y así el orden queda parejo de nuevo.
+  async function moverActividad(id: string, direccion: -1 | 1) {
+    if (!equipo) return;
+    const desde = checklistItems.findIndex((i) => i.id === id);
+    const hasta = desde + direccion;
+    if (desde < 0 || hasta < 0 || hasta >= checklistItems.length) return;
+    const nuevo = [...checklistItems];
+    [nuevo[desde], nuevo[hasta]] = [nuevo[hasta], nuevo[desde]];
+    const renumerado = nuevo.map((item, orden) => ({ ...item, orden }));
+    const cambiados = renumerado.filter((item) => checklistItems.find((i) => i.id === item.id)?.orden !== item.orden);
+    setChecklistItems(renumerado);
+    try {
+      await Promise.all(cambiados.map((item) => apiPatch(`/api/checklistDiario/${item.id}`, { orden: item.orden })));
+    } catch (err) {
+      toast.error((err as Error).message);
+      const r = await apiGet(`/api/checklistDiario?equipoId=${equipo.id}`).catch(() => null);
+      if (r) setChecklistItems(aplanarDocs<ChecklistDiarioItem>(r));
+    }
+  }
   const horasRestantes = equipo ? horasRestantesSimple(equipo) : null;
   const kmRestantes = equipo ? kilometrosRestantesSimple(equipo) : null;
   const diasProxima = equipo ? diasHastaProximoMantenimiento(equipo) : null;
@@ -254,6 +276,7 @@ export default function EquipoDetallePage() {
           onAdd={agregarActividad}
           onEditar={editarActividad}
           onQuitar={quitarActividad}
+          onMover={moverActividad}
           soloLectura={!puedeEditarChecklist}
         />
       </Seccion>

@@ -2,28 +2,47 @@
 
 // NOT-IN-DS: lista editable de actividades del checklist diario de un
 // equipo. Mismo espíritu que ManualesBox.tsx -- lista + formulario chico
-// para agregar, con soloLectura para ocultar edit/borrar/agregar.
+// para agregar, con soloLectura para ocultar edit/borrar/agregar/ordenar.
+// Quitar pide confirmación en la misma fila (un toque de más en el celular
+// no borra nada) y las flechas cambian el orden en que lo ve el operador.
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Button } from "@/components/mantenimiento/ds/Button/Button";
 import { FormField } from "@/components/mantenimiento/ds/Form/Form";
+import { Icon } from "@/components/mantenimiento/ds/Icon/Icon";
 import type { ChecklistDiarioItem } from "@/lib/mantenimiento/types";
+
+const BOTON_FLECHA: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 32,
+  height: 32,
+  border: "1px solid var(--ds-color-gray-200)",
+  borderRadius: "var(--ds-radius-md)",
+  background: "var(--ds-surface)",
+  color: "var(--ds-text)",
+  cursor: "pointer"
+};
 
 export function ChecklistDiarioBox({
   items,
   onAdd,
   onEditar,
   onQuitar,
+  onMover,
   soloLectura
 }: {
   items: ChecklistDiarioItem[];
   onAdd: (titulo: string, detalle: string) => Promise<void>;
   onEditar: (id: string, titulo: string, detalle: string) => Promise<void>;
   onQuitar: (id: string) => void;
+  onMover?: (id: string, direccion: -1 | 1) => void;
   soloLectura?: boolean;
 }) {
   const [agregando, setAgregando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
   const [detalle, setDetalle] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -59,29 +78,77 @@ export function ChecklistDiarioBox({
       {items.length === 0 && !agregando && (
         <div style={{ color: "var(--ds-color-gray-400)" }}>Todavía no hay actividades cargadas para este equipo.</div>
       )}
-      {items.map((item) => (
+      {items.map((item, indice) => (
         <div
           key={item.id}
           style={{
             display: "flex",
-            alignItems: "flex-start",
+            alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
             gap: "var(--ds-space-3)",
             padding: "var(--ds-space-3)",
             background: "var(--ds-color-gray-100)",
             borderRadius: "var(--ds-radius-md)"
           }}
         >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: "var(--ds-font-weight-semibold)" }}>{item.titulo}</div>
-            {item.detalle && <div style={{ color: "var(--ds-color-gray-500)", fontSize: "var(--ds-font-size-body-sm)" }}>{item.detalle}</div>}
-          </div>
-          {!soloLectura && (
-            <div style={{ display: "flex", gap: "var(--ds-space-2)", flexShrink: 0 }}>
-              <Button ariaLabel="Editar actividad" layout="icon" size="sm" color="white" icon="edit" onClick={() => abrirEdicion(item)} />
-              <Button ariaLabel="Quitar actividad" layout="icon" size="sm" color="white" icon="delete" onClick={() => onQuitar(item.id)} />
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-3)", minWidth: 0, flex: "1 1 220px" }}>
+            {!soloLectura && onMover && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  aria-label={`Subir "${item.titulo}"`}
+                  style={{ ...BOTON_FLECHA, opacity: indice === 0 ? 0.35 : 1, cursor: indice === 0 ? "default" : "pointer" }}
+                  disabled={indice === 0}
+                  onClick={() => onMover(item.id, -1)}
+                >
+                  {/* "back" es la flecha a la izquierda: girada 90° apunta arriba. */}
+                  <span style={{ display: "flex", transform: "rotate(90deg)" }}>
+                    <Icon name="back" size="sm" />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Bajar "${item.titulo}"`}
+                  style={{ ...BOTON_FLECHA, opacity: indice === items.length - 1 ? 0.35 : 1, cursor: indice === items.length - 1 ? "default" : "pointer" }}
+                  disabled={indice === items.length - 1}
+                  onClick={() => onMover(item.id, 1)}
+                >
+                  <span style={{ display: "flex", transform: "rotate(-90deg)" }}>
+                    <Icon name="back" size="sm" />
+                  </span>
+                </button>
+              </div>
+            )}
+            <span style={{ color: "var(--ds-color-gray-400)", fontSize: "var(--ds-font-size-body-sm)", fontWeight: "var(--ds-font-weight-semibold)", minWidth: 16 }}>
+              {indice + 1}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: "var(--ds-font-weight-semibold)" }}>{item.titulo}</div>
+              {item.detalle && <div style={{ color: "var(--ds-color-gray-500)", fontSize: "var(--ds-font-size-body-sm)" }}>{item.detalle}</div>}
             </div>
-          )}
+          </div>
+          {!soloLectura &&
+            (confirmandoId === item.id ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)", flexShrink: 0 }}>
+                <span style={{ fontSize: "var(--ds-font-size-label)" }}>¿Quitar del checklist?</span>
+                <Button
+                  label="Quitar"
+                  color="red"
+                  size="sm"
+                  onClick={() => {
+                    setConfirmandoId(null);
+                    onQuitar(item.id);
+                  }}
+                />
+                <Button label="No" color="white" size="sm" onClick={() => setConfirmandoId(null)} />
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: "var(--ds-space-2)", flexShrink: 0 }}>
+                <Button ariaLabel="Editar actividad" layout="icon" size="sm" color="white" icon="edit" onClick={() => abrirEdicion(item)} />
+                <Button ariaLabel="Quitar actividad" layout="icon" size="sm" color="white" icon="delete" onClick={() => setConfirmandoId(item.id)} />
+              </div>
+            ))}
         </div>
       ))}
 

@@ -7,7 +7,9 @@
 // transaccional (ver app/api/inspeccionesDiarias/route.ts).
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAppStore } from "@/lib/mantenimiento/store";
+import { puede } from "@/lib/mantenimiento/permisos";
 import { useToast } from "@/components/mantenimiento/local/Toast";
 import { EstadoCarga } from "@/components/mantenimiento/local/EstadoCarga";
 import { Button } from "@/components/mantenimiento/ds/Button/Button";
@@ -25,7 +27,8 @@ import { apiGet, apiPost, aplanarDocs, subirArchivo } from "@/lib/mantenimiento/
 import type { ChecklistDiarioItem } from "@/lib/mantenimiento/types";
 
 export default function InspeccionDiariaPage() {
-  const { equipos, cargando, errorCarga } = useAppStore();
+  const { equipos, cargando, errorCarga, usuario } = useAppStore();
+  const puedeEditarChecklist = puede(usuario?.rol, "equipos.editar");
   const toast = useToast();
 
   const [equipoId, setEquipoId] = useState("");
@@ -143,10 +146,25 @@ export default function InspeccionDiariaPage() {
             <div className="mnt-insp-card" style={{ color: "var(--ds-color-gray-400)" }}>Cargando checklist…</div>
           ) : items.length === 0 ? (
             <div className="mnt-insp-card" style={{ color: "var(--ds-color-gray-400)" }}>
-              Este equipo todavía no tiene un checklist cargado -- pedile al administrador que lo complete desde la ficha del equipo.
+              {puedeEditarChecklist ? (
+                <>
+                  Este equipo todavía no tiene un checklist cargado.{" "}
+                  <Link href={`/mantenimiento/equipos/${equipo.id}#checklist`} style={{ color: "var(--ds-text)", textDecoration: "underline" }}>
+                    Agregar actividades desde la ficha del equipo
+                  </Link>
+                </>
+              ) : (
+                "Este equipo todavía no tiene un checklist cargado -- pedile al administrador que lo complete desde la ficha del equipo."
+              )}
             </div>
           ) : (
-            <ChecklistInspeccion items={items} respuestas={respuestas} onEstado={marcarItem} onObservacion={anotarObservacion} />
+            <ChecklistInspeccion
+              items={items}
+              respuestas={respuestas}
+              onEstado={marcarItem}
+              onObservacion={anotarObservacion}
+              enlaceEditar={puedeEditarChecklist ? `/mantenimiento/equipos/${equipo.id}#checklist` : undefined}
+            />
           )}
 
           <section className="mnt-insp-card">
