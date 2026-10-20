@@ -32,17 +32,37 @@ export async function GET(peticion: Request) {
   const auth = await requerirUsuario();
   if (auth.error) return auth.error;
 
-  const equipoId = new URL(peticion.url).searchParams.get("equipoId");
+  const params = new URL(peticion.url).searchParams;
+  const equipoId = params.get("equipoId");
+  // Rango opcional [desde, hasta) en ISO (UTC) -- lo usa el gráfico semanal del
+  // Panel para no traerse todo el historial con checklist y fotos.
+  const desde = params.get("desde") ? new Date(params.get("desde") as string) : null;
+  const hasta = params.get("hasta") ? new Date(params.get("hasta") as string) : null;
+  if ((desde && isNaN(desde.getTime())) || (hasta && isNaN(hasta.getTime()))) {
+    return NextResponse.json({ error: "Fecha inválida en desde/hasta." }, { status: 400 });
+  }
 
   try {
     const resultado = await ejecutar((request) => {
-      const base =
-        "SELECT i.id, i.equipoId, i.usuarioId, u.nombre AS usuarioNombre, i.horometro, i.checklist, i.fotos, i.fecha " +
-        "FROM mant.InspeccionesDiarias i JOIN mant.Usuarios u ON u.id = i.usuarioId";
+      const condiciones: string[] = [];
       if (equipoId) {
-        return request.input("equipoId", equipoId).query(base + " WHERE i.equipoId = @equipoId ORDER BY i.fecha DESC");
+        request.input("equipoId", equipoId);
+        condiciones.push("i.equipoId = @equipoId");
       }
-      return request.query(base + " ORDER BY i.fecha DESC");
+      if (desde) {
+        request.input("desde", desde);
+        condiciones.push("i.fecha >= @desde");
+      }
+      if (hasta) {
+        request.input("hasta", hasta);
+        condiciones.push("i.fecha < @hasta");
+      }
+      return request.query(
+        "SELECT i.id, i.equipoId, i.usuarioId, u.nombre AS usuarioNombre, i.horometro, i.checklist, i.fotos, i.fecha " +
+          "FROM mant.InspeccionesDiarias i JOIN mant.Usuarios u ON u.id = i.usuarioId" +
+          (condiciones.length ? " WHERE " + condiciones.join(" AND ") : "") +
+          " ORDER BY i.fecha DESC"
+      );
     });
     let filas: Record<string, any>[] = resultado.recordset;
     if (auth.usuario.rol === "operador") {

@@ -164,8 +164,8 @@ export default function EquiposPage() {
   }
 
   const columnas: ColumnaTabla<Equipo>[] = [
-    { key: "codigo", header: "Código" },
-    { key: "nombre", header: "Nombre" },
+    { key: "codigo", header: "Código", movil: "titulo" },
+    { key: "nombre", header: "Nombre", movil: "titulo" },
     { key: "placa", header: "Placa", render: (eq) => eq.placa || "—" },
     { key: "horometroActual", header: "Horómetro", render: (eq) => `${eq.horometroActual.toLocaleString("es-CR")} h`, align: "right" },
     { key: "estado", header: "Estado", render: (eq) => <Pill tone={ESTADO_TONO[eq.estado]}>{ESTADO_LABEL[eq.estado]}</Pill>, sortValue: (eq) => eq.estado },
@@ -201,6 +201,8 @@ export default function EquiposPage() {
       key: "kilometraje",
       header: "Kilometraje",
       align: "right",
+      // En celular se omite para que la tarjeta sea más corta (está en la ficha).
+      movil: "oculto",
       sortValue: (eq) => eq.kilometraje ?? -1,
       render: (eq) => (eq.kilometraje != null ? `${eq.kilometraje.toLocaleString("es-CR")} km` : "—")
     },
@@ -242,7 +244,7 @@ export default function EquiposPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--ds-space-3)" }}>
         <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>Equipos</h1>
         {puedeEditar && <Button label="Nuevo equipo" color="green" layout="icon-left" icon="plus" onClick={abrirNuevo} />}
       </div>

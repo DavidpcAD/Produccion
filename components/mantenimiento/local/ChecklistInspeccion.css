@@ -1,0 +1,228 @@
+/* Inspección diaria: tarjeta del equipo + checklist Bien/Falla.
+   Solo tokens del DS de Mantenimiento, así el tema oscuro sale solo. */
+
+.mnt-insp-card {
+  background:    var(--ds-surface);
+  border-radius: var(--ds-radius-lg);
+  box-shadow:    var(--ds-shadow-01);
+  padding:       var(--ds-space-5);
+}
+
+/* ── Equipo ─────────────────────────────────────────────── */
+.mnt-insp-equipo {
+  display:     flex;
+  flex-wrap:   wrap;
+  align-items: flex-end;
+  gap:         var(--ds-space-4) var(--ds-space-6);
+}
+.mnt-insp-equipo__id { flex: 1 1 260px; min-width: 0; }
+.mnt-insp-equipo__codigo {
+  display:        inline-block;
+  padding:        2px var(--ds-space-2);
+  border-radius:  var(--ds-radius-sm);
+  background:     var(--ds-text);
+  color:          var(--ds-surface);
+  font-size:      var(--ds-font-size-body-sm);
+  font-weight:    var(--ds-font-weight-semibold);
+  letter-spacing: var(--ds-letter-spacing-wide);
+}
+.mnt-insp-equipo__nombre {
+  margin-top:  var(--ds-space-2);
+  font-size:   var(--ds-font-size-subtitle);
+  line-height: var(--ds-line-height-subtitle);
+  font-weight: var(--ds-font-weight-semibold);
+}
+.mnt-insp-equipo__meta {
+  margin-top: var(--ds-space-1);
+  color:      var(--ds-color-gray-500);
+  font-size:  var(--ds-font-size-label);
+}
+.mnt-insp-equipo__horometro { flex: 0 1 200px; }
+
+/* ── Checklist ──────────────────────────────────────────── */
+.mnt-chk__head {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     flex-start;
+  gap:             var(--ds-space-4);
+}
+.mnt-chk__title {
+  margin:      0;
+  font-size:   var(--ds-font-size-subtitle);
+  line-height: var(--ds-line-height-subtitle);
+  font-weight: var(--ds-font-weight-semibold);
+}
+.mnt-chk__sub {
+  margin:    var(--ds-space-1) 0 0;
+  color:     var(--ds-color-gray-500);
+  font-size: var(--ds-font-size-label);
+}
+.mnt-chk__editar {
+  display:     inline-flex;
+  align-items: center;
+  gap:         6px;
+  margin-top:  var(--ds-space-2);
+  color:       var(--ds-text);
+  font-size:   var(--ds-font-size-body-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.mnt-chk__editar:hover { color: var(--ds-color-gray-500); }
+
+.mnt-chk__count {
+  flex-shrink: 0;
+  color:       var(--ds-color-gray-400);
+  font-size:   var(--ds-font-size-body-md);
+}
+.mnt-chk__count strong {
+  color:       var(--ds-text);
+  font-size:   var(--ds-font-size-subtitle-lg);
+  font-weight: var(--ds-font-weight-semibold);
+}
+
+/* Barra de avance en tres tramos (bien / falla / por revisar), separados por
+   un hueco de 2px del color de la tarjeta. */
+.mnt-chk__progress {
+  display:       flex;
+  gap:           2px;
+  height:        8px;
+  margin-top:    var(--ds-space-4);
+  border-radius: 8px;
+  overflow:      hidden;
+}
+.mnt-chk__progress > span { flex-basis: 0; transition: flex-grow 0.25s ease; }
+.mnt-chk__progress-bien      { background: var(--ds-color-green-100); }
+.mnt-chk__progress-falla     { background: var(--ds-color-red-200); }
+.mnt-chk__progress-pendiente { background: var(--ds-color-gray-100); }
+
+.mnt-chk__resumen {
+  display:   flex;
+  flex-wrap: wrap;
+  gap:       var(--ds-space-2);
+  margin:    var(--ds-space-2) 0 0;
+  color:     var(--ds-color-gray-500);
+  font-size: var(--ds-font-size-body-sm);
+}
+
+.mnt-chk__lista {
+  list-style:     none;
+  margin:         var(--ds-space-5) 0 0;
+  padding:        0;
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--ds-space-2);
+}
+
+.mnt-chk__item {
+  display:               grid;
+  grid-template-columns: auto 1fr auto;
+  align-items:           center;
+  gap:                   var(--ds-space-3);
+  padding:               var(--ds-space-3) var(--ds-space-4);
+  border:                1px solid var(--ds-color-gray-100);
+  border-radius:         var(--ds-radius-md);
+  transition:            background 0.2s ease, border-color 0.2s ease;
+}
+.mnt-chk__item--bien {
+  background:   color-mix(in srgb, var(--ds-color-green-100) 10%, var(--ds-surface));
+  border-color: color-mix(in srgb, var(--ds-color-green-100) 45%, var(--ds-surface));
+}
+.mnt-chk__item--falla {
+  background:   color-mix(in srgb, var(--ds-color-red-200) 8%, var(--ds-surface));
+  border-color: color-mix(in srgb, var(--ds-color-red-200) 45%, var(--ds-surface));
+}
+
+.mnt-chk__marca {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           28px;
+  height:          28px;
+  border-radius:   50%;
+  background:      var(--ds-color-gray-100);
+  color:           var(--ds-color-gray-500);
+  font-size:       var(--ds-font-size-body-sm);
+  font-weight:     var(--ds-font-weight-semibold);
+}
+.mnt-chk__item--bien  .mnt-chk__marca { background: var(--ds-color-green-100); }
+.mnt-chk__item--falla .mnt-chk__marca { background: var(--ds-color-red-200); }
+
+.mnt-chk__texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mnt-chk__titulo {
+  font-size:   var(--ds-font-size-body-md);
+  line-height: var(--ds-line-height-body-md);
+  font-weight: var(--ds-font-weight-semibold);
+}
+.mnt-chk__detalle {
+  color:       var(--ds-color-gray-500);
+  font-size:   var(--ds-font-size-label);
+  line-height: var(--ds-line-height-label);
+}
+
+.mnt-chk__opciones { display: flex; gap: var(--ds-space-2); }
+.mnt-chk__btn {
+  display:       inline-flex;
+  align-items:   center;
+  justify-content: center;
+  gap:           6px;
+  min-height:    44px;
+  min-width:     92px;
+  padding:       0 var(--ds-space-4);
+  border:        1px solid var(--ds-color-gray-200);
+  border-radius: var(--ds-radius-xl);
+  background:    var(--ds-surface);
+  color:         var(--ds-color-gray-500);
+  font:          inherit;
+  font-size:     var(--ds-font-size-label);
+  font-weight:   var(--ds-font-weight-semibold);
+  cursor:        pointer;
+  transition:    background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.mnt-chk__btn:hover { border-color: var(--ds-color-gray-300); color: var(--ds-text); }
+.mnt-chk__btn:active { transform: scale(0.97); }
+.mnt-chk__btn:focus-visible { outline: 2px solid var(--ds-text); outline-offset: 2px; }
+/* Texto sobre relleno de marca sólido: fijo (negro sobre verde, blanco sobre
+   rojo) en los dos temas, igual que .ds-btn--green. */
+.mnt-chk__btn--bien[aria-pressed="true"] {
+  background:   var(--ds-color-green-100);
+  border-color: var(--ds-color-green-100);
+  color:        var(--ds-color-black);
+}
+.mnt-chk__btn--falla[aria-pressed="true"] {
+  background:   var(--ds-color-red-200);
+  border-color: var(--ds-color-red-200);
+  color:        var(--ds-color-white);
+}
+
+.mnt-chk__obs { grid-column: 2 / -1; }
+
+/* Celular: los botones bajan a su propia fila, a todo el ancho. */
+@media (max-width: 560px) {
+  .mnt-chk__item { grid-template-columns: auto 1fr; }
+  .mnt-chk__opciones { grid-column: 1 / -1; }
+  .mnt-chk__btn { flex: 1; }
+  .mnt-chk__obs { grid-column: 1 / -1; }
+}
+
+/* ── Barra de guardar ───────────────────────────────────── */
+.mnt-insp-guardar {
+  position:       sticky;
+  bottom:         0;
+  display:        flex;
+  flex-wrap:      wrap;
+  align-items:    center;
+  justify-content: space-between;
+  gap:            var(--ds-space-3);
+  padding:        var(--ds-space-3) var(--ds-space-4);
+  border-radius:  var(--ds-radius-lg);
+  background:     var(--ds-surface);
+  box-shadow:     var(--ds-shadow-bar);
+}
+.mnt-insp-guardar__estado {
+  display:     flex;
+  align-items: center;
+  gap:         var(--ds-space-2);
+  color:       var(--ds-color-gray-500);
+  font-size:   var(--ds-font-size-label);
+}
+.mnt-insp-guardar__estado--listo { color: var(--ds-text); font-weight: var(--ds-font-weight-semibold); }

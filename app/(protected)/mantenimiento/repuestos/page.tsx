@@ -146,8 +146,8 @@ function RepuestosPageInterna() {
   }
 
   const columnas: ColumnaTabla<Repuesto>[] = [
-    { key: "codigo", header: "Código" },
-    { key: "nombre", header: "Nombre" },
+    { key: "codigo", header: "Código", movil: "titulo" },
+    { key: "nombre", header: "Nombre", movil: "titulo" },
     { key: "categoria", header: "Categoría" },
     {
       key: "stockActual",
@@ -213,7 +213,7 @@ function RepuestosPageInterna() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--ds-space-3)" }}>
         <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>Repuestos</h1>
         {puedeEditar && <Button label="Nuevo repuesto" color="green" layout="icon-left" icon="plus" onClick={abrirNuevo} state={equipoId ? "standard" : "disabled"} />}
       </div>

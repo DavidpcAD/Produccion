@@ -66,7 +66,7 @@ export default function NuevaOtPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)", maxWidth: 480 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--ds-space-3)" }}>
         <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>Nueva orden de trabajo</h1>
         <Button label="Volver" color="white" onClick={() => router.push("/mantenimiento/ordenes")} />
       </div>

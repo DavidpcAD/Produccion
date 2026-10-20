@@ -107,6 +107,28 @@ export default function EquipoDetallePage() {
       toast.error((err as Error).message);
     }
   }
+
+  // Sube o baja una actividad y renumera "orden" 0..n-1 en todas: al quitar
+  // actividades o al agregarlas (orden = cantidad actual) pueden quedar
+  // números repetidos, y así el orden queda parejo de nuevo.
+  async function moverActividad(id: string, direccion: -1 | 1) {
+    if (!equipo) return;
+    const desde = checklistItems.findIndex((i) => i.id === id);
+    const hasta = desde + direccion;
+    if (desde < 0 || hasta < 0 || hasta >= checklistItems.length) return;
+    const nuevo = [...checklistItems];
+    [nuevo[desde], nuevo[hasta]] = [nuevo[hasta], nuevo[desde]];
+    const renumerado = nuevo.map((item, orden) => ({ ...item, orden }));
+    const cambiados = renumerado.filter((item) => checklistItems.find((i) => i.id === item.id)?.orden !== item.orden);
+    setChecklistItems(renumerado);
+    try {
+      await Promise.all(cambiados.map((item) => apiPatch(`/api/checklistDiario/${item.id}`, { orden: item.orden })));
+    } catch (err) {
+      toast.error((err as Error).message);
+      const r = await apiGet(`/api/checklistDiario?equipoId=${equipo.id}`).catch(() => null);
+      if (r) setChecklistItems(aplanarDocs<ChecklistDiarioItem>(r));
+    }
+  }
   const horasRestantes = equipo ? horasRestantesSimple(equipo) : null;
   const kmRestantes = equipo ? kilometrosRestantesSimple(equipo) : null;
   const diasProxima = equipo ? diasHastaProximoMantenimiento(equipo) : null;
@@ -216,9 +238,10 @@ export default function EquipoDetallePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)", maxWidth: 900 }}>
       <EstadoCarga cargando={false} error={errorCarga} />
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-3)" }}>
+      {/* flexWrap: en celular el botón Volver baja y las etiquetas pasan bajo el título. */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--ds-space-3)" }}>
+        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--ds-space-2) var(--ds-space-3)" }}>
             <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>{equipo.nombre}</h1>
             <Pill tone={ESTADO_TONO[equipo.estado]}>{ESTADO_LABEL[equipo.estado]}</Pill>
             {horasRestantes != null && <Pill tone={toneRestante(horasRestantes, equipo.intervaloHorasPreventivo)}>{horasRestantes.toFixed(0)} h para el próx. MTO</Pill>}
@@ -254,6 +277,7 @@ export default function EquipoDetallePage() {
           onAdd={agregarActividad}
           onEditar={editarActividad}
           onQuitar={quitarActividad}
+          onMover={moverActividad}
           soloLectura={!puedeEditarChecklist}
         />
       </Seccion>

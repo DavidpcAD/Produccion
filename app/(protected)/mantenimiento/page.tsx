@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAppStore } from "@/lib/mantenimiento/store";
 import { StatTile } from "@/components/mantenimiento/local/StatTile";
 import { MiniBarChart } from "@/components/mantenimiento/local/MiniBarChart";
+import { EquiposChecklistDia } from "@/components/mantenimiento/local/EquiposChecklistDia";
 import { Pill } from "@/components/mantenimiento/local/Table";
 import { EstadoCarga } from "@/components/mantenimiento/local/EstadoCarga";
 import { Icon } from "@/components/mantenimiento/ds/Icon/Icon";
@@ -65,6 +66,8 @@ export default function DashboardPage() {
         <StatTile label="Costo total registrado" value={`₡${costoTotalMes.toLocaleString("es-CR")}`} icon="calculator" tone="black" />
       </div>
 
+      <EquiposChecklistDia />
+
       <div style={{ display: "flex", gap: "var(--ds-space-4)", flexWrap: "wrap" }}>
         <div style={{ background: "var(--ds-surface)", borderRadius: "var(--ds-radius-lg)", boxShadow: "var(--ds-shadow-01)", padding: "var(--ds-space-5)", flex: 1, minWidth: 320 }}>
           <div style={{ fontWeight: "var(--ds-font-weight-semibold)", marginBottom: "var(--ds-space-2)" }}>OTs por tipo</div>
@@ -87,9 +90,9 @@ export default function DashboardPage() {
             <Link
               key={plan.id}
               href="/mantenimiento/planes"
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--ds-space-3)", borderRadius: "var(--ds-radius-md)", background: "var(--ds-color-gray-100)", textDecoration: "none", color: "inherit" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--ds-space-2)", padding: "var(--ds-space-3)", borderRadius: "var(--ds-radius-md)", background: "var(--ds-color-gray-100)", textDecoration: "none", color: "inherit" }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)", flex: "1 1 220px", minWidth: 0 }}>
                 <Icon name="alert" size="sm" color={urgencia === "vencido" ? "var(--ds-color-red-200)" : "var(--ds-color-yellow)"} />
                 {plan.nombre} — {equipo?.nombre}
               </span>
@@ -100,9 +103,9 @@ export default function DashboardPage() {
             <Link
               key={r.id}
               href="/mantenimiento/repuestos"
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--ds-space-3)", borderRadius: "var(--ds-radius-md)", background: "var(--ds-color-gray-100)", textDecoration: "none", color: "inherit" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--ds-space-2)", padding: "var(--ds-space-3)", borderRadius: "var(--ds-radius-md)", background: "var(--ds-color-gray-100)", textDecoration: "none", color: "inherit" }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)", flex: "1 1 220px", minWidth: 0 }}>
                 <Icon name="sin-stock" size="sm" color="var(--ds-color-red-200)" />
                 {r.nombre} — stock {r.stockActual}/{r.stockMinimo}
               </span>
