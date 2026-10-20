@@ -17,7 +17,8 @@ export interface FilterChipOption {
 
 export function FilterChips({ options, value, onChange }: { options: FilterChipOption[]; value: string; onChange: (value: string) => void }) {
   return (
-    <div style={{ display: "flex", gap: "var(--ds-space-2)", flexWrap: "wrap" }}>
+    // En celular la fila se desliza de lado en vez de partirse (ver movil.css).
+    <div className="mnt-chips">
       {options.map((opt) => (
         <Button key={opt.value} label={opt.label} size="sm" color={value === opt.value ? "black" : "white"} onClick={() => onChange(opt.value)} />
       ))}

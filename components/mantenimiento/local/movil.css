@@ -1,0 +1,135 @@
+/* Ajustes de Mantenimiento para CELULAR (≤ 640px, el mismo corte "sm" que usa
+   Produccion). La idea: en el teléfono nada queda más ancho que la pantalla,
+   no hay columnas escondidas detrás de un scroll lateral, y la letra y los
+   toques siguen cómodos. En computadora nada de esto aplica.
+   Lo carga app/(protected)/mantenimiento/layout.tsx para todo el módulo. */
+
+/* ── Tabla → tarjetas (ver Table.tsx) ───────────────────── */
+.mnt-tabla__movil { display: none; }
+
+.mnt-tabla__orden {
+  display:         flex;
+  align-items:     center;
+  justify-content: flex-end;
+  gap:             var(--ds-space-2);
+  color:           var(--ds-color-gray-500);
+  font-size:       var(--ds-font-size-body-sm);
+}
+.mnt-tabla__orden select {
+  max-width:     70%;
+  min-height:    36px;
+  padding:       0 var(--ds-space-3);
+  border:        1px solid var(--ds-color-gray-200);
+  border-radius: var(--ds-radius-xl);
+  background:    var(--ds-surface);
+  color:         var(--ds-text);
+  font:          inherit;
+  font-size:     var(--ds-font-size-label);
+}
+
+.mnt-tarjetas {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--ds-space-2);
+  margin:         0;
+  padding:        0;
+  list-style:     none;
+}
+.mnt-tarjeta {
+  padding:       var(--ds-space-4);
+  border-radius: var(--ds-radius-lg);
+  background:    var(--ds-surface);
+  box-shadow:    var(--ds-shadow-01);
+  color:         var(--ds-text);
+}
+.mnt-tarjeta--clic { cursor: pointer; transition: transform 0.1s ease, background 0.4s ease; }
+.mnt-tarjeta--clic:active { transform: scale(0.99); }
+.mnt-tarjeta--clic:focus-visible { outline: 2px solid var(--ds-text); outline-offset: 2px; }
+.mnt-tarjeta--vuelta { background: color-mix(in srgb, var(--ds-color-green-100) 18%, var(--ds-surface)); }
+.mnt-tarjeta--vacia {
+  padding:    var(--ds-space-6) var(--ds-space-4);
+  color:      var(--ds-color-gray-400);
+  text-align: center;
+}
+
+.mnt-tarjeta__cabeza {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     flex-start;
+  gap:             var(--ds-space-3);
+}
+.mnt-tarjeta__titulos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mnt-tarjeta__titulo {
+  font-size:     var(--ds-font-size-body-md);
+  line-height:   var(--ds-line-height-body-md);
+  font-weight:   var(--ds-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.mnt-tarjeta__subtitulo {
+  color:         var(--ds-color-gray-500);
+  font-size:     var(--ds-font-size-label);
+  line-height:   var(--ds-line-height-label);
+  overflow-wrap: anywhere;
+}
+.mnt-tarjeta__flecha { flex-shrink: 0; margin-top: 4px; color: var(--ds-color-gray-400); }
+
+/* Pares "columna: valor" en dos columnas parejas. */
+.mnt-tarjeta__datos {
+  display:               grid;
+  grid-template-columns: minmax(96px, 40%) 1fr;
+  gap:                   6px var(--ds-space-3);
+  margin:                var(--ds-space-3) 0 0;
+  padding-top:           var(--ds-space-3);
+  border-top:            1px solid var(--ds-color-gray-100);
+  font-size:             var(--ds-font-size-label);
+  line-height:           var(--ds-line-height-label);
+}
+.mnt-tarjeta__dato { display: contents; }
+.mnt-tarjeta__dato dt { color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); }
+.mnt-tarjeta__dato dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+.mnt-tarjeta__acciones {
+  display:         flex;
+  flex-wrap:       wrap;
+  justify-content: flex-end;
+  gap:             var(--ds-space-2);
+  margin-top:      var(--ds-space-3);
+}
+
+/* ── Filtros (FilterChips) ──────────────────────────────── */
+.mnt-chips { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+
+@media (max-width: 640px) {
+  /* Títulos de página: 26px en vez de 32px. Todas las pantallas usan la
+     variable, así que alcanza con redefinirla acá. */
+  .mnt-pagina {
+    --ds-font-size-heading:   26px;
+    --ds-line-height-heading: 32px;
+  }
+
+  .mnt-tabla__escritorio { display: none; }
+  .mnt-tabla__movil { display: flex; flex-direction: column; gap: var(--ds-space-2); }
+
+  /* Una sola fila que se desliza de lado (llega al borde de la pantalla) en
+     vez de 2-3 renglones de botones. */
+  .mnt-chips {
+    flex-wrap:          nowrap;
+    overflow-x:         auto;
+    margin:             0 calc(-1 * var(--ds-space-4));
+    padding:            var(--ds-space-1) var(--ds-space-4);
+    scroll-padding:     0 var(--ds-space-4);
+    scrollbar-width:    none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mnt-chips::-webkit-scrollbar { display: none; }
+  .mnt-chips > * { flex-shrink: 0; }
+
+  /* Editor de checklist (ficha del equipo): editar/quitar en columna al lado
+     del texto, así la fila no se parte en dos renglones. */
+  .mnt-actividad__acciones { flex-direction: column; }
+
+  /* Inspección diaria: el botón de guardar ocupa todo el ancho. */
+  .mnt-insp-guardar > :last-child { flex: 1 1 100%; }
+  .mnt-insp-guardar > :last-child button,
+  .mnt-insp-guardar > button { width: 100%; }
+}

@@ -28,7 +28,8 @@ export function StatTile({ label, value, icon, tone = "black" }: { label: string
         display: "flex",
         flexDirection: "column",
         gap: "var(--ds-space-2)",
-        minWidth: 180,
+        // 150 (no 180): en un celular de 390px entran dos por fila en vez de una.
+        minWidth: 150,
         flex: 1
       }}
     >

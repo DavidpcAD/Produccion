@@ -151,7 +151,7 @@ export default function PlanesPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--ds-space-3)" }}>
         <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>Preventivo</h1>
         {puedeEditar && <Button label="Nuevo plan" color="green" layout="icon-left" icon="plus" onClick={abrirNuevo} />}
       </div>

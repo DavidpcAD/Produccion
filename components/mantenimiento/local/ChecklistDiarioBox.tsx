@@ -81,18 +81,20 @@ export function ChecklistDiarioBox({
       {items.map((item, indice) => (
         <div
           key={item.id}
+          className="mnt-actividad"
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            flexWrap: "wrap",
+            // Solo se parte en dos renglones mientras pide confirmar el borrado.
+            flexWrap: confirmandoId === item.id ? "wrap" : "nowrap",
             gap: "var(--ds-space-3)",
             padding: "var(--ds-space-3)",
             background: "var(--ds-color-gray-100)",
             borderRadius: "var(--ds-radius-md)"
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-3)", minWidth: 0, flex: "1 1 220px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-3)", minWidth: 0, flex: "1 1 auto" }}>
             {!soloLectura && onMover && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
                 <button
@@ -144,7 +146,7 @@ export function ChecklistDiarioBox({
                 <Button label="No" color="white" size="sm" onClick={() => setConfirmandoId(null)} />
               </div>
             ) : (
-              <div style={{ display: "flex", gap: "var(--ds-space-2)", flexShrink: 0 }}>
+              <div className="mnt-actividad__acciones" style={{ display: "flex", gap: "var(--ds-space-2)", flexShrink: 0 }}>
                 <Button ariaLabel="Editar actividad" layout="icon" size="sm" color="white" icon="edit" onClick={() => abrirEdicion(item)} />
                 <Button ariaLabel="Quitar actividad" layout="icon" size="sm" color="white" icon="delete" onClick={() => setConfirmandoId(item.id)} />
               </div>

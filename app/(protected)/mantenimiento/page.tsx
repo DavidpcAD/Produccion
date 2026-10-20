@@ -90,9 +90,9 @@ export default function DashboardPage() {
             <Link
               key={plan.id}
               href="/mantenimiento/planes"
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--ds-space-3)", borderRadius: "var(--ds-radius-md)", background: "var(--ds-color-gray-100)", textDecoration: "none", color: "inherit" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--ds-space-2)", padding: "var(--ds-space-3)", borderRadius: "var(--ds-radius-md)", background: "var(--ds-color-gray-100)", textDecoration: "none", color: "inherit" }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)", flex: "1 1 220px", minWidth: 0 }}>
                 <Icon name="alert" size="sm" color={urgencia === "vencido" ? "var(--ds-color-red-200)" : "var(--ds-color-yellow)"} />
                 {plan.nombre} — {equipo?.nombre}
               </span>
@@ -103,9 +103,9 @@ export default function DashboardPage() {
             <Link
               key={r.id}
               href="/mantenimiento/repuestos"
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--ds-space-3)", borderRadius: "var(--ds-radius-md)", background: "var(--ds-color-gray-100)", textDecoration: "none", color: "inherit" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--ds-space-2)", padding: "var(--ds-space-3)", borderRadius: "var(--ds-radius-md)", background: "var(--ds-color-gray-100)", textDecoration: "none", color: "inherit" }}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-2)", flex: "1 1 220px", minWidth: 0 }}>
                 <Icon name="sin-stock" size="sm" color="var(--ds-color-red-200)" />
                 {r.nombre} — stock {r.stockActual}/{r.stockMinimo}
               </span>

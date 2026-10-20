@@ -178,10 +178,11 @@ export default function OtDetallePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)", maxWidth: 720 }}>
       <EstadoCarga cargando={false} error={errorCarga} />
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-3)" }}>
-            <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>{ot.numero}</h1>
+      {/* flexWrap: en celular el botón Volver baja y las etiquetas pasan bajo el título. */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--ds-space-3)" }}>
+        <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--ds-space-2) var(--ds-space-3)" }}>
+            <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0, whiteSpace: "nowrap" }}>{ot.numero}</h1>
             <Pill tone={ESTADO_TONO[ot.estado]}>{ESTADO_LABEL[ot.estado]}</Pill>
             <Pill tone="gray">{TIPO_LABEL[ot.tipo]}</Pill>
           </div>

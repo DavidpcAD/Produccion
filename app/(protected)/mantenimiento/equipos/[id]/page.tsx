@@ -238,9 +238,10 @@ export default function EquipoDetallePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)", maxWidth: 900 }}>
       <EstadoCarga cargando={false} error={errorCarga} />
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--ds-space-3)" }}>
+      {/* flexWrap: en celular el botón Volver baja y las etiquetas pasan bajo el título. */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--ds-space-3)" }}>
+        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--ds-space-2) var(--ds-space-3)" }}>
             <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>{equipo.nombre}</h1>
             <Pill tone={ESTADO_TONO[equipo.estado]}>{ESTADO_LABEL[equipo.estado]}</Pill>
             {horasRestantes != null && <Pill tone={toneRestante(horasRestantes, equipo.intervaloHorasPreventivo)}>{horasRestantes.toFixed(0)} h para el próx. MTO</Pill>}

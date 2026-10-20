@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 // --ds-text, --ds-nav-bg, etc. que usan SUS componentes). Importado acá, Next lo carga
 // SOLO en las rutas /mantenimiento/*, sin tocar el resto de Produccion.
 import '@/components/mantenimiento/ds/design-system.css';
+// Ajustes para celular de todo el módulo (tablas → tarjetas, títulos, filtros).
+import '@/components/mantenimiento/local/movil.css';
 import { DataStoreProvider } from '@/lib/mantenimiento/store';
 import { ToastProvider } from '@/components/mantenimiento/local/Toast';
 
@@ -17,7 +19,7 @@ export default function MantenimientoLayout({ children }: { children: ReactNode 
   return (
     <DataStoreProvider>
       <ToastProvider>
-        <div className="p-4 sm:p-6 min-w-0">{children}</div>
+        <div className="mnt-pagina p-4 sm:p-6 min-w-0">{children}</div>
       </ToastProvider>
     </DataStoreProvider>
   );

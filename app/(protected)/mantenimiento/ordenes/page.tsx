@@ -47,10 +47,10 @@ export default function OrdenesPage() {
   }
 
   const columnas: ColumnaTabla<FilaOt>[] = [
-    { key: "numero", header: "Número" },
+    { key: "numero", header: "Número", movil: "titulo" },
     { key: "equipo", header: "Equipo", sortValue: (o) => o.equipo?.nombre ?? "", render: (o) => o.equipo?.nombre ?? "—" },
     { key: "tipo", header: "Tipo", render: (o) => <Pill tone={o.tipo === "correctivo" ? "red" : o.tipo === "preventivo" ? "green" : "gray"}>{TIPO_LABEL[o.tipo]}</Pill> },
-    { key: "titulo", header: "Título" },
+    { key: "titulo", header: "Título", movil: "titulo" },
     { key: "prioridad", header: "Prioridad", render: (o) => <Pill tone={PRIORIDAD_TONO[o.prioridad]}>{o.prioridad}</Pill> },
     { key: "estado", header: "Estado", render: (o) => <Pill tone={ESTADO_TONO[o.estado]}>{ESTADO_LABEL[o.estado]}</Pill> },
     { key: "fechaApertura", header: "Apertura", render: (o) => new Date(o.fechaApertura).toLocaleDateString("es-CR") },
@@ -59,7 +59,7 @@ export default function OrdenesPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--ds-space-3)" }}>
         <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>Órdenes de trabajo</h1>
         <Button label="Nueva OT" color="green" layout="icon-left" icon="plus" onClick={() => router.push("/mantenimiento/ordenes/nueva")} />
       </div>
