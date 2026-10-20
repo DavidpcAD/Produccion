@@ -30,6 +30,7 @@ export interface PresupuestoLiquidadoRow {
   variantDescription?: string;
   unitOfMeasureCode: string;
   taskNo: string;
+  taskDescription: string;
   presupuestadoCant: number;
   liquidadoCant: number;
   unitCost: number;
@@ -108,6 +109,13 @@ export async function presupuestoLiquidado(obra: string, taskNo?: string): Promi
 
   const taskQty = buildTaskQty(workLines, pickVersion(versions));
 
+  // Descripción de cada actividad (tarea), tomada de las líneas de venta (ej. "1.1" →
+  // "Fundaciones"). Para el encabezado del grupo en la vista Detalle.
+  const tareaDesc = new Map<string, string>();
+  for (const l of workLines) {
+    if (l.taskNo && l.description && !tareaDesc.has(l.taskNo)) tareaDesc.set(l.taskNo, l.description);
+  }
+
   // Presupuesto por material: cantidad (rendimiento × cantidad de tarea) y costo unitario.
   const budgetQty = new Map<string, number>();
   const budgetCost = new Map<string, number>();
@@ -150,6 +158,7 @@ export async function presupuestoLiquidado(obra: string, taskNo?: string): Promi
         variantDescription: c?.variantDescription,
         unitOfMeasureCode: b?.unit || c?.unit || '',
         taskNo: b?.taskNo ?? c?.taskNo ?? '',
+        taskDescription: tareaDesc.get(b?.taskNo ?? c?.taskNo ?? '') ?? '',
         presupuestadoCant,
         liquidadoCant,
         unitCost,

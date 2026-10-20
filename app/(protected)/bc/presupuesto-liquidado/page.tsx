@@ -2,43 +2,36 @@
 /* eslint-disable react-hooks/set-state-in-effect -- efectos de carga de datos (obras al
    montar, comparación al cambiar de obra): el setState va tras el fetch/await. */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Combobox } from '@/components/ui/Combobox';
-import { DataTable } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { Icon, IconName } from '@/components/ds/Icon/Icon';
 import { formatCRC } from '@/lib/utilidades/format';
 import type { EstadoPL, PresupuestoLiquidadoResponse, PresupuestoLiquidadoRow } from '@/lib/bc/presupuesto-liquidado';
 
 // Material presupuestado vs. liquidado por obra (SOLO Super Admin). Portado de
-// Digitación y armado como dashboard: valores en ₡, por categoría, con gráficos.
+// Digitación como dashboard: valores en ₡, por categoría, con gráficos; el Detalle va
+// agrupado por actividad (se expande para ver los materiales de cada tarea).
 
 const num = new Intl.NumberFormat('es-CR', { maximumFractionDigits: 2 });
 const pct = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(1)}%`;
 const PALETA = ['#16a34a', '#2563eb', '#f59e0b', '#ea580c', '#7c3aed', '#94a3b8', '#0d9488', '#db2777'];
+const sinAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const ESTADO_META: Record<EstadoPL, { label: string; bg: string; fg: string }> = {
-  en_rango:           { label: 'En rango',          bg: '#e6f4ea', fg: '#1a8245' },
-  revisar:            { label: 'Revisar',           bg: '#f7ecd6', fg: '#b7791f' },
-  sobre_presupuesto:  { label: 'Sobre presupuesto', bg: '#f5e1e1', fg: '#bb4a4a' },
+  en_rango:          { label: 'En rango',          bg: '#e6f4ea', fg: '#1a8245' },
+  revisar:           { label: 'Revisar',           bg: '#f7ecd6', fg: '#b7791f' },
+  sobre_presupuesto: { label: 'Sobre presupuesto', bg: '#f5e1e1', fg: '#bb4a4a' },
 };
 
-const COLUMNAS: ColumnDef<PresupuestoLiquidadoRow>[] = [
-  { id: 'itemNo', accessorKey: 'itemNo', header: 'Código', meta: { label: 'Código', noFilter: true }, cell: ({ row }) => <span className="font-mono whitespace-nowrap">{row.original.itemNo}</span> },
-  { id: 'description', accessorKey: 'description', header: 'Descripción', meta: { label: 'Descripción', noFilter: true }, cell: ({ row }) => row.original.description || '—' },
-  { id: 'categoria', accessorKey: 'categoria', header: 'Categoría', meta: { label: 'Categoría' }, cell: ({ row }) => row.original.categoria || '—' },
-  { id: 'unidad', accessorKey: 'unitOfMeasureCode', header: 'Unidad', meta: { label: 'Unidad' }, cell: ({ row }) => row.original.unitOfMeasureCode || '—' },
-  { id: 'presupCant', accessorKey: 'presupuestadoCant', header: 'Presup. cant', meta: { label: 'Presupuestado (cant)', align: 'right', noFilter: true }, cell: ({ row }) => <span className="whitespace-nowrap">{num.format(row.original.presupuestadoCant)}</span> },
-  { id: 'presupValor', accessorKey: 'presupuestadoValor', header: 'Presup. ₡', meta: { label: 'Presupuestado (₡)', align: 'right', noFilter: true }, cell: ({ row }) => <span className="whitespace-nowrap">{formatCRC(row.original.presupuestadoValor)}</span> },
-  { id: 'liqCant', accessorKey: 'liquidadoCant', header: 'Liq. cant', meta: { label: 'Liquidado (cant)', align: 'right', noFilter: true }, cell: ({ row }) => <span className="whitespace-nowrap">{num.format(row.original.liquidadoCant)}</span> },
-  { id: 'liqValor', accessorKey: 'liquidadoValor', header: 'Liq. ₡', meta: { label: 'Liquidado (₡)', align: 'right', noFilter: true }, cell: ({ row }) => <span className="whitespace-nowrap">{formatCRC(row.original.liquidadoValor)}</span> },
-  {
-    id: 'variacion', accessorKey: 'variacionPct', header: 'Variación', meta: { label: 'Variación %', align: 'right', noFilter: true },
-    cell: ({ row }) => { const v = row.original.variacionPct; return <span className={`font-semibold whitespace-nowrap ${v > 0 ? 'text-ds-red-ink' : v < 0 ? 'text-ds-green-ink' : 'text-ds-gray-400'}`}>{pct(v)}</span>; },
-  },
-  { id: 'estado', header: 'Estado', meta: { label: 'Estado' }, accessorFn: (r) => ESTADO_META[r.estado].label, cell: ({ row }) => <EstadoChip estado={row.original.estado} /> },
-];
+function estadoDe(tp: number, tl: number): EstadoPL {
+  if (tp <= 0) return tl > 0 ? 'sobre_presupuesto' : 'en_rango';
+  const v = ((tl - tp) / tp) * 100;
+  if (v > 10) return 'sobre_presupuesto';
+  if (v > 1e-4) return 'revisar';
+  return 'en_rango';
+}
 
 interface ObraOpt { codigo: string; nombre: string }
 
@@ -92,26 +85,16 @@ export default function PresupuestoLiquidadoPage() {
   );
   const catOpts = useMemo(() => [{ value: '', label: 'Todas las categorías' }, ...categorias.map((c) => ({ value: c, label: c }))], [categorias]);
 
-  const rows = useMemo(() => {
-    return (data?.rows ?? []).filter((r) => {
-      if (categoriaSel && r.categoria !== categoriaSel) return false;
-      if (soloVariacion && r.estado === 'en_rango') return false;
-      return true;
-    });
-  }, [data, categoriaSel, soloVariacion]);
+  const rows = useMemo(() => (data?.rows ?? []).filter((r) => {
+    if (categoriaSel && r.categoria !== categoriaSel) return false;
+    if (soloVariacion && r.estado === 'en_rango') return false;
+    return true;
+  }), [data, categoriaSel, soloVariacion]);
 
   const k = useMemo(() => {
     const vp = rows.reduce((s, r) => s + r.presupuestadoValor, 0);
     const vl = rows.reduce((s, r) => s + r.liquidadoValor, 0);
-    return {
-      valorPresup: vp,
-      valorLiq: vl,
-      diferencia: vp - vl,
-      pctLiq: vp > 0 ? (vl / vp) * 100 : 0,
-      diffPct: vp > 0 ? ((vp - vl) / vp) * 100 : 0,
-      conVariacion: rows.filter((r) => r.estado !== 'en_rango').length,
-      total: rows.length,
-    };
+    return { valorPresup: vp, valorLiq: vl, diferencia: vp - vl, pctLiq: vp > 0 ? (vl / vp) * 100 : 0, diffPct: vp > 0 ? ((vp - vl) / vp) * 100 : 0, conVariacion: rows.filter((r) => r.estado !== 'en_rango').length, total: rows.length };
   }, [rows]);
 
   const porCategoria = useMemo(() => {
@@ -119,9 +102,7 @@ export default function PresupuestoLiquidadoPage() {
     for (const r of rows) {
       const cat = r.categoria || 'Sin categoría';
       const g = m.get(cat) ?? { presupuestado: 0, liquidado: 0 };
-      g.presupuestado += r.presupuestadoValor;
-      g.liquidado += r.liquidadoValor;
-      m.set(cat, g);
+      g.presupuestado += r.presupuestadoValor; g.liquidado += r.liquidadoValor; m.set(cat, g);
     }
     return Array.from(m, ([categoria, v]) => ({ categoria, ...v })).sort((a, b) => (b.presupuestado + b.liquidado) - (a.presupuestado + a.liquidado));
   }, [rows]);
@@ -156,7 +137,7 @@ export default function PresupuestoLiquidadoPage() {
           <div className="inline-flex overflow-hidden rounded-ds border border-ds-gray-200">
             {([{ v: 'resumen', l: 'Resumen' }, { v: 'detalle', l: 'Detalle' }] as const).map((o) => (
               <button key={o.v} type="button" onClick={() => setVista(o.v)}
-                className={`px-4 py-2 text-body-sm transition-colors ${vista === o.v ? 'bg-brand text-ds-ink font-semibold' : 'bg-ds-surface text-ds-gray-500 hover:bg-ds-gray-100'}`}>{o.l}</button>
+                className={`px-4 py-2 text-body-sm transition-colors ${vista === o.v ? 'bg-brand font-semibold text-ds-ink' : 'bg-ds-surface text-ds-gray-500 hover:bg-ds-gray-100'}`}>{o.l}</button>
             ))}
           </div>
         </div>
@@ -176,7 +157,7 @@ export default function PresupuestoLiquidadoPage() {
             <KpiCard icono="completado" accent="purple" titulo="Diferencia" valor={loading ? '—' : formatCRC(Math.abs(k.diferencia))}
               sub={loading ? undefined : (k.diferencia >= 0 ? `Ahorro · ${k.diffPct.toFixed(1)}%` : `Sobre presupuesto · ${Math.abs(k.diffPct).toFixed(1)}%`)}
               subColor={k.diferencia >= 0 ? 'text-ds-green-ink' : 'text-ds-red-ink'} />
-            <KpiCard icono="alert" accent="orange" titulo="Materiales con variación" valor={loading ? '—' : `${num.format(k.conVariacion)}`} sub={loading ? undefined : `de ${num.format(k.total)} materiales`} destacado={k.conVariacion > 0} />
+            <KpiCard icono="alert" accent="orange" titulo="Materiales con variación" valor={loading ? '—' : num.format(k.conVariacion)} sub={loading ? undefined : `de ${num.format(k.total)} materiales`} destacado={k.conVariacion > 0} />
           </div>
 
           {vista === 'resumen' ? (
@@ -191,18 +172,7 @@ export default function PresupuestoLiquidadoPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
-              <DataTable<PresupuestoLiquidadoRow>
-                columns={COLUMNAS}
-                data={rows}
-                loading={loading}
-                searchPlaceholder="Código, descripción o categoría…"
-                exportFilename={`presupuesto-liquidado-${obra}`}
-                pageSize={50}
-                emptyMessage="Sin materiales con los filtros actuales."
-                persistKey="bc-presupuesto-liquidado"
-              />
-            </div>
+            <DetalleActividades rows={rows} loading={loading} obra={obra} />
           )}
         </>
       )}
@@ -250,7 +220,107 @@ function SeccionHeader({ icono, titulo, leyenda }: { icono: IconName; titulo: st
 
 function EstadoChip({ estado }: { estado: EstadoPL }) {
   const m = ESTADO_META[estado];
-  return <span className="inline-flex items-center rounded-ds px-2 py-0.5 text-label font-medium" style={{ background: m.bg, color: m.fg }}>{m.label}</span>;
+  return <span className="inline-flex items-center whitespace-nowrap rounded-ds px-2 py-0.5 text-label font-medium" style={{ background: m.bg, color: m.fg }}>{m.label}</span>;
+}
+
+// ─── Detalle agrupado por ACTIVIDAD (acordeón) ──────────────────────────────────
+function DetalleActividades({ rows, loading, obra }: { rows: PresupuestoLiquidadoRow[]; loading?: boolean; obra: string }) {
+  const [buscar, setBuscar] = useState('');
+  const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
+
+  const filtradas = useMemo(() => {
+    const q = sinAcento(buscar.trim());
+    if (!q) return rows;
+    return rows.filter((r) => sinAcento(`${r.description} ${r.itemNo} ${r.categoria} ${r.taskNo} ${r.taskDescription}`).includes(q));
+  }, [rows, buscar]);
+
+  const grupos = useMemo(() => {
+    const m = new Map<string, PresupuestoLiquidadoRow[]>();
+    for (const r of filtradas) { const kk = r.taskNo || '—'; const a = m.get(kk); if (a) a.push(r); else m.set(kk, [r]); }
+    return Array.from(m.entries()).map(([taskNo, lineas]) => {
+      const tp = lineas.reduce((s, r) => s + r.presupuestadoValor, 0);
+      const tl = lineas.reduce((s, r) => s + r.liquidadoValor, 0);
+      return { taskNo, descripcion: lineas[0]?.taskDescription ?? '', lineas, tp, tl, variacion: tp > 0 ? ((tl - tp) / tp) * 100 : (tl > 0 ? 100 : 0), estado: estadoDe(tp, tl) };
+    }).sort((a, b) => a.taskNo.localeCompare(b.taskNo, undefined, { numeric: true }));
+  }, [filtradas]);
+
+  const todasAbiertas = grupos.length > 0 && grupos.every((g) => abiertas.has(g.taskNo));
+  const toggleTodas = () => setAbiertas(todasAbiertas ? new Set() : new Set(grupos.map((g) => g.taskNo)));
+  const toggle = (t: string) => setAbiertas((prev) => { const n = new Set(prev); if (n.has(t)) n.delete(t); else n.add(t); return n; });
+
+  function exportar() {
+    const esc = (v: unknown) => { const s = v == null ? '' : String(v); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const head = ['Actividad', 'Descripción actividad', 'Código', 'Descripción', 'Categoría', 'Unidad', 'Presup. cant', 'Presup. ₡', 'Liq. cant', 'Liq. ₡', 'Variación %', 'Estado'];
+    const body = filtradas.map((r) => [r.taskNo, r.taskDescription, r.itemNo, r.description, r.categoria, r.unitOfMeasureCode, r.presupuestadoCant, r.presupuestadoValor, r.liquidadoCant, r.liquidadoValor, r.variacionPct, ESTADO_META[r.estado].label].map(esc).join(';'));
+    const csv = '﻿' + [head.join(';'), ...body].join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a'); a.href = url; a.download = `presupuesto-liquidado-${obra}.csv`; a.click(); URL.revokeObjectURL(url);
+  }
+
+  if (loading) return <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-11 animate-pulse rounded-ds-lg bg-ds-gray-100" />)}</div>;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-[220px] flex-1"><Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Material, código, actividad…" /></div>
+        <button type="button" onClick={toggleTodas} className="rounded-ds border border-ds-gray-200 bg-ds-surface px-3.5 py-2 text-body-sm font-medium text-ds-gray-600 hover:border-ds-gray-300">{todasAbiertas ? 'Colapsar todo' : 'Expandir todo'}</button>
+        <button type="button" onClick={exportar} disabled={filtradas.length === 0} className="rounded-ds border border-ds-gray-200 bg-ds-surface px-3.5 py-2 text-body-sm font-medium text-ds-gray-600 hover:border-ds-gray-300 disabled:opacity-50">Exportar</button>
+      </div>
+
+      {grupos.length === 0 ? (
+        <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface py-12 text-center text-body-sm text-ds-gray-400 shadow-ds-01">Sin materiales con los filtros actuales.</div>
+      ) : grupos.map((g) => {
+        const open = abiertas.has(g.taskNo);
+        return (
+          <div key={g.taskNo} className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
+            <button type="button" onClick={() => toggle(g.taskNo)} className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left hover:bg-ds-gray-100">
+              <span className={`shrink-0 text-ds-gray-400 transition-transform ${open ? 'rotate-90' : ''}`}><Icon name="arrow-right" size="sm" color="currentColor" /></span>
+              <span className="shrink-0 font-mono font-semibold text-ds-ink">{g.taskNo}</span>
+              <span className="min-w-[120px] flex-1 break-words font-medium text-ds-ink">{g.descripcion || '—'}</span>
+              <span className="shrink-0 whitespace-nowrap text-body-sm text-ds-gray-500">Presup. <b className="font-mono text-ds-ink">{formatCRC(g.tp)}</b></span>
+              <span className="shrink-0 whitespace-nowrap text-body-sm text-ds-gray-500">Liq. <b className="font-mono text-ds-ink">{formatCRC(g.tl)}</b></span>
+              <span className={`w-16 shrink-0 text-right font-semibold ${g.variacion > 0 ? 'text-ds-red-ink' : g.variacion < 0 ? 'text-ds-green-ink' : 'text-ds-gray-400'}`}>{pct(g.variacion)}</span>
+              <EstadoChip estado={g.estado} />
+            </button>
+            {open && (
+              <div className="overflow-x-auto border-t border-ds-gray-100">
+                <table className="w-full text-body-sm">
+                  <thead>
+                    <tr className="border-b border-ds-gray-100 bg-ds-gray-50 text-label uppercase tracking-wide text-ds-gray-400">
+                      <th className="px-4 py-2 text-left font-semibold">Código</th>
+                      <th className="px-4 py-2 text-left font-semibold">Descripción</th>
+                      <th className="px-3 py-2 text-left font-semibold">Unidad</th>
+                      <th className="px-3 py-2 text-right font-semibold">Presup. cant</th>
+                      <th className="px-3 py-2 text-right font-semibold">Presup. ₡</th>
+                      <th className="px-3 py-2 text-right font-semibold">Liq. cant</th>
+                      <th className="px-3 py-2 text-right font-semibold">Liq. ₡</th>
+                      <th className="px-3 py-2 text-right font-semibold">Variación</th>
+                      <th className="px-3 py-2 text-left font-semibold">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.lineas.map((r) => (
+                      <tr key={`${r.itemNo}|${r.variantCode}|${r.taskNo}`} className="border-b border-ds-gray-100 last:border-0">
+                        <td className="px-4 py-2 font-mono whitespace-nowrap">{r.itemNo}</td>
+                        <td className="px-4 py-2">{r.description || '—'}{r.variantCode ? <span className="text-ds-gray-400"> · {r.variantDescription || r.variantCode}</span> : null}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{r.unitOfMeasureCode || '—'}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">{num.format(r.presupuestadoCant)}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap font-mono">{formatCRC(r.presupuestadoValor)}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">{num.format(r.liquidadoCant)}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap font-mono">{formatCRC(r.liquidadoValor)}</td>
+                        <td className={`px-3 py-2 text-right whitespace-nowrap font-semibold ${r.variacionPct > 0 ? 'text-ds-red-ink' : r.variacionPct < 0 ? 'text-ds-green-ink' : 'text-ds-gray-400'}`}>{pct(r.variacionPct)}</td>
+                        <td className="px-3 py-2"><EstadoChip estado={r.estado} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function AvanceCategoria({ datos, loading }: { datos: { categoria: string; presupuestado: number; liquidado: number }[]; loading?: boolean }) {
