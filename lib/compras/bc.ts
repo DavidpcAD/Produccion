@@ -154,7 +154,10 @@ export type BcItem = { id: string; code: string; descripcion: string; unidad: st
 // línea de compra con "Project VN-K.26 must not be blocked with type All", así que el
 // pedido se crea y nunca se puede lanzar. En producción hay 82 de 221 obras así.
 export type BcObra = { id: string; codigo: string; nombre: string; bloqueada?: boolean };
-export type BcAlmacen = { codigo: string; nombre: string };
+// tipoAlmacen: clasificación Real / Virtual del almacén (Location."GJW Tipo Almacen",
+// enum 50101). La expone la page 50234; se usa para marcar el inventario que quedó
+// "sin liquidar" en los almacenes virtuales (casas, comisiones, centros de costo…).
+export type BcAlmacen = { codigo: string; nombre: string; tipoAlmacen?: string };
 
 // BC manda el tipo como "Inventory" | "Service" | "Non_x002D_Inventory"
 // (Non-Inventory viene escapado en OData). Cualquier otra cosa se trata como
@@ -867,13 +870,83 @@ export async function bcAlmacenes(): Promise<BcAlmacen[]> {
   try {
     const rows = await listAll("inventory", "locations");
     const alm = rows
-      .map((l) => ({ codigo: l.code ?? l.Code ?? "", nombre: l.name ?? l.Name ?? l.code ?? l.Code ?? "" }))
+      .map((l) => {
+        // El enum puede llegar como texto ("Real"/"Virtual"/" ") o como número
+        // (1/2/0) según cómo serialice OData; normalizamos a 'Real'/'Virtual'/''.
+        const t = (l.tipoAlmacen ?? l.TipoAlmacen ?? "").toString().trim().toLowerCase();
+        const tipoAlmacen = t === "2" || t.includes("virtual") ? "Virtual" : t === "1" || t.includes("real") ? "Real" : "";
+        return { codigo: l.code ?? l.Code ?? "", nombre: l.name ?? l.Name ?? l.code ?? l.Code ?? "", tipoAlmacen };
+      })
       .filter((a) => a.codigo);
     if (alm.length) lastGoodAlmacenes = alm;
     return alm;
   } catch {
     return lastGoodAlmacenes ?? [];
   }
+}
+
+// ─── INVENTARIO SIN LIQUIDAR (Item Ledger Entry ABIERTAS) ───────────────────────
+// Cada movimiento de inventario cuya Remaining Quantity ≠ 0 = material que entró a
+// un almacén y todavía NO se consumió/liquidó. Es lo que la página "Almacén de
+// proyecto" de BC (70720602, sobre Item Ledger Entry 32) muestra por obra. Fuente:
+// page 50114 "GJW Item Ledger Entry API" → entitySet `itemLedgerEntriesWithTasks`.
+// `obra` = Global Dimension 1 Code; `cantidad` = Remaining Quantity (campo `stock`).
+// Va no-store (cambia con cada recepción/consumo) y se pagina sin el tope de
+// listCustom: las entradas abiertas pueden ser muchas.
+export type BcIleAbierto = {
+  entryNo: number;
+  itemNo: string;
+  descripcion: string;
+  variante: string;
+  unidad: string;
+  locationCode: string;
+  obra: string;
+  jobTaskNo: string;
+  cantidad: number;
+  costoActual: number;
+  tipoMovimiento: string;
+  documentoNo: string;
+  procedenciaNo: string;
+  proveedor: string;
+  idBoletaEntrega: string;
+  fechaMovimiento: string | null;
+};
+
+export async function bcItemLedgerSinLiquidar(): Promise<BcIleAbierto[]> {
+  const cid = await getCompanyId();
+  const filtro = encodeURIComponent("open eq true");
+  let url: string | null = `${customRoot("inventory")}/companies(${cid})/itemLedgerEntriesWithTasks?$filter=${filtro}`;
+  const out: BcIleAbierto[] = [];
+  let guard = 0;
+  while (url && guard++ < 2000) {
+    const res = await bcFetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`BC ${res.status} en ${url}: ${(await res.text()).slice(0, 250)}`);
+    const data: any = await res.json();
+    for (const r of (data.value ?? [])) {
+      out.push({
+        entryNo: Number(r.entryNo ?? r.EntryNo ?? 0),
+        itemNo: (r.itemNo ?? "").toString().trim(),
+        descripcion: (r.description ?? "").toString(),
+        variante: (r.variantCode ?? "").toString().trim(),
+        unidad: (r.unitOfMeasureCode ?? "").toString().trim(),
+        locationCode: (r.locationCode ?? "").toString().trim(),
+        obra: (r.globalDimension1Code ?? "").toString().trim(),
+        jobTaskNo: (r.jobTaskNo ?? "").toString().trim(),
+        cantidad: Number(r.stock ?? 0),
+        costoActual: Number(r.costAmountActual ?? 0),
+        // entryType llega escapado estilo OData ("Positive_x0020_Adjmt_x002E_");
+        // lo volvemos legible ("Positive Adjmt.") para la app de Reportes.
+        tipoMovimiento: (r.entryType ?? "").toString().replace(/_x([0-9A-Fa-f]{4})_/g, (_m: string, h: string) => String.fromCharCode(parseInt(h, 16))).trim(),
+        documentoNo: (r.documentNo ?? "").toString().trim(),
+        procedenciaNo: (r.sourceNo ?? "").toString().trim(),
+        proveedor: (r.vendorName ?? "").toString(),
+        idBoletaEntrega: (r.idBoletaEntrega ?? "").toString().trim(),
+        fechaMovimiento: r.postingDate ?? null,
+      });
+    }
+    url = data["@odata.nextLink"] ?? null;
+  }
+  return out;
 }
 
 export type BcVendor = { id: string; code: string; nombre: string; currencyCode: string };
