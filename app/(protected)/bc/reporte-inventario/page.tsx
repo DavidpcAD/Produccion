@@ -1,19 +1,18 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowsClockwise, DownloadSimple, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { ArrowsClockwise } from '@phosphor-icons/react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { PageShell, PageHeader } from '@/components/layout/Page';
-import { Input } from '@/components/ui/Input';
-import { Combobox } from '@/components/ui/Combobox';
-import { Table } from '@/components/ui/Table';
+import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Icon, IconName } from '@/components/ds/Icon/Icon';
-import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 // Reporte de inventario por almacén (SOLO Super Admin). Lee el snapshot
 // dbo.InventarioAlmacen vía /api/bc/inventario/almacen. Lo importante es lo SIN
 // LIQUIDAR: material apartado al almacén de proyecto (gomJobWarehouseQuantity > 0),
-// lo que muestra la página "Almacén de proyecto" de BC. Se mantiene al día SOLO: al
-// abrir, si la foto está vieja, dispara el sync en segundo plano.
+// lo que muestra la página "Almacén de proyecto" de BC. Se actualiza SOLO al abrir
+// (si la foto está vieja, sincroniza en segundo plano). El detalle usa el DataTable
+// del DS: filtros por columna, orden, Columnas, búsqueda y exportar.
 
 interface Fila {
   entryNo: number;
@@ -41,10 +40,8 @@ interface Estado {
   mensaje: string | null;
 }
 
-const PAGE = 50;
-const STALE_MS = 10 * 60 * 1000; // si la foto es más vieja, se re-sincroniza sola al abrir.
+const STALE_MS = 10 * 60 * 1000;
 const num = new Intl.NumberFormat('es-CR', { maximumFractionDigits: 2 });
-// Paleta del donut (verde de marca al frente, luego azules/neutros).
 const PALETA = ['#84cc16', '#4d7c0f', '#16a34a', '#0d9488', '#0ea5e9', '#2563eb', '#6366f1', '#a855f7', '#f59e0b'];
 const COLOR_OTROS = '#cbd5e1';
 
@@ -63,19 +60,41 @@ function agrupar(filas: Fila[], key: (f: Fila) => string): { nombre: string; val
   return Array.from(m, ([nombre, valor]) => ({ nombre, valor })).sort((a, b) => b.valor - a.valor);
 }
 
+const COLUMNAS: ColumnDef<Fila>[] = [
+  {
+    id: 'almacen', accessorKey: 'almacen', header: 'Almacén', meta: { label: 'Almacén' },
+    cell: ({ row }) => (
+      <span className="inline-flex items-center gap-2 font-semibold whitespace-nowrap">
+        {row.original.almacen || '—'}
+        {row.original.esVirtual && <span className="inline-flex items-center rounded-ds bg-ds-yellow-soft px-1.5 py-0.5 text-label font-medium text-ds-yellow-ink">sin liquidar</span>}
+      </span>
+    ),
+  },
+  { id: 'categoria', accessorKey: 'categoria', header: 'Categoría', meta: { label: 'Categoría' }, cell: ({ row }) => row.original.categoria || '—' },
+  { id: 'itemNo', accessorKey: 'itemNo', header: 'Artículo', meta: { label: 'Artículo', noFilter: true }, cell: ({ row }) => <span className="font-mono whitespace-nowrap">{row.original.itemNo}</span> },
+  { id: 'descripcion', accessorKey: 'descripcion', header: 'Descripción', meta: { label: 'Descripción', noFilter: true }, cell: ({ row }) => row.original.descripcion || '—' },
+  { id: 'obra', accessorKey: 'obra', header: 'Obra', meta: { label: 'Obra' }, cell: ({ row }) => <span className="whitespace-nowrap">{row.original.obra || '—'}</span> },
+  { id: 'cantidad', accessorKey: 'cantidad', header: 'Existencia', meta: { label: 'Existencia', align: 'right', noFilter: true }, cell: ({ row }) => <span className="whitespace-nowrap">{num.format(row.original.cantidad)}</span> },
+  {
+    id: 'cantidadProyecto', accessorKey: 'cantidadProyecto', header: 'Sin liquidar', meta: { label: 'Sin liquidar', align: 'right', noFilter: true },
+    cell: ({ row }) => row.original.cantidadProyecto > 0 ? <span className="font-semibold text-ds-yellow-ink whitespace-nowrap">{num.format(row.original.cantidadProyecto)}</span> : <span className="text-ds-gray-300">—</span>,
+  },
+  { id: 'unidad', accessorKey: 'unidad', header: 'Unidad', meta: { label: 'Unidad' }, cell: ({ row }) => row.original.unidad || '—' },
+  { id: 'proveedor', accessorKey: 'proveedor', header: 'Proveedor', meta: { label: 'Proveedor' }, cell: ({ row }) => row.original.proveedor || '—' },
+  {
+    id: 'fechaMovimiento', accessorKey: 'fechaMovimiento', header: 'Fecha',
+    meta: { label: 'Fecha', noFilter: true, exportValue: (r: Fila) => r.fechaMovimiento?.slice(0, 10) ?? '' },
+    cell: ({ row }) => <span className="whitespace-nowrap">{row.original.fechaMovimiento ? row.original.fechaMovimiento.slice(0, 10) : '—'}</span>,
+  },
+];
+
 export default function ReporteInventarioPage() {
   const { toast } = useToast();
   const [filas, setFilas] = useState<Fila[]>([]);
   const [estado, setEstado] = useState<Estado | null>(null);
   const [loading, setLoading] = useState(true);
   const [actualizando, setActualizando] = useState(false);
-
-  const [buscar, setBuscar] = useState('');
-  const [obraSel, setObraSel] = useState('');
-  const [almacenSel, setAlmacenSel] = useState('');
-  const [categoriaSel, setCategoriaSel] = useState('');
   const [soloVirtuales, setSoloVirtuales] = useState(true);
-  const [page, setPage] = useState(0);
   const yaAutorefresco = useRef(false);
 
   const cargar = useCallback(async (): Promise<Estado | null> => {
@@ -123,34 +142,16 @@ export default function ReporteInventarioPage() {
     return () => { vivo = false; };
   }, [cargar, sincronizar]);
 
-  const obras = useMemo(() => Array.from(new Set(filas.map((f) => f.obra).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')), [filas]);
-  const almacenes = useMemo(() => Array.from(new Set(filas.map((f) => f.almacen).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')), [filas]);
-  const categorias = useMemo(() => Array.from(new Set(filas.map((f) => f.categoria).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')), [filas]);
-
-  const hayFiltro = !!(buscar || obraSel || almacenSel || categoriaSel) || !soloVirtuales;
-
-  const filtradas = useMemo(() => {
-    const q = buscar.trim();
-    return filas.filter((f) => {
-      if (soloVirtuales && !f.esVirtual) return false;
-      if (obraSel && f.obra !== obraSel) return false;
-      if (almacenSel && f.almacen !== almacenSel) return false;
-      if (categoriaSel && f.categoria !== categoriaSel) return false;
-      if (q && !coincideBusqueda(f.itemNo, q) && !coincideBusqueda(f.descripcion ?? '', q) &&
-        !coincideBusqueda(f.obra ?? '', q) && !coincideBusqueda(f.almacen ?? '', q)) return false;
-      return true;
-    });
-  }, [filas, buscar, obraSel, almacenSel, categoriaSel, soloVirtuales]);
-
-  const soloSinLiquidar = useMemo(() => filtradas.filter((f) => f.esVirtual), [filtradas]);
+  const soloSinLiquidar = useMemo(() => filas.filter((f) => f.esVirtual), [filas]);
+  const dataset = useMemo(() => (soloVirtuales ? soloSinLiquidar : filas), [soloVirtuales, soloSinLiquidar, filas]);
   const totalSinLiquidar = useMemo(() => soloSinLiquidar.reduce((s, f) => s + (f.cantidadProyecto || 0), 0), [soloSinLiquidar]);
 
   const kpis = useMemo(() => ({
-    movimientos: filtradas.length,
-    almacenes: new Set(filtradas.map((f) => f.almacen)).size,
-    cantidad: filtradas.reduce((s, f) => s + (f.cantidad || 0), 0),
+    movimientos: dataset.length,
+    almacenes: new Set(dataset.map((f) => f.almacen)).size,
+    cantidad: dataset.reduce((s, f) => s + (f.cantidad || 0), 0),
     sinLiquidar: totalSinLiquidar,
-  }), [filtradas, totalSinLiquidar]);
+  }), [dataset, totalSinLiquidar]);
 
   const porAlmacen = useMemo(() => agrupar(soloSinLiquidar, (f) => f.almacen ?? '—').slice(0, 10), [soloSinLiquidar]);
   const donutCategoria = useMemo(() => {
@@ -160,27 +161,6 @@ export default function ReporteInventarioPage() {
     if (resto > 0) top.push({ nombre: 'Otros', valor: resto, color: COLOR_OTROS });
     return top;
   }, [soloSinLiquidar]);
-
-  const totalPag = Math.max(1, Math.ceil(filtradas.length / PAGE));
-  const pageActual = Math.min(page, totalPag - 1);
-  const visibles = filtradas.slice(pageActual * PAGE, pageActual * PAGE + PAGE);
-
-  const limpiar = () => { setBuscar(''); setObraSel(''); setAlmacenSel(''); setCategoriaSel(''); setSoloVirtuales(true); setPage(0); };
-
-  const exportar = useCallback(() => {
-    const esc = (v: unknown) => { const s = v == null ? '' : String(v); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const head = ['Almacén', 'Categoría', 'Artículo', 'Descripción', 'Obra', 'Existencia', 'Sin liquidar', 'Unidad', 'Proveedor', 'Fecha'];
-    const cuerpo = filtradas.map((f) => [f.almacen, f.categoria, f.itemNo, f.descripcion, f.obra, f.cantidad, f.cantidadProyecto, f.unidad, f.proveedor, f.fechaMovimiento ? f.fechaMovimiento.slice(0, 10) : ''].map(esc).join(';'));
-    const csv = '﻿' + [head.join(';'), ...cuerpo].join('\r\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `inventario-sin-liquidar-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [filtradas]);
-
-  const opt = (xs: string[], todos: string) => [{ value: '', label: todos }, ...xs.map((x) => ({ value: x, label: x }))];
 
   return (
     <PageShell>
@@ -193,15 +173,9 @@ export default function ReporteInventarioPage() {
               <span className={`h-2 w-2 rounded-full ${actualizando ? 'animate-pulse bg-ds-yellow-ink' : 'bg-ds-green-ink'}`} />
               {actualizando ? 'Actualizando desde BC…' : estado?.ultimaCorrida ? `Actualizado · ${fechaHora(estado.ultimaCorrida)}` : 'Sin datos aún'}
             </span>
-            <button
-              type="button"
-              onClick={sincronizar}
-              disabled={actualizando}
-              title="Actualizar ahora"
-              className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3 py-2 text-body-sm font-medium text-ds-gray-600 transition-colors hover:border-ds-gray-300 disabled:opacity-50"
-            >
-              <ArrowsClockwise size={16} className={actualizando ? 'animate-spin' : ''} />
-              Actualizar
+            <button type="button" onClick={sincronizar} disabled={actualizando} title="Actualizar ahora"
+              className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3 py-2 text-body-sm font-medium text-ds-gray-600 transition-colors hover:border-ds-gray-300 disabled:opacity-50">
+              <ArrowsClockwise size={16} className={actualizando ? 'animate-spin' : ''} /> Actualizar
             </button>
           </div>
         }
@@ -215,30 +189,17 @@ export default function ReporteInventarioPage() {
         <KpiCard titulo="Apartado sin liquidar" valor={loading ? '—' : num.format(kpis.sinLiquidar)} icono="alert" destacado={kpis.sinLiquidar > 0} />
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap items-end gap-3 rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
-        <div className="w-56">
-          <Input label="Buscar" placeholder="Artículo, descripción u obra" value={buscar} onChange={(e) => { setBuscar(e.target.value); setPage(0); }} />
+      {/* Alcance */}
+      <div className="flex items-center gap-2">
+        <span className="text-label text-ds-gray-500">Mostrar:</span>
+        <div className="inline-flex overflow-hidden rounded-ds border border-ds-gray-200">
+          {[{ v: true, l: 'Solo sin liquidar' }, { v: false, l: 'Todo el inventario' }].map((o) => (
+            <button key={o.l} type="button" onClick={() => setSoloVirtuales(o.v)}
+              className={`px-3 py-1.5 text-body-sm transition-colors ${soloVirtuales === o.v ? 'bg-ds-ink text-ds-surface' : 'bg-ds-surface text-ds-gray-500 hover:bg-ds-gray-100'}`}>
+              {o.l}
+            </button>
+          ))}
         </div>
-        <div className="w-48"><Combobox label="Obra" value={obraSel} onChange={(v) => { setObraSel(v); setPage(0); }} options={opt(obras, 'Todas las obras')} placeholder="Todas las obras" /></div>
-        <div className="w-48"><Combobox label="Almacén" value={almacenSel} onChange={(v) => { setAlmacenSel(v); setPage(0); }} options={opt(almacenes, 'Todos los almacenes')} placeholder="Todos los almacenes" /></div>
-        <div className="w-52"><Combobox label="Categoría" value={categoriaSel} onChange={(v) => { setCategoriaSel(v); setPage(0); }} options={opt(categorias, 'Todas las categorías')} placeholder="Todas las categorías" /></div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-label text-ds-gray-500">Vista</span>
-          <button
-            type="button"
-            onClick={() => { setSoloVirtuales((v) => !v); setPage(0); }}
-            aria-pressed={soloVirtuales}
-            className={`rounded-ds border px-3 py-2 text-body-sm transition-colors ${soloVirtuales ? 'border-ds-ink bg-ds-ink text-ds-surface' : 'border-ds-gray-200 bg-ds-surface text-ds-gray-500 hover:border-ds-gray-300'}`}
-          >
-            Solo sin liquidar
-          </button>
-        </div>
-        {hayFiltro && (
-          <button type="button" onClick={limpiar} className="ml-auto self-end text-body-sm font-medium text-ds-gray-500 underline-offset-2 hover:underline">
-            Limpiar filtros
-          </button>
-        )}
       </div>
 
       {/* Gráficos */}
@@ -253,56 +214,19 @@ export default function ReporteInventarioPage() {
         </div>
       </div>
 
-      {/* Detalle */}
+      {/* Detalle (DataTable del DS: filtros por columna, orden, Columnas, exportar) */}
       <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
-        <SeccionHeader
-          icono="boleta"
-          titulo="Detalle de artículos sin liquidar"
-          right={
-            <button type="button" onClick={exportar} disabled={filtradas.length === 0} className="inline-flex items-center gap-2 rounded-ds border border-ds-gray-200 bg-ds-surface px-3 py-2 text-body-sm font-medium text-ds-gray-600 transition-colors hover:border-ds-gray-300 disabled:opacity-50">
-              <DownloadSimple size={16} /> Exportar a Excel
-            </button>
-          }
-        />
-        <Table<Fila>
-          columns={[
-            { key: 'almacen', header: 'Almacén', className: 'font-semibold whitespace-nowrap', render: (f) => (
-              <span className="inline-flex items-center gap-2">
-                {f.almacen || <span className="text-ds-gray-300">—</span>}
-                {f.esVirtual && <span className="inline-flex items-center rounded-ds bg-ds-yellow-soft px-1.5 py-0.5 text-label font-medium text-ds-yellow-ink">sin liquidar</span>}
-              </span>
-            ) },
-            { key: 'categoria', header: 'Categoría', render: (f) => f.categoria || <span className="text-ds-gray-300">—</span> },
-            { key: 'itemNo', header: 'Artículo', className: 'font-mono whitespace-nowrap', render: (f) => f.itemNo },
-            { key: 'descripcion', header: 'Descripción', render: (f) => f.descripcion || <span className="text-ds-gray-300">—</span> },
-            { key: 'obra', header: 'Obra', className: 'whitespace-nowrap', render: (f) => f.obra || <span className="text-ds-gray-300">—</span> },
-            { key: 'cantidad', header: 'Existencia', className: 'text-right whitespace-nowrap', render: (f) => <span>{num.format(f.cantidad)}</span> },
-            { key: 'cantidadProyecto', header: 'Sin liquidar', className: 'text-right whitespace-nowrap', render: (f) => (
-              f.cantidadProyecto > 0 ? <span className="font-semibold text-ds-yellow-ink">{num.format(f.cantidadProyecto)}</span> : <span className="text-ds-gray-300">—</span>
-            ) },
-            { key: 'unidad', header: 'Unidad', className: 'whitespace-nowrap', render: (f) => f.unidad || '—' },
-            { key: 'proveedor', header: 'Proveedor', render: (f) => f.proveedor || <span className="text-ds-gray-300">—</span> },
-            { key: 'fechaMovimiento', header: 'Fecha', className: 'whitespace-nowrap', render: (f) => (f.fechaMovimiento ? f.fechaMovimiento.slice(0, 10) : '—') },
-          ]}
-          data={visibles}
-          keyField="entryNo"
+        <SeccionHeader icono="boleta" titulo="Detalle de artículos" />
+        <DataTable<Fila>
+          columns={COLUMNAS}
+          data={dataset}
           loading={loading}
-          emptyMessage={soloVirtuales ? 'No hay material sin liquidar con los filtros actuales.' : 'Ningún movimiento coincide con el filtro.'}
+          searchPlaceholder="Artículo, descripción, obra…"
+          exportFilename="inventario-sin-liquidar"
+          pageSize={50}
+          emptyMessage={soloVirtuales ? 'No hay material sin liquidar.' : 'Sin movimientos.'}
+          persistKey="bc-reporte-inventario"
         />
-        {!loading && filtradas.length > 0 && (
-          <div className="mt-3 flex items-center justify-between text-body-sm text-ds-gray-500">
-            <span>
-              Mostrando {num.format(pageActual * PAGE + 1)}–{num.format(Math.min(filtradas.length, (pageActual + 1) * PAGE))} de {num.format(filtradas.length)}
-            </span>
-            {totalPag > 1 && (
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={pageActual === 0} className="inline-flex h-8 w-8 items-center justify-center rounded-ds border border-ds-gray-200 disabled:opacity-40"><CaretLeft size={16} /></button>
-                <span>{pageActual + 1} / {totalPag}</span>
-                <button type="button" onClick={() => setPage((p) => Math.min(totalPag - 1, p + 1))} disabled={pageActual >= totalPag - 1} className="inline-flex h-8 w-8 items-center justify-center rounded-ds border border-ds-gray-200 disabled:opacity-40"><CaretRight size={16} /></button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </PageShell>
   );
@@ -322,14 +246,11 @@ function KpiCard({ titulo, valor, icono, destacado }: { titulo: string; valor: s
   );
 }
 
-function SeccionHeader({ icono, titulo, right }: { icono: IconName; titulo: string; right?: React.ReactNode }) {
+function SeccionHeader({ icono, titulo }: { icono: IconName; titulo: string }) {
   return (
-    <div className="mb-3 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-ds bg-ds-gray-100 text-ds-gray-500"><Icon name={icono} size="sm" /></span>
-        <h2 className="text-body font-semibold text-ds-ink">{titulo}</h2>
-      </div>
-      {right}
+    <div className="mb-3 flex items-center gap-2">
+      <span className="flex h-8 w-8 items-center justify-center rounded-ds bg-ds-gray-100 text-ds-gray-500"><Icon name={icono} size="sm" /></span>
+      <h2 className="text-body font-semibold text-ds-ink">{titulo}</h2>
     </div>
   );
 }
@@ -357,7 +278,6 @@ function Donut({ datos, total, loading }: { datos: { nombre: string; valor: numb
   const r = 70, sw = 24, c = 2 * Math.PI * r;
   if (loading) return <div className="h-44 animate-pulse rounded-ds bg-ds-gray-100" />;
   if (datos.length === 0 || total <= 0) return <p className="py-8 text-center text-body-sm text-ds-gray-400">Sin material sin liquidar</p>;
-  // Offset acumulado SIN mutar en render (el React Compiler no deja reasignar).
   const segs = datos.map((d, i) => {
     const antes = datos.slice(0, i).reduce((s, x) => s + x.valor, 0);
     return { ...d, len: (d.valor / total) * c, offset: (antes / total) * c };
