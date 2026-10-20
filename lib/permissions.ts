@@ -101,6 +101,10 @@ export function getRouteLevel(pathname: string): number {
   if (pathname.startsWith('/api/bc/reportar') || pathname.startsWith('/api/bc/registrar')) return 4;
   if (pathname.startsWith('/api/bc/preview') || pathname.startsWith('/api/bc/resumen')) return 2;
   if (pathname.startsWith('/api/presupuestos')) return 2;
+  // Reporte de inventario (snapshot a SQL para Reportes): SOLO Super Admin. Va antes
+  // que el /bc genérico. El endpoint /api/bc/inventario/almacen además se auto-gatea
+  // a N4 en su handler.
+  if (pathname.startsWith('/bc/reporte-inventario')) return 4;
   if (pathname.startsWith('/bc')) return 2;
   if (pathname.startsWith('/apps')) return 4;
   if (pathname.startsWith('/roles')) return 4;
@@ -377,6 +381,9 @@ export function getRouteModule(pathname: string): Modulo {
   }
   const p = pathname.startsWith('/api/') ? pathname.slice(4) : pathname;
   if (p === '/' ) return 'dashboard';
+  // Reporte de inventario → módulo 'admin' (solo Super Admin), antes que el /bc
+  // genérico que es del dominio Presupuesto. Así el menú lo esconde para el resto.
+  if (p.startsWith('/bc/reporte-inventario')) return 'admin';
   // Business Central (integración de avance + presupuestos por obra) = dominio Presupuesto.
   if (p.startsWith('/bc') || p.startsWith('/presupuestos')) return 'presupuesto';
   // Catálogos que viven bajo /avance pero son del dominio de Partidas (Presupuesto).
