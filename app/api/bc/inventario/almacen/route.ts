@@ -23,7 +23,7 @@ export async function GET(req: Request) {
       pool.request().query("SELECT ultimaCorrida, filas, ok, ms, mensaje FROM dbo.InventarioAlmacenSync WHERE id = 1"),
       pool.request().query(
         "SELECT entryNo, almacen, tipoAlmacen, esVirtual, categoria, itemNo, descripcion, obra, unidad, " +
-        "cantidad, costoActual, proveedor, documentoNo, tipoMovimiento, fechaMovimiento " +
+        "cantidad, cantidadProyecto, costoActual, proveedor, documentoNo, tipoMovimiento, fechaMovimiento " +
         "FROM dbo.InventarioAlmacen ORDER BY almacen, itemNo",
       ),
     ]);

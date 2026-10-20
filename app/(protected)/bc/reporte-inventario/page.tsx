@@ -23,6 +23,7 @@ interface Fila {
   obra: string | null;
   unidad: string | null;
   cantidad: number;
+  cantidadProyecto: number;
   costoActual: number | null;
   proveedor: string | null;
   documentoNo: string | null;
@@ -56,7 +57,7 @@ export default function ReporteInventarioPage() {
   const [buscar, setBuscar] = useState('');
   const [almacenSel, setAlmacenSel] = useState('');
   const [categoriaSel, setCategoriaSel] = useState('');
-  const [soloVirtuales, setSoloVirtuales] = useState(false);
+  const [soloVirtuales, setSoloVirtuales] = useState(true);
 
   const cargar = useCallback(async () => {
     // `loading` ya arranca en true, así que la primera carga muestra skeletons sin
@@ -123,7 +124,7 @@ export default function ReporteInventarioPage() {
       movimientos: filtradas.length,
       almacenes: new Set(filtradas.map((f) => f.almacen)).size,
       cantidad: filtradas.reduce((s, f) => s + (f.cantidad || 0), 0),
-      sinLiquidar: virt.length,
+      sinLiquidar: virt.reduce((s, f) => s + (f.cantidadProyecto || 0), 0),
     };
   }, [filtradas]);
 
@@ -155,7 +156,7 @@ export default function ReporteInventarioPage() {
         <KpiCard titulo="Movimientos" valor={loading ? '—' : num.format(kpis.movimientos)} />
         <KpiCard titulo="Almacenes" valor={loading ? '—' : num.format(kpis.almacenes)} />
         <KpiCard titulo="Cantidad total" valor={loading ? '—' : num.format(kpis.cantidad)} />
-        <KpiCard titulo="Sin liquidar (virtuales)" valor={loading ? '—' : num.format(kpis.sinLiquidar)} destacado={kpis.sinLiquidar > 0} />
+        <KpiCard titulo="Apartado sin liquidar" valor={loading ? '—' : num.format(kpis.sinLiquidar)} destacado={kpis.sinLiquidar > 0} />
       </div>
 
       {/* Filtros */}
@@ -182,7 +183,7 @@ export default function ReporteInventarioPage() {
                 : 'border-ds-gray-200 bg-ds-surface text-ds-gray-500 hover:border-ds-gray-300'
             }`}
           >
-            Solo sin liquidar (virtuales)
+            Solo sin liquidar
           </button>
         </div>
       </div>
@@ -193,7 +194,7 @@ export default function ReporteInventarioPage() {
             <span className="inline-flex items-center gap-2">
               {f.almacen || <span className="text-ds-gray-300">—</span>}
               {f.esVirtual && (
-                <span className="inline-flex items-center rounded-ds bg-ds-yellow-soft px-1.5 py-0.5 text-label font-medium text-ds-yellow-ink">virtual</span>
+                <span className="inline-flex items-center rounded-ds bg-ds-yellow-soft px-1.5 py-0.5 text-label font-medium text-ds-yellow-ink">sin liquidar</span>
               )}
             </span>
           ) },
@@ -201,8 +202,13 @@ export default function ReporteInventarioPage() {
           { key: 'itemNo', header: 'Artículo', className: 'font-mono whitespace-nowrap', render: (f) => f.itemNo },
           { key: 'descripcion', header: 'Descripción', render: (f) => f.descripcion || <span className="text-ds-gray-300">—</span> },
           { key: 'obra', header: 'Obra', className: 'whitespace-nowrap', render: (f) => f.obra || <span className="text-ds-gray-300">—</span> },
-          { key: 'cantidad', header: 'Cantidad', className: 'text-right whitespace-nowrap', render: (f) => (
-            <span className="font-semibold">{num.format(f.cantidad)}</span>
+          { key: 'cantidad', header: 'Existencia', className: 'text-right whitespace-nowrap', render: (f) => (
+            <span>{num.format(f.cantidad)}</span>
+          ) },
+          { key: 'cantidadProyecto', header: 'Sin liquidar', className: 'text-right whitespace-nowrap', render: (f) => (
+            f.cantidadProyecto > 0
+              ? <span className="font-semibold text-ds-yellow-ink">{num.format(f.cantidadProyecto)}</span>
+              : <span className="text-ds-gray-300">—</span>
           ) },
           { key: 'unidad', header: 'Unidad', className: 'whitespace-nowrap', render: (f) => f.unidad || '—' },
           { key: 'proveedor', header: 'Proveedor', render: (f) => f.proveedor || <span className="text-ds-gray-300">—</span> },
@@ -213,7 +219,7 @@ export default function ReporteInventarioPage() {
         loading={loading}
         emptyMessage={
           soloVirtuales
-            ? 'No hay inventario sin liquidar en almacenes virtuales (o todavía no están marcados como virtuales en BC).'
+            ? 'No hay material sin liquidar (apartado al almacén de proyecto) con los filtros actuales. Probá "Refrescar desde BC".'
             : buscar || almacenSel || categoriaSel
               ? 'Ningún movimiento coincide con el filtro.'
               : 'Sin datos. Usá "Refrescar desde BC" para cargar el inventario.'

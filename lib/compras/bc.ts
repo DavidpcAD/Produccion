@@ -903,6 +903,7 @@ export type BcIleAbierto = {
   obra: string;
   jobTaskNo: string;
   cantidad: number;
+  cantidadProyecto: number;
   costoActual: number;
   tipoMovimiento: string;
   documentoNo: string;
@@ -933,6 +934,9 @@ export async function bcItemLedgerSinLiquidar(): Promise<BcIleAbierto[]> {
         obra: (r.globalDimension1Code ?? "").toString().trim(),
         jobTaskNo: (r.jobTaskNo ?? "").toString().trim(),
         cantidad: Number(r.stock ?? 0),
+        // Cantidad apartada en el almacén de PROYECTO que aún NO se liquidó. Es lo que
+        // muestra la página "Almacén de proyecto" (70720602); el "almacén virtual".
+        cantidadProyecto: Number(r.gomJobWarehouseQuantity ?? 0),
         costoActual: Number(r.costAmountActual ?? 0),
         // entryType llega escapado estilo OData ("Positive_x0020_Adjmt_x002E_");
         // lo volvemos legible ("Positive Adjmt.") para la app de Reportes.

@@ -37,11 +37,14 @@ export async function refrescarInventarioAlmacen(): Promise<ResultadoSnapshot> {
       obra: e.obra || null,
       jobTaskNo: e.jobTaskNo || null,
       almacen: e.locationCode || null,
-      esVirtual: /virtual/i.test(tipo),
+      // "Virtual" = tiene material apartado en el almacén de PROYECTO sin liquidar
+      // (gomJobWarehouseQuantity > 0), NO la clasificación de la ubicación.
+      esVirtual: (e.cantidadProyecto ?? 0) > 0,
       tipoAlmacen: tipo || null,
       variante: e.variante || null,
       unidad: e.unidad || null,
       cantidad: Number.isFinite(e.cantidad) ? e.cantidad : 0,
+      cantidadProyecto: Number.isFinite(e.cantidadProyecto) ? e.cantidadProyecto : 0,
       costoActual: Number.isFinite(e.costoActual) ? e.costoActual : null,
       tipoMovimiento: e.tipoMovimiento || null,
       documentoNo: e.documentoNo || null,
@@ -75,6 +78,7 @@ export async function refrescarInventarioAlmacen(): Promise<ResultadoSnapshot> {
       tabla.columns.add("variante", sql.NVarChar(20), { nullable: true });
       tabla.columns.add("unidad", sql.NVarChar(20), { nullable: true });
       tabla.columns.add("cantidad", sql.Decimal(18, 4), { nullable: false });
+      tabla.columns.add("cantidadProyecto", sql.Decimal(18, 4), { nullable: true });
       tabla.columns.add("costoActual", sql.Decimal(18, 4), { nullable: true });
       tabla.columns.add("tipoMovimiento", sql.NVarChar(40), { nullable: true });
       tabla.columns.add("documentoNo", sql.NVarChar(40), { nullable: true });
@@ -89,7 +93,7 @@ export async function refrescarInventarioAlmacen(): Promise<ResultadoSnapshot> {
         tabla.rows.add(
           f.entryNo, f.itemNo, f.descripcion, f.categoria, f.obra, f.jobTaskNo,
           f.almacen, f.esVirtual, f.tipoAlmacen, f.variante, f.unidad, f.cantidad,
-          f.costoActual, f.tipoMovimiento, f.documentoNo, f.procedenciaNo,
+          f.cantidadProyecto, f.costoActual, f.tipoMovimiento, f.documentoNo, f.procedenciaNo,
           f.proveedor, f.idBoletaEntrega, f.fechaMovimiento, ahora,
         );
       }
