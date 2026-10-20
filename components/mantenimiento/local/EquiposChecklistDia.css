@@ -1,0 +1,217 @@
+/* "Checklist por día" (Panel).
+   Colores validados con el validador de paleta (dataviz), cada tema con sus
+   propios tonos:
+   - Claro:  completo #0a6e31 · falla #e8665c · sin checklist #747b86
+   - Oscuro: completo #3fae66 · falla #c94a44 · sin checklist #8b929e
+   Verde/rojo separan ΔE 9.5 (claro) y 8.1 (oscuro) para daltonismo. El gris
+   es neutro a propósito (= ausencia); además de la leyenda y el rótulo lleva
+   línea punteada, así no depende solo del color. */
+
+.mnt-hab {
+  --mnt-hab-completo: #0a6e31;
+  --mnt-hab-falla:    #e8665c;
+  --mnt-hab-sin:      #747b86;
+  position:      relative;
+  background:    var(--ds-surface);
+  border-radius: var(--ds-radius-lg);
+  box-shadow:    var(--ds-shadow-01);
+  padding:       var(--ds-space-5);
+}
+:root[data-theme="dark"] .mnt-hab {
+  --mnt-hab-completo: #3fae66;
+  --mnt-hab-falla:    #c94a44;
+  --mnt-hab-sin:      #8b929e;
+}
+
+/* Al cambiar de rango se mantiene el gráfico anterior atenuado (sin saltos). */
+.mnt-hab--cargando .mnt-hab__grafico,
+.mnt-hab--cargando .mnt-hab__tabla-wrap { opacity: 0.5; transition: opacity 0.2s ease; }
+
+.mnt-hab__head {
+  display:         flex;
+  flex-wrap:       wrap;
+  justify-content: space-between;
+  align-items:     flex-start;
+  gap:             var(--ds-space-3) var(--ds-space-6);
+}
+.mnt-hab__title {
+  margin:      0;
+  font-size:   var(--ds-font-size-body-md);
+  font-weight: var(--ds-font-weight-semibold);
+}
+.mnt-hab__sub {
+  margin:    2px 0 0;
+  color:     var(--ds-color-gray-500);
+  font-size: var(--ds-font-size-label);
+}
+
+.mnt-hab__leyenda {
+  display:    flex;
+  flex-wrap:  wrap;
+  gap:        var(--ds-space-2) var(--ds-space-4);
+  margin:     0;
+  padding:    0;
+  list-style: none;
+  color:      var(--ds-color-gray-500);
+  font-size:  var(--ds-font-size-body-sm);
+}
+.mnt-hab__leyenda li { display: flex; align-items: center; gap: 6px; }
+
+/* Clave de línea (no caja): espeja cómo se dibuja cada serie. */
+.mnt-hab__clave {
+  display:    inline-block;
+  width:      16px;
+  height:     0;
+  border-top: 2px solid;
+  flex-shrink: 0;
+}
+.mnt-hab__clave--completo { border-color: var(--mnt-hab-completo); }
+.mnt-hab__clave--falla    { border-color: var(--mnt-hab-falla); }
+.mnt-hab__clave--sin      { border-color: var(--mnt-hab-sin); border-top-style: dashed; }
+
+/* ── Filtros (una sola fila, arriba del gráfico) ───────── */
+.mnt-hab__filtros {
+  display:     flex;
+  flex-wrap:   wrap;
+  align-items: center;
+  gap:         var(--ds-space-3);
+  margin-top:  var(--ds-space-4);
+}
+.mnt-hab__rangos { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+.mnt-hab__rango {
+  min-height:    32px;
+  padding:       0 var(--ds-space-3);
+  border:        1px solid var(--ds-color-gray-200);
+  border-radius: var(--ds-radius-xl);
+  background:    var(--ds-surface);
+  color:         var(--ds-color-gray-500);
+  font:          inherit;
+  font-size:     var(--ds-font-size-body-sm);
+  cursor:        pointer;
+}
+.mnt-hab__rango:hover { color: var(--ds-text); border-color: var(--ds-color-gray-300); }
+.mnt-hab__rango[aria-pressed="true"] {
+  background:   var(--ds-text);
+  border-color: var(--ds-text);
+  color:        var(--ds-surface);
+  font-weight:  var(--ds-font-weight-semibold);
+}
+.mnt-hab__rango:focus-visible,
+.mnt-hab__vista:focus-visible { outline: 2px solid var(--ds-text); outline-offset: 2px; }
+.mnt-hab__vista {
+  margin-left: auto;
+  border:      none;
+  background:  none;
+  padding:     var(--ds-space-1) 0;
+  color:       var(--ds-text);
+  font:        inherit;
+  font-size:   var(--ds-font-size-body-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor:      pointer;
+}
+
+.mnt-hab__error { color: var(--ds-color-red-200); font-size: var(--ds-font-size-label); }
+
+/* ── Gráfico ───────────────────────────────────────────── */
+.mnt-hab__grafico { position: relative; margin-top: var(--ds-space-3); min-height: 300px; }
+.mnt-hab__grafico svg { display: block; overflow: visible; }
+
+.mnt-hab__hoy  { fill: var(--ds-color-gray-100); opacity: 0.7; }
+.mnt-hab__guia { stroke: var(--ds-color-gray-100); stroke-width: 1; shape-rendering: crispEdges; }
+.mnt-hab__tick {
+  fill:      var(--ds-color-gray-400);
+  font-size: var(--ds-font-size-body-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.mnt-hab__area { fill: var(--mnt-hab-completo); opacity: 0.1; }
+.mnt-hab__linea {
+  fill:            none;
+  stroke-width:    2;
+  stroke-linejoin: round;
+  stroke-linecap:  round;
+}
+.mnt-hab__linea--completo { stroke: var(--mnt-hab-completo); }
+.mnt-hab__linea--falla    { stroke: var(--mnt-hab-falla); }
+.mnt-hab__linea--sin      { stroke: var(--mnt-hab-sin); stroke-dasharray: 6 5; }
+
+/* Puntos de 8px con anillo de 2px del color de la tarjeta. */
+.mnt-hab__punto {
+  stroke:       var(--ds-surface);
+  stroke-width: 2;
+  transition:   r 0.12s ease;
+}
+.mnt-hab__punto--completo { fill: var(--mnt-hab-completo); }
+.mnt-hab__punto--falla    { fill: var(--mnt-hab-falla); }
+.mnt-hab__punto--sin      { fill: var(--mnt-hab-sin); }
+
+.mnt-hab__rotulo {
+  fill:        var(--ds-text);
+  font-size:   var(--ds-font-size-label);
+  font-weight: var(--ds-font-weight-semibold);
+}
+
+.mnt-hab__ejex {
+  fill:      var(--ds-color-gray-500);
+  font-size: var(--ds-font-size-body-sm);
+  font-variant-numeric: tabular-nums;
+}
+.mnt-hab__ejex--hoy { fill: var(--ds-text); font-weight: var(--ds-font-weight-semibold); }
+
+.mnt-hab__cruz { stroke: var(--ds-color-gray-300); stroke-width: 1; pointer-events: none; }
+.mnt-hab__captura { fill: transparent; outline: none; cursor: crosshair; }
+.mnt-hab__captura:focus-visible { stroke: var(--ds-color-gray-300); stroke-width: 1; }
+
+/* Tooltip: el número manda, la etiqueta acompaña. */
+.mnt-hab__tip {
+  position:       absolute;
+  z-index:        2;
+  min-width:      170px;
+  padding:        var(--ds-space-2) var(--ds-space-3);
+  border-radius:  var(--ds-radius-md);
+  background:     var(--ds-surface-2);
+  box-shadow:     var(--ds-shadow-03-big);
+  color:          var(--ds-text);
+  font-size:      var(--ds-font-size-body-sm);
+  pointer-events: none;
+  white-space:    nowrap;
+}
+.mnt-hab__tip-dia { margin-bottom: 6px; color: var(--ds-color-gray-500); }
+.mnt-hab__tip-fila { display: flex; align-items: center; gap: var(--ds-space-2); line-height: 22px; }
+.mnt-hab__tip-fila strong {
+  min-width:   24px;
+  font-size:   var(--ds-font-size-label);
+  font-weight: var(--ds-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.mnt-hab__tip-fila span:last-child { color: var(--ds-color-gray-500); }
+.mnt-hab__tip-pie {
+  margin-top:  6px;
+  padding-top: 6px;
+  border-top:  1px solid var(--ds-color-gray-100);
+  color:       var(--ds-color-gray-400);
+}
+
+/* ── Tabla ─────────────────────────────────────────────── */
+.mnt-hab__tabla-wrap { margin-top: var(--ds-space-3); max-height: 320px; overflow-y: auto; }
+.mnt-hab__tabla { width: 100%; border-collapse: collapse; font-size: var(--ds-font-size-label); }
+.mnt-hab__tabla th,
+.mnt-hab__tabla td {
+  padding:       var(--ds-space-2) var(--ds-space-3);
+  border-bottom: 1px solid var(--ds-color-gray-100);
+  text-align:    right;
+  font-variant-numeric: tabular-nums;
+}
+.mnt-hab__tabla th:first-child { text-align: left; }
+.mnt-hab__tabla thead th {
+  position:    sticky;
+  top:         0;
+  background:  var(--ds-surface);
+  color:       var(--ds-color-gray-500);
+  font-size:   var(--ds-font-size-body-sm);
+  font-weight: var(--ds-font-weight-semibold);
+}
+.mnt-hab__tabla tbody th { font-weight: var(--ds-font-weight-regular); }
+.mnt-hab__fila-hoy th,
+.mnt-hab__fila-hoy td { font-weight: var(--ds-font-weight-semibold); }
