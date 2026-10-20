@@ -207,7 +207,7 @@ export async function getObrasConVersion(): Promise<Set<string>> {
 
 // ─── Presupuesto vs Liquidado (solo LECTURA) ────────────────────────────────
 // Material descompuesto (rendimiento por tarea). Solo type='item'.
-export interface DecompItemBC { taskNo: string; itemNo: string; variantCode: string; unitOfMeasure: string; description: string; performance: number }
+export interface DecompItemBC { taskNo: string; itemNo: string; variantCode: string; unitOfMeasure: string; description: string; performance: number; unitCost: number }
 export async function bcDecompLines(worksNo: string, company?: string): Promise<DecompItemBC[]> {
   const body = await req(`workDecomposedLines?$filter=${encodeURIComponent(`worksNo eq '${odataStr(worksNo)}'`)}&$top=10000`, { method: 'GET' }, company).catch(() => ({ value: [] }));
   const rows = (body?.value ?? []) as Array<Record<string, unknown>>;
@@ -220,6 +220,7 @@ export async function bcDecompLines(worksNo: string, company?: string): Promise<
       unitOfMeasure: String(r.unitOfMeasure ?? ''),
       description: String(r.description ?? ''),
       performance: Number(r.performance ?? 0),
+      unitCost: Number(r.unitCost ?? r.unitAmount ?? 0),
     }));
 }
 

@@ -8,38 +8,43 @@ import {
   type WorkLineBC,
   type WorkVersionBC,
 } from '@/lib/bc-construction';
+import { bcItems } from '@/lib/compras/bc';
 
-// Presupuesto vs Liquidado por obra (solo cantidades, por material). Portado de la
-// app de Digitación. El presupuesto de cada material NO está guardado como total: se
-// calcula cruzando dos fuentes de BC:
-//   • Descompuesto (workDecomposedLines) → rendimiento (performance) por material/tarea.
-//   • Líneas de venta (workLines) → cantidad de la tarea, en la versión de re-estudio.
-//   presupuestado = rendimiento × cantidad de la tarea (emparejado por Task No.).
-// El liquidado (consumido) y los "Extra" (consumo sin línea de presupuesto) salen de
-// consumidoObra (page 50106).
+// Presupuesto vs Liquidado por obra. Portado de Digitación y enriquecido con VALORES
+// (₡) y CATEGORÍA:
+//   • presupuestado (cant) = rendimiento (descompuesto) × cantidad de la tarea (líneas
+//     de venta, versión de re-estudio).
+//   • liquidado (cant) = consumido (page 50106 consumidoObra).
+//   • unitCost = costo unitario del descompuesto (o lastDirectCost del catálogo en los
+//     "extra"); valor = cantidad × unitCost (mismo costo a ambos lados, así la variación
+//     en ₡ sigue a la de cantidad).
+//   • categoría = ItemCategoryCode del catálogo (bcItems).
 
-export type EstadoPresupuesto = 'sin_consumo' | 'en_presupuesto' | 'completo' | 'sobregiro' | 'extra';
+export type EstadoPL = 'en_rango' | 'revisar' | 'sobre_presupuesto';
 
 export interface PresupuestoLiquidadoRow {
   itemNo: string;
   description: string;
+  categoria: string;
   variantCode: string;
   variantDescription?: string;
   unitOfMeasureCode: string;
   taskNo: string;
-  presupuestado: number;
-  liquidado: number;
-  saldo: number;
+  presupuestadoCant: number;
+  liquidadoCant: number;
+  unitCost: number;
+  presupuestadoValor: number;
+  liquidadoValor: number;
+  diferenciaValor: number;   // presupuestado − liquidado (positivo = ahorro)
+  variacionPct: number;      // (liquidado − presupuestado) / presupuestado × 100
   esExtra: boolean;
-  estado: EstadoPresupuesto;
+  estado: EstadoPL;
 }
 export interface PresupuestoLiquidadoResumen {
   materiales: number;
-  actividades: number;
-  presupuestadas: number;
-  sinConsumo: number;
-  sobregiros: number;
-  extras: number;
+  conVariacion: number;
+  valorPresupuestado: number;
+  valorLiquidado: number;
 }
 export interface PresupuestoLiquidadoResponse {
   obra: string;
@@ -50,16 +55,15 @@ export interface PresupuestoLiquidadoResponse {
 const round = (n: number) => Math.round(n * 100) / 100;
 const keyOf = (itemNo: string, variantCode: string, taskNo: string) => `${itemNo}|${variantCode}|${taskNo}`;
 
-function estadoDe(esExtra: boolean, presupuestado: number, liquidado: number): EstadoPresupuesto {
-  if (esExtra) return 'extra';
-  if (liquidado <= 0) return 'sin_consumo';
-  if (liquidado > presupuestado + 1e-9) return 'sobregiro';
-  if (liquidado >= presupuestado - 1e-9) return 'completo';
-  return 'en_presupuesto';
+function estadoDe(esExtra: boolean, presupCant: number, liqCant: number): EstadoPL {
+  if (esExtra) return 'sobre_presupuesto';
+  if (presupCant <= 0) return liqCant > 0 ? 'sobre_presupuesto' : 'en_rango';
+  const v = ((liqCant - presupCant) / presupCant) * 100;
+  if (v > 10) return 'sobre_presupuesto';
+  if (v > 1e-4) return 'revisar';
+  return 'en_rango';
 }
 
-// Versión de líneas de venta que manda: la de re-estudio más reciente; si no hay flag
-// de re-estudio, la más reciente de todas.
 function pickVersion(versions: WorkVersionBC[]): string {
   if (!versions.length) return '';
   const byNewest = [...versions].sort((a, b) => Date.parse(b.createDateTime || '') - Date.parse(a.createDateTime || ''));
@@ -67,8 +71,6 @@ function pickVersion(versions: WorkVersionBC[]): string {
   return (reStudy[0] ?? byNewest[0]).versionCode;
 }
 
-// Mapa tarea → cantidad presupuestada (lado ventas) en la versión elegida. Si esa
-// versión no empareja (desfase de datos), cae a todas las líneas para no dejar 0.
 function buildTaskQty(lines: WorkLineBC[], versionCode: string): Map<string, number> {
   const esVenta = (l: WorkLineBC) => /vent|sale/i.test(l.lineType);
   const build = (pool: WorkLineBC[]): Map<string, number> => {
@@ -88,27 +90,36 @@ function buildTaskQty(lines: WorkLineBC[], versionCode: string): Map<string, num
 
 export async function presupuestoLiquidado(obra: string, taskNo?: string): Promise<PresupuestoLiquidadoResponse> {
   const company = await companyConObra(obra);
-  const [consumido, decompLines, workLines, versions] = await Promise.all([
+  const [consumido, decompLines, workLines, versions, items] = await Promise.all([
     bcConsumidoObra(obra, taskNo, company),
     bcDecompLines(obra, company),
     getWorkLines(obra, company),
     bcWorkVersions(obra, company),
+    bcItems().catch(() => []),
   ]);
+
+  // Catálogo: categoría y costo de respaldo por material.
+  const catPorItem = new Map<string, string>();
+  const costCatalogo = new Map<string, number>();
+  for (const it of items) {
+    if (it.categoria) catPorItem.set(it.code, it.categoria);
+    if (it.lastDirectCost) costCatalogo.set(it.code, it.lastDirectCost);
+  }
 
   const taskQty = buildTaskQty(workLines, pickVersion(versions));
 
-  // Presupuesto por material = rendimiento × cantidad de la tarea (se suman líneas).
+  // Presupuesto por material: cantidad (rendimiento × cantidad de tarea) y costo unitario.
   const budgetQty = new Map<string, number>();
+  const budgetCost = new Map<string, number>();
   const budgetMeta = new Map<string, { itemNo: string; variantCode: string; taskNo: string; description: string; unit: string }>();
   for (const d of decompLines) {
     if (taskNo && d.taskNo !== taskNo) continue;
     const k = keyOf(d.itemNo, d.variantCode, d.taskNo);
-    const aporte = (taskQty.get(d.taskNo) ?? 0) * d.performance;
-    budgetQty.set(k, (budgetQty.get(k) ?? 0) + aporte);
+    budgetQty.set(k, (budgetQty.get(k) ?? 0) + (taskQty.get(d.taskNo) ?? 0) * d.performance);
+    if (d.unitCost > 0 && !budgetCost.has(k)) budgetCost.set(k, d.unitCost);
     if (!budgetMeta.has(k)) budgetMeta.set(k, { itemNo: d.itemNo, variantCode: d.variantCode, taskNo: d.taskNo, description: d.description, unit: d.unitOfMeasure });
   }
 
-  // Liquidado (consumido neto) + metadatos.
   const consumedQty = new Map<string, number>();
   const consumedMeta = new Map<string, { itemNo: string; variantCode: string; taskNo: string; description: string; unit: string; variantDescription?: string }>();
   for (const r of consumido) {
@@ -121,33 +132,43 @@ export async function presupuestoLiquidado(obra: string, taskNo?: string): Promi
     .map((k) => {
       const b = budgetMeta.get(k);
       const c = consumedMeta.get(k);
-      const presupuestado = round(budgetQty.get(k) ?? 0);
-      const liquidado = round(consumedQty.get(k) ?? 0);
+      const itemNo = b?.itemNo ?? c?.itemNo ?? '';
+      const presupuestadoCant = round(budgetQty.get(k) ?? 0);
+      const liquidadoCant = round(consumedQty.get(k) ?? 0);
       const esExtra = !b;
+      const unitCost = round(budgetCost.get(k) ?? costCatalogo.get(itemNo) ?? 0);
+      const presupuestadoValor = round(presupuestadoCant * unitCost);
+      const liquidadoValor = round(liquidadoCant * unitCost);
+      const variacionPct = presupuestadoCant > 0
+        ? round(((liquidadoCant - presupuestadoCant) / presupuestadoCant) * 100)
+        : (liquidadoCant > 0 ? 100 : 0);
       return {
-        itemNo: b?.itemNo ?? c?.itemNo ?? '',
+        itemNo,
         description: b?.description || c?.description || '',
+        categoria: catPorItem.get(itemNo) ?? '',
         variantCode: b?.variantCode ?? c?.variantCode ?? '',
         variantDescription: c?.variantDescription,
         unitOfMeasureCode: b?.unit || c?.unit || '',
         taskNo: b?.taskNo ?? c?.taskNo ?? '',
-        presupuestado,
-        liquidado,
-        saldo: round(presupuestado - liquidado),
+        presupuestadoCant,
+        liquidadoCant,
+        unitCost,
+        presupuestadoValor,
+        liquidadoValor,
+        diferenciaValor: round(presupuestadoValor - liquidadoValor),
+        variacionPct,
         esExtra,
-        estado: estadoDe(esExtra, presupuestado, liquidado),
+        estado: estadoDe(esExtra, presupuestadoCant, liquidadoCant),
       };
     })
-    .filter((r) => r.presupuestado > 0 || r.liquidado > 0)
+    .filter((r) => r.presupuestadoCant > 0 || r.liquidadoCant > 0)
     .sort((a, b) => a.taskNo.localeCompare(b.taskNo, undefined, { numeric: true }) || a.description.localeCompare(b.description));
 
   const resumen: PresupuestoLiquidadoResumen = {
     materiales: rows.length,
-    actividades: new Set(rows.map((r) => r.taskNo)).size,
-    presupuestadas: rows.filter((r) => !r.esExtra).length,
-    sinConsumo: rows.filter((r) => r.estado === 'sin_consumo').length,
-    sobregiros: rows.filter((r) => r.estado === 'sobregiro').length,
-    extras: rows.filter((r) => r.esExtra).length,
+    conVariacion: rows.filter((r) => r.estado !== 'en_rango').length,
+    valorPresupuestado: round(rows.reduce((s, r) => s + r.presupuestadoValor, 0)),
+    valorLiquidado: round(rows.reduce((s, r) => s + r.liquidadoValor, 0)),
   };
 
   return { obra, rows, resumen };
