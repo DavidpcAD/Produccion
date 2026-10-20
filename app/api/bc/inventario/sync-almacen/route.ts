@@ -33,10 +33,22 @@ export async function POST(req: Request) {
 }
 
 // GET → frescura de la última corrida (para ver el estado sin abrir SQL). Solo admin.
-export async function GET() {
+// GET ?run=1 → DISPARO MANUAL desde el navegador: un admin abre la URL en la barra de
+// direcciones (su cookie viaja sola) y refresca el snapshot sin consola ni terminal.
+// El POST sigue siendo el camino del scheduler nocturno; esto es solo la comodidad de
+// correrlo a mano. Es idempotente (reemplaza la foto), así que repetirlo no hace daño.
+export async function GET(req: Request) {
   const session = await getSession();
   if (!session || session.nivelAdmin < 2) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  if (new URL(req.url).searchParams.get("run") === "1") {
+    try {
+      const r = await refrescarInventarioAlmacen();
+      return NextResponse.json(r);
+    } catch (e) {
+      return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });
+    }
   }
   try {
     const pool = await getDb();
