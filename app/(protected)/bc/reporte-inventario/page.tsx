@@ -6,6 +6,7 @@ import { PageShell, PageHeader } from '@/components/layout/Page';
 import { DataTable } from '@/components/ui/DataTable';
 import { useToast } from '@/components/ui/Toast';
 import { Icon, IconName } from '@/components/ds/Icon/Icon';
+import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 // Reporte de inventario por almacén (SOLO Super Admin). Lee el snapshot
 // dbo.InventarioAlmacen vía /api/bc/inventario/almacen. Lo importante es lo SIN
@@ -49,6 +50,19 @@ function fechaHora(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// ¿La fecha de ingreso al almacén (la que trae de BC, por factura o transferencia)
+// cae en el rango [desde, hasta]? Compara por el día (yyyy-mm-dd): el orden
+// lexicográfico de ese formato coincide con el cronológico. Una fila sin fecha
+// queda fuera cuando hay algún extremo activo.
+function enRango(iso: string | null, desde: string, hasta: string): boolean {
+  if (!desde && !hasta) return true;
+  const d = iso ? iso.slice(0, 10) : '';
+  if (!d) return false;
+  if (desde && d < desde) return false;
+  if (hasta && d > hasta) return false;
+  return true;
 }
 
 function agrupar(filas: Fila[], key: (f: Fila) => string): { nombre: string; valor: number }[] {
@@ -95,6 +109,9 @@ export default function ReporteInventarioPage() {
   const [loading, setLoading] = useState(true);
   const [actualizando, setActualizando] = useState(false);
   const [soloVirtuales, setSoloVirtuales] = useState(true);
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const [vista, setVista] = useState<'tabla' | 'arbol'>('tabla');
   const yaAutorefresco = useRef(false);
 
   const cargar = useCallback(async (): Promise<Estado | null> => {
@@ -142,8 +159,11 @@ export default function ReporteInventarioPage() {
     return () => { vivo = false; };
   }, [cargar, sincronizar]);
 
-  const soloSinLiquidar = useMemo(() => filas.filter((f) => f.esVirtual), [filas]);
-  const dataset = useMemo(() => (soloVirtuales ? soloSinLiquidar : filas), [soloVirtuales, soloSinLiquidar, filas]);
+  // Rango de fechas de ingreso al almacén: filtra TODO el reporte (KPIs, gráficos,
+  // detalle y árbol), para poder ver, p. ej., lo que ingresó antes de una fecha.
+  const base = useMemo(() => (desde || hasta ? filas.filter((f) => enRango(f.fechaMovimiento, desde, hasta)) : filas), [filas, desde, hasta]);
+  const soloSinLiquidar = useMemo(() => base.filter((f) => f.esVirtual), [base]);
+  const dataset = useMemo(() => (soloVirtuales ? soloSinLiquidar : base), [soloVirtuales, soloSinLiquidar, base]);
   const totalSinLiquidar = useMemo(() => soloSinLiquidar.reduce((s, f) => s + (f.cantidadProyecto || 0), 0), [soloSinLiquidar]);
 
   const kpis = useMemo(() => ({
@@ -189,16 +209,25 @@ export default function ReporteInventarioPage() {
         <KpiCard titulo="Apartado sin liquidar" valor={loading ? '—' : num.format(kpis.sinLiquidar)} icono="alert" destacado={kpis.sinLiquidar > 0} />
       </div>
 
-      {/* Alcance */}
-      <div className="flex items-center gap-2">
-        <span className="text-label text-ds-gray-500">Mostrar:</span>
-        <div className="inline-flex overflow-hidden rounded-ds border border-ds-gray-200">
-          {[{ v: true, l: 'Solo sin liquidar' }, { v: false, l: 'Todo el inventario' }].map((o) => (
-            <button key={o.l} type="button" onClick={() => setSoloVirtuales(o.v)}
-              className={`px-3 py-1.5 text-body-sm transition-colors ${soloVirtuales === o.v ? 'bg-ds-ink text-ds-surface' : 'bg-ds-surface text-ds-gray-500 hover:bg-ds-gray-100'}`}>
-              {o.l}
+      {/* Alcance + filtro por fecha de ingreso */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-label text-ds-gray-500">Mostrar:</span>
+          <Segmented<boolean> value={soloVirtuales} onChange={setSoloVirtuales} options={[{ v: true, l: 'Solo sin liquidar' }, { v: false, l: 'Todo el inventario' }]} />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-label text-ds-gray-500">Ingresó:</span>
+          <input type="date" value={desde} max={hasta || undefined} onChange={(e) => setDesde(e.target.value)} aria-label="Fecha de ingreso desde"
+            className="rounded-ds border border-ds-gray-200 bg-ds-surface px-2.5 py-1.5 text-body-sm text-ds-ink focus:border-ds-gray-300 focus:outline-none" />
+          <span className="text-body-sm text-ds-gray-400">a</span>
+          <input type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} aria-label="Fecha de ingreso hasta"
+            className="rounded-ds border border-ds-gray-200 bg-ds-surface px-2.5 py-1.5 text-body-sm text-ds-ink focus:border-ds-gray-300 focus:outline-none" />
+          {(desde || hasta) && (
+            <button type="button" onClick={() => { setDesde(''); setHasta(''); }}
+              className="rounded-ds px-2 py-1 text-body-sm font-medium text-ds-gray-500 hover:bg-ds-gray-100">
+              Limpiar
             </button>
-          ))}
+          )}
         </div>
       </div>
 
@@ -214,19 +243,32 @@ export default function ReporteInventarioPage() {
         </div>
       </div>
 
-      {/* Detalle (DataTable del DS: filtros por columna, orden, Columnas, exportar) */}
+      {/* Detalle: tabla plana (DataTable del DS) o árbol por almacén, a elección */}
       <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
-        <SeccionHeader icono="boleta" titulo="Detalle de artículos" />
-        <DataTable<Fila>
-          columns={COLUMNAS}
-          data={dataset}
-          loading={loading}
-          searchPlaceholder="Artículo, descripción, obra…"
-          exportFilename="inventario-sin-liquidar"
-          pageSize={50}
-          emptyMessage={soloVirtuales ? 'No hay material sin liquidar.' : 'Sin movimientos.'}
-          persistKey="bc-reporte-inventario"
-        />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-ds bg-ds-gray-100 text-ds-gray-500"><Icon name="boleta" size="sm" /></span>
+            <h2 className="text-body font-semibold text-ds-ink">Detalle de artículos</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-label text-ds-gray-500">Vista:</span>
+            <Segmented<'tabla' | 'arbol'> value={vista} onChange={setVista} options={[{ v: 'tabla', l: 'Tabla' }, { v: 'arbol', l: 'Árbol' }]} />
+          </div>
+        </div>
+        {vista === 'tabla' ? (
+          <DataTable<Fila>
+            columns={COLUMNAS}
+            data={dataset}
+            loading={loading}
+            searchPlaceholder="Artículo, descripción, obra…"
+            exportFilename="inventario-sin-liquidar"
+            pageSize={50}
+            emptyMessage={soloVirtuales ? 'No hay material sin liquidar.' : 'Sin movimientos.'}
+            persistKey="bc-reporte-inventario"
+          />
+        ) : (
+          <ArbolAlmacenes rows={dataset} loading={loading} soloVirtuales={soloVirtuales} />
+        )}
       </div>
     </PageShell>
   );
@@ -251,6 +293,119 @@ function SeccionHeader({ icono, titulo }: { icono: IconName; titulo: string }) {
     <div className="mb-3 flex items-center gap-2">
       <span className="flex h-8 w-8 items-center justify-center rounded-ds bg-ds-gray-100 text-ds-gray-500"><Icon name={icono} size="sm" /></span>
       <h2 className="text-body font-semibold text-ds-ink">{titulo}</h2>
+    </div>
+  );
+}
+
+// Control segmentado (estilo del DS) reutilizable para los selectores de la barra.
+function Segmented<T extends string | boolean>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; l: string }[] }) {
+  return (
+    <div className="inline-flex overflow-hidden rounded-ds border border-ds-gray-200">
+      {options.map((o) => (
+        <button key={String(o.v)} type="button" onClick={() => onChange(o.v)}
+          className={`px-3 py-1.5 text-body-sm transition-colors ${value === o.v ? 'bg-ds-ink text-ds-surface' : 'bg-ds-surface text-ds-gray-500 hover:bg-ds-gray-100'}`}>
+          {o.l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Vista árbol: los artículos agrupados por almacén (el "almacén de proyecto" de BC),
+// cada grupo se expande para ver su detalle. Pensado para recorrer, por almacén
+// virtual, qué material hay sin liquidar.
+function ArbolAlmacenes({ rows, loading, soloVirtuales }: { rows: Fila[]; loading?: boolean; soloVirtuales: boolean }) {
+  const [buscar, setBuscar] = useState('');
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+
+  const filtradas = useMemo(() => {
+    const q = buscar.trim();
+    if (!q) return rows;
+    return rows.filter((r) => coincideBusqueda(`${r.itemNo} ${r.descripcion ?? ''} ${r.categoria ?? ''} ${r.obra ?? ''} ${r.almacen ?? ''}`, q));
+  }, [rows, buscar]);
+
+  const grupos = useMemo(() => {
+    const m = new Map<string, Fila[]>();
+    for (const r of filtradas) { const k = r.almacen ?? '—'; const a = m.get(k); if (a) a.push(r); else m.set(k, [r]); }
+    return Array.from(m.entries()).map(([almacen, lineas]) => ({
+      almacen,
+      esVirtual: lineas.some((l) => l.esVirtual),
+      lineas: [...lineas].sort((a, b) => a.itemNo.localeCompare(b.itemNo, undefined, { numeric: true })),
+      sinLiquidar: lineas.reduce((s, l) => s + (l.cantidadProyecto || 0), 0),
+      existencia: lineas.reduce((s, l) => s + (l.cantidad || 0), 0),
+      articulos: new Set(lineas.map((l) => l.itemNo)).size,
+    })).sort((a, b) => b.sinLiquidar - a.sinLiquidar || a.almacen.localeCompare(b.almacen));
+  }, [filtradas]);
+
+  const todosAbiertos = grupos.length > 0 && grupos.every((g) => abiertos.has(g.almacen));
+  const toggleTodos = () => setAbiertos(todosAbiertos ? new Set() : new Set(grupos.map((g) => g.almacen)));
+  const toggle = (k: string) => setAbiertos((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+
+  if (loading) return <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-ds-lg bg-ds-gray-100" />)}</div>;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Artículo, descripción, obra…"
+          className="min-w-[220px] flex-1 rounded-ds border border-ds-gray-200 bg-ds-surface px-3 py-2 text-body-sm text-ds-ink placeholder:text-ds-gray-400 focus:border-ds-gray-300 focus:outline-none" />
+        <button type="button" onClick={toggleTodos} disabled={grupos.length === 0}
+          className="rounded-ds border border-ds-gray-200 bg-ds-surface px-3.5 py-2 text-body-sm font-medium text-ds-gray-600 hover:border-ds-gray-300 disabled:opacity-50">
+          {todosAbiertos ? 'Colapsar todo' : 'Expandir todo'}
+        </button>
+      </div>
+
+      {grupos.length === 0 ? (
+        <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface py-12 text-center text-body-sm text-ds-gray-400 shadow-ds-01">
+          {soloVirtuales ? 'No hay material sin liquidar.' : 'Sin movimientos.'}
+        </div>
+      ) : grupos.map((g) => {
+        const open = abiertos.has(g.almacen);
+        return (
+          <div key={g.almacen} className="overflow-hidden rounded-ds-lg border border-ds-gray-200 bg-ds-surface shadow-ds-01">
+            <button type="button" onClick={() => toggle(g.almacen)} className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left hover:bg-ds-gray-100">
+              <span className={`shrink-0 text-ds-gray-400 transition-transform ${open ? 'rotate-90' : ''}`}><Icon name="arrow-right" size="sm" color="currentColor" /></span>
+              <span className="shrink-0 font-semibold text-ds-ink">{g.almacen}</span>
+              {g.esVirtual && <span className="inline-flex shrink-0 items-center rounded-ds bg-ds-yellow-soft px-1.5 py-0.5 text-label font-medium text-ds-yellow-ink">sin liquidar</span>}
+              <span className="shrink-0 text-body-sm text-ds-gray-400">{num.format(g.articulos)} {g.articulos === 1 ? 'artículo' : 'artículos'}</span>
+              <span className="flex-1" />
+              {!soloVirtuales && <span className="shrink-0 whitespace-nowrap text-body-sm text-ds-gray-500">Existencia <b className="font-mono text-ds-ink">{num.format(g.existencia)}</b></span>}
+              <span className="shrink-0 whitespace-nowrap text-body-sm text-ds-gray-500">Sin liquidar <b className="font-mono text-ds-yellow-ink">{num.format(g.sinLiquidar)}</b></span>
+            </button>
+            {open && (
+              <div className="overflow-x-auto border-t border-ds-gray-100">
+                <table className="w-full text-body-sm">
+                  <thead>
+                    <tr className="border-b border-ds-gray-100 bg-ds-gray-100 text-label uppercase tracking-wide text-ds-gray-400">
+                      <th className="px-4 py-2 text-left font-semibold">Artículo</th>
+                      <th className="px-3 py-2 text-left font-semibold">Categoría</th>
+                      <th className="px-3 py-2 text-left font-semibold">Descripción</th>
+                      <th className="px-3 py-2 text-left font-semibold">Obra</th>
+                      <th className="px-3 py-2 text-right font-semibold">Existencia</th>
+                      <th className="px-3 py-2 text-right font-semibold">Sin liquidar</th>
+                      <th className="px-3 py-2 text-left font-semibold">Unidad</th>
+                      <th className="px-3 py-2 text-left font-semibold">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.lineas.map((r) => (
+                      <tr key={r.entryNo} className="border-b border-ds-gray-100 last:border-0">
+                        <td className="px-4 py-2 font-mono whitespace-nowrap">{r.itemNo}</td>
+                        <td className="px-3 py-2">{r.categoria || '—'}</td>
+                        <td className="px-3 py-2">{r.descripcion || '—'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{r.obra || '—'}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">{num.format(r.cantidad)}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">{r.cantidadProyecto > 0 ? <span className="font-semibold text-ds-yellow-ink">{num.format(r.cantidadProyecto)}</span> : <span className="text-ds-gray-300">—</span>}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{r.unidad || '—'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{r.fechaMovimiento ? r.fechaMovimiento.slice(0, 10) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
