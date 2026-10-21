@@ -112,6 +112,16 @@ export interface OrdenTrabajo {
   firmaId?: string | null;
   firmaResponsable?: string | null;
   firmaFecha?: string | null;
+  /** Tipo de falla asignado por Mantenimiento (null = sin clasificar). */
+  tipoFallaId?: string | null;
+}
+
+/** Tipo de falla para el historial (mant.TiposFalla). Se desactiva, no se borra. */
+export interface TipoFalla {
+  id: string;
+  nombre: string;
+  orden: number;
+  activo: boolean;
 }
 
 export interface PlanMantenimiento {

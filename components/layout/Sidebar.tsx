@@ -104,6 +104,7 @@ const navItems: NavItemDef[] = [
       { href: '/mantenimiento/inspeccion', label: 'Inspección diaria' },
       { href: '/mantenimiento/equipos', label: 'Equipos' },
       { href: '/mantenimiento/ordenes', label: 'Órdenes de trabajo' },
+      { href: '/mantenimiento/fallas', label: 'Fallas' },
       { href: '/mantenimiento/planes', label: 'Preventivo' },
       { href: '/mantenimiento/repuestos', label: 'Repuestos' },
       { href: '/mantenimiento/reportes', label: 'Reportes' },

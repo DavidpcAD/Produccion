@@ -1,6 +1,7 @@
 // PATCH acá es solo para las ediciones "simples" de una OT ya abierta:
-// título, descripción, prioridad, fecha programada, responsable, y guardar
-// el checklist mientras se lo va tildando. A propósito NO se puede cambiar
+// título, descripción, prioridad, fecha programada, responsable, guardar
+// el checklist mientras se lo va tildando, y clasificar la falla
+// (tipoFallaId, también en OTs ya finalizadas). A propósito NO se puede cambiar
 // el estado, los repuestos usados, las fotos ni la firma por acá — esos
 // cambios de estado tienen cada uno su propio endpoint transaccional
 // (iniciar / cancelar / finalizar), porque tocan más de una tabla a la vez.
@@ -10,10 +11,11 @@ import { ejecutar, type ErrorSql } from "@/lib/mantenimiento/db";
 import { aJsonONull } from "@/lib/mantenimiento/json";
 import { requerirRol } from "@/lib/mantenimiento/auth";
 
-const COLUMNAS_EDITABLES = ["prioridad", "titulo", "descripcion", "fechaProgramada", "responsable", "checklist"];
+const COLUMNAS_EDITABLES = ["prioridad", "titulo", "descripcion", "fechaProgramada", "responsable", "checklist", "tipoFallaId"];
 
 function valorParaColumna(nombre: string, valor: any): any {
   if (nombre === "fechaProgramada") return valor ? new Date(valor) : null;
+  if (nombre === "tipoFallaId") return valor ? String(valor) : null; // "" o null = sin clasificar
   if (nombre === "checklist") return aJsonONull(valor || []);
   if (nombre === "titulo" || nombre === "descripcion" || nombre === "responsable") return String(valor ?? "").trim();
   return valor == null ? null : valor;
@@ -40,6 +42,10 @@ export async function PATCH(peticion: Request, { params }: { params: Promise<{ i
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
+    // 547 = violación de FK: el único campo editable con FK es tipoFallaId.
+    if ((err as ErrorSql).number === 547) {
+      return NextResponse.json({ error: "Ese tipo de falla no existe. Recargá la página e intentá de nuevo." }, { status: 400 });
+    }
     return NextResponse.json({ error: "No se pudo guardar: " + (err as Error).message }, { status: 500 });
   }
 }

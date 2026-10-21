@@ -1,0 +1,124 @@
+/* Ficha del equipo (FichaEquipo.tsx). Solo tokens del DS: el tema oscuro
+   sale solo. En celular los bloques quedan uno debajo del otro. */
+
+.mnt-ficha {
+  background:    var(--ds-surface);
+  border-radius: var(--ds-radius-lg);
+  box-shadow:    var(--ds-shadow-01);
+  padding:       var(--ds-space-5);
+}
+
+.mnt-ficha__cabeza {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     flex-start;
+  flex-wrap:       wrap;
+  gap:             var(--ds-space-3);
+}
+.mnt-ficha__id { flex: 1 1 280px; min-width: 0; }
+.mnt-ficha__etiquetas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-2); }
+.mnt-ficha__codigo {
+  padding:        2px var(--ds-space-2);
+  border-radius:  var(--ds-radius-sm);
+  background:     var(--ds-text);
+  color:          var(--ds-surface);
+  font-size:      var(--ds-font-size-body-sm);
+  font-weight:    var(--ds-font-weight-semibold);
+  letter-spacing: var(--ds-letter-spacing-wide);
+}
+.mnt-ficha__tipo { color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); }
+.mnt-ficha__nombre {
+  margin:      var(--ds-space-2) 0 0;
+  font-size:   var(--ds-font-size-heading);
+  line-height: var(--ds-line-height-heading);
+  font-weight: var(--ds-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.mnt-ficha__detalle { margin-top: var(--ds-space-1); color: var(--ds-color-gray-500); }
+
+/* Franja de 4 datos clave, separada del encabezado por una línea fina. */
+.mnt-ficha__resumen {
+  display:               grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap:                   var(--ds-space-4);
+  margin:                var(--ds-space-5) 0 0;
+  padding-top:           var(--ds-space-4);
+  border-top:            1px solid var(--ds-color-gray-100);
+}
+.mnt-ficha__dato dt { color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); }
+.mnt-ficha__dato dd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-space-1); margin: var(--ds-space-1) 0 0; }
+.mnt-ficha__cifra { font-size: var(--ds-font-size-subtitle); line-height: var(--ds-line-height-subtitle); font-weight: var(--ds-font-weight-semibold); }
+.mnt-ficha__nota { color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); }
+.mnt-ficha__vacio { color: var(--ds-color-gray-400); }
+
+/* ── Ficha técnica ── */
+.mnt-ficha__seccion { margin: 0; font-size: var(--ds-font-size-body-md); font-weight: var(--ds-font-weight-semibold); }
+.mnt-ficha__bloques {
+  display:               grid;
+  /* 300px: con el ancho máximo de la ficha (900px) quedan 2×2, nunca 3 + 1. */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap:                   var(--ds-space-4);
+  margin-top:            var(--ds-space-4);
+}
+.mnt-ficha__bloque {
+  padding:       var(--ds-space-4);
+  border:        1px solid var(--ds-color-gray-100);
+  border-radius: var(--ds-radius-md);
+}
+.mnt-ficha__bloque-titulo {
+  margin:         0 0 var(--ds-space-3);
+  color:          var(--ds-color-gray-500);
+  font-size:      var(--ds-font-size-body-sm);
+  font-weight:    var(--ds-font-weight-semibold);
+  letter-spacing: var(--ds-letter-spacing-wide);
+  text-transform: uppercase;
+}
+.mnt-ficha__lista { display: flex; flex-direction: column; margin: 0; }
+.mnt-ficha__fila {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     baseline;
+  gap:             var(--ds-space-3);
+  padding:         6px 0;
+  border-bottom:   1px solid var(--ds-color-gray-100);
+  font-size:       var(--ds-font-size-label);
+}
+.mnt-ficha__fila:last-child { border-bottom: none; }
+.mnt-ficha__fila dt { color: var(--ds-color-gray-500); flex-shrink: 0; }
+.mnt-ficha__fila dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.mnt-ficha__notas { margin-top: var(--ds-space-4); }
+.mnt-ficha__notas p { margin: 0; white-space: pre-wrap; }
+
+/* ── Historial de fallas del equipo ── */
+.mnt-ficha__enlace { color: var(--ds-text); font-size: var(--ds-font-size-body-sm); text-decoration: underline; text-underline-offset: 3px; }
+.mnt-ficha__chips { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); margin: var(--ds-space-4) 0 0; padding: 0; list-style: none; }
+.mnt-ficha__chips li {
+  padding:       4px 10px;
+  border-radius: var(--ds-radius-xl);
+  background:    var(--ds-color-gray-100);
+  font-size:     var(--ds-font-size-body-sm);
+}
+.mnt-ficha__fallas { display: flex; flex-direction: column; gap: var(--ds-space-1); margin: var(--ds-space-3) 0 0; padding: 0; list-style: none; }
+.mnt-ficha__falla {
+  display:               grid;
+  grid-template-columns: 6.5rem 1fr auto;
+  align-items:           center;
+  gap:                   var(--ds-space-3);
+  padding:               var(--ds-space-2) var(--ds-space-3);
+  border-radius:         var(--ds-radius-md);
+  color:                 var(--ds-text);
+  font-size:             var(--ds-font-size-label);
+  text-decoration:       none;
+}
+.mnt-ficha__falla:hover { background: var(--ds-color-gray-100); }
+.mnt-ficha__falla:focus-visible { outline: 2px solid var(--ds-text); outline-offset: 1px; }
+.mnt-ficha__falla-fecha { color: var(--ds-color-gray-500); font-variant-numeric: tabular-nums; }
+.mnt-ficha__falla-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnt-ficha__falla-tipo { color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); white-space: nowrap; }
+.mnt-ficha__falla-tipo--sin { color: var(--ds-color-gray-400); font-style: italic; }
+
+@media (max-width: 640px) {
+  .mnt-ficha__resumen { grid-template-columns: 1fr 1fr; }
+  .mnt-ficha__falla { grid-template-columns: 1fr auto; }
+  .mnt-ficha__falla-fecha { grid-column: 1 / -1; font-size: var(--ds-font-size-body-sm); }
+}

@@ -13,7 +13,10 @@ import { FormTextarea } from "@/components/mantenimiento/local/FormExtras";
 import { ChecklistBox, RepuestosUsadosBox } from "@/components/mantenimiento/local/OtDetalleWidgets";
 import { PhotoGallery } from "@/components/mantenimiento/local/PhotoGallery";
 import { SignaturePad } from "@/components/mantenimiento/local/SignaturePad";
+import Link from "next/link";
 import { puede } from "@/lib/mantenimiento/permisos";
+import { esFalla, useTiposFalla } from "@/lib/mantenimiento/fallas";
+import { SelectorTipoFalla } from "@/components/mantenimiento/local/SelectorTipoFalla";
 import type { EstadoOt, RepuestoUsado, TipoOt } from "@/lib/mantenimiento/types";
 import type { TonoPill } from "@/lib/mantenimiento/planUtils";
 
@@ -45,6 +48,7 @@ export default function OtDetallePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { ots, equipos, repuestos, cargando, errorCarga, actualizarOt, iniciarOt, cancelarOt, finalizarOt, subirArchivo, usuario } = useAppStore();
+  const { tipos: tiposFalla } = useTiposFalla();
   const toast = useToast();
   const puedeEjecutar = puede(usuario?.rol, "ots.ejecutar");
 
@@ -215,6 +219,27 @@ export default function OtDetallePage() {
               <strong>Motivo de cancelación:</strong> {ot.motivoCancelacion}
             </div>
           )}
+        </div>
+      </Seccion>
+
+      <Seccion titulo="Historial de fallas">
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-3)" }}>
+          <div style={{ color: "var(--ds-color-gray-500)", fontSize: "var(--ds-font-size-label)" }}>
+            {ot.estado === "cancelada"
+              ? "Las órdenes canceladas no cuentan en el historial de fallas."
+              : esFalla(ot)
+                ? "Esta orden cuenta como falla del equipo. Elegí el tipo para que aparezca bien en el gráfico."
+                : "Esta orden no cuenta como falla. Si en el trabajo se encontró una, asignale el tipo y pasa al historial."}
+          </div>
+          <div style={{ maxWidth: 360 }}>
+            <SelectorTipoFalla ot={ot} tipos={tiposFalla} editable={puede(usuario?.rol, "equipos.editar")} />
+          </div>
+          <Link
+            href={`/mantenimiento/fallas?equipo=${ot.equipoId}`}
+            style={{ color: "var(--ds-text)", fontSize: "var(--ds-font-size-body-sm)", textDecoration: "underline", textUnderlineOffset: 3, alignSelf: "flex-start" }}
+          >
+            Ver el historial de fallas de {equipo?.codigo ?? "este equipo"}
+          </Link>
         </div>
       </Seccion>
 
