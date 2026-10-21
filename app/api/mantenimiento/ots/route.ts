@@ -34,8 +34,21 @@ function mapearFila(fila: Record<string, any>) {
     repuestosUsados: parsearJson(fila.repuestosUsados, []),
     firmaId: fila.firmaId || null,
     firmaResponsable: fila.firmaResponsable || null,
-    firmaFecha: fila.firmaFecha ? new Date(fila.firmaFecha).toISOString() : null
+    firmaFecha: fila.firmaFecha ? new Date(fila.firmaFecha).toISOString() : null,
+    tipoFallaId: fila.tipoFallaId || null
   };
+}
+
+// tipoFallaId llega con la migración 2026-10-21_mantenimiento_tipos_falla, que
+// en producción se aplica AL ARRANCAR la app. Hasta que exista la columna (o si
+// esa migración fallara) la lista de OTs no puede romperse: se pide sin ella.
+// Una vez que aparece se recuerda y no se vuelve a consultar.
+let hayColumnaTipoFalla = false;
+async function existeColumnaTipoFalla(): Promise<boolean> {
+  if (hayColumnaTipoFalla) return true;
+  const r = await ejecutar((request) => request.query("SELECT COL_LENGTH('mant.OrdenesTrabajo', 'tipoFallaId') AS largo"));
+  hayColumnaTipoFalla = r.recordset[0].largo != null;
+  return hayColumnaTipoFalla;
 }
 
 export async function GET() {
@@ -43,12 +56,14 @@ export async function GET() {
   if (auth.error) return auth.error;
 
   try {
+    const conTipoFalla = await existeColumnaTipoFalla();
     const resultado = await ejecutar((request) =>
       request.query(
         "SELECT id, numero, equipoId, tipo, prioridad, titulo, descripcion, fechaProgramada, responsable, " +
           "horometroApertura, horometroCierre, estado, fechaApertura, fechaInicio, fechaFin, motivoCancelacion, " +
-          "trabajoRealizado, costoManoObra, planId, checklist, fotos, repuestosUsados, firmaId, firmaResponsable, firmaFecha " +
-          "FROM mant.OrdenesTrabajo"
+          "trabajoRealizado, costoManoObra, planId, checklist, fotos, repuestosUsados, firmaId, firmaResponsable, firmaFecha" +
+          (conTipoFalla ? ", tipoFallaId" : "") +
+          " FROM mant.OrdenesTrabajo"
       )
     );
     let filas: Record<string, any>[] = resultado.recordset;

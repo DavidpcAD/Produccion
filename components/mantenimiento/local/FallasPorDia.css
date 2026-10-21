@@ -1,0 +1,190 @@
+/* "Fallas por día" (pantalla Fallas). Mismo diseño que EquiposChecklistDia.
+   Colores validados con el validador de paleta (dataviz), cada tema con sus
+   propios tonos, contra TODOS los pares (las líneas se cruzan):
+   - Claro:  t1 #2a78d6 · t2 #eb6834 · t3 #1baf7a · otras #3f4652 · sin #9aa1ad
+   - Oscuro: t1 #3987e5 · t2 #d95926 · t3 #199e70 · otras #c3c8d1 · sin #6b7280
+   Los dos grises son neutros a propósito ("Otras" = varios tipos, "Sin
+   clasificar" = todavía sin tipo). "Sin clasificar" va además PUNTEADA: con el
+   aqua queda en ΔE 6.5 para daltonismo (claro), legal solo con esa segunda
+   señal + leyenda + rótulo + tabla. */
+
+.mnt-fal {
+  --mnt-fal-t1:    #2a78d6;
+  --mnt-fal-t2:    #eb6834;
+  --mnt-fal-t3:    #1baf7a;
+  --mnt-fal-otras: #3f4652;
+  --mnt-fal-sin:   #9aa1ad;
+  position:      relative;
+  background:    var(--ds-surface);
+  border-radius: var(--ds-radius-lg);
+  box-shadow:    var(--ds-shadow-01);
+  padding:       var(--ds-space-5);
+}
+:root[data-theme="dark"] .mnt-fal {
+  --mnt-fal-t1:    #3987e5;
+  --mnt-fal-t2:    #d95926;
+  --mnt-fal-t3:    #199e70;
+  --mnt-fal-otras: #c3c8d1;
+  --mnt-fal-sin:   #6b7280;
+}
+
+.mnt-fal__head {
+  display:         flex;
+  flex-wrap:       wrap;
+  justify-content: space-between;
+  align-items:     flex-start;
+  gap:             var(--ds-space-3) var(--ds-space-6);
+}
+.mnt-fal__title { margin: 0; font-size: var(--ds-font-size-body-md); font-weight: var(--ds-font-weight-semibold); }
+.mnt-fal__sub { margin: 2px 0 0; color: var(--ds-color-gray-500); font-size: var(--ds-font-size-label); }
+
+.mnt-fal__leyenda {
+  display:    flex;
+  flex-wrap:  wrap;
+  gap:        var(--ds-space-2) var(--ds-space-4);
+  margin:     0;
+  padding:    0;
+  list-style: none;
+  color:      var(--ds-color-gray-500);
+  font-size:  var(--ds-font-size-body-sm);
+}
+.mnt-fal__leyenda li { display: flex; align-items: center; gap: 6px; }
+
+/* Clave de línea (no caja): espeja cómo se dibuja cada serie. */
+.mnt-fal__clave { display: inline-block; width: 16px; height: 0; border-top: 2px solid; flex-shrink: 0; }
+.mnt-fal__clave--t1    { border-color: var(--mnt-fal-t1); }
+.mnt-fal__clave--t2    { border-color: var(--mnt-fal-t2); }
+.mnt-fal__clave--t3    { border-color: var(--mnt-fal-t3); }
+.mnt-fal__clave--otras { border-color: var(--mnt-fal-otras); }
+.mnt-fal__clave--sin   { border-color: var(--mnt-fal-sin); border-top-style: dashed; }
+
+.mnt-fal__filtros {
+  display:     flex;
+  flex-wrap:   wrap;
+  align-items: center;
+  gap:         var(--ds-space-3);
+  margin-top:  var(--ds-space-4);
+}
+.mnt-fal__rangos { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+.mnt-fal__rango {
+  min-height:    32px;
+  padding:       0 var(--ds-space-3);
+  border:        1px solid var(--ds-color-gray-200);
+  border-radius: var(--ds-radius-xl);
+  background:    var(--ds-surface);
+  color:         var(--ds-color-gray-500);
+  font:          inherit;
+  font-size:     var(--ds-font-size-body-sm);
+  cursor:        pointer;
+}
+.mnt-fal__rango:hover { color: var(--ds-text); border-color: var(--ds-color-gray-300); }
+.mnt-fal__rango[aria-pressed="true"] {
+  background:   var(--ds-text);
+  border-color: var(--ds-text);
+  color:        var(--ds-surface);
+  font-weight:  var(--ds-font-weight-semibold);
+}
+.mnt-fal__rango:focus-visible,
+.mnt-fal__vista:focus-visible { outline: 2px solid var(--ds-text); outline-offset: 2px; }
+.mnt-fal__total { color: var(--ds-color-gray-500); font-size: var(--ds-font-size-label); }
+.mnt-fal__total strong { color: var(--ds-text); font-size: var(--ds-font-size-body-md); }
+.mnt-fal__vista {
+  margin-left: auto;
+  border:      none;
+  background:  none;
+  padding:     var(--ds-space-1) 0;
+  color:       var(--ds-text);
+  font:        inherit;
+  font-size:   var(--ds-font-size-body-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor:      pointer;
+}
+
+.mnt-fal__grafico { position: relative; margin-top: var(--ds-space-3); min-height: 300px; }
+.mnt-fal__grafico svg { display: block; overflow: visible; }
+
+.mnt-fal__hoy  { fill: var(--ds-color-gray-100); opacity: 0.7; }
+.mnt-fal__guia { stroke: var(--ds-color-gray-100); stroke-width: 1; shape-rendering: crispEdges; }
+.mnt-fal__tick { fill: var(--ds-color-gray-400); font-size: var(--ds-font-size-body-sm); font-variant-numeric: tabular-nums; }
+
+.mnt-fal__linea { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.mnt-fal__linea--t1    { stroke: var(--mnt-fal-t1); }
+.mnt-fal__linea--t2    { stroke: var(--mnt-fal-t2); }
+.mnt-fal__linea--t3    { stroke: var(--mnt-fal-t3); }
+.mnt-fal__linea--otras { stroke: var(--mnt-fal-otras); }
+.mnt-fal__linea--sin   { stroke: var(--mnt-fal-sin); stroke-dasharray: 6 5; }
+
+/* Puntos de 8px con anillo de 2px del color de la tarjeta. */
+.mnt-fal__punto { stroke: var(--ds-surface); stroke-width: 2; transition: r 0.12s ease; }
+.mnt-fal__punto--t1    { fill: var(--mnt-fal-t1); }
+.mnt-fal__punto--t2    { fill: var(--mnt-fal-t2); }
+.mnt-fal__punto--t3    { fill: var(--mnt-fal-t3); }
+.mnt-fal__punto--otras { fill: var(--mnt-fal-otras); }
+.mnt-fal__punto--sin   { fill: var(--mnt-fal-sin); }
+
+.mnt-fal__rotulo { fill: var(--ds-text); font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); }
+.mnt-fal__ejex { fill: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); font-variant-numeric: tabular-nums; }
+.mnt-fal__ejex--hoy { fill: var(--ds-text); font-weight: var(--ds-font-weight-semibold); }
+
+.mnt-fal__cruz { stroke: var(--ds-color-gray-300); stroke-width: 1; pointer-events: none; }
+.mnt-fal__captura { fill: transparent; outline: none; cursor: crosshair; }
+.mnt-fal__captura:focus-visible { stroke: var(--ds-color-gray-300); stroke-width: 1; }
+
+/* Tooltip: el número manda, la etiqueta acompaña. */
+.mnt-fal__tip {
+  position:       absolute;
+  z-index:        2;
+  min-width:      190px;
+  padding:        var(--ds-space-2) var(--ds-space-3);
+  border-radius:  var(--ds-radius-md);
+  background:     var(--ds-surface-2);
+  box-shadow:     var(--ds-shadow-03-big);
+  color:          var(--ds-text);
+  font-size:      var(--ds-font-size-body-sm);
+  pointer-events: none;
+  white-space:    nowrap;
+}
+.mnt-fal__tip-dia { margin-bottom: 6px; color: var(--ds-color-gray-500); }
+.mnt-fal__tip-fila { display: flex; align-items: center; gap: var(--ds-space-2); line-height: 22px; }
+.mnt-fal__tip-fila strong { min-width: 20px; font-size: var(--ds-font-size-label); font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums; }
+.mnt-fal__tip-fila span:last-child { color: var(--ds-color-gray-500); }
+.mnt-fal__tip-pie { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--ds-color-gray-100); color: var(--ds-color-gray-500); line-height: 18px; }
+
+.mnt-fal__tabla-wrap { margin-top: var(--ds-space-3); max-height: 320px; overflow: auto; }
+.mnt-fal__tabla { width: 100%; border-collapse: collapse; font-size: var(--ds-font-size-label); }
+.mnt-fal__tabla th,
+.mnt-fal__tabla td { padding: var(--ds-space-2) var(--ds-space-3); border-bottom: 1px solid var(--ds-color-gray-100); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mnt-fal__tabla th:first-child { text-align: left; }
+.mnt-fal__tabla thead th { position: sticky; top: 0; background: var(--ds-surface); color: var(--ds-color-gray-500); font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); }
+.mnt-fal__tabla tbody th { font-weight: var(--ds-font-weight-regular); }
+.mnt-fal__fila-hoy th,
+.mnt-fal__fila-hoy td { font-weight: var(--ds-font-weight-semibold); }
+
+/* ── Ranking "Equipos con más fallas" (pantalla Fallas) ── */
+.mnt-fal-ranking { display: flex; flex-direction: column; gap: var(--ds-space-2); margin: 0; padding: 0; list-style: none; }
+.mnt-fal-ranking__fila {
+  display:               grid;
+  grid-template-columns: minmax(0, 11rem) 1fr 2.5rem;
+  align-items:           center;
+  gap:                   var(--ds-space-3);
+  padding:               4px 6px;
+  border:                none;
+  border-radius:         var(--ds-radius-md);
+  background:            none;
+  color:                 var(--ds-text);
+  font:                  inherit;
+  font-size:             var(--ds-font-size-label);
+  text-align:            left;
+  cursor:                pointer;
+  width:                 100%;
+}
+.mnt-fal-ranking__fila:hover { background: var(--ds-color-gray-100); }
+.mnt-fal-ranking__fila:focus-visible { outline: 2px solid var(--ds-text); outline-offset: 1px; }
+.mnt-fal-ranking__fila[aria-pressed="true"] { background: var(--ds-color-gray-100); font-weight: var(--ds-font-weight-semibold); }
+.mnt-fal-ranking__nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnt-fal-ranking__pista { height: 12px; }
+/* Barra: punta redondeada de 4px, base recta. Gris neutro y no un tono de
+   la paleta: en esta misma pantalla el azul ya significa "tipo de falla 1". */
+.mnt-fal-ranking__barra { display: block; height: 100%; min-width: 4px; border-radius: 0 4px 4px 0; background: var(--ds-color-gray-500); }
+.mnt-fal-ranking__valor { text-align: right; font-weight: var(--ds-font-weight-semibold); font-variant-numeric: tabular-nums; }

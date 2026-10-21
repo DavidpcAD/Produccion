@@ -8,14 +8,14 @@ import { EstadoCarga } from "@/components/mantenimiento/local/EstadoCarga";
 import { Button } from "@/components/mantenimiento/ds/Button/Button";
 import { ManualesBox } from "@/components/mantenimiento/local/ManualesBox";
 import { ChecklistDiarioBox } from "@/components/mantenimiento/local/ChecklistDiarioBox";
+import { FichaEncabezado, FichaTecnica, FallasEquipo } from "@/components/mantenimiento/local/FichaEquipo";
+import { esFalla, useTiposFalla } from "@/lib/mantenimiento/fallas";
 import { useToast } from "@/components/mantenimiento/local/Toast";
 import { horasRestantesSimple, kilometrosRestantesSimple, toneRestante, diasHastaProximoMantenimiento, toneFechaProxima, type TonoPill } from "@/lib/mantenimiento/planUtils";
 import { puede } from "@/lib/mantenimiento/permisos";
 import { apiGet, apiPost, apiPatch, apiDelete, aplanarDocs } from "@/lib/mantenimiento/api";
-import type { ChecklistDiarioItem, Equipo, EstadoEquipo, InspeccionDiaria, MovimientoRepuesto, OrdenTrabajo, Repuesto } from "@/lib/mantenimiento/types";
+import type { ChecklistDiarioItem, Equipo, InspeccionDiaria, MovimientoRepuesto, OrdenTrabajo, Repuesto } from "@/lib/mantenimiento/types";
 
-const ESTADO_TONO: Record<EstadoEquipo, "green" | "yellow" | "red"> = { operativo: "green", mantenimiento: "yellow", fuera_servicio: "red" };
-const ESTADO_LABEL: Record<EstadoEquipo, string> = { operativo: "Operativo", mantenimiento: "Mantenimiento", fuera_servicio: "Fuera de servicio" };
 
 function Seccion({ titulo, subtitulo, children, id }: { titulo: string; subtitulo?: string; children: ReactNode; id?: string }) {
   return (
@@ -57,6 +57,7 @@ export default function EquipoDetallePage() {
   const router = useRouter();
   const { equipos, ots, repuestos, movimientos, guardarEquipo, subirArchivo, cargando, errorCarga, usuario } = useAppStore();
   const toast = useToast();
+  const { tipos: tiposFalla } = useTiposFalla();
   const puedeSubirManual = puede(usuario?.rol, "equipos.subirManual");
   const puedeEditarChecklist = puede(usuario?.rol, "equipos.editar");
 
@@ -157,6 +158,14 @@ export default function EquipoDetallePage() {
 
   const repertorio = useMemo(() => (equipo ? repuestos.filter((r) => r.equipoId === equipo.id) : []), [equipo, repuestos]);
 
+  // Historial de fallas (ver lib/mantenimiento/fallas.ts para qué cuenta).
+  const fallasEquipo = useMemo(() => (equipo ? ots.filter((ot) => ot.equipoId === equipo.id && esFalla(ot)) : []), [equipo, ots]);
+  const fallasDelAnio = useMemo(() => {
+    const limite = new Date();
+    limite.setFullYear(limite.getFullYear() - 1);
+    return fallasEquipo.filter((ot) => new Date(ot.fechaApertura) >= limite);
+  }, [fallasEquipo]);
+
   const historial = useMemo<LineaHistorial[]>(() => {
     if (!equipo) return [];
     return movimientos
@@ -238,38 +247,31 @@ export default function EquipoDetallePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--ds-space-5)", maxWidth: 900 }}>
       <EstadoCarga cargando={false} error={errorCarga} />
-      {/* flexWrap: en celular el botón Volver baja y las etiquetas pasan bajo el título. */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--ds-space-3)" }}>
-        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--ds-space-2) var(--ds-space-3)" }}>
-            <h1 style={{ fontSize: "var(--ds-font-size-heading)", margin: 0 }}>{equipo.nombre}</h1>
-            <Pill tone={ESTADO_TONO[equipo.estado]}>{ESTADO_LABEL[equipo.estado]}</Pill>
-            {horasRestantes != null && <Pill tone={toneRestante(horasRestantes, equipo.intervaloHorasPreventivo)}>{horasRestantes.toFixed(0)} h para el próx. MTO</Pill>}
-            {kmRestantes != null && <Pill tone={toneRestante(kmRestantes, equipo.intervaloKilometrajePreventivo ?? 0)}>{kmRestantes.toFixed(0)} km para el próx. MTO</Pill>}
-            {diasProxima != null && (
-              <Pill tone={toneFechaProxima(diasProxima)}>
-                {diasProxima <= 0 ? `MTO vencido desde ${equipo.proximaFechaMantenimiento}` : `Próx. MTO: ${equipo.proximaFechaMantenimiento} (${diasProxima}d)`}
-              </Pill>
-            )}
-          </div>
-          <div style={{ color: "var(--ds-color-gray-500)", marginTop: 4 }}>
-            {equipo.codigo} — {equipo.marca} {equipo.modelo} — {equipo.horometroActual.toLocaleString("es-CR")} h — {equipo.kilometraje != null ? `${equipo.kilometraje.toLocaleString("es-CR")} km` : "sin kilometraje"}
-          </div>
-          <div style={{ color: "var(--ds-color-gray-400)", fontSize: "var(--ds-font-size-body-sm)", marginTop: 4, display: "flex", gap: "var(--ds-space-3)", flexWrap: "wrap" }}>
-            {equipo.placa && <span>Placa: {equipo.placa}</span>}
-            {equipo.combustible && <span>Combustible: {equipo.combustible}</span>}
-            {equipo.kilometraje != null && <span>Kilometraje: {equipo.kilometraje.toLocaleString("es-CR")} km</span>}
-            {equipo.revisionTecnica && <span>Revisión técnica: {equipo.revisionTecnica}</span>}
-            {equipo.fechaIngreso && <span>Ingreso: {equipo.fechaIngreso}</span>}
-            {equipo.ultimaFechaMantenimiento && <span>Último MTO: {equipo.ultimaFechaMantenimiento}</span>}
-          </div>
-        </div>
-        <Button label="Volver a Equipos" color="white" onClick={() => router.push("/mantenimiento/equipos")} />
-      </div>
+      <FichaEncabezado
+        equipo={equipo}
+        fallas12Meses={fallasDelAnio.length}
+        sinClasificar={fallasEquipo.filter((ot) => !ot.tipoFallaId).length}
+        onVolver={() => router.push("/mantenimiento/equipos")}
+        proximoMantenimiento={
+          horasRestantes == null && kmRestantes == null && diasProxima == null ? (
+            <span style={{ color: "var(--ds-color-gray-400)" }}>Sin intervalo cargado</span>
+          ) : (
+            <>
+              {horasRestantes != null && <Pill tone={toneRestante(horasRestantes, equipo.intervaloHorasPreventivo)}>{horasRestantes.toFixed(0)} h</Pill>}
+              {kmRestantes != null && <Pill tone={toneRestante(kmRestantes, equipo.intervaloKilometrajePreventivo ?? 0)}>{kmRestantes.toFixed(0)} km</Pill>}
+              {diasProxima != null && (
+                <Pill tone={toneFechaProxima(diasProxima)}>
+                  {diasProxima <= 0 ? `Vencido (${equipo.proximaFechaMantenimiento})` : `${equipo.proximaFechaMantenimiento} (${diasProxima}d)`}
+                </Pill>
+              )}
+            </>
+          )
+        }
+      />
 
-      <Seccion titulo="Manuales">
-        <ManualesBox manuales={equipo.manuales || []} onAdd={agregarManual} onRemove={quitarManual} soloLectura={!puedeSubirManual} />
-      </Seccion>
+      <FichaTecnica equipo={equipo} />
+
+      <FallasEquipo equipoId={equipo.id} fallas={fallasEquipo} tipos={tiposFalla} />
 
       <Seccion id="checklist" titulo="Checklist diario" subtitulo="Lo que el operador completa antes de usar el equipo, desde Inspección diaria.">
         <ChecklistDiarioBox
@@ -317,6 +319,10 @@ export default function EquipoDetallePage() {
             })}
           </div>
         )}
+      </Seccion>
+
+      <Seccion titulo="Manuales">
+        <ManualesBox manuales={equipo.manuales || []} onAdd={agregarManual} onRemove={quitarManual} soloLectura={!puedeSubirManual} />
       </Seccion>
 
       <Seccion titulo="Repuestos de este equipo">
