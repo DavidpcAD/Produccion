@@ -152,10 +152,11 @@ export type Modulo =
   //   · 'recepcion' RECIBE el material y sus facturas ("Órdenes por recibir" /
   //     "Recibidas"). Lo lleva Fábrica de Maderas, que pide Y recibe lo suyo.
   | 'bodega' | 'recepcion' | 'admin'
-  // 'cuadrillas' es su PROPIO módulo, aparte de 'ingenieria'. Antes Cuadrillas
-  // colgaba del módulo 'ingenieria' —el mismo de Órdenes de Compra— así que todo
-  // ingeniero de obra la veía. No le corresponde: la llevan el Super Admin y el rol
-  // legacy "Jefe de cuadrillas" (que entra por nivel, sin módulo de Producción).
+  // 'cuadrillas' es su PROPIO módulo, aparte de 'ingenieria'. Se mantiene separado
+  // para poder darlo/quitarlo sin tocar Órdenes de Compra. Hoy lo llevan Ingeniería
+  // (los tres tipos), el Super Admin y el rol legacy "Jefe de cuadrillas" (que entra
+  // por nivel, sin módulo de Producción). Estuvo fuera de Ingeniería entre el
+  // 2026-10-07 y el 2026-10-22, cuando David lo devolvió.
   | 'cuadrillas'
   // Mantenimiento (Control de Reparaciones): equipos, OTs, preventivo, repuestos.
   // Módulo propio del rol "Mantenimiento" (idApp 10); nadie más lo ve salvo Super
@@ -278,10 +279,13 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   if (n.startsWith('superadmin') || n === 'super admin' || n === 'administrador' ||
       t === 'super admin' || t === 'superadmin' || t === 'superadministrador') return '*';
   if (n === 'presupuestista') return ['presupuesto'];
-  // Ingeniería = Órdenes de Compra ('ingenieria') y Avance de obra ('avance'). Si
-  // Avance está apagado, computeAllowedModules lo saca. NO lleva 'cuadrillas' a
-  // propósito: el ingeniero de obra no administra cuadrillas (decisión 2026-10-07).
-  if (n === 'ingenieria' || n === 'ingeniería' || n === 'ingeniero' || n.startsWith('ingeniero ')) return ['ingenieria', 'avance'];
+  // Ingeniería = Órdenes de Compra ('ingenieria'), Avance de obra ('avance') y
+  // Cuadrillas ('cuadrillas'). Si Avance está apagado, computeAllowedModules lo saca.
+  // El 2026-10-07 se le había quitado 'cuadrillas' (el ingeniero "no administra
+  // cuadrillas"); el 2026-10-22 David lo revirtió —los ingenieros de obra ocupan ver
+  // las cuadrillas y sus integrantes— así que vuelve a verlas y administrarlas, como
+  // antes de ese cambio.
+  if (n === 'ingenieria' || n === 'ingeniería' || n === 'ingeniero' || n.startsWith('ingeniero ')) return ['ingenieria', 'avance', 'cuadrillas'];
   if (n === 'administracion' || n === 'administración') {
     // Digitación (jessieCor): decisión de David 21/08/2026 — este rol pasa a ser SOLO
     // de Órdenes de Compra (pedir material, igual que Bodega/Locales) y deja de abrir
@@ -397,9 +401,9 @@ export function getRouteModule(pathname: string): Modulo {
   // Aprobación OC es solo de Super Admin (no de los ingenieros).
   if (p.startsWith('/compras/aprobacion')) return 'admin';
   if (p.startsWith('/avance')) return 'avance';
-  // Cuadrillas es su PROPIO módulo: el ingeniero de obra NO la ve (en Compras ve solo
-  // lo suyo). La abren el Super Admin y el rol legacy "Jefe de cuadrillas" (por nivel).
-  // /encargados y /compras siguen siendo del módulo 'ingenieria'.
+  // Cuadrillas es su PROPIO módulo. La abren Ingeniería (los tres tipos), el Super
+  // Admin y el rol legacy "Jefe de cuadrillas" (por nivel). /encargados y /compras
+  // siguen siendo del módulo 'ingenieria'.
   if (p.startsWith('/cuadrillas')) return 'cuadrillas';
   if (p.startsWith('/encargados') || p.startsWith('/compras')) return 'ingenieria';
   if (p.startsWith('/concreto')) return 'concreto';
