@@ -14,7 +14,7 @@ import { useToast } from "@/components/mantenimiento/local/Toast";
 import { horasRestantesSimple, kilometrosRestantesSimple, toneRestante, diasHastaProximoMantenimiento, toneFechaProxima, type TonoPill } from "@/lib/mantenimiento/planUtils";
 import { puede } from "@/lib/mantenimiento/permisos";
 import { apiGet, apiPost, apiPatch, apiDelete, aplanarDocs } from "@/lib/mantenimiento/api";
-import type { ChecklistDiarioItem, Equipo, InspeccionDiaria, MovimientoRepuesto, OrdenTrabajo, Repuesto } from "@/lib/mantenimiento/types";
+import type { ChecklistDiarioItem, EspecificacionEquipo, InspeccionDiaria, MovimientoRepuesto, OrdenTrabajo, Repuesto } from "@/lib/mantenimiento/types";
 
 
 function Seccion({ titulo, subtitulo, children, id }: { titulo: string; subtitulo?: string; children: ReactNode; id?: string }) {
@@ -134,25 +134,36 @@ export default function EquipoDetallePage() {
   const kmRestantes = equipo ? kilometrosRestantesSimple(equipo) : null;
   const diasProxima = equipo ? diasHastaProximoMantenimiento(equipo) : null;
 
-  async function agregarManual(archivo: File) {
+  async function agregarManual(archivo: File, tipo: "manual" | "ficha") {
     if (!equipo) return;
     try {
       const subida = await subirArchivo(archivo);
-      const entrada = { archivoId: subida.id, nombre: archivo.name, contentType: subida.contentType, sizeBytes: subida.sizeBytes, subidoEn: new Date().toISOString() };
+      const entrada = { archivoId: subida.id, nombre: archivo.name, contentType: subida.contentType, sizeBytes: subida.sizeBytes, subidoEn: new Date().toISOString(), tipo };
       await guardarEquipo({ manuales: [...(equipo.manuales || []), entrada] }, equipo.id);
-      toast.exito("Manual subido.");
+      toast.exito(tipo === "ficha" ? "Ficha técnica subida." : "Manual subido.");
     } catch (err) {
       toast.error((err as Error).message);
     }
   }
 
-  async function quitarManual(indice: number) {
+  async function quitarManual(archivoId: string) {
     if (!equipo) return;
     try {
-      await guardarEquipo({ manuales: (equipo.manuales || []).filter((_, i) => i !== indice) }, equipo.id);
-      toast.exito("Manual quitado.");
+      await guardarEquipo({ manuales: (equipo.manuales || []).filter((m) => m.archivoId !== archivoId) }, equipo.id);
+      toast.exito("Documento quitado.");
     } catch (err) {
       toast.error((err as Error).message);
+    }
+  }
+
+  async function guardarEspecificaciones(especificaciones: EspecificacionEquipo[]) {
+    if (!equipo) return;
+    try {
+      await guardarEquipo({ especificaciones }, equipo.id);
+      toast.exito("Especificaciones guardadas.");
+    } catch (err) {
+      toast.error((err as Error).message);
+      throw err;
     }
   }
 
@@ -269,7 +280,11 @@ export default function EquipoDetallePage() {
         }
       />
 
-      <FichaTecnica equipo={equipo} />
+      <FichaTecnica equipo={equipo} editable={puedeEditarChecklist} onGuardarEspecificaciones={guardarEspecificaciones} />
+
+      <Seccion id="documentos" titulo="Documentos" subtitulo="Fichas técnicas y manuales del equipo.">
+        <ManualesBox manuales={equipo.manuales || []} onAdd={agregarManual} onRemove={quitarManual} soloLectura={!puedeSubirManual} />
+      </Seccion>
 
       <FallasEquipo equipoId={equipo.id} fallas={fallasEquipo} tipos={tiposFalla} />
 
@@ -321,9 +336,6 @@ export default function EquipoDetallePage() {
         )}
       </Seccion>
 
-      <Seccion titulo="Manuales">
-        <ManualesBox manuales={equipo.manuales || []} onAdd={agregarManual} onRemove={quitarManual} soloLectura={!puedeSubirManual} />
-      </Seccion>
 
       <Seccion titulo="Repuestos de este equipo">
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--ds-space-3)" }}>

@@ -25,6 +25,14 @@ export interface ManualEquipo {
   contentType?: string;
   sizeBytes?: number;
   subidoEn: string;
+  /** Sección de "Documentos" donde se muestra. Los subidos antes de esto no lo tienen: son manuales. */
+  tipo?: "manual" | "ficha";
+}
+
+/** Dato técnico libre sacado de la ficha técnica (potencia, peso, capacidades...). */
+export interface EspecificacionEquipo {
+  nombre: string;
+  valor: string;
 }
 
 export interface Equipo {
@@ -57,6 +65,7 @@ export interface Equipo {
   ultimaFechaMantenimiento?: string;
   proximaFechaMantenimiento?: string;
   manuales?: ManualEquipo[];
+  especificaciones?: EspecificacionEquipo[];
   creadoEn?: string;
 }
 

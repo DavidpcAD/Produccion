@@ -9,11 +9,11 @@
 // - FallasEquipo: últimas fallas del equipo + enlace al historial completo.
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/mantenimiento/ds/Button/Button";
 import { Pill } from "@/components/mantenimiento/local/Table";
 import { nombreTipo } from "@/lib/mantenimiento/fallas";
-import type { Equipo, EstadoEquipo, OrdenTrabajo, TipoFalla } from "@/lib/mantenimiento/types";
+import type { Equipo, EspecificacionEquipo, EstadoEquipo, OrdenTrabajo, TipoFalla } from "@/lib/mantenimiento/types";
 import "./FichaEquipo.css";
 
 const ESTADO_TONO: Record<EstadoEquipo, "green" | "yellow" | "red"> = { operativo: "green", mantenimiento: "yellow", fuera_servicio: "red" };
@@ -103,7 +103,92 @@ function Bloque({ titulo, filas }: { titulo: string; filas: [string, ReactNode][
   );
 }
 
-export function FichaTecnica({ equipo }: { equipo: Equipo }) {
+// Datos técnicos libres (potencia, peso, capacidades...) cargados desde las
+// fichas técnicas. Se editan todos juntos y se guardan con un solo botón.
+function Especificaciones({
+  especificaciones,
+  editable,
+  onGuardar
+}: {
+  especificaciones: EspecificacionEquipo[];
+  editable: boolean;
+  onGuardar?: (lista: EspecificacionEquipo[]) => Promise<void>;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [borrador, setBorrador] = useState<EspecificacionEquipo[]>([]);
+  const [guardando, setGuardando] = useState(false);
+
+  function empezar() {
+    setBorrador(especificaciones.length ? especificaciones.map((e) => ({ ...e })) : [{ nombre: "", valor: "" }]);
+    setEditando(true);
+  }
+  function cambiar(i: number, campo: keyof EspecificacionEquipo, valor: string) {
+    setBorrador((b) => b.map((e, j) => (j === i ? { ...e, [campo]: valor } : e)));
+  }
+  async function guardar() {
+    if (!onGuardar) return;
+    setGuardando(true);
+    try {
+      await onGuardar(borrador.filter((e) => e.nombre.trim() && e.valor.trim()));
+      setEditando(false);
+    } catch {
+      // el mensaje de error ya lo muestra quien guarda; el borrador queda abierto
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="mnt-ficha__bloque mnt-ficha__bloque--ancho">
+      <div className="mnt-ficha__bloque-cabeza">
+        <h3 className="mnt-ficha__bloque-titulo">Especificaciones</h3>
+        {editable && onGuardar && !editando && <Button label={especificaciones.length ? "Editar" : "Agregar"} color="white" size="sm" onClick={empezar} />}
+      </div>
+
+      {!editando &&
+        (especificaciones.length === 0 ? (
+          <div className="mnt-ficha__vacio">Sin especificaciones todavía. Se cargan desde la ficha técnica del equipo (potencia, peso, capacidades, etc.).</div>
+        ) : (
+          <dl className="mnt-ficha__lista mnt-ficha__lista--columnas">
+            {especificaciones.map((e, i) => (
+              <div key={`${e.nombre}-${i}`} className="mnt-ficha__fila">
+                <dt>{e.nombre}</dt>
+                <dd>{e.valor}</dd>
+              </div>
+            ))}
+          </dl>
+        ))}
+
+      {editando && (
+        <div className="mnt-ficha__editor">
+          {borrador.map((e, i) => (
+            <div key={i} className="mnt-ficha__editor-fila">
+              <input className="ds-form-field__input" placeholder="Dato (ej.: Potencia)" value={e.nombre} maxLength={80} aria-label={`Dato ${i + 1}`} onChange={(ev) => cambiar(i, "nombre", ev.target.value)} />
+              <input className="ds-form-field__input" placeholder="Valor (ej.: 173 hp)" value={e.valor} maxLength={120} aria-label={`Valor ${i + 1}`} onChange={(ev) => cambiar(i, "valor", ev.target.value)} />
+              <Button ariaLabel={`Quitar ${e.nombre || "fila"}`} layout="icon" size="sm" color="white" icon="delete" onClick={() => setBorrador((b) => b.filter((_, j) => j !== i))} />
+            </div>
+          ))}
+          <div className="mnt-ficha__editor-acciones">
+            <Button label="Agregar fila" color="white" size="sm" layout="icon-left" icon="plus" onClick={() => setBorrador((b) => [...b, { nombre: "", valor: "" }])} />
+            <span style={{ flex: 1 }} />
+            <Button label="Cancelar" color="white" size="sm" onClick={() => setEditando(false)} />
+            <Button label={guardando ? "Guardando…" : "Guardar"} color="green" size="sm" state={guardando ? "disabled" : "standard"} onClick={guardar} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function FichaTecnica({
+  equipo,
+  editable = false,
+  onGuardarEspecificaciones
+}: {
+  equipo: Equipo;
+  editable?: boolean;
+  onGuardarEspecificaciones?: (lista: EspecificacionEquipo[]) => Promise<void>;
+}) {
   return (
     <section className="mnt-ficha mnt-ficha--tecnica" aria-label="Ficha técnica">
       <h2 className="mnt-ficha__seccion">Ficha técnica</h2>
@@ -150,6 +235,7 @@ export function FichaTecnica({ equipo }: { equipo: Equipo }) {
             ["Llantas traseras", texto(equipo.llantasTraseras)]
           ]}
         />
+        <Especificaciones especificaciones={equipo.especificaciones ?? []} editable={editable} onGuardar={onGuardarEspecificaciones} />
       </div>
       {equipo.notas?.trim() && (
         <div className="mnt-ficha__notas">

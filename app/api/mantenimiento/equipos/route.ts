@@ -43,8 +43,21 @@ function mapearFila(fila: FilaSql) {
     ultimaFechaMantenimiento: String(fila.ultimaFechaMantenimiento ?? ""),
     proximaFechaMantenimiento: String(fila.proximaFechaMantenimiento ?? ""),
     manuales: parsearJson(fila.manuales, []),
+    especificaciones: parsearJson(fila.especificaciones, []),
     creadoEn: fila.creadoEn ? new Date(fila.creadoEn).toISOString() : undefined
   };
+}
+
+// especificaciones llega con la migración 2026-10-23_mantenimiento_especificaciones_equipo,
+// que en producción se aplica AL ARRANCAR la app. Hasta que exista la columna
+// (o si esa migración fallara) la lista de equipos no puede romperse: se pide
+// sin ella. Una vez que aparece se recuerda y no se vuelve a consultar.
+let hayColumnaEspecificaciones = false;
+async function existeColumnaEspecificaciones(): Promise<boolean> {
+  if (hayColumnaEspecificaciones) return true;
+  const r = await ejecutar((request) => request.query("SELECT COL_LENGTH('mant.Equipos', 'especificaciones') AS largo"));
+  hayColumnaEspecificaciones = r.recordset[0].largo != null;
+  return hayColumnaEspecificaciones;
 }
 
 export async function GET() {
@@ -52,13 +65,16 @@ export async function GET() {
   if (auth.error) return auth.error;
 
   try {
+    const conEspecificaciones = await existeColumnaEspecificaciones();
     const resultado = await ejecutar((request) =>
       request.query(
         "SELECT id, codigo, nombre, tipo, marca, modelo, anio, numeroSerie, horometroActual, " +
           "estado, ubicacion, intervaloHorasPreventivo, notas, fotoId, placa, revisionTecnica, " +
           "fechaIngreso, kilometraje, combustible, filtroAceite, filtroDiesel, filtroAireAcondicionado, " +
           "llantasDelanteras, llantasTraseras, cilindraje, intervaloKilometrajePreventivo, " +
-          "ultimaFechaMantenimiento, proximaFechaMantenimiento, manuales, creadoEn FROM mant.Equipos"
+          "ultimaFechaMantenimiento, proximaFechaMantenimiento, manuales, creadoEn" +
+          (conEspecificaciones ? ", especificaciones" : "") +
+          " FROM mant.Equipos"
       )
     );
     let filas: Record<string, any>[] = resultado.recordset;
