@@ -1,7 +1,7 @@
 /* ============================================================================
    Mantenimiento — datos sacados de las FICHAS TÉCNICAS (2026-10-23).
 
-   Fichas de la carpeta "Fichas Tecnicas" de Steven: EXC-02, EXC-03, RETRO-01, MEZC-01, MEZC-02, COMP-02, MONT-02, TELE-01, COMP-01.
+   Fichas de la carpeta "Fichas Tecnicas" de Steven: EXC-02, EXC-03, RETRO-01, MEZC-01, MEZC-02, COMP-02, MONT-02, TELE-01, COMP-01, COMP-03.
    Generado por script; decisiones confirmadas por Steven el 2026-10-23.
 
    Qué hace, por equipo (buscado por CÓDIGO):
@@ -108,6 +108,16 @@ WHERE codigo = N'COMP-01';
 UPDATE mant.Equipos SET cilindraje = N'1826 cc' WHERE codigo = N'COMP-01' AND cilindraje = N'300';
 UPDATE mant.Equipos SET especificaciones = N'[{"nombre":"Tipo","valor":"Rodillo vibratorio tándem liviano, junta articulada con oscilación"},{"nombre":"Motor","valor":"Kubota D1803-M-DI, 3 cilindros diésel, 1.826 cm³"},{"nombre":"Potencia","valor":"24,8 kW (33,3 HP) según ISO 3046"},{"nombre":"Velocidad nominal del motor","valor":"2.100 / 2.400 rpm"},{"nombre":"Emisiones","valor":"Stage IIIA / EPA Tier 4 Interim"},{"nombre":"Peso de funcionamiento","valor":"2.460 kg (CECE) / 2.655 kg máx."},{"nombre":"Ancho del tambor","valor":"1.200 mm (diámetro 695 mm, espesor 13 mm)"},{"nombre":"Amplitud / frecuencia","valor":"0,5 mm / 58 y 66 Hz"},{"nombre":"Fuerza centrífuga","valor":"38,8 / 46,5 kN"},{"nombre":"Velocidad de traslación","valor":"11 km/h"},{"nombre":"Pendiente superable","valor":"30 % con vibración / 35 % sin vibración"},{"nombre":"Tanque de combustible","valor":"35 L"},{"nombre":"Tanque hidráulico","valor":"28,5 L"},{"nombre":"Tanque de agua (riego)","valor":"190 L"},{"nombre":"Batería","valor":"12 V 77 Ah"},{"nombre":"Espesor máx. de capa","valor":"Arena/grava 250 mm; tierras mixtas 180 mm; asfalto 100 mm"},{"nombre":"Dimensiones","valor":"2.500 × 1.350 × 2.550 mm (largo × ancho × alto); 1.935 mm con ROPS plegado"},{"nombre":"Radio de giro interior","valor":"2.540 mm"}]'
 WHERE codigo = N'COMP-01' AND ISNULL(LTRIM(RTRIM(especificaciones)), N'') IN (N'', N'[]');
+
+-- COMP-03 — ficha: Ammann ARX 26-2 (MSS-2518-01-S1) — misma máquina que COMP-01
+UPDATE mant.Equipos SET
+    marca = CASE WHEN ISNULL(LTRIM(RTRIM(marca)), N'') = N'' THEN N'Ammann' ELSE marca END,
+    modelo = CASE WHEN ISNULL(LTRIM(RTRIM(modelo)), N'') = N'' THEN N'ARX26-2' ELSE modelo END,
+    cilindraje = CASE WHEN ISNULL(LTRIM(RTRIM(cilindraje)), N'') = N'' THEN N'1826 cc' ELSE cilindraje END,
+    combustible = CASE WHEN ISNULL(LTRIM(RTRIM(combustible)), N'') = N'' THEN N'Diesel' ELSE combustible END
+WHERE codigo = N'COMP-03';
+UPDATE mant.Equipos SET especificaciones = N'[{"nombre":"Tipo","valor":"Rodillo vibratorio tándem liviano, junta articulada con oscilación"},{"nombre":"Motor","valor":"Kubota D1803-M-DI, 3 cilindros diésel, 1.826 cm³"},{"nombre":"Potencia","valor":"24,8 kW (33,3 HP) según ISO 3046"},{"nombre":"Velocidad nominal del motor","valor":"2.100 / 2.400 rpm"},{"nombre":"Emisiones","valor":"Stage IIIA / EPA Tier 4 Interim"},{"nombre":"Peso de funcionamiento","valor":"2.460 kg (CECE) / 2.655 kg máx."},{"nombre":"Ancho del tambor","valor":"1.200 mm (diámetro 695 mm, espesor 13 mm)"},{"nombre":"Amplitud / frecuencia","valor":"0,5 mm / 58 y 66 Hz"},{"nombre":"Fuerza centrífuga","valor":"38,8 / 46,5 kN"},{"nombre":"Velocidad de traslación","valor":"11 km/h"},{"nombre":"Pendiente superable","valor":"30 % con vibración / 35 % sin vibración"},{"nombre":"Tanque de combustible","valor":"35 L"},{"nombre":"Tanque hidráulico","valor":"28,5 L"},{"nombre":"Tanque de agua (riego)","valor":"190 L"},{"nombre":"Batería","valor":"12 V 77 Ah"},{"nombre":"Espesor máx. de capa","valor":"Arena/grava 250 mm; tierras mixtas 180 mm; asfalto 100 mm"},{"nombre":"Dimensiones","valor":"2.500 × 1.350 × 2.550 mm (largo × ancho × alto); 1.935 mm con ROPS plegado"},{"nombre":"Radio de giro interior","valor":"2.540 mm"}]'
+WHERE codigo = N'COMP-03' AND ISNULL(LTRIM(RTRIM(especificaciones)), N'') IN (N'', N'[]');
 
 COMMIT TRANSACTION;
 END TRY
