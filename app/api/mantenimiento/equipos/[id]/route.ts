@@ -14,7 +14,7 @@ const COLUMNAS_EDITABLES = [
   "horometroActual", "estado", "ubicacion", "intervaloHorasPreventivo", "intervaloKilometrajePreventivo", "notas", "fotoId",
   "placa", "revisionTecnica", "fechaIngreso", "kilometraje", "combustible", "manuales",
   "filtroAceite", "filtroDiesel", "filtroAireAcondicionado", "llantasDelanteras", "llantasTraseras", "cilindraje",
-  "ultimaFechaMantenimiento", "proximaFechaMantenimiento"
+  "ultimaFechaMantenimiento", "proximaFechaMantenimiento", "especificaciones"
 ];
 
 function valorParaColumna(nombre: string, valor: any): any {
@@ -26,6 +26,15 @@ function valorParaColumna(nombre: string, valor: any): any {
   }
   if (nombre === "manuales") {
     return aJsonONull(valor || []);
+  }
+  if (nombre === "especificaciones") {
+    // Lista de { nombre, valor }: se limpian espacios y se descartan filas vacías.
+    const lista = Array.isArray(valor) ? valor : [];
+    return aJsonONull(
+      lista
+        .map((e: { nombre?: unknown; valor?: unknown }) => ({ nombre: String(e?.nombre ?? "").trim(), valor: String(e?.valor ?? "").trim() }))
+        .filter((e: { nombre: string; valor: string }) => e.nombre && e.valor)
+    );
   }
   if (["codigo", "nombre", "marca", "modelo", "numeroSerie", "ubicacion", "notas", "placa", "revisionTecnica", "fechaIngreso", "filtroAceite", "filtroDiesel", "filtroAireAcondicionado", "llantasDelanteras", "llantasTraseras", "cilindraje", "ultimaFechaMantenimiento", "proximaFechaMantenimiento"].indexOf(nombre) !== -1) {
     return String(valor ?? "").trim();
