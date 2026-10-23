@@ -1,7 +1,7 @@
 /* ============================================================================
    Mantenimiento — datos sacados de las FICHAS TÉCNICAS (2026-10-23).
 
-   7 fichas de la carpeta "Fichas Tecnicas" de Steven: EXC-02, EXC-03, RETRO-01, MEZC-01, MEZC-02, COMP-02, MONT-02.
+   Fichas de la carpeta "Fichas Tecnicas" de Steven: EXC-02, EXC-03, RETRO-01, MEZC-01, MEZC-02, COMP-02, MONT-02, TELE-01, COMP-01.
    Generado por script; decisiones confirmadas por Steven el 2026-10-23.
 
    Qué hace, por equipo (buscado por CÓDIGO):
@@ -90,6 +90,24 @@ WHERE codigo = N'MONT-02';
 UPDATE mant.Equipos SET notas = N'' WHERE codigo = N'MONT-02' AND notas = N'Marca/modelo sin identificar.';
 UPDATE mant.Equipos SET especificaciones = N'[{"nombre":"Capacidad de carga","valor":"2.500 kg con centro de carga a 500 mm"},{"nombre":"Motor","valor":"GCT (ex-Nissan) K25, 4 cilindros, 2.488 cm³, a gas LPG"},{"nombre":"Potencia","valor":"35 kW a 2.400 rpm"},{"nombre":"Peso de servicio","valor":"3.895 kg"},{"nombre":"Transmisión","valor":"Convertidor de par"},{"nombre":"Neumáticos","valor":"Delanteros 7.00-12 12PR; traseros 6.00-9 10PR (inflables)"},{"nombre":"Velocidad","valor":"19,4 km/h con carga / 19,7 km/h en vacío"},{"nombre":"Velocidad de elevación","valor":"0,47 m/s con carga / 0,55 m/s en vacío"},{"nombre":"Horquillas","valor":"40 × 122 × 1.150 mm; tablero clase 2A"},{"nombre":"Radio de giro","valor":"2.265 mm"},{"nombre":"Distancia entre ejes","valor":"1.600 mm"},{"nombre":"Hidráulica para accesorios","valor":"160 bar, 72 L/min"},{"nombre":"Altura de elevación","valor":"Según mástil: 3.000 a 6.500 mm"},{"nombre":"Frenos de servicio","valor":"Hidráulicos"}]'
 WHERE codigo = N'MONT-02' AND ISNULL(LTRIM(RTRIM(especificaciones)), N'') IN (N'', N'[]');
+
+-- TELE-01 — ficha: Manitou MXT 1740 P (julio 2026) — nombre actual del MT-X 1740
+UPDATE mant.Equipos SET
+    modelo = CASE WHEN ISNULL(LTRIM(RTRIM(modelo)), N'') = N'' THEN N'MT-X 1740' ELSE modelo END,
+    cilindraje = CASE WHEN ISNULL(LTRIM(RTRIM(cilindraje)), N'') = N'' THEN N'4400 cc' ELSE cilindraje END,
+    combustible = CASE WHEN ISNULL(LTRIM(RTRIM(combustible)), N'') = N'' THEN N'Diesel' ELSE combustible END
+WHERE codigo = N'TELE-01';
+UPDATE mant.Equipos SET notas = N'' WHERE codigo = N'TELE-01' AND notas LIKE N'Modelo exacto sin confirmar%';
+UPDATE mant.Equipos SET especificaciones = N'[{"nombre":"Ficha de referencia","valor":"Manitou MXT 1740 P (nombre actual del MT-X 1740)"},{"nombre":"Capacidad de carga máx.","valor":"4.000 kg"},{"nombre":"Altura de elevación máx.","valor":"17,40 m"},{"nombre":"Alcance máx.","valor":"13,48 m"},{"nombre":"Motor","valor":"Perkins 1104D-44T, 4 cilindros, 4,4 L"},{"nombre":"Potencia","valor":"92 HP (70 kW)"},{"nombre":"Par máximo","valor":"392 Nm"},{"nombre":"Emisiones","valor":"Stage IIIA"},{"nombre":"Peso","valor":"11.235 kg (con horquillas)"},{"nombre":"Transmisión","valor":"Convertidor de par con caja manual, 4 adelante / 4 atrás"},{"nombre":"Velocidad máxima","valor":"28 km/h"},{"nombre":"Tracción y dirección","valor":"4 ruedas motrices y 4 directrices"},{"nombre":"Frenos","valor":"Multidisco en baño de aceite en ejes delantero y trasero; estacionamiento manual"},{"nombre":"Bomba hidráulica","valor":"De engranajes, 96,7 L/min a 250 bar"},{"nombre":"Aceite hidráulico","valor":"125 L"},{"nombre":"Tanque de combustible","valor":"80 L"},{"nombre":"Horquillas","valor":"1.200 × 125 × 50 mm"},{"nombre":"Dimensiones","valor":"6,20 × 2,38 × 2,59 m (largo al tablero × ancho × alto)"},{"nombre":"Radio de giro exterior","valor":"4,05 m"},{"nombre":"Mandos","valor":"Monopalanca (Monolever)"}]'
+WHERE codigo = N'TELE-01' AND ISNULL(LTRIM(RTRIM(especificaciones)), N'') IN (N'', N'[]');
+
+-- COMP-01 — ficha: Ammann ARX 26-2 (MSS-2518-01-S1)
+UPDATE mant.Equipos SET
+    combustible = CASE WHEN ISNULL(LTRIM(RTRIM(combustible)), N'') = N'' THEN N'Diesel' ELSE combustible END
+WHERE codigo = N'COMP-01';
+UPDATE mant.Equipos SET cilindraje = N'1826 cc' WHERE codigo = N'COMP-01' AND cilindraje = N'300';
+UPDATE mant.Equipos SET especificaciones = N'[{"nombre":"Tipo","valor":"Rodillo vibratorio tándem liviano, junta articulada con oscilación"},{"nombre":"Motor","valor":"Kubota D1803-M-DI, 3 cilindros diésel, 1.826 cm³"},{"nombre":"Potencia","valor":"24,8 kW (33,3 HP) según ISO 3046"},{"nombre":"Velocidad nominal del motor","valor":"2.100 / 2.400 rpm"},{"nombre":"Emisiones","valor":"Stage IIIA / EPA Tier 4 Interim"},{"nombre":"Peso de funcionamiento","valor":"2.460 kg (CECE) / 2.655 kg máx."},{"nombre":"Ancho del tambor","valor":"1.200 mm (diámetro 695 mm, espesor 13 mm)"},{"nombre":"Amplitud / frecuencia","valor":"0,5 mm / 58 y 66 Hz"},{"nombre":"Fuerza centrífuga","valor":"38,8 / 46,5 kN"},{"nombre":"Velocidad de traslación","valor":"11 km/h"},{"nombre":"Pendiente superable","valor":"30 % con vibración / 35 % sin vibración"},{"nombre":"Tanque de combustible","valor":"35 L"},{"nombre":"Tanque hidráulico","valor":"28,5 L"},{"nombre":"Tanque de agua (riego)","valor":"190 L"},{"nombre":"Batería","valor":"12 V 77 Ah"},{"nombre":"Espesor máx. de capa","valor":"Arena/grava 250 mm; tierras mixtas 180 mm; asfalto 100 mm"},{"nombre":"Dimensiones","valor":"2.500 × 1.350 × 2.550 mm (largo × ancho × alto); 1.935 mm con ROPS plegado"},{"nombre":"Radio de giro interior","valor":"2.540 mm"}]'
+WHERE codigo = N'COMP-01' AND ISNULL(LTRIM(RTRIM(especificaciones)), N'') IN (N'', N'[]');
 
 COMMIT TRANSACTION;
 END TRY
