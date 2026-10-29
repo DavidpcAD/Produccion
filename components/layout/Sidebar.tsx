@@ -43,6 +43,10 @@ interface NavItemDef {
 // persona puede abrir (ver `rutaDeEntrada` en lib/permissions.ts). Si se agrega una
 // entrada nueva arriba, acordate de agregarla también en RUTAS_DE_ENTRADA.
 const navItems: NavItemDef[] = [
+  // Gerencia (KPI Adelante): tablero de KPIs. Solo lo ve el rol "Gerencia" (y
+  // Super Admin), por el módulo 'gerencia'. Su ruta /gerencia está en
+  // RUTAS_DE_ENTRADA (lib/permissions.ts) para que ese rol entre acá al abrir la app.
+  { href: '/gerencia',  label: 'Gerencia',      icon: 'kanban',    minLevel: 4 },
   { href: '/proyectos', label: 'Proyectos',     icon: 'folder',    minLevel: 2 },
   { href: '/obras',     label: 'Obras',         icon: 'place',     minLevel: 2 },
   { href: '/cuadrillas',label: 'Cuadrillas',    icon: 'cuadrillas',minLevel: 2 },

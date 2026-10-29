@@ -60,6 +60,7 @@ const ROLES: [string, string][] = [
   ['Ingenieria', 'Obra Gris'], ['Ingenieria', 'PostVenta'],
   ['Presupuestista', 'General'],
   ['Mantenimiento', 'General'],
+  ['Gerencia', 'General'],
 ];
 
 let fallas = 0;

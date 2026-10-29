@@ -55,6 +55,9 @@ const MODULE_LEVEL: Record<string, number> = {
   // Mantenimiento es operativo: no debe elevar el nivel del usuario (con 4 vería
   // todo lo demás). El rol "Mantenimiento" queda en nivel 1, igual que Bodega.
   mantenimiento: 1,
+  // Gerencia solo VE KPIs (lectura): no debe elevar el nivel del usuario. El rol
+  // "Gerencia" queda en nivel 1; entra a su tablero por módulo, no por nivel.
+  gerencia: 1,
 };
 
 /** Calcula el nivelAdmin efectivo a partir de los roles del usuario.
@@ -127,6 +130,10 @@ export function getRouteLevel(pathname: string): number {
   // tiene rol de Producción). El nivel 4 solo cierra la puerta a los usuarios
   // SIN rol de Producción —que caen por nivel— para que nadie llegue por URL.
   if (pathname.startsWith('/mantenimiento')) return 4;
+  // Gerencia: igual criterio que Mantenimiento. El acceso real lo da el MÓDULO
+  // 'gerencia' del rol; el nivel 4 solo cierra la puerta por URL a quien NO tiene
+  // rol de Producción (cae por nivel).
+  if (pathname.startsWith('/gerencia')) return 4;
   if (pathname.startsWith('/utilidades')) return 2;
   if (pathname.startsWith('/avance')) return 2;
   if (pathname.startsWith('/marcaje')) return 2;
@@ -161,7 +168,12 @@ export type Modulo =
   // Mantenimiento (Control de Reparaciones): equipos, OTs, preventivo, repuestos.
   // Módulo propio del rol "Mantenimiento" (idApp 10); nadie más lo ve salvo Super
   // Admin. El app en sí se embebe (ver app/(protected)/mantenimiento).
-  | 'mantenimiento';
+  | 'mantenimiento'
+  // Gerencia (KPI Adelante): tablero de KPIs para el equipo gerencial. Módulo
+  // propio del rol "Gerencia" (idApp 10) y EXCLUSIVO: SOLO lo ve ese rol, ni
+  // siquiera el Super Admin (ver MODULOS_EXCLUSIVOS). Es solo lectura (datos de
+  // ejemplo del prototipo), sin API propia. Ver app/(protected)/gerencia.
+  | 'gerencia';
 
 /** ── Interruptor de "Avance de obra" ──────────────────────────────────────
  *  El módulo está incompleto, así que NO sale a producción todavía: en `false`
@@ -172,11 +184,17 @@ export type Modulo =
 export const AVANCE_OBRA_ACTIVO = false;
 
 const MODULOS_BASE: Modulo[] =
-  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas', 'mantenimiento'];
+  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas', 'mantenimiento', 'gerencia'];
 
 /** Módulos publicados (los apagados no salen para nadie). */
 export const MODULOS_TODOS: Modulo[] =
   MODULOS_BASE.filter((m) => m !== 'avance' || AVANCE_OBRA_ACTIVO);
+
+/** Módulos EXCLUSIVOS: el comodín '*' (Super Admin) NO los otorga. Solo los ve el
+ *  rol que los tiene asignado explícitamente. Gerencia es así por pedido de David
+ *  (2026-10-29): el tablero de KPIs es SOLO del rol "Gerencia", ni el Super Admin
+ *  lo ve. (Un usuario que tenga Super Admin Y Gerencia sí lo ve, por su rol Gerencia.) */
+export const MODULOS_EXCLUSIVOS: Modulo[] = ['gerencia'];
 
 /** Cómo se llama cada módulo para una persona. Se usa al rebotar a alguien de
  *  una ruta que no le toca: decirle "no tenés acceso a Desembolsos" es una
@@ -193,6 +211,7 @@ const NOMBRE_MODULO: Record<Modulo, string> = {
   admin: 'Administración',
   cuadrillas: 'Cuadrillas',
   mantenimiento: 'Mantenimiento',
+  gerencia: 'Gerencia',
 };
 
 /** Pantallas que comparten módulo pero tienen nombre propio. Casi todas caen en
@@ -279,6 +298,10 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   if (n.startsWith('superadmin') || n === 'super admin' || n === 'administrador' ||
       t === 'super admin' || t === 'superadmin' || t === 'superadministrador') return '*';
   if (n === 'presupuestista') return ['presupuesto'];
+  // Gerencia (KPI Adelante): su único módulo 'gerencia' (tablero de KPIs). Se
+  // matchea por NOMBRE, igual que presupuestista/mantenimiento (el tipo del rol es
+  // "General"/vacío). Es EXCLUSIVO: el '*' del Super Admin NO lo otorga, solo este rol.
+  if (n === 'gerencia' || n === 'gerente') return ['gerencia'];
   // Ingeniería = Órdenes de Compra ('ingenieria'), Avance de obra ('avance') y
   // Cuadrillas ('cuadrillas'). Si Avance está apagado, computeAllowedModules lo saca.
   // El 2026-10-07 se le había quitado 'cuadrillas' (el ingeniero "no administra
@@ -332,6 +355,7 @@ export function computeAllowedModules(
 ): Modulo[] | null {
   const mods = new Set<Modulo>(['dashboard']);
   let known = false;
+  let comodin = false; // algún rol es Super Admin ('*')
   // Solo cuentan los roles de Producción (idApp 10). Los de otras apps (ej. un
   // "Administrador" legacy) NO deben dar acceso aquí.
   for (const r of roles) {
@@ -339,9 +363,14 @@ export function computeAllowedModules(
     const m = modulosDeRol(r.nombre, r.tipo);
     if (m === undefined) continue;
     known = true;
-    if (m === '*') return [...MODULOS_TODOS];
+    if (m === '*') { comodin = true; continue; }
     for (const x of m) mods.add(x);
   }
+  // El '*' (Super Admin) da TODOS los módulos publicados MENOS los exclusivos (ver
+  // MODULOS_EXCLUSIVOS). Se resuelve DESPUÉS del loop —y no con un return al toparse
+  // con '*'— para no perder un módulo exclusivo que otro rol del MISMO usuario sí
+  // otorgue (ej. alguien que sea Super Admin Y Gerencia).
+  if (comodin) for (const x of MODULOS_TODOS) if (!MODULOS_EXCLUSIVOS.includes(x)) mods.add(x);
   // Los módulos apagados (ver AVANCE_OBRA_ACTIVO) no se entregan a nadie.
   return known ? [...mods].filter(moduloPublicado) : null;
 }
@@ -411,6 +440,9 @@ export function getRouteModule(pathname: string): Modulo {
   // Mantenimiento: la página /mantenimiento y sus sub-rutas (la app de Steven
   // embebida; su API vive en SU propio deploy, no en Produccion).
   if (p.startsWith('/mantenimiento')) return 'mantenimiento';
+  // Gerencia: la página /gerencia (tablero de KPIs). Sin API propia (datos de
+  // ejemplo); el gateo basta con la pantalla.
+  if (p.startsWith('/gerencia')) return 'gerencia';
   // Marcaje va con Reporte H4: es la misma familia (marcas de los relojes de H4) y
   // no cuelga de ningún menú — se entra escribiendo la dirección. Sin esto caía en
   // 'dashboard', o sea abierto a cualquiera con rol de Producción.
@@ -489,6 +521,10 @@ const RUTAS_DE_ENTRADA: { href: string; minLevel: number }[] = [
   { href: '/bc/integracion', minLevel: 2 },
   { href: '/avance', minLevel: 2 },
   { href: '/concreto/dashboard', minLevel: 2 },
+  // Gerencia: el rol "Gerencia" solo lleva este módulo, así que su pantalla de
+  // entrada es el tablero de KPIs. Va DESPUÉS de /proyectos para no cambiar la
+  // entrada del Super Admin (que sigue entrando en /proyectos).
+  { href: '/gerencia', minLevel: 4 },
   // Mantenimiento va ANTES de Órdenes de Compra: el rol "Mantenimiento" también
   // lleva 'bodega' (pedir material), así que sin esto aterrizaría en "Mis
   // solicitudes" en vez de en su app. Va DESPUÉS de los módulos de Presupuesto

@@ -26,6 +26,9 @@ const CLAVES = [
   // La caché local del bootstrap (precios, proveedores, obras): es de la persona,
   // no del aparato, así que se va con ella (ver lib/compras/cache-local.ts).
   'adelante_oc_cache_v1',
+  // El tablero de KPIs de Gerencia (qué KPIs eligió cada gerente): es de la
+  // persona, no del aparato (ver components/gerencia/KpiApp.tsx).
+  'adelante_kpi_tablero_v1',
 ];
 
 /** Prefijos que se van (los borradores de plantilla llevan el id pegado). */
