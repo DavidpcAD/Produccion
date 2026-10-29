@@ -1,5 +1,33 @@
 import type { NextConfig } from "next";
 
+// La Content Security Policy (explicada abajo, en `securityHeaders`) en función
+// de quién puede enmarcar la página: todo Produccion va con 'none' y solo el
+// tablero de Gerencia necesita 'self' (ver headers()).
+function csp(frameAncestors: string) {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https://*.blob.core.windows.net",
+    // El websocket de Fast Refresh de `next dev` vive en ws://127.0.0.1:<puerto>,
+    // que `'self'` no cubre: en desarrollo la consola se llenaba de "violates
+    // the following Content Security Policy directive" y el refresco en caliente
+    // quedaba a medias. Se abre ws: SOLO en desarrollo; en producción no hay
+    // websocket que valga y la directiva queda igual de cerrada que antes.
+    `connect-src 'self' https://login.microsoftonline.com https://api.businesscentral.dynamics.com${process.env.NODE_ENV === 'development' ? ' ws://localhost:* ws://127.0.0.1:*' : ''}`,
+    // Nada de <object>/<embed>: no se usan y son vector clásico de inyección.
+    "object-src 'none'",
+    // Que un HTML inyectado no pueda cambiar la base de las URLs relativas.
+    "base-uri 'self'",
+    // Un formulario de esta app solo puede enviar a esta app: si alguien logra
+    // inyectar un <form>, no puede mandarse las credenciales a otro dominio.
+    "form-action 'self'",
+    `frame-ancestors ${frameAncestors}`,
+    "upgrade-insecure-requests",
+  ].join('; ');
+}
+
 const securityHeaders = [
   // Forzar HTTPS — cualquier recurso debe cargarse sobre HTTPS
   {
@@ -42,28 +70,7 @@ const securityHeaders = [
   // pruebas, no de arrastre en un cambio de seguridad.
   {
     key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.blob.core.windows.net",
-      // El websocket de Fast Refresh de `next dev` vive en ws://127.0.0.1:<puerto>,
-      // que `'self'` no cubre: en desarrollo la consola se llenaba de "violates
-      // the following Content Security Policy directive" y el refresco en caliente
-      // quedaba a medias. Se abre ws: SOLO en desarrollo; en producción no hay
-      // websocket que valga y la directiva queda igual de cerrada que antes.
-      `connect-src 'self' https://login.microsoftonline.com https://api.businesscentral.dynamics.com${process.env.NODE_ENV === 'development' ? ' ws://localhost:* ws://127.0.0.1:*' : ''}`,
-      // Nada de <object>/<embed>: no se usan y son vector clásico de inyección.
-      "object-src 'none'",
-      // Que un HTML inyectado no pueda cambiar la base de las URLs relativas.
-      "base-uri 'self'",
-      // Un formulario de esta app solo puede enviar a esta app: si alguien logra
-      // inyectar un <form>, no puede mandarse las credenciales a otro dominio.
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-      "upgrade-insecure-requests",
-    ].join('; '),
+    value: csp("'none'"),
   },
 ];
 
@@ -88,6 +95,14 @@ const nextConfig: NextConfig = {
       {
         source: '/(.*)',
         headers: securityHeaders,
+      },
+      {
+        // Tablero de Gerencia: la app de Marcos corre tal cual dentro de un iframe
+        // en /gerencia (ver components/gerencia/KpiFrame.tsx), así que SU documento
+        // sí puede ser enmarcado, solo por esta misma app. Va después de la regla
+        // general a propósito: si dos reglas ponen la misma cabecera, gana la última.
+        source: '/gerencia-app/:path*',
+        headers: [{ key: 'Content-Security-Policy', value: csp("'self'") }],
       },
     ];
   },

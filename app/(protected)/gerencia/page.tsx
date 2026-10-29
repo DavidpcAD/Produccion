@@ -1,8 +1,8 @@
-import { KpiApp } from '@/components/gerencia/KpiApp';
+import { KpiFrame } from '@/components/gerencia/KpiFrame';
 
-// Tablero de KPIs para Gerencia (ver components/gerencia). El acceso lo gatea el
-// módulo 'gerencia' del rol (lib/permissions.ts): solo el rol "Gerencia" y Super
-// Admin. Sin API propia: son datos de ejemplo del prototipo.
+// Tablero de KPIs para Gerencia: la app de Marcos tal cual (ver KpiFrame). El
+// acceso lo gatea el módulo 'gerencia' del rol (lib/permissions.ts): SOLO el rol
+// "Gerencia", ni el Super Admin. Sin API propia: son datos de ejemplo.
 export default function GerenciaPage() {
-  return <KpiApp />;
+  return <KpiFrame />;
 }
