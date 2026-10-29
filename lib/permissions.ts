@@ -440,8 +440,10 @@ export function getRouteModule(pathname: string): Modulo {
   // Mantenimiento: la página /mantenimiento y sus sub-rutas (la app de Steven
   // embebida; su API vive en SU propio deploy, no en Produccion).
   if (p.startsWith('/mantenimiento')) return 'mantenimiento';
-  // Gerencia: la página /gerencia (tablero de KPIs). Sin API propia (datos de
-  // ejemplo); el gateo basta con la pantalla.
+  // Gerencia: la página /gerencia (tablero de KPIs) Y /gerencia-app/*, los
+  // archivos de la app de Marcos que esa página carga en un iframe (están en
+  // public/, y el proxy también los filtra: su matcher no excluye public). Sin API
+  // propia (datos de ejemplo).
   if (p.startsWith('/gerencia')) return 'gerencia';
   // Marcaje va con Reporte H4: es la misma familia (marcas de los relojes de H4) y
   // no cuelga de ningún menú — se entra escribiendo la dirección. Sin esto caía en

@@ -27,8 +27,10 @@ const CLAVES = [
   // no del aparato, así que se va con ella (ver lib/compras/cache-local.ts).
   'adelante_oc_cache_v1',
   // El tablero de KPIs de Gerencia (qué KPIs eligió cada gerente): es de la
-  // persona, no del aparato (ver components/gerencia/KpiApp.tsx).
-  'adelante_kpi_tablero_v1',
+  // persona, no del aparato. Lo guarda la app de Marcos dentro de su iframe, que
+  // es del mismo origen y comparte este localStorage (ver
+  // components/gerencia/KpiFrame.tsx); la clave es la de SU código.
+  'adelante-kpi-slots-v1',
 ];
 
 /** Prefijos que se van (los borradores de plantilla llevan el id pegado). */

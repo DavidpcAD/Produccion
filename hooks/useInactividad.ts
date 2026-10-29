@@ -93,6 +93,14 @@ export function seguirAqui() {
   marcarActividad();
 }
 
+/** Actividad que esta ventana no escucha: los toques dentro de un iframe no
+ *  burbujean hasta `window`. El tablero de Gerencia corre en uno (ver
+ *  components/gerencia/KpiFrame.tsx) y sin esto la sesión se cerraría a los
+ *  30 min aunque el gerente lo esté usando. */
+export function registrarActividad() {
+  marcarActividad();
+}
+
 // ── Cierre ──────────────────────────────────────────────────────────────────
 
 let cerrando = false;

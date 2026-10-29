@@ -1,0 +1,1328 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="KPI Adelante"><meta name="theme-color" content="#F4F6F8"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" type="image/png" href="icon-192.png"><link rel="manifest" href="manifest.webmanifest"></head><body>
+<title>KPI Adelante</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;1,700;1,800;1,900&family=Barlow:wght@400;500;600&display=swap">
+<!-- Produccion: en el original esto era <script src="https://unpkg.com/@phosphor-icons/web@2.1.1">, que solo inyecta estas hojas de estilo desde unpkg. La CSP de Produccion no deja cargar scripts de terceros, asi que van copias locales de la MISMA version (solo los 3 pesos que se usan). Es el unico cambio respecto al index.html de Marcos (github.com/onexmac/kpi). -->
+<link rel="stylesheet" href="vendor/phosphor/regular/style.css">
+<link rel="stylesheet" href="vendor/phosphor/bold/style.css">
+<link rel="stylesheet" href="vendor/phosphor/fill/style.css">
+<style>
+/* Layout: phone column. Header de semana, grilla 2 columnas (hero, pares, ancho), barra inferior.
+   Mezcla: tiles vacíos estilo Losa Flotante (azul) + KPIs con tipografía condensada itálica estilo Nike Run. */
+:root {
+  --ground: #F4F6F8;
+  --surface: #FFFFFF;
+  --ink: #0B0C0D;
+  --ink-2: #5B6470;
+  --line: #DADFE5;
+  --losa: #4FA3E0;          /* foco y enlaces */
+  --slot: #ADD010;          /* borde y + de placeholders */
+  --slot-fill: #EEF6CC;     /* relleno de placeholders */
+  --volt: #ADD010;          /* hero y acentos de dato */
+  --volt-deep: #4F6006;     /* botones sobre volt */
+  --tile-dark: #111315;
+  --good: #3DDC84;
+  --bad: #FF6B5E;
+  --scrim: rgba(28, 32, 38, .34);
+
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue Condensed", Impact, sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+
+  --r-tile: 24px;
+  --r-card: 30px;
+  --ease-snap: cubic-bezier(.2, .9, .25, 1.15);
+  --hold: 450ms;
+  color-scheme: light;
+}
+/* El documento nunca scrollea (en iOS eso arrastra todo el webview). Cada pantalla es su propio
+   contenedor con el rebote nativo; contain evita que el gesto se pase al documento. */
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.scroller { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+.scroller > .app, .scroller > .alerts { min-height: calc(100% + 1px); box-sizing: border-box; }
+#s-inicio { background: var(--ground); }
+#s-alertas { background: var(--surface); }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+body.locked { overflow: hidden; }
+
+.app {
+  max-width: 440px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+  padding-block: 18px calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------- Header ---------- */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { font-family: var(--display); font-weight: 800; font-style: italic; font-size: 20px; letter-spacing: .02em; text-transform: uppercase; }
+.brand span { color: var(--ink-2); font-weight: 600; font-style: normal; letter-spacing: .08em; font-size: 14px; margin-left: 6px; }
+.sample { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); border: 1.5px solid var(--line); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.hello { padding-block: 34px 22px; }
+.hello h1 { margin: 0; font-family: var(--display); font-weight: 900; font-style: italic; font-size: clamp(52px, 16vw, 68px); line-height: .86; letter-spacing: -.01em; text-transform: uppercase; text-wrap: balance; }
+.hello p { margin: 10px 0 0; font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+
+/* ---------- Grid ---------- */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.tile {
+  position: relative;
+  border: 0;
+  margin: 0;
+  padding: 16px 16px 14px;
+  border-radius: var(--r-tile);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  transition: transform 420ms var(--ease-snap);
+}
+.tile:focus-visible { outline: 3px solid var(--losa); outline-offset: 3px; }
+.tile.hero { grid-column: span 2; height: 232px; }
+.tile.sm { height: 156px; }
+.tile.wide { grid-column: span 2; height: 136px; }
+.tile.pressing { transform: scale(.955); transition: transform var(--hold) cubic-bezier(.25, .7, .3, 1); }
+.tile.popped { transform: scale(1.025); transition: transform 160ms ease-out; }
+
+.tile.empty {
+  background: var(--slot-fill);
+  box-shadow: inset 0 0 0 2.5px var(--slot);
+  display: grid;
+  place-items: center;
+}
+.plus { width: 40px; height: 40px; position: relative; }
+.plus::before, .plus::after { content: ""; position: absolute; background: var(--slot); border-radius: 3px; }
+.plus::before { left: 0; right: 0; top: 50%; height: 8px; margin-top: -4px; }
+.plus::after { top: 0; bottom: 0; left: 50%; width: 8px; margin-left: -4px; }
+.tile.empty .slot-hint { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--volt-deep); }
+
+.tile.filled { background: var(--tile-dark); color: #fff; display: flex; flex-direction: column; }
+.tile.filled.hero { background: var(--volt); color: var(--ink); }
+.t-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.t-label { font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; line-height: 1.05; min-width: 0; }
+.t-app { font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: .1em; opacity: .55; flex: none; }
+.t-num { margin-top: auto; font-family: var(--display); font-weight: 900; font-style: italic; line-height: .82; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tile.sm .t-num { font-size: 54px; color: var(--volt); }
+.tile.wide .t-num { font-size: 62px; color: var(--volt); }
+.tile.hero .t-num { font-size: 112px; }
+.t-unit { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .8; margin-top: 6px; }
+.t-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.delta { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .04em; border-radius: 999px; padding: 3px 9px 2px; background: rgba(255, 255, 255, .1); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tile.hero .delta, .tile.wide .delta { }
+.tile.hero .delta { background: var(--ink); }
+.delta.good { color: var(--good); }
+.delta.bad { color: var(--bad); }
+.delta.flat { color: #C9CED4; }
+.spark { position: absolute; right: 14px; bottom: 16px; width: 46%; height: 64px; pointer-events: none; }
+.tile.wide .spark { width: 44%; height: 58px; bottom: 18px; }
+.tile.wide .t-foot { width: 52%; }
+.tile.hero .t-foot { width: 50%; }
+
+/* ---------- Bottom bar ---------- */
+.bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+}
+.bar-in { max-width: 440px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px max(12px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; border: 0; background: none; cursor: pointer; color: var(--ink-2); font: 700 11px var(--display); letter-spacing: .08em; text-transform: uppercase; }
+.tab .ic { display: grid; place-items: center; width: 56px; height: 32px; border-radius: 999px; }
+.tab i { font-size: 24px; line-height: 1; }
+.tab[aria-current="page"] { color: var(--ink); }
+.tab[aria-current="page"] .ic { background: var(--volt); }
+.tab:focus-visible { outline: 3px solid var(--losa); outline-offset: -3px; border-radius: 14px; }
+
+/* ---------- Picker (popup) ---------- */
+.scrim { position: fixed; inset: 0; z-index: 20; background: var(--scrim); }
+.card {
+  position: fixed; z-index: 21;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .06), 0 24px 60px rgba(20, 24, 30, .22);
+  overflow: hidden;
+}
+.card-in { display: flex; flex-direction: column; height: 100%; }
+.card-head { padding: 22px 22px 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.card-head h2 { margin: 0; font-family: var(--display); font-weight: 900; font-style: italic; font-size: 36px; line-height: .9; text-transform: uppercase; }
+.card-head p { margin: 6px 0 0; font-size: 13px; color: var(--ink-2); }
+.x { flex: none; width: 36px; height: 36px; border-radius: 12px; border: 0; background: var(--ground); cursor: pointer; display: grid; place-items: center; }
+.x svg { width: 14px; height: 14px; }
+.x:focus-visible, .chip:focus-visible, .row:focus-visible, .remove:focus-visible, .back:focus-visible { outline: 3px solid var(--losa); outline-offset: 2px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 6px 22px 12px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1.5px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px 5px; font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--volt); }
+.list { flex: 1; overflow-y: auto; padding: 0 12px 12px; overscroll-behavior: contain; }
+.group { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); padding: 14px 10px 6px; }
+.row { width: 100%; display: grid; grid-template-columns: 78px 1fr auto; align-items: center; gap: 12px; padding: 10px; border: 0; background: none; border-radius: 16px; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.row:hover { background: var(--ground); }
+.row, .group { overflow: hidden; transform-origin: 30px 50%; }
+.row.current { background: var(--volt); }
+.row-num { font-family: var(--display); font-weight: 900; font-style: italic; font-size: 30px; line-height: .9; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.row-txt { min-width: 0; }
+.row-txt b { display: block; font-weight: 600; font-size: 15px; line-height: 1.2; }
+.row-txt small { display: block; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.row.current .row-txt small { color: var(--ink); opacity: .7; }
+.tag { font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); border: 1.5px solid var(--line); border-radius: 999px; padding: 2px 8px 1px; white-space: nowrap; }
+.row.current .tag { border-color: var(--ink); color: var(--ink); }
+.card-foot { padding: 10px 22px 18px; border-top: 1px solid var(--line); }
+.remove { width: 100%; border: 0; background: var(--ground); border-radius: 14px; padding: 13px; font: 600 14px var(--body); color: var(--bad); cursor: pointer; }
+
+/* ---------- Detail ---------- */
+.detail { position: fixed; z-index: 30; background: var(--tile-dark); overflow: hidden; }
+.detail-in { position: absolute; left: 0; top: 0; overflow-y: auto; overscroll-behavior: contain; color: #fff; touch-action: pan-y; }
+.d-top {
+  background: var(--volt); color: var(--ink);
+  padding: calc(14px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) 74px max(20px, env(safe-area-inset-left, 0px));
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%);
+}
+.d-bar { display: flex; justify-content: space-between; align-items: center; max-width: 440px; margin: 0 auto; }
+.d-nav { position: sticky; bottom: 0; z-index: 2; background: color-mix(in srgb, var(--tile-dark) 86%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid #23272B; padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.d-nav-in { max-width: 440px; margin: 0 auto; display: flex; }
+.back { height: 52px; padding: 0 22px 0 14px; border-radius: 16px; border: 0; background: var(--volt); color: var(--ink); cursor: pointer; display: flex; align-items: center; gap: 6px; font: italic 900 22px var(--display); text-transform: uppercase; }
+.back i { font-size: 24px; }
+.d-app { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; background: var(--volt-deep); color: var(--volt); border-radius: 12px; padding: 8px 12px 7px; }
+.d-main { max-width: 440px; margin: 0 auto; text-align: center; padding-top: 22px; }
+.d-label { font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: .1em; text-transform: uppercase; }
+.d-num { font-family: var(--display); font-weight: 900; font-style: italic; font-size: clamp(110px, 38vw, 168px); line-height: .84; letter-spacing: -.03em; margin-top: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.d-unit { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: .02em; text-transform: uppercase; margin-top: 8px; }
+.d-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 26px; }
+.d-stats div { min-width: 0; }
+.d-stats small { display: block; font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--volt-deep); }
+.d-stats b { display: block; font-family: var(--display); font-weight: 800; font-size: 30px; line-height: 1; margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.d-body { max-width: 440px; margin: 0 auto; padding: 8px max(20px, env(safe-area-inset-right, 0px)) 28px max(20px, env(safe-area-inset-left, 0px)); }
+.d-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 22px 0 10px; }
+.d-h h3 { margin: 0; font-family: var(--display); font-weight: 800; font-style: italic; font-size: 24px; text-transform: uppercase; color: var(--volt); }
+.d-h span { font-size: 12px; color: #9AA3AD; }
+.chart { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: .06em; fill: #8E98A3; }
+.chart .end { fill: var(--volt); font-weight: 800; font-size: 14px; }
+.splits { display: flex; flex-direction: column; gap: 8px; }
+.split { display: grid; grid-template-columns: 1fr auto 74px; gap: 12px; align-items: center; background: #1C1F22; border-radius: 16px; padding: 14px 16px; }
+.split span { font-size: 15px; font-weight: 500; min-width: 0; }
+.split b { font-family: var(--display); font-weight: 800; font-size: 24px; font-variant-numeric: tabular-nums; }
+.split i { font-style: normal; font-family: var(--display); font-weight: 700; font-size: 15px; text-align: right; font-variant-numeric: tabular-nums; }
+.split i.good { color: var(--good); } .split i.bad { color: var(--bad); } .split i.flat { color: #9AA3AD; }
+.d-note { margin-top: 18px; font-size: 13px; line-height: 1.45; color: #9AA3AD; }
+
+/* ---------- Alertas ---------- */
+body[data-tab="alertas"] { background: var(--surface); }
+.alerts { max-width: 464px; margin: 0 auto; padding: 18px 0 calc(var(--bar-h, 130px) + 24px); }
+.alerts .top, .alerts .hello { padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+.chat-row { display: grid; grid-template-columns: 60px 1fr; column-gap: 20px; align-items: center; width: 100%; border: 0; background: none; padding: 0 0 0 max(12px, env(safe-area-inset-left, 0px)); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.chat-row { overflow: hidden; transform-origin: 30px 50%; }
+.chat-row:active { background: var(--ground); }
+.sk-b { display: block; border-radius: 8px; background: linear-gradient(90deg, #E6E9ED 0 40%, #F4F6F8 50%, #E6E9ED 60%) 0 0 / 300% 100%; animation: sk 1.1s linear infinite; }
+.sk-media { height: 180px; border-radius: 0; }
+@keyframes sk { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.chat-row:focus-visible { outline: 3px solid var(--losa); outline-offset: -3px; }
+.chat-row .av { width: 60px; height: 60px; margin: 10px 0; }
+.chat-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 81px; border-bottom: 1px solid var(--line); padding-right: max(20px, env(safe-area-inset-right, 0px)); min-width: 0; }
+.chat-name { font: 700 24px/1 var(--display); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge { flex: none; min-width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; padding: 0 10px; box-sizing: border-box; font: 700 22px/1 var(--display); color: #fff; font-variant-numeric: tabular-nums; }
+.badge.urgent { background: #D8524F; }
+.badge.unread { background: #0A8FD8; }
+.badge.muted { background: #C8A46C; }
+.av { border-radius: 50%; display: grid; place-items: center; overflow: hidden; flex: none; font: italic 900 22px var(--display); }
+.av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chipbar { background: #000; }
+.chipbar-in { max-width: 464px; margin: 0 auto; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 12px max(20px, env(safe-area-inset-right, 0px)) 12px max(20px, env(safe-area-inset-left, 0px)); }
+.chipbar-in::-webkit-scrollbar { display: none; }
+.fchip { flex: 1 0 auto; border: 1.5px solid var(--volt); border-radius: 10px; background: none; color: var(--volt); padding: 6px 12px 5px; font: italic 900 20px/1.1 var(--display); text-transform: uppercase; cursor: pointer; }
+.fchip[aria-pressed="true"] { background: var(--volt); color: var(--ink); }
+.fchip:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* ---------- Chat ---------- */
+.chat { position: fixed; inset: 0; z-index: 30; background: var(--ground); }
+.chat-in { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; display: flex; flex-direction: column; color: var(--ink); }
+.feed { flex: 1 0 auto; width: 100%; max-width: 464px; align-self: center; box-sizing: border-box; padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.msg { background: var(--surface); border-radius: 30px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0, 0, 0, .05), 0 6px 16px rgba(20, 24, 30, .08); }
+.msg-h { display: flex; justify-content: space-between; gap: 12px; padding: 24px 24px 20px; }
+.msg-lot { font: italic 900 38px/.9 var(--display); letter-spacing: -.01em; }
+.msg-place, .msg-time { font: 700 20px/1 var(--display); text-transform: uppercase; color: #8E949B; margin-top: 8px; }
+.msg-r { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.msg-who { font: 700 20px/1 var(--display); text-transform: uppercase; }
+.bars { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.pbar { display: block; width: 80px; height: 14px; border-radius: 999px; background: #3A3D40; overflow: hidden; }
+.pbar i { display: block; height: 100%; border-radius: 999px; }
+.dots { display: flex; justify-content: flex-end; gap: 5px; }
+.dots i { width: 16px; height: 16px; border-radius: 50%; background: #3A3D40; }
+.dots i.on { background: #0A8FD8; }
+.dots i.done { background: var(--volt); }
+.dots i.miss { background: #D8524F; }
+/* Foto señalada por seguridad */
+.ph-grid > div.flagged, .pd-photo.flagged { outline: 4px solid #D8524F; outline-offset: -4px; }
+.trk { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.trk > div { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; font: 700 12px/1.1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: #6B747E; }
+.trk i { width: 22px; height: 22px; border-radius: 50%; background: #2A2E33; }
+.trk .on { color: #fff; } .trk .on i { background: #0A8FD8; }
+.trk .done { color: var(--volt); } .trk .done i { background: var(--volt); }
+.trk .miss { color: #D8524F; } .trk .miss i { background: #D8524F; }
+.msg-cam { background: #DCDFE5; height: 112px; display: grid; place-items: center; }
+.msg-cam i { font-size: 48px; }
+.ph-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.ph-grid > div { aspect-ratio: 1; background-size: cover; background-position: center; position: relative; overflow: hidden; }
+.ph-grid.n1 > div, .ph-grid.n3 > div:first-child { grid-column: span 2; aspect-ratio: 2 / 1; }
+.ph-grid .more > i { position: absolute; inset: -16px; background: inherit; filter: blur(12px) brightness(.72); }
+.ph-grid .more > span { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font: 300 52px var(--body); }
+.chat .d-nav { background: #000; border-top: 0; }
+/* Las barras van fuera del contenedor que scrollea: así el rebote de iOS no las mueve. */
+.c-navwrap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; }
+.chat .feed { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+.msg[data-k] { cursor: pointer; }
+.old-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 20px; color: #9AA1A9; }
+.old-line svg { width: 150px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; }
+.old-line span { font: 700 22px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
+
+/* ---------- Detalle de despacho ---------- */
+.post { z-index: 40; }
+.pd-num { font-size: clamp(56px, 19vw, 110px); white-space: normal; text-wrap: balance; }
+.pd-body { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+.pd-back { position: absolute; z-index: 3; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.rc { background: var(--surface); color: var(--ink); border-radius: 20px 20px 0 0; padding: 20px 18px 30px;
+  -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 16px 100%;
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 16px 100%; }
+.rc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 3px solid var(--ink); padding-bottom: 12px; }
+.rc-head span { font: italic 900 22px/.95 var(--display); text-transform: uppercase; }
+.rc-head b { font: italic 900 30px/1 var(--display); color: #D8524F; white-space: nowrap; }
+.rc-meta { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; padding: 12px 0; border-bottom: 1.5px dashed var(--line); font: 700 16px/1.1 var(--display); text-transform: uppercase; }
+.rc-meta small, .rc-sign small { display: block; font: 700 10px var(--display); letter-spacing: .12em; color: var(--ink-2); margin-bottom: 3px; }
+.rc-row { display: grid; grid-template-columns: 1fr 44px 44px 44px; gap: 6px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.rc-desc { font: 600 15px/1.2 var(--body); min-width: 0; }
+.rc-desc small { display: block; font-size: 12px; font-weight: 500; color: var(--ink-2); margin-top: 2px; }
+.rc-row b { text-align: right; font: italic 900 28px/1 var(--display); font-variant-numeric: tabular-nums; }
+.rc-row b.pre { color: #A3AAB2; }
+.rc-row b.good { color: #2BA866; }
+.rc-row b.bad { color: #D8524F; }
+.rc-row.over { background: #F3CBCB; margin: 0 -18px; padding-left: 18px; padding-right: 18px; }
+.rc-th { padding: 12px 0 6px; font: 700 11px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.rc-th span:not(:first-child) { text-align: right; }
+.rc-total { border-bottom: 3px solid var(--ink); }
+.rc-total span { font: italic 900 22px var(--display); text-transform: uppercase; }
+.rc-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 14px; font: 700 18px/1.1 var(--display); text-transform: uppercase; }
+.rc-sign i { color: #2BA866; margin-left: 4px; vertical-align: -2px; }
+.rc-sign .pending { color: #D8524F; }
+.pd-photos { display: flex; flex-direction: column; gap: 10px; }
+.pd-photo { width: 100%; display: block; border-radius: 20px; background: #1C1F22; }
+.pd-cam { height: 200px; border-radius: 20px; background: #1C1F22; display: grid; place-items: center; align-content: center; gap: 8px; color: #8E98A3; font: 700 14px var(--display); letter-spacing: .1em; text-transform: uppercase; }
+.pd-cam i { font-size: 44px; }
+.c-nav { align-items: center; gap: 16px; }
+.c-title { margin-left: auto; min-width: 0; font: 700 24px/1 var(--display); color: #fff; text-transform: uppercase; text-align: right; text-wrap: balance; }
+.c-nav .av { width: 60px; height: 60px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile, .tile.pressing, .tile.popped { transition: none; transform: none; }
+}
+</style>
+
+<div class="scroller" id="s-inicio">
+<div class="app" id="v-inicio">
+  <div class="top">
+    <div class="brand">Adelante<span>Gerencia</span></div>
+    <div class="sample">Datos de ejemplo</div>
+  </div>
+  <div class="hello">
+    <h1>Esta semana</h1>
+    <p id="week">Semana 44 · Ciudad del Valle</p>
+  </div>
+  <div class="grid" id="grid" aria-label="Sus KPIs"></div>
+</div>
+</div>
+
+<div class="scroller" id="s-alertas" hidden>
+<section class="alerts" id="v-alertas">
+  <div class="top">
+    <div class="brand">Adelante<span>Gerencia</span></div>
+    <div class="sample">Datos de ejemplo</div>
+  </div>
+  <div class="hello">
+    <h1>Alertas</h1>
+    <p id="a-sub"></p>
+  </div>
+  <div id="chats"></div>
+</section>
+</div>
+
+<div class="detail post" id="post" role="dialog" aria-modal="true" aria-labelledby="pd-label" hidden>
+  <div class="detail-in" id="post-in"></div>
+  <button class="back pd-back" id="pd-back" type="button" aria-label="Volver al chat"><i class="ph-bold ph-caret-left" aria-hidden="true"></i>Volver</button>
+</div>
+
+<div class="chat" id="chat" role="dialog" aria-modal="true" aria-labelledby="c-title" hidden>
+  <div class="chat-in" id="chat-in"></div>
+  <div class="c-navwrap" id="c-nav"></div>
+</div>
+
+<nav class="bar" aria-label="Navegación principal">
+  <div class="chipbar" id="chipbar" hidden>
+    <div class="chipbar-in" id="fchips" role="toolbar" aria-label="Filtrar chats"></div>
+  </div>
+  <div class="bar-in">
+    <button class="tab" type="button" aria-current="page"><span class="ic"><i class="ph-fill ph-house" aria-hidden="true"></i></span>Inicio</button>
+    <button class="tab" type="button"><span class="ic"><i class="ph ph-flow-arrow" aria-hidden="true"></i></span>Flujo</button>
+    <button class="tab" type="button"><span class="ic"><i class="ph ph-users-three" aria-hidden="true"></i></span>Personal</button>
+    <button class="tab" type="button"><span class="ic"><i class="ph ph-coins" aria-hidden="true"></i></span>Costos</button>
+    <button class="tab" type="button"><span class="ic"><i class="ph ph-bell" aria-hidden="true"></i></span>Alertas</button>
+  </div>
+</nav>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="card" id="card" role="dialog" aria-modal="true" aria-labelledby="pk-title" hidden>
+  <div class="card-in" id="card-in">
+    <div class="card-head">
+      <div>
+        <h2 id="pk-title">Elegir KPI</h2>
+        <p id="pk-sub"></p>
+      </div>
+      <button class="x" id="pk-close" type="button" aria-label="Cerrar">
+        <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="#0B0C0D" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>
+      </button>
+    </div>
+    <div class="chips" id="chips" role="toolbar" aria-label="Filtrar por área"></div>
+    <div class="list" id="list"></div>
+    <div class="card-foot" id="pk-foot" hidden>
+      <button class="remove" id="pk-remove" type="button">Quitar este KPI</button>
+    </div>
+  </div>
+</div>
+
+<div class="detail" id="detail" role="dialog" aria-modal="true" aria-labelledby="d-label" hidden>
+  <div class="detail-in" id="detail-in"></div>
+  <button class="back pd-back" id="d-back" type="button" aria-label="Volver al tablero"><i class="ph-bold ph-caret-left" aria-hidden="true"></i>Volver</button>
+</div>
+
+<script>
+(() => {
+  // ---------- Motion: springs → CSS linear() ----------
+  // Física de resorte amortiguado muestreada como easing; un solo lenguaje de movimiento para toda la app.
+  const SUPPORTS_LINEAR = window.CSS && CSS.supports && CSS.supports('transition-timing-function', 'linear(0, 1)');
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function spring({ stiffness, damping, mass = 1 }) {
+    const w0 = Math.sqrt(stiffness / mass);
+    const zeta = damping / (2 * Math.sqrt(stiffness * mass));
+    const x = t => {
+      if (zeta < 1) {
+        const wd = w0 * Math.sqrt(1 - zeta * zeta);
+        return 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
+      }
+      return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+    };
+    let T = 0;
+    for (let t = 0; t < 3; t += 1 / 240) if (Math.abs(1 - x(t)) > 0.002) T = t;
+    T += 1 / 60;
+    const n = Math.min(64, Math.max(16, Math.round(T * 60)));
+    const pts = [];
+    for (let i = 0; i <= n; i++) pts.push(i === n ? '1' : x(T * i / n).toFixed(4));
+    return {
+      duration: Math.round(T * 1000),
+      easing: SUPPORTS_LINEAR ? `linear(${pts.join(', ')})` : 'cubic-bezier(.2, .9, .25, 1.08)'
+    };
+  }
+  const M = {
+    snap: spring({ stiffness: 520, damping: 26 }),   // soltar un tile
+    pop: spring({ stiffness: 340, damping: 27 }),    // abrir popup, leve sobrepaso
+    expand: spring({ stiffness: 260, damping: 30 }), // tile → pantalla de detalle
+    exit: spring({ stiffness: 420, damping: 42 })    // cerrar, sin rebote
+  };
+  if (SUPPORTS_LINEAR) document.documentElement.style.setProperty('--ease-snap', M.snap.easing);
+
+  const anim = (el, frames, m, extra = {}) =>
+    el.animate(frames, REDUCED ? { duration: 1, fill: 'forwards' } : { duration: m.duration, easing: m.easing, fill: 'forwards', ...extra });
+  const fade = (el, from, to, duration, delay = 0) =>
+    el.animate([{ opacity: from }, { opacity: to }], { duration: REDUCED ? 1 : duration, delay: REDUCED ? 0 : delay, easing: 'ease-out', fill: 'both' });
+
+  // ---------- Datos (ejemplo) ----------
+  // 12 semanas, la última es la actual. El valor mostrado siempre es el último punto de la serie.
+  const AREAS = ['Producción', 'Materiales', 'Personas', 'Ventas', 'Finanzas'];
+  // Apps de Adelante de donde sale cada dato.
+  const APP_NAMES = { A3: 'Tres Amigos', B0: 'Boletas', H4: 'Horas', V5: 'Ventas', BC: 'Business Central' };
+  const KPIS = {
+    ppc: { area: 'Producción', app: 'A3', label: 'PPC semanal', unit: '% del plan cumplido', pct: true, good: 'up', target: 85,
+      series: [71, 74, 69, 76, 80, 77, 73, 79, 82, 75, 76, 78],
+      by: 'Por cuadrilla', rows: [['Losa 1', '84%', 6], ['Losa 2', '79%', 2], ['Soldadura', '81%', -3], ['Repello', '72%', -5], ['Enchape', '74%', 1]],
+      note: 'Porcentaje de tareas comprometidas en el sprint que se completaron.' },
+    entregadas: { area: 'Producción', app: 'A3', label: 'Viviendas entregadas', unit: 'viviendas / semana', good: 'up', target: 15,
+      series: [9, 11, 10, 12, 12, 13, 11, 14, 12, 13, 15, 14],
+      by: 'Por etapa', rows: [['Etapa 1', '6', 1], ['Etapa 2', '5', -1], ['Etapa 3', '3', 0]],
+      note: 'Viviendas que salieron de la última estación (Pintura y Reparaciones) esta semana.' },
+    takt: { area: 'Producción', app: 'A3', label: 'Takt de Losa', unit: 'días por vivienda', dec: 1, good: 'down', target: 4,
+      series: [4.9, 4.8, 4.7, 4.8, 4.5, 4.6, 4.4, 4.5, 4.3, 4.4, 4.3, 4.2],
+      by: 'Por cuadrilla', rows: [['Losa 1', '4,0', -0.2], ['Losa 2', '4,4', 0]],
+      note: 'Losa marca el ritmo de toda la cascada: cada día que baja aquí se gana aguas abajo.' },
+    wip: { area: 'Producción', app: 'A3', label: 'Viviendas en proceso', unit: 'viviendas abiertas', good: 'none',
+      series: [58, 60, 61, 59, 62, 64, 63, 61, 62, 65, 64, 63],
+      by: 'Por estación', rows: [['Losa', '4', 0], ['Muros y soldadura', '14', 1], ['Repello', '12', -1], ['Liviano y complementarias', '19', 0], ['Acabados', '14', -1]],
+      note: 'Inventario en proceso. Si sube sin que suban las entregas, hay un cuello de botella.' },
+    missmat: { area: 'Producción', app: 'A3', label: 'Fallas por materiales', unit: '% de tareas no cumplidas', pct: true, good: 'down', target: 25,
+      series: [33, 35, 38, 36, 40, 44, 39, 42, 45, 43, 40, 41],
+      by: 'Causas de incumplimiento', rows: [['Materiales', '41%', 1], ['Prerrequisito no listo', '24%', -2], ['Clima', '14%', 3], ['Cambio de diseño', '9%', -1], ['Cuadrilla', '8%', 0], ['Otro', '4%', -1]],
+      note: 'Cuando materiales domina, la palanca está aguas arriba, en B0, no en el ritual del sprint.' },
+    solpend: { area: 'Materiales', app: 'B0', label: 'Solicitudes pendientes', unit: 'solicitudes abiertas', good: 'down', target: 15,
+      series: [18, 22, 19, 25, 21, 24, 30, 26, 23, 29, 31, 27],
+      by: 'Por antigüedad', rows: [['Menos de 24 h', '11', -3], ['1 a 3 días', '10', 0], ['Más de 3 días', '6', -1]],
+      note: 'Solicitudes de material de jefes de obra que todavía no se han despachado.' },
+    entregamat: { area: 'Materiales', app: 'B0', label: 'Entrega de material', unit: 'días promedio', dec: 1, good: 'down', target: 2,
+      series: [3.4, 3.1, 3.3, 3.0, 2.9, 3.2, 2.8, 2.9, 2.7, 2.8, 2.5, 2.6],
+      by: 'Por familia', rows: [['Acero', '3,1', 0.2], ['Cemento y agregados', '1,8', -0.1], ['Eléctrico', '2,9', 0.3], ['Acabados', '2,7', -0.4]],
+      note: 'Desde que se crea la solicitud en B0 hasta que el material llega a la obra.' },
+    horas: { area: 'Personas', app: 'H4', label: 'Horas registradas', unit: 'horas / semana', good: 'up',
+      series: [9420, 9510, 9380, 9600, 9710, 9650, 9580, 9800, 9760, 9690, 9900, 9840],
+      by: 'Por área', rows: [['Cadena de vivienda', '6 980', -40], ['Infraestructura', '1 720', 0], ['Planta y bodega', '760', -20], ['Administración', '380', 0]],
+      note: 'Horas registradas en H4 por supervisores y gerentes.' },
+    asistencia: { area: 'Personas', app: 'H4', label: 'Asistencia', unit: '% del personal programado', pct: true, good: 'up', target: 96,
+      series: [92, 93, 91, 94, 95, 93, 92, 94, 95, 93, 94, 94],
+      by: 'Por cuadrilla', rows: [['Formaleta', '97%', 1], ['Repello', '91%', -2], ['Complementarias', '93%', 0], ['Soldadura', '96%', 1]],
+      note: 'Asistencia contra el personal asignado a obra en H4.' },
+    personal: { area: 'Personas', app: 'H4', label: 'Personal activo', unit: 'personas', good: 'none',
+      series: [201, 203, 204, 206, 205, 208, 210, 209, 211, 212, 213, 214],
+      by: 'Por área', rows: [['Cadena de vivienda', '151', 1], ['Infraestructura', '34', 0], ['Planta y bodega', '17', 0], ['Administración', '12', 0]],
+      note: 'Personas con rol y obra asignados en H4.' },
+    vendidas: { area: 'Ventas', app: 'V5', label: 'Viviendas vendidas', unit: 'viviendas / semana', good: 'up', target: 7,
+      series: [4, 6, 5, 7, 5, 6, 8, 5, 7, 6, 4, 6],
+      by: 'Por producto', rows: [['Casa 2 habitaciones', '3', 1], ['Casa 3 habitaciones', '2', 1], ['Lote con servicios', '1', 0]],
+      note: 'Contratos de venta firmados en la semana.' },
+    reservas: { area: 'Ventas', app: 'V5', label: 'Reservas activas', unit: 'reservas', good: 'up',
+      series: [34, 35, 37, 36, 38, 39, 40, 38, 39, 41, 40, 41],
+      by: 'Por estado', rows: [['En trámite de crédito', '23', 2], ['Con prima completa', '11', -1], ['Recién reservadas', '7', 0]],
+      note: 'Reservas que aún no pasan a contrato.' },
+    ventasmonto: { area: 'Ventas', app: 'V5', label: 'Ventas firmadas', unit: 'millones de ₡ / semana', good: 'up',
+      series: [310, 420, 365, 505, 350, 430, 580, 360, 495, 440, 290, 435],
+      by: 'Por producto', rows: [['Casa 2 habitaciones', '₡ 198 M', 70], ['Casa 3 habitaciones', '₡ 172 M', 85], ['Lote con servicios', '₡ 65 M', -10]],
+      note: 'Monto de contratos firmados en V5.' },
+    costom2: { area: 'Finanzas', app: 'BC', label: 'Costo directo por m²', unit: 'miles de ₡ / m²', good: 'down', target: 400,
+      series: [398, 401, 403, 405, 404, 407, 409, 408, 410, 411, 413, 412],
+      by: 'Por partida', rows: [['Materiales', '238', 2], ['Mano de obra', '131', -1], ['Equipo', '27', 0], ['Subcontratos', '16', -2]],
+      note: 'Costo directo de construcción por metro cuadrado, desde Business Central.' },
+    desvio: { area: 'Finanzas', app: 'BC', label: 'Desvío vs presupuesto', unit: '% sobre presupuesto', pct: true, dec: 1, good: 'down', target: 2,
+      series: [1.2, 1.5, 1.9, 2.1, 2.4, 2.2, 2.8, 3.1, 3.3, 3.5, 4.1, 3.8],
+      by: 'Por etapa', rows: [['Etapa 1', '2,1%', -0.2], ['Etapa 2', '4,6%', -0.4], ['Etapa 3', '5,2%', 0.1]],
+      note: 'Costo real acumulado contra presupuesto aprobado.' }
+  };
+
+  const SLOTS = ['hero', 'sm', 'sm', 'wide', 'sm', 'sm', 'sm', 'sm'];
+  const SLOT_NAME = { hero: 'espacio principal', sm: 'espacio pequeño', wide: 'espacio ancho' };
+  const DEFAULT = ['ppc', 'entregadas', 'solpend', null, 'vendidas', null, 'asistencia', null];
+  const KEY = 'adelante-kpi-slots-v1';
+
+  let slots = DEFAULT.slice();
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (Array.isArray(saved) && saved.length === SLOTS.length && saved.every(k => k === null || KPIS[k])) slots = saved;
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(slots)); } catch (e) {} };
+
+  // ---------- Formato ----------
+  const fmt = (v, dec = 0) => v.toLocaleString('es-CR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  const valueOf = k => KPIS[k].series[KPIS[k].series.length - 1];
+  const show = k => fmt(valueOf(k), KPIS[k].dec || 0) + (KPIS[k].pct ? '%' : '');
+  function delta(k) {
+    const s = KPIS[k].series, d = s[s.length - 1] - s[s.length - 2], dec = KPIS[k].dec || 0;
+    const r = Math.round(d * 10 ** dec) / 10 ** dec;
+    const cls = r === 0 || KPIS[k].good === 'none' ? 'flat' : ((r > 0) === (KPIS[k].good === 'up') ? 'good' : 'bad');
+    const arrow = r > 0 ? '▲' : r < 0 ? '▼' : '■';
+    const unit = KPIS[k].pct ? ' pts' : '';
+    return { cls, text: `${arrow} ${r > 0 ? '+' : r < 0 ? '−' : ''}${fmt(Math.abs(r), dec)}${unit}` };
+  }
+  function isoWeek(d) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const day = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - day);
+    const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - y0) / 864e5 + 1) / 7);
+  }
+  const WEEK = isoWeek(new Date());
+  document.getElementById('week').textContent = `Semana ${WEEK} · Ciudad del Valle`;
+
+  // ---------- Sparkline / gráfico ----------
+  function sparkPath(s, w, h, pad, target) {
+    const vals = target != null ? s.concat(target) : s;
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const span = hi - lo || 1; lo -= span * .12; hi += span * .12;
+    const X = i => pad + i * (w - pad * 2) / (s.length - 1);
+    const Y = v => h - pad - (v - lo) / (hi - lo) * (h - pad * 2);
+    return { X, Y, d: s.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ') };
+  }
+  function sparkSVG(k, stroke) {
+    const s = KPIS[k].series, { X, Y, d } = sparkPath(s, 160, 64, 5);
+    const last = s.length - 1;
+    return `<svg class="spark" viewBox="0 0 160 64" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${d}" fill="none" stroke="${stroke}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <circle cx="${X(last)}" cy="${Y(s[last])}" r="4" fill="${stroke}"/></svg>`;
+  }
+  function chartSVG(k) {
+    const c = KPIS[k], s = c.series, W = 340, H = 170, top = 16, bot = 26, padX = 12;
+    const vals = c.target != null ? s.concat(c.target) : s;
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const span = hi - lo || 1; lo -= span * .15; hi += span * .15;
+    const X = i => padX + i * (W - padX * 2 - 30) / (s.length - 1);
+    const Y = v => top + (hi - v) / (hi - lo) * (H - top - bot);
+    const line = s.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+    const area = `${line} L${X(s.length - 1).toFixed(1)} ${H - bot} L${X(0).toFixed(1)} ${H - bot} Z`;
+    const grid = [0, 1, 2, 3].map(j => { const y = top + j * (H - top - bot) / 3; return `<line x1="${padX}" x2="${W - padX}" y1="${y}" y2="${y}" stroke="#2A2E33" stroke-width="1"/>`; }).join('');
+    const weeks = [0, 3, 6, 9, 11].map(i => `<text x="${X(i)}" y="${H - 6}" text-anchor="middle">S${WEEK - (s.length - 1 - i)}</text>`).join('');
+    const tgt = c.target != null ? `<line x1="${padX}" x2="${W - padX}" y1="${Y(c.target)}" y2="${Y(c.target)}" stroke="#F4F6F8" stroke-opacity=".55" stroke-width="1.2" stroke-dasharray="4 5"/>
+      <text x="${padX + 2}" y="${Y(c.target) - 6}">META ${fmt(c.target, c.dec || 0)}${c.pct ? '%' : ''}</text>` : '';
+    const L = s.length - 1;
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tendencia de ${c.label}, últimas 12 semanas">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ADD010" stop-opacity=".32"/><stop offset="1" stop-color="#ADD010" stop-opacity="0"/></linearGradient></defs>
+      ${grid}<path d="${area}" fill="url(#g)"/>${tgt}
+      <path d="${line}" fill="none" stroke="#ADD010" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${X(L)}" cy="${Y(s[L])}" r="5.5" fill="#ADD010" stroke="#111315" stroke-width="2.5"/>
+      <text class="end" x="${X(L) + 10}" y="${Y(s[L]) + 5}">${show(k)}</text>
+      ${weeks}</svg>`;
+  }
+
+  // ---------- Render grid ----------
+  const grid = document.getElementById('grid');
+  function tileHTML(k, size, i) {
+    if (!k) return `<button class="tile ${size} empty" data-i="${i}" type="button" aria-label="Agregar KPI al ${SLOT_NAME[size]}">
+      <span class="plus" aria-hidden="true"></span>${size === 'hero' ? '<span class="slot-hint">Agregar KPI</span>' : ''}</button>`;
+    const c = KPIS[k], dl = delta(k);
+    const spark = size === 'hero' ? sparkSVG(k, '#0B0C0D') : size === 'wide' ? sparkSVG(k, '#ADD010') : '';
+    return `<button class="tile ${size} filled" data-i="${i}" type="button" aria-label="${c.label}: ${show(k)}. Toque para ver detalle; mantenga presionado para cambiar.">
+      <div class="t-head"><span class="t-label">${c.label}</span><span class="t-app">${c.app}</span></div>
+      <div class="t-num" data-num>${show(k)}</div>
+      <div class="t-unit">${c.unit}</div>
+      <div class="t-foot"><span class="delta ${dl.cls}">${dl.text}</span></div>
+      ${spark}</button>`;
+  }
+  function render() {
+    grid.innerHTML = SLOTS.map((size, i) => tileHTML(slots[i], size, i)).join('');
+  }
+  const tileAt = i => grid.querySelector(`.tile[data-i="${i}"]`);
+
+  function countUp(i) {
+    const k = slots[i], el = tileAt(i)?.querySelector('[data-num]');
+    if (!k || !el || REDUCED) return;
+    const end = valueOf(k), dec = KPIS[k].dec || 0, start = performance.now(), dur = 700;
+    const step = now => {
+      const p = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - p, 4);
+      el.textContent = fmt(end * e, dec) + (KPIS[k].pct ? '%' : '');
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  // ---------- Gestos: tap vs mantener presionado ----------
+  const HOLD = 450;
+  let press = null;
+  const cancelPress = () => {
+    if (!press) return;
+    clearTimeout(press.timer);
+    press.t.classList.remove('pressing');
+    press = null;
+  };
+  grid.addEventListener('pointerdown', e => {
+    const t = e.target.closest('.tile');
+    if (!t || e.button > 0 || busy) return;
+    const i = +t.dataset.i;
+    press = { t, i, x: e.clientX, y: e.clientY, long: false };
+    t.classList.add('pressing');
+    press.timer = setTimeout(() => {
+      if (!press) return;
+      press.long = true;
+      t.classList.remove('pressing');
+      t.classList.add('popped');
+      try { navigator.vibrate && navigator.vibrate(12); } catch (err) {}
+      setTimeout(() => { t.classList.remove('popped'); openPicker(i); }, 120);
+    }, HOLD);
+  });
+  grid.addEventListener('pointermove', e => {
+    if (press && !press.long && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) cancelPress();
+  });
+  grid.addEventListener('pointerup', () => {
+    if (!press) return;
+    const { long, i, t } = press;
+    clearTimeout(press.timer);
+    t.classList.remove('pressing');
+    press = null;
+    if (!long) tap(i);
+  });
+  grid.addEventListener('pointercancel', cancelPress);
+  grid.addEventListener('pointerleave', cancelPress);
+  grid.addEventListener('contextmenu', e => e.preventDefault());
+  // Teclado: Enter/Espacio = tap; tecla de menú, Shift+F10 o "E" = cambiar
+  grid.addEventListener('click', e => {
+    const t = e.target.closest('.tile');
+    if (t && e.detail === 0) tap(+t.dataset.i);
+  });
+  grid.addEventListener('keydown', e => {
+    const t = e.target.closest('.tile');
+    if (!t) return;
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10') || e.key === 'e' || e.key === 'E') { e.preventDefault(); openPicker(+t.dataset.i); }
+  });
+  const tap = i => slots[i] ? openDetail(i) : openPicker(i);
+
+  // ---------- Picker ----------
+  const scrim = document.getElementById('scrim'), card = document.getElementById('card'), cardIn = document.getElementById('card-in');
+  const list = document.getElementById('list'), chips = document.getElementById('chips');
+  let busy = false, pickSlot = null, filter = 'Todos', lastFocus = null;
+
+  function cardRect() {
+    const vw = innerWidth, vh = innerHeight;
+    const w = Math.min(vw - 32, 420);
+    const top = Math.max(56, vh * 0.15);
+    const bottom = Math.max(24, vh * 0.06);
+    return { left: (vw - w) / 2, top, width: w, height: Math.min(vh - top - bottom, 640) };
+  }
+  const rectFrame = (r, extra = {}) => ({ left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', ...extra });
+
+  function renderChips() {
+    chips.innerHTML = ['Todos', ...AREAS].map(a => `<button class="chip" type="button" aria-pressed="${a === filter}" data-a="${a}">${a}</button>`).join('');
+  }
+  function renderList() {
+    const cur = slots[pickSlot];
+    list.innerHTML = AREAS.map(a => {
+      const hid = filter === 'Todos' || filter === a ? '' : ' hidden';
+      const rows = Object.keys(KPIS).filter(k => KPIS[k].area === a).map(k => {
+        const used = slots.indexOf(k), c = KPIS[k];
+        const tag = k === cur ? '<span class="tag">Actual</span>' : used >= 0 ? '<span class="tag">En pantalla</span>' : '';
+        return `<button class="row${k === cur ? ' current' : ''}" type="button" data-k="${k}" data-area="${a}"${hid}>
+          <span class="row-num">${show(k)}</span>
+          <span class="row-txt"><b>${c.label}</b><small>${c.unit} · ${c.app}</small></span>${tag}</button>`;
+      }).join('');
+      return `<div class="group" data-area="${a}"${hid}>${a}</div>${rows}`;
+    }).join('');
+  }
+  // Misma transición que los filtros de Alertas.
+  let pickFiltering = false;
+  chips.addEventListener('click', async e => {
+    const b = e.target.closest('.chip');
+    if (!b || pickFiltering || b.dataset.a === filter) return;
+    filter = b.dataset.a; renderChips();
+    pickFiltering = true;
+    list.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' });
+    await filterSwap([...list.children], el => filter === 'Todos' || el.dataset.area === filter);
+    pickFiltering = false;
+  });
+  list.addEventListener('click', e => {
+    const r = e.target.closest('.row'); if (!r) return;
+    choose(r.dataset.k);
+  });
+
+  function openPicker(i) {
+    if (busy) return;
+    busy = true; pickSlot = i; lastFocus = document.activeElement;
+    const tile = tileAt(i), from = tile.getBoundingClientRect(), to = cardRect();
+    document.getElementById('pk-sub').textContent = slots[i]
+      ? `Reemplazar “${KPIS[slots[i]].label}” en el ${SLOT_NAME[SLOTS[i]]}.`
+      : `Elija qué ver en el ${SLOT_NAME[SLOTS[i]]}.`;
+    document.getElementById('pk-foot').hidden = !slots[i];
+    filter = 'Todos'; renderChips(); renderList();
+    cardIn.style.width = to.width + 'px'; cardIn.style.height = to.height + 'px';
+    Object.assign(card.style, rectFrame(to));
+    scrim.hidden = false; card.hidden = false; list.scrollTop = 0;
+    document.body.classList.add('locked');
+    fade(scrim, 0, 1, 240);
+    const bg = getComputedStyle(tile).backgroundColor;
+    const a = anim(card, [rectFrame(from, { borderRadius: '24px', backgroundColor: bg }), rectFrame(to, { borderRadius: '30px', backgroundColor: '#FFFFFF' })], M.pop);
+    fade(cardIn, 0, 1, 200, 70);
+    a.finished.then(() => { busy = false; document.getElementById('pk-close').focus({ preventScroll: true }); });
+  }
+
+  function closePicker(changed) {
+    if (busy || card.hidden) return;
+    busy = true;
+    if (changed) { render(); save(); }
+    const i = pickSlot, tile = tileAt(i), to = tile.getBoundingClientRect(), from = card.getBoundingClientRect();
+    const bg = getComputedStyle(tile).backgroundColor;
+    fade(cardIn, 1, 0, 110);
+    fade(scrim, 1, 0, 220, 40);
+    const a = anim(card, [rectFrame(from, { borderRadius: '30px', backgroundColor: '#FFFFFF' }), rectFrame(to, { borderRadius: '24px', backgroundColor: bg })], M.exit);
+    a.finished.then(() => {
+      card.getAnimations().forEach(x => x.cancel()); scrim.getAnimations().forEach(x => x.cancel()); cardIn.getAnimations().forEach(x => x.cancel());
+      card.hidden = true; scrim.hidden = true; busy = false;
+      document.body.classList.remove('locked');
+      if (changed) {
+        countUp(i);
+        const t = tileAt(i);
+        t && anim(t, [{ transform: 'scale(.94)' }, { transform: 'scale(1)' }], M.snap);
+      }
+      (tileAt(i) || lastFocus)?.focus({ preventScroll: true });
+    });
+  }
+
+  function choose(k) {
+    const i = pickSlot, j = slots.indexOf(k);
+    if (j === i) return closePicker(false);
+    if (j >= 0) slots[j] = slots[i]; // si ya estaba en pantalla, intercambia lugares
+    slots[i] = k;
+    closePicker(true);
+  }
+  document.getElementById('pk-remove').addEventListener('click', () => { slots[pickSlot] = null; closePicker(true); });
+  document.getElementById('pk-close').addEventListener('click', () => closePicker(false));
+  scrim.addEventListener('click', () => closePicker(false));
+
+  // ---------- Detalle ----------
+  const detail = document.getElementById('detail'), detailIn = document.getElementById('detail-in');
+  let detailSlot = null;
+
+  function detailHTML(k) {
+    const c = KPIS[k], s = c.series, dec = c.dec || 0, sfx = c.pct ? '%' : '';
+    const prev = s[s.length - 2], avg = s.reduce((a, b) => a + b, 0) / s.length;
+    const splits = c.rows.map(([name, val, d]) => {
+      const cls = d === 0 || c.good === 'none' ? 'flat' : ((d > 0) === (c.good === 'up') ? 'good' : 'bad');
+      const dd = Math.abs(d), ddec = Number.isInteger(dd) ? 0 : 1;
+      return `<div class="split"><span>${name}</span><b>${val}</b><i class="${cls}">${d > 0 ? '+' : d < 0 ? '−' : ''}${fmt(dd, ddec)}${c.pct && ddec === 0 && d !== 0 ? ' pts' : ''}</i></div>`;
+    }).join('');
+    return `<div class="d-top">
+        <div class="d-bar">
+          <span class="d-app">${c.app} • ${APP_NAMES[c.app]}</span>
+        </div>
+        <div class="d-main">
+          <div class="d-label" id="d-label">${c.label}</div>
+          <div class="d-num">${show(k)}</div>
+          <div class="d-unit">${c.unit}</div>
+          <div class="d-stats">
+            <div><small>Meta</small><b>${c.target != null ? fmt(c.target, dec) + sfx : '—'}</b></div>
+            <div><small>Sem. anterior</small><b>${fmt(prev, dec)}${sfx}</b></div>
+            <div><small>Prom. 12 sem.</small><b>${fmt(avg, dec)}${sfx}</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="d-body pd-body">
+        <div class="d-h"><h3>Tendencia</h3><span>Últimas 12 semanas</span></div>
+        ${chartSVG(k)}
+        <div class="d-h"><h3>${c.by}</h3><span>vs. semana anterior</span></div>
+        <div class="splits">${splits}</div>
+        <p class="d-note">${c.note} Datos de ejemplo para el prototipo.</p>
+      </div>`;
+  }
+
+  function openDetail(i) {
+    if (busy) return;
+    busy = true; detailSlot = i; lastFocus = document.activeElement;
+    const tile = tileAt(i), from = tile.getBoundingClientRect();
+    const to = { left: 0, top: 0, width: innerWidth, height: innerHeight };
+    detailIn.innerHTML = detailHTML(slots[i]);
+    detailIn.style.width = to.width + 'px'; detailIn.style.height = to.height + 'px'; detailIn.scrollTop = 0;
+    detail.hidden = false;
+    document.body.classList.add('locked');
+    const bg = getComputedStyle(tile).backgroundColor;
+    tile.style.visibility = 'hidden';
+    const a = anim(detail, [rectFrame(from, { borderRadius: '24px', backgroundColor: bg }), rectFrame(to, { borderRadius: '0px', backgroundColor: '#111315' })], M.expand);
+    fade(detailIn, 0, 1, 260, 60);
+    detailIn.querySelector('.d-num').animate(
+      [{ transform: 'translateY(18px) scale(.92)' }, { transform: 'none' }],
+      REDUCED ? { duration: 1 } : { duration: M.pop.duration, easing: M.pop.easing, delay: 60, fill: 'both' });
+    fade(document.getElementById('d-back'), 0, 1, 220, 200);
+    a.finished.then(() => { busy = false; document.getElementById('d-back').focus({ preventScroll: true }); });
+  }
+
+  function closeDetail() {
+    if (busy || detail.hidden) return;
+    busy = true;
+    const tile = tileAt(detailSlot), to = tile.getBoundingClientRect();
+    const from = { left: 0, top: 0, width: innerWidth, height: innerHeight };
+    const bg = getComputedStyle(tile).backgroundColor;
+    fade(detailIn, 1, 0, 140); fade(document.getElementById('d-back'), 1, 0, 120);
+    const a = anim(detail, [rectFrame(from, { borderRadius: '0px', backgroundColor: '#111315' }), rectFrame(to, { borderRadius: '24px', backgroundColor: bg })], M.exit);
+    a.finished.then(() => {
+      finishDetail();
+    });
+  }
+  function finishDetail() {
+    const tile = tileAt(detailSlot);
+    [detail, detailIn, document.getElementById('d-back')].forEach(el => el.getAnimations().forEach(x => x.cancel()));
+    detail.hidden = true; detail.style.transform = ''; detail.style.boxShadow = '';
+    tile.style.visibility = ''; busy = false;
+    document.body.classList.remove('locked');
+    tile.focus({ preventScroll: true });
+  }
+
+  // ---------- Deslizar desde el borde izquierdo = volver ----------
+  const EDGE = 28;
+  function edgeSwipe(el, { isOpen, onStart, onCancel, onDone }) {
+    let drag = null;
+    el.addEventListener('pointerdown', e => {
+      if (busy || !isOpen() || e.button > 0 || e.clientX > EDGE) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, t: performance.now(), v: 0, on: false };
+    });
+    el.addEventListener('pointermove', e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.on) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > dx) { drag = null; return; }
+        if (dx < 8) return;
+        drag.on = true;
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        el.style.boxShadow = '-16px 0 40px rgba(0, 0, 0, .35)';
+        onStart && onStart();
+      }
+      const now = performance.now(), x = Math.max(0, dx);
+      drag.v = (x - drag.dx) / Math.max(1, now - drag.t); drag.dx = x; drag.t = now;
+      el.style.transform = `translateX(${x}px)`;
+    });
+    const end = () => {
+      if (!drag) return;
+      const d = drag; drag = null;
+      if (!d.on) return;
+      const go = d.dx > innerWidth * .33 || d.v > .5, to = go ? innerWidth : 0;
+      busy = true;
+      const a = el.animate([{ transform: `translateX(${d.dx}px)` }, { transform: `translateX(${to}px)` }],
+        REDUCED ? { duration: 1 } : { duration: M.exit.duration, easing: M.exit.easing });
+      el.style.transform = `translateX(${to}px)`;
+      a.finished.then(() => {
+        a.cancel();
+        if (go) return onDone();
+        busy = false; el.style.transform = ''; el.style.boxShadow = '';
+        onCancel && onCancel();
+      });
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+  edgeSwipe(detail, {
+    isOpen: () => !detail.hidden,
+    onStart: () => { tileAt(detailSlot).style.visibility = ''; },
+    onCancel: () => { tileAt(detailSlot).style.visibility = 'hidden'; },
+    onDone: finishDetail
+  });
+
+  document.getElementById('d-back').addEventListener('click', closeDetail);
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!post.hidden) closePost(); else if (!detail.hidden) closeDetail(); else if (!chat.hidden) closeChat(); else if (!card.hidden) closePicker(false);
+  });
+
+
+  render();
+
+  // ---------- Navegación inferior ----------
+  const $ = id => document.getElementById(id);
+  const bar = document.querySelector('.bar');
+  const setBarH = () => document.documentElement.style.setProperty('--bar-h', bar.offsetHeight + 'px');
+  setBarH(); new ResizeObserver(setBarH).observe(bar, { box: 'border-box' }); // los íconos cargan después y cambian la altura
+
+  // Resortes en cascada: pop, pop, pop.
+  const springOpts = (m, delay = 0) => REDUCED ? { duration: 1, fill: 'both' } : { duration: m.duration, easing: m.easing, delay, fill: 'both' };
+  // Filtrar una lista: los que salen se encogen con resorte (y los de abajo suben), después
+  // los que entran crecen en cascada. Se anima también el padding para que colapse a cero.
+  async function filterSwap(items, isIn) {
+    const leave = items.filter(el => !el.hidden && !isIn(el)), enter = items.filter(el => el.hidden && isIn(el));
+    const full = el => { const cs = getComputedStyle(el); return { height: el.offsetHeight + 'px', paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, opacity: 1, transform: 'scale(1)' }; };
+    const none = { height: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0, transform: 'scale(.6)' };
+    await Promise.all(leave.map((el, k) => el.animate([full(el), none], springOpts(M.exit, Math.min(k, 8) * 30)).finished));
+    leave.forEach(el => { el.hidden = true; el.getAnimations().forEach(a => a.cancel()); });
+    enter.forEach(el => { el.hidden = false; });
+    const frames = enter.map(full);
+    await Promise.all(enter.map((el, k) => el.animate([none, frames[k]], springOpts(M.pop, Math.min(k, 10) * 55)).finished));
+    enter.forEach(el => el.getAnimations().forEach(a => a.cancel()));
+  }
+  const popIn = (els, base = 0, step = 60) => Promise.all(els.map((el, k) =>
+    el.animate([{ opacity: 0, transform: 'translateY(16px) scale(.9)' }, { opacity: 1, transform: 'none' }], springOpts(M.pop, base + k * step))
+      .finished.then(a => a.cancel())));
+
+  const TAB_IDS = ['inicio', 'flujo', 'personal', 'costos', 'alertas'];
+  const tabs = [...bar.querySelectorAll('.tab')];
+  const views = { inicio: $('s-inicio'), alertas: $('s-alertas') };
+  function setTab(id) {
+    if (!views[id]) return; // pestañas sin vista todavía
+    tabs.forEach((t, n) => {
+      const on = TAB_IDS[n] === id, i = t.querySelector('i');
+      on ? t.setAttribute('aria-current', 'page') : t.removeAttribute('aria-current');
+      i.classList.toggle('ph-fill', on); i.classList.toggle('ph', !on);
+    });
+    Object.entries(views).forEach(([k, v]) => { v.hidden = k !== id; });
+    $('chipbar').hidden = id !== 'alertas';
+    document.body.dataset.tab = id;
+    // El fondo del documento es lo que se ve en el rebote de iOS: igual al de la vista, sin hueco blanco.
+    document.documentElement.style.background = id === 'alertas' ? '#FFFFFF' : '#F4F6F8';
+    views[id].scrollTop = 0;
+    if (id === 'alertas') popIn([...$('chats').children].filter(r => !r.hidden), 40, 45);
+  }
+  tabs.forEach((t, n) => t.addEventListener('click', () => setTab(TAB_IDS[n])));
+  document.documentElement.style.background = '#F4F6F8';
+
+  // ---------- Alertas (datos de ejemplo) ----------
+  // tone: urgent = rojo, unread = azul, muted = arena.
+  const CHATS = [
+    { id: 'granvia', name: 'Gran Vía', cat: 'Obra', n: 13, tone: 'urgent' },
+    { id: 'ilios', name: 'Bodega Ilios', cat: 'Bodega', n: 1, tone: 'unread' },
+    { id: 'central', name: 'Central', cat: 'Obra', n: 3, tone: 'unread' },
+    { id: 'barani', name: 'Bodega Barani', cat: 'Bodega', n: 1, tone: 'unread' },
+    { id: 'pedidos', name: 'Pedidos', cat: 'Pedidos', n: 2, tone: 'urgent' },
+    { id: 'ventas', name: 'Ventas', cat: 'Ventas', n: 8, tone: 'unread' },
+    { id: 'castilla', name: 'Bodega Castilla', cat: 'Bodega', n: 0, tone: 'unread' },
+    { id: 'maq', name: 'MAQ', cat: 'Obra', n: 4, tone: 'muted' },
+    { id: 'novarum', name: 'Bodega Novarum', cat: 'Bodega', n: 0, tone: 'unread' }
+  ].map(c => ({ ...c, img: `av/${c.id}.jpg` }));
+  const FILTERS = ['Todo', 'Ventas', 'Bodega', 'Pedidos'];
+  let chatFilter = 'Todo';
+
+  const PHOTO_FILES = ['volqueta-1', 'volqueta-2', 'volqueta-3'];
+  const PHOTOS = PHOTO_FILES.map(f => `url(fotos/${f}.jpg) center / cover`);
+  // Cada mensaje es un despacho a obra con su boleta: [descripción, unidad, presupuesto, solicitado, despachado].
+  // stage = cuántas etapas del recorrido ya pasó (ver STEPS). Sin fotos = foto pendiente.
+  const STEPS = ['Despachado', 'Seguridad', 'Entregó chofer', 'Recibió líder'];
+  const POSTS = [
+    { lot: '105, 104', place: 'Barani', who: 'Pedro B.', time: '5 min', stage: 1,
+      doc: { no: '0440', date: '27 oct', obra: 'Casa 105', act: 'Para tapia',
+        items: [['Baldosas 1,90', 'unidades', 24, 20, 20], ['Baldosas 0,90', 'unidades', 6, 5, 5], ['Columna sencilla', 'unidades', 3, 3, 3], ['Columna Tee', 'unidades', 4, 3, 3]] } },
+    { lot: '105, 104', place: 'Barani', who: 'Pedro B.', time: '25 min', stage: 3, photos: 6,
+      doc: { no: '0441', date: '27 oct', obra: 'Casa 104', act: 'Para tapia',
+        items: [['Baldosas 1,90', 'unidades', 40, 40, 40], ['Columnas 1,30', 'unidades', 12, 12, 0], ['Columna sencilla', 'unidades', 6, 6, 1], ['Columna Tee', 'unidades', 3, 3, 3]] } },
+    { lot: 'A.23', place: 'Novarum', who: 'Pedro B.', time: '1 h', stage: 2, photos: 3,
+      doc: { no: '0437', date: '26 oct', obra: 'Lote A.23', act: 'Contrapiso',
+        items: [['Cemento Fuerte 50 kg', 'sacos', 45, 40, 40], ['Arena de río', 'm³', 6, 6, 6]] } },
+    { lot: '87', place: 'Castilla', who: 'Ana M.', time: '3 h', stage: 4, photos: 4,
+      doc: { no: '0435', date: '26 oct', obra: 'Casa 87', act: 'Muebles de cocina',
+        items: [['Mueble bajo 120', 'unidades', 2, 2, 2], ['Mueble aéreo 90', 'unidades', 2, 2, 2], ['Sobre de cocina', 'unidades', 1, 1, 1], ['Puerta de closet', 'unidades', 4, 4, 4]] } },
+    { lot: 'B.12, B.13', place: 'Ilios', who: 'Luis R.', time: '2 h', stage: 1,
+      doc: { no: '0436', date: '26 oct', obra: 'Lotes B.12 y B.13', act: 'Relleno',
+        items: [['Lastre 3/4"', 'm³', 14, 12, 12]] } },
+    { lot: '64', place: 'Barani', who: 'Karla S.', time: 'ayer', stage: 2, photos: 2,
+      doc: { no: '0431', date: '25 oct', obra: 'Casa 64', act: 'Losa',
+        items: [['Varilla #3', 'unidades', 120, 120, 60], ['Malla electrosoldada', 'láminas', 20, 20, 20], ['Alambre negro', 'kg', 12, 10, 10]] } }
+  ];
+  // Problemas de ejemplo por chat (k = posición del mensaje en ese chat): flag = foto señalada
+  // por seguridad, over = se despachó más que el presupuesto, skip = se saltó el check de seguridad.
+  const ISSUES = {
+    granvia: [{ k: 1, flag: 2 }, { k: 3, over: true }],
+    pedidos: [{ k: 3, flag: 4 }, { k: 1, skip: true }]
+  };
+  function postsFor(c) {
+    const off = CHATS.indexOf(c);
+    return POSTS.map((_, k) => POSTS[(k + off) % POSTS.length]).slice(0, 5).map((p, k) => {
+      const q = { ...p, doc: { ...p.doc, items: p.doc.items.map(it => it.slice()) } };
+      for (const is of ISSUES[c.id] || []) {
+        if (is.k !== k) continue;
+        if (is.flag != null) q.flag = is.flag;
+        if (is.skip) { q.skip = 1; q.stage = Math.max(q.stage, 3); }
+        if (is.over) { const it = q.doc.items[0]; it[3] = it[4] = it[2] + Math.ceil(it[2] * .5); }
+      }
+      return q;
+    });
+  }
+  const docSum = (p, i) => p.doc.items.reduce((a, it) => a + it[i], 0);
+  const dispatchPct = p => Math.round(docSum(p, 4) / docSum(p, 2) * 100);
+  const overBudget = p => p.doc.items.reduce((a, it) => a + Math.max(0, it[4] - it[2]), 0);
+  // Rojo en la notificación: exceso de presupuesto, un check saltado o una foto señalada.
+  const hasIssue = p => p.flag != null || p.skip != null || overBudget(p) > 0;
+  const chatTone = c => postsFor(c).some(hasIssue) ? 'urgent' : c.tone === 'urgent' ? 'unread' : c.tone;
+  const mixHex = (a, b, t) => '#' + [1, 3, 5].map(i =>
+    Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('');
+  // Barra: despachado contra presupuesto. Azul creciendo, verde al 100 %, rojo si algo se pasó
+  // (más oscuro cuanto mayor el exceso; tope de color al 25 % sobre el presupuesto).
+  function budgetBar(p) {
+    const pre = docSum(p, 2), desp = docSum(p, 4), over = overBudget(p);
+    if (over > 0) return { w: 100, color: mixHex('#F09A96', '#B71C1C', Math.min(1, over / pre / .25)) };
+    if (desp >= pre) return { w: 100, color: '#ADD010' };
+    return { w: Math.round(desp / pre * 100), color: '#0A8FD8' };
+  }
+  // Recorrido del pedido: azul lo que ya pasó, todo verde al completarse, rojo el check saltado.
+  const stepCls = (p, i) => i === p.skip ? 'miss' : i < p.stage ? (p.stage >= STEPS.length && p.skip == null ? 'done' : 'on') : '';
+  const stageText = p => p.skip != null ? `Sin ${STEPS[p.skip].toLowerCase()}` : p.stage === 0 ? 'Sin despachar' : STEPS[p.stage - 1];
+  const dotsHTML = p => `<span class="dots" role="img" aria-label="${stageText(p)}">${STEPS.map((_, i) => `<i class="${stepCls(p, i)}"></i>`).join('')}</span>`;
+  const photoOrder = p => {
+    const o = [...Array(p.photos).keys()];
+    if (p.flag != null) { o.splice(o.indexOf(p.flag), 1); o.unshift(p.flag); } // la señalada va primero
+    return o;
+  };
+  // Despachado contra presupuesto: verde = queda disponible, rojo = se pasó.
+  const budgetCls = (pre, desp) => desp > pre ? 'bad' : desp < pre ? 'good' : '';
+
+  const avatarHTML = c => c.img
+    ? `<span class="av"><img src="${c.img}" alt=""></span>`
+    : `<span class="av" style="background:${c.bg};color:${c.fg}" aria-hidden="true">${c.short}</span>`;
+
+  const inFilter = c => chatFilter === 'Todo' || c.cat === chatFilter;
+  const chatById = id => CHATS.find(c => c.id === id);
+  function renderChats() {
+    $('chats').innerHTML = CHATS.map(c => `<button class="chat-row" type="button" data-id="${c.id}"${inFilter(c) ? '' : ' hidden'} aria-label="${c.name}${c.n ? `, ${c.n} sin leer` : ''}">
+      ${avatarHTML(c)}<span class="chat-main"><span class="chat-name">${c.name}</span>${c.n ? `<span class="badge ${chatTone(c)}">${c.n}</span>` : ''}</span></button>`).join('');
+    const unread = CHATS.reduce((a, c) => a + c.n, 0);
+    $('a-sub').textContent = `${CHATS.length} chats · ${unread} sin leer`;
+  }
+  function renderFilters() {
+    $('fchips').innerHTML = FILTERS.map(f => `<button class="fchip" type="button" aria-pressed="${f === chatFilter}" data-f="${f}">${f}</button>`).join('');
+  }
+  $('fchips').addEventListener('click', e => {
+    const b = e.target.closest('.fchip'); if (!b) return;
+    applyFilter(b.dataset.f);
+  });
+  // Los que salen se encogen con resorte; después entran los nuevos en cascada.
+  let filtering = false;
+  async function applyFilter(f) {
+    if (filtering || f === chatFilter) return;
+    filtering = true; chatFilter = f; renderFilters();
+    await filterSwap([...$('chats').children], r => inFilter(chatById(r.dataset.id)));
+    filtering = false;
+  }
+  $('chats').addEventListener('click', e => {
+    const r = e.target.closest('.chat-row'); if (r) openChat(r.dataset.id);
+  });
+
+  // ---------- Chat ----------
+  const chat = $('chat'), chatIn = $('chat-in');
+  let chatId = null, chatToken = 0;
+
+  function photosHTML(p, seed) {
+    const show = Math.min(p.photos, 4);
+    const cells = Array.from({ length: show }, (_, k) => {
+      const idx = photoOrder(p)[k], bg = PHOTOS[(seed + idx) % PHOTOS.length];
+      const more = k === 3 && p.photos > 4, cls = [more && 'more', idx === p.flag && 'flagged'].filter(Boolean).join(' ');
+      return `<div${cls ? ` class="${cls}"` : ''} style="background:${bg}">${more ? `<i></i><span>+${p.photos - 3}</span>` : ''}</div>`;
+    }).join('');
+    return `<div class="ph-grid n${show}">${cells}</div>`;
+  }
+  function postHTML(p, seed, k) {
+    const bb = budgetBar(p);
+    const right = p.photos
+      ? `<div class="bars"><span class="pbar"><i style="width:${bb.w}%;background:${bb.color}"></i></span>${dotsHTML(p)}</div>`
+      : `<div class="msg-time">${p.time}</div>`;
+    const media = p.photos ? photosHTML(p, seed) : '<div class="msg-cam"><i class="ph ph-camera" aria-label="Foto pendiente"></i></div>';
+    return `<article class="msg" data-k="${k}"><div class="msg-h">
+      <div><div class="msg-lot">${p.lot}</div><div class="msg-place">${p.place}</div></div>
+      <div class="msg-r"><div class="msg-who">${p.who}</div>${right}</div></div>${media}</article>`;
+  }
+  let currentPosts = [], currentSeed = 0;
+  const OLD_LINE = `<div class="old-line" role="separator"><svg viewBox="0 0 150 16" aria-hidden="true">
+    <path d="M3 8 q 9 -9 18 0 t 18 0 t 18 0 t 18 0 t 18 0 t 18 0 t 18 0 t 18 0"/></svg><span>Mensajes antiguos</span></div>`;
+  function postsHTML(c) {
+    const off = CHATS.indexOf(c);
+    currentSeed = off;
+    currentPosts = postsFor(c);
+    const fresh = c.n ? Math.min(c.n, 4) : 2; // los no leídos quedan arriba de la línea
+    return currentPosts.map((p, k) => (k === fresh ? OLD_LINE : '') + postHTML(p, off + k, k)).join('');
+  }
+  const SKELETON = `<div class="msg" aria-hidden="true"><div class="msg-h">
+    <div><i class="sk-b" style="width:132px;height:34px"></i><i class="sk-b" style="width:84px;height:18px;margin-top:10px"></i></div>
+    <div class="msg-r"><i class="sk-b" style="width:80px;height:18px"></i><i class="sk-b" style="width:80px;height:14px;margin-top:12px"></i></div>
+    </div><i class="sk-b sk-media"></i></div>`;
+  function chatHTML(c) {
+    return `<div class="feed" aria-busy="true">${SKELETON.repeat(3)}</div>`;
+  }
+  function chatNavHTML(c) {
+    return `<div class="d-nav"><div class="d-nav-in c-nav">
+        <button class="back" id="c-back" type="button" aria-label="Volver a alertas"><i class="ph-bold ph-caret-left" aria-hidden="true"></i>Volver</button>
+        <span class="c-title" id="c-title">${c.name}</span>${avatarHTML(c)}
+      </div></div>`;
+  }
+
+  function openChat(id) {
+    if (busy) return;
+    busy = true; chatId = id;
+    const c = chatById(id), token = ++chatToken;
+    chatIn.innerHTML = chatHTML(c);
+    $('c-nav').innerHTML = chatNavHTML(c);
+    chat.hidden = false; chatIn.scrollTop = 0;
+    const feed = chatIn.querySelector('.feed');
+    popIn([...feed.children], 120, 70);
+    // Carga simulada: esqueletos, luego los mensajes entran en cascada.
+    setTimeout(() => {
+      if (token !== chatToken) return;
+      Promise.all([...feed.children].map(el => el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.96)' }], { duration: REDUCED ? 1 : 140, fill: 'forwards' }).finished))
+        .then(() => {
+          if (token !== chatToken) return;
+          feed.innerHTML = postsHTML(c); feed.removeAttribute('aria-busy');
+          popIn([...feed.children], 0, 80);
+        });
+    }, 750);
+    document.body.classList.add('locked');
+    $('c-back').addEventListener('click', closeChat);
+    const a = anim(chat, [{ transform: 'translateX(100%)' }, { transform: 'none' }], M.expand);
+    a.finished.then(() => { a.cancel(); busy = false; $('c-back').focus({ preventScroll: true }); });
+  }
+  function closeChat() {
+    if (busy || chat.hidden) return;
+    busy = true;
+    anim(chat, [{ transform: 'none' }, { transform: 'translateX(100%)' }], M.exit).finished.then(finishChat);
+  }
+  function finishChat() {
+    chat.getAnimations().forEach(x => x.cancel());
+    chat.hidden = true; chat.style.transform = ''; chat.style.boxShadow = ''; busy = false; chatToken++;
+    document.body.classList.remove('locked');
+    const c = CHATS.find(x => x.id === chatId);
+    if (c) c.n = 0; // abrir el chat lo marca como leído
+    renderChats();
+    $('chats').querySelector(`[data-id="${chatId}"]`)?.focus({ preventScroll: true });
+  }
+  edgeSwipe(chat, { isOpen: () => !chat.hidden, onDone: finishChat });
+  chatIn.addEventListener('click', e => {
+    const m = e.target.closest('.msg[data-k]'); if (m) openPost(+m.dataset.k);
+  });
+
+  // ---------- Detalle de despacho: boleta + fotos ----------
+  const post = $('post'), postIn = $('post-in'), pdBack = $('pd-back');
+  let postCard = null;
+  // Transform que pone el texto del lote grande exactamente sobre el texto del lote de la tarjeta,
+  // estando el detalle en la posición `box` (se mide el texto, no la caja: el grande va centrado).
+  function lotDelta(lot, cardLot, box) {
+    const text = el => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect(); };
+    const s = parseFloat(getComputedStyle(cardLot).fontSize) / parseFloat(getComputedStyle(lot).fontSize);
+    const lb = lot.getBoundingClientRect(), lt = text(lot), ct = text(cardLot), ri = postIn.getBoundingClientRect();
+    const x = box.left + (lb.left - ri.left) + s * (lt.left - lb.left);
+    const y = box.top + (lb.top - ri.top) + s * (lt.top - lb.top);
+    return `translate(${ct.left - x}px, ${ct.top - y}px) scale(${s})`;
+  }
+  // El lote vuela como copia fija encima de todo: dentro del encabezado lo cortaría la V.
+  // Se ubica donde queda el lote con el detalle abierto (contenedor en 0,0).
+  function flyLot(lot, frames, opts) {
+    const lb = lot.getBoundingClientRect(), ri = postIn.getBoundingClientRect(), fly = lot.cloneNode(true);
+    Object.assign(fly.style, { position: 'fixed', left: lb.left - ri.left + 'px', top: lb.top - ri.top + 'px', width: lb.width + 'px', height: lb.height + 'px',
+      margin: '0', textAlign: 'center', color: '#0B0C0D', zIndex: 5, transformOrigin: '0 0', pointerEvents: 'none' });
+    post.appendChild(fly);
+    lot.style.visibility = 'hidden';
+    const a = fly.animate(frames, opts);
+    a.fly = fly;
+    return a;
+  }
+  function postDetailHTML(p, seed) {
+    const d = p.doc, dp = dispatchPct(p), received = p.stage >= STEPS.length;
+    const rows = d.items.map(([desc, unit, pre, sol, desp]) => `<div class="rc-row${desp > pre ? ' over' : ''}"><span class="rc-desc">${desc}<small>${unit}</small></span>
+      <b class="pre${desp > pre ? ' bad' : ''}">${pre}</b><b>${sol}</b><b class="${budgetCls(pre, desp)}">${desp}</b></div>`).join('');
+    const photos = p.photos
+      ? photoOrder(p).map((idx, k) => `<img class="pd-photo${idx === p.flag ? ' flagged' : ''}" src="fotos/${PHOTO_FILES[(seed + idx) % PHOTO_FILES.length]}.jpg" alt="Foto ${k + 1} de ${p.photos}${idx === p.flag ? ', señalada por seguridad' : ''}" loading="lazy">`).join('')
+      : '<div class="pd-cam"><i class="ph ph-camera" aria-hidden="true"></i>Foto pendiente</div>';
+    return `<div class="d-top">
+        <div class="d-bar"><span class="d-app">Boleta Nº ${d.no}</span></div>
+        <div class="d-main">
+          <div class="d-label" id="pd-label">${p.place} · ${p.who}</div>
+          <div class="d-num pd-num">${p.lot}</div>
+          <div class="d-unit">${d.act} · ${d.date}</div>
+          <div class="d-stats">
+            <div><small>Solicitado</small><b>${docSum(p, 3)}</b></div>
+            <div><small>Despachado</small><b>${dp}%</b></div>
+            <div><small>Etapa</small><b>${p.stage}/${STEPS.length}</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="d-body pd-body">
+        <div class="d-h"><h3>Despacho</h3><span>hace ${p.time}</span></div>
+        <div class="rc">
+          <div class="rc-head"><span>Boleta de salida<br>de materiales</span><b>Nº ${d.no}</b></div>
+          <div class="rc-meta"><div><small>Fecha</small>${d.date}</div><div><small>Obra</small>${d.obra}</div><div><small>Bodega</small>${p.place}</div></div>
+          <div class="rc-row rc-th"><span>Descripción</span><span>Pre.</span><span>Sol.</span><span>Des.</span></div>
+          ${rows}
+          <div class="rc-row rc-total"><span>Total</span><b class="pre${docSum(p, 4) > docSum(p, 2) ? ' bad' : ''}">${docSum(p, 2)}</b><b>${docSum(p, 3)}</b><b class="${budgetCls(docSum(p, 2), docSum(p, 4))}">${docSum(p, 4)}</b></div>
+          <div class="rc-sign"><div><small>Despachó</small>${p.who}<i class="ph-fill ph-check-circle" aria-label="firmado"></i></div>
+            <div><small>Recibió</small>${received ? 'Líder de cuadrilla' : '<span class="pending">Pendiente</span>'}</div></div>
+        </div>
+        <div class="d-h"><h3>Recorrido</h3><span>${stageText(p)}</span></div>
+        <div class="trk">${STEPS.map((st, i) => `<div class="${stepCls(p, i)}"><i></i><span>${st}</span></div>`).join('')}</div>
+        <div class="d-h"><h3>Fotos</h3><span>${p.photos ? p.photos + ' fotos' : 'sin fotos'}</span></div>
+        <div class="pd-photos">${photos}</div>
+      </div>`;
+  }
+  function openPost(k) {
+    if (busy) return;
+    const card = chatIn.querySelector(`.msg[data-k="${k}"]`); if (!card) return;
+    busy = true; postCard = card;
+    const from = card.getBoundingClientRect(), to = { left: 0, top: 0, width: innerWidth, height: innerHeight };
+    postIn.innerHTML = postDetailHTML(currentPosts[k], currentSeed + k);
+    postIn.style.width = to.width + 'px'; postIn.style.height = to.height + 'px';
+    post.hidden = false; postIn.scrollTop = 0;
+    card.style.visibility = 'hidden';
+    const a = anim(post, [rectFrame(from, { borderRadius: '30px', backgroundColor: '#FFFFFF' }), rectFrame(to, { borderRadius: '0px', backgroundColor: '#111315' })], M.expand);
+    // El lote viaja de la tarjeta al número grande (mismo resorte que el contenedor).
+    const lot = postIn.querySelector('.pd-num');
+    const flyIn = flyLot(lot, [{ transform: lotDelta(lot, card.querySelector('.msg-lot'), { left: 0, top: 0 }) }, { transform: 'none' }], springOpts(M.expand));
+    flyIn.finished.then(() => { flyIn.fly.remove(); lot.style.visibility = ''; });
+    // El verde se funde; todo lo demás entra en cascada: pop, pop, pop.
+    fade(postIn.querySelector('.d-top'), 0, 1, 220, 40);
+    const q = sel => [...postIn.querySelectorAll(sel)];
+    popIn([...q('.d-app, .d-label, .d-unit'), ...q('.d-stats > div')], 140, 45);
+    popIn([...q('.pd-body > .d-h:first-child, .rc'), ...q('.rc-head, .rc-meta, .rc-row, .rc-sign')], 320, 40);
+    popIn([...q('.pd-body > .d-h:not(:first-child)'), ...q('.trk > div'), ...q('.pd-photos > *').slice(0, 2)], 640, 60);
+    popIn([pdBack], 420);
+    a.finished.then(() => { busy = false; pdBack.focus({ preventScroll: true }); });
+  }
+  function closePost() {
+    if (busy || post.hidden) return;
+    busy = true;
+    const q = sel => [...postIn.querySelectorAll(sel)];
+    const inView = el => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; };
+    // 1) El detalle se desarma: cada pieza sale con resorte, de abajo hacia arriba. Sin caja que se encoja.
+    const out = [pdBack, ...q('.pd-photos > *'), ...q('.trk > div').reverse(), ...q('.pd-body > .d-h:not(:first-child)'),
+      ...q('.rc-sign, .rc-row, .rc-meta, .rc-head').reverse(), ...q('.rc, .pd-body > .d-h:first-child').reverse(),
+      ...q('.d-stats > div').reverse(), ...q('.d-app, .d-label, .d-unit').reverse()].filter(inView);
+    const STEP = 24;
+    out.forEach((el, k) => el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6)' }], springOpts(M.exit, k * STEP)));
+    const D = REDUCED ? 0 : Math.min(260, out.length * STEP);
+    // El verde y el fondo oscuro se disuelven y dejan ver el chat.
+    q('.d-top')[0].animate([{ backgroundColor: '#ADD010' }, { backgroundColor: 'rgba(173, 208, 16, 0)' }], { duration: REDUCED ? 1 : 260, delay: D * .5, easing: 'ease-out', fill: 'forwards' });
+    post.animate([{ backgroundColor: '#111315' }, { backgroundColor: 'rgba(17, 19, 21, 0)' }], { duration: REDUCED ? 1 : 300, delay: D * .6, easing: 'ease-out', fill: 'forwards' });
+    // 2) El lote vuela de regreso a la tarjeta.
+    const lot = q('.pd-num')[0], cardLot = postCard.querySelector('.msg-lot');
+    const flight = flyLot(lot, [{ transform: 'none' }, { transform: lotDelta(lot, cardLot, { left: 0, top: 0 }) }], springOpts(M.expand, D * .5));
+    // 3) La tarjeta del chat se rearma en cascada alrededor del lote.
+    cardLot.style.visibility = 'hidden';
+    postCard.style.visibility = '';
+    postCard.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], springOpts(M.pop, D * .7)).finished.then(a => a.cancel());
+    const parts = [...postCard.querySelectorAll('.msg-place, .msg-who, .msg-time, .pbar, .dots, .msg-cam, .ph-grid > div')];
+    const back = popIn(parts, D * .7 + 80, 40);
+    Promise.all([flight.finished, back]).then(() => { cardLot.style.visibility = ''; flight.fly.remove(); finishPost(); });
+  }
+  function finishPost() {
+    [post, postIn, pdBack].forEach(el => el.getAnimations().forEach(x => x.cancel()));
+    post.hidden = true; post.style.transform = ''; post.style.boxShadow = ''; busy = false;
+    if (postCard) { postCard.style.visibility = ''; }
+  }
+  pdBack.addEventListener('click', closePost);
+
+  // ---------- Rebote elástico (como en Histok) ----------
+  // No se bloquea el rebote nativo de iOS (da la inercia); encima, el contenido se encoge
+  // hasta 5 % hacia el borde que se estira y vuelve con resorte al soltar.
+  const SPRING_BACK = spring({ stiffness: 210, damping: 26 });
+  function rubber(scroller, target) {
+    const isWin = scroller === window;
+    let pinned = null, edge = 'top';
+    const pos = () => isWin ? scrollY : scroller.scrollTop;
+    const max = () => isWin ? document.documentElement.scrollHeight - innerHeight : scroller.scrollHeight - scroller.clientHeight;
+    scroller.addEventListener('touchmove', e => {
+      const t = target();
+      if (e.touches.length !== 1 || !t) return;
+      const y = e.touches[0].clientY, sy = pos();
+      const atTop = sy <= 0, atBottom = sy >= max() - 1;
+      if (atTop || atBottom) {
+        if (pinned === null) { pinned = y; edge = atTop ? 'top' : 'bottom'; }
+        const d = y - pinned, over = edge === 'top' ? Math.max(0, d) : Math.max(0, -d);
+        t.style.transformOrigin = edge === 'top' ? '50% 0%' : '50% 100%';
+        t.style.transform = over ? `scale(${1 - Math.min(over, 300) / 300 * 0.05})` : '';
+      } else if (pinned !== null) { pinned = null; t.style.transform = ''; }
+    }, { passive: true });
+    const end = () => {
+      pinned = null;
+      const t = target();
+      if (!t || !t.style.transform) return;
+      const from = t.style.transform;
+      t.style.transform = '';
+      if (!REDUCED) t.animate([{ transform: from }, { transform: 'scale(1)' }], { duration: SPRING_BACK.duration, easing: SPRING_BACK.easing });
+    };
+    scroller.addEventListener('touchend', end);
+    scroller.addEventListener('touchcancel', end);
+  }
+  // Se encoge el contenido, nunca el contenedor que scrollea: cambiar el transform del
+  // scroller corta la inercia y el rebote en iOS. Chat, detalle y boleta usan el rebote nativo.
+  rubber($('s-inicio'), () => $('v-inicio'));
+  rubber($('s-alertas'), () => $('v-alertas'));
+  edgeSwipe(post, {
+    isOpen: () => !post.hidden,
+    onStart: () => { postCard.style.visibility = ''; },
+    onCancel: () => { postCard.style.visibility = 'hidden'; },
+    onDone: finishPost
+  });
+
+  renderFilters(); renderChats();
+})();
+</script>
+
+</body></html>
