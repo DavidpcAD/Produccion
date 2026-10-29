@@ -9,7 +9,7 @@ import {
 } from "@/components/compras/inventario-bc";
 import { useStore } from "@/lib/compras/store";
 import {
-  formatDate, formatDateTime, money, num, numeroOrdenPlano, ordenAlmacenDestino, ordenConsumoDirecto,
+  badgePrioridad, formatDate, formatDateTime, money, num, numeroOrdenPlano, ordenAlmacenDestino, ordenConsumoDirecto,
   ordenDevueltaPorBc, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas,
   ordenReabiertaTrasAprobar, ordenTotalConIva,
 } from "@/lib/compras/helpers";
@@ -47,6 +47,9 @@ export function OrdenFila({
   // decirlo en la lista, antes de que alguien la vuelva a aprobar de corrido creyendo
   // que es nueva.
   const reab = ordenReabiertaTrasAprobar(orden, movimientos);
+  // Prioridad que le puso Proveeduría (null si es normal): se marca en la lista para
+  // poder triar la cola sin abrir cada orden.
+  const prio = badgePrioridad(orden.prioridad);
   const prov = proveedores.find((p) => p.id === orden.proveedorId);
   // La fecha NO va acá: ya se muestra arriba, al lado del número. Repetirla en esta
   // línea la sacaba dos veces en la misma tarjeta.
@@ -78,6 +81,13 @@ export function OrdenFila({
             </span>
           </span>
           <span className="oc-fila__marcas">
+            {prio && (
+              <span className={`ds-badge ds-badge--${prio.tone} oc-marca`}
+                title="Prioridad que le puso Proveeduría al armar la orden">
+                <Icon name="alert" size="sm" color="currentColor" />
+                {prio.label}
+              </span>
+            )}
             {cd.hay && (
               <span className="ds-badge ds-badge--yellow oc-marca"
                 title={`Se consume contra ${cd.destinos.join(" · ")}. El material NO entra a inventario: el costo va a la obra.`}>

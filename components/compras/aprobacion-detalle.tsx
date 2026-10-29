@@ -11,7 +11,7 @@ import {
 } from "@/components/compras/inventario-bc";
 import { useStore } from "@/lib/compras/store";
 import {
-  bcEstadoBadge, formatDate, formatDateTime, money, num, numeroOrden, ordenAlmacenDestino, ordenBadge,
+  badgePrioridad, bcEstadoBadge, formatDate, formatDateTime, money, num, numeroOrden, ordenAlmacenDestino, ordenBadge,
   ordenConsumoDirecto, ordenDevueltaPorBc, ordenEsDirecta, ordenLineaEsConsumoDirecto,
   numeroOrdenPlano, ordenLineaImporte, ordenMaquinas, ordenPedidos, ordenReabiertaTrasAprobar,
   ordenTotalConIva, ROL_LABEL,
@@ -80,6 +80,8 @@ export function AprobacionDetalle({
   const provNombre = orden.proveedorNombre ?? prov?.nombre;
   const articulos = orden.lineas.filter((l) => l.tipo === "articulo");
   const b = ordenBadge(orden.estado);
+  // Prioridad que le puso Proveeduría (null si es normal: no se pinta chip).
+  const prio = badgePrioridad(orden.prioridad);
   const cd = ordenConsumoDirecto(orden);
   const alm = ordenAlmacenDestino(orden);
   const maquinas = ordenMaquinas(orden, pedidos);
@@ -98,6 +100,12 @@ export function AprobacionDetalle({
 
   const comentarios = useMemo(() => {
     const out: { quien: string; rol: string; fecha?: string; texto: string }[] = [];
+    // 0) Lo que Proveeduría dejó escrito en la orden misma al armarla. Va primero
+    // porque es justo lo que quien aprueba tiene que leer antes de decidir: el mensaje
+    // interno para él, y las observaciones que le van a llegar impresas al proveedor.
+    // (Antes esta app ni leía estas columnas, así que no aparecían acá.)
+    if (orden.notaInterna?.trim()) out.push({ quien: "Proveeduría", rol: "Mensaje para quien aprueba", texto: orden.notaInterna.trim() });
+    if (orden.observaciones?.trim()) out.push({ quien: "Proveeduría", rol: "Observaciones para el proveedor · salen en el PDF", texto: orden.observaciones.trim() });
     // 1) El que pidió el material: la nota de su solicitud.
     for (const n of ordenPedidos(orden)) {
       const ped = pedidos.find((x) => x.numero === n);
@@ -135,6 +143,7 @@ export function AprobacionDetalle({
           <div className="oc-det__num-fila">
             <h2 className="oc-det__num">{numeroOrdenPlano(orden)}</h2>
             <Badge tone={b.tone}>{b.label}</Badge>
+            {prio && <Badge tone={prio.tone} title="Prioridad que le puso Proveeduría al armar la orden">{prio.label}</Badge>}
             {sinLanzarBc && (
               <Badge tone="red" title={`El pedido ${orden.bcNumber} quedó sin lanzar en Business Central.`}>Sin lanzar en BC</Badge>
             )}

@@ -1,4 +1,4 @@
-import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Recepcion, Role, TipoSolicitud } from "./types";
+import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Prioridad, Recepcion, Role, TipoSolicitud } from "./types";
 import type { EstadoBcOrden } from "./api";
 import { almacenesQueRecibe } from "../permissions";
 
@@ -943,6 +943,16 @@ export function ordenBadge(estado: Orden["estado"]): { label: string; tone: stri
   // de SQL tiene códigos que no están en OrdenEstado ('devuelto', 'cerrado'…), así que
   // es alcanzable. Mejor mostrar el código crudo que reventar.
   return { label: String(estado ?? "—"), tone: "gray" };
+}
+
+// El distintivo de prioridad que ve quien aprueba. "normal" no devuelve nada: es lo de
+// siempre y meter un chip gris en cada orden sería ruido (mismo criterio que la app de
+// Proveeduría, de donde sale la prioridad, y que su PDF, que solo la imprime si no es
+// normal). Los tonos calzan con los de allá: alta=amarillo, urgente=rojo.
+export function badgePrioridad(p?: Prioridad): { tone: "yellow" | "red"; label: string } | null {
+  if (p === "urgente") return { tone: "red", label: "Urgente" };
+  if (p === "alta") return { tone: "yellow", label: "Prioridad alta" };
+  return null;
 }
 
 // Distribución proporcional de un cargo (flete) por importe de las líneas de artículo
