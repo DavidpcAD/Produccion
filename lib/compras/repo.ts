@@ -2,7 +2,7 @@ import { getPool, sql } from "./db";
 import { pedir } from "./pedir";
 import { etiquetaInterna } from "./helpers";
 import { bcDeepLinkPedido } from "./bc";
-import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
+import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Prioridad, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
 
 /* ============================================================================
    Capa de acceso a datos (SQL Server) para Compras Adelante.
@@ -593,6 +593,31 @@ export async function softDeletePedido(id: number, usuario: string, rol: Role) {
 // BC, la columna más pesada de la base) en cada carga de cada pantalla.
 const COLS_ORDEN = `idOrdenCompra, idEstado, ordenNo, proveedorNo, proveedorNombre, currencyCode,
   versionesArchivadas, bcNo, fechaEmision, fechaCreacion`;
+// Columnas de dbo.OrdenCompra que ESCRIBE la app de Proveeduría (otro repo, misma
+// tabla) y que esta app solo LEE: el mensaje interno para quien aprueba (notaInterna),
+// la prioridad, y las observaciones para el proveedor (notaCreador, las que salen en el
+// PDF). Proveeduría las crea al vuelo con ALTER TABLE, así que pueden no existir en una
+// base que todavía no las tiene; se detectan para no reventar el listado de Aprobación
+// con "Invalid column name". Se cachea: el esquema no cambia en caliente (igual criterio
+// que `plantillaTieneTipo`).
+let colsOrdenProveeduria: string[] | null = null;
+async function columnasProveeduriaOrden(pool: sql.ConnectionPool): Promise<string[]> {
+  if (colsOrdenProveeduria) return colsOrdenProveeduria;
+  try {
+    const r = await pedir(pool).query(
+      "SELECT COL_LENGTH('dbo.OrdenCompra','notaCreador') AS nc, COL_LENGTH('dbo.OrdenCompra','notaInterna') AS ni, COL_LENGTH('dbo.OrdenCompra','prioridad') AS pr",
+    );
+    const row = r.recordset[0] ?? {};
+    const cols: string[] = [];
+    if (row.nc != null) cols.push("notaCreador");
+    if (row.ni != null) cols.push("notaInterna");
+    if (row.pr != null) cols.push("prioridad");
+    colsOrdenProveeduria = cols;
+  } catch {
+    colsOrdenProveeduria = [];
+  }
+  return colsOrdenProveeduria;
+}
 const COLS_ORDEN_DET = `d.idOrdenCompraDet, d.idOrdenCompra, d.idPedidoCompraDet, d.lineNum, d.tipoLinea,
   d.itemNo, d.variantCode, d.descripcion, d.quantity, d.quantityRecibida, d.quantityFacturada,
   d.unitOfMeasureCode, d.locationCode, d.directUnitCost, d.vatPct, d.lineDiscountPct,
@@ -613,9 +638,12 @@ export async function listOrdenes(opts?: { estados?: string[] }): Promise<Orden[
     .filter((x): x is number => typeof x === "number");
   const soloEstados = opts?.estados?.length ? ` AND idEstado IN (${ids.join(",") || "-1"})` : "";
   const soloEstadosDet = opts?.estados?.length ? ` AND oc.idEstado IN (${ids.join(",") || "-1"})` : "";
+  // Comentario/prioridad de Proveeduría: solo las que existan en esta base (ver arriba).
+  const extraCab = await columnasProveeduriaOrden(pool);
+  const colsCab = extraCab.length ? `${COLS_ORDEN}, ${extraCab.join(", ")}` : COLS_ORDEN;
   // Cabecera y líneas son independientes: se piden a la vez (ver listPedidos).
   const [h, d] = await Promise.all([
-    pedir(pool).query(`SELECT ${COLS_ORDEN} FROM dbo.OrdenCompra WHERE esEliminada = 0${soloEstados} ORDER BY idOrdenCompra DESC`),
+    pedir(pool).query(`SELECT ${colsCab} FROM dbo.OrdenCompra WHERE esEliminada = 0${soloEstados} ORDER BY idOrdenCompra DESC`),
     pedir(pool).query(`SELECT ${COLS_ORDEN_DET},
              -- Consumo inmediato: la TAREA (Job Task) puede venir en NULL si la orden se
              -- armó desde la app de proveeduría (otro repo, mismas tablas), que no copia
@@ -712,6 +740,12 @@ function mapOrden(o: any, lineas: any[]): Orden {
     currencyCode: o.currencyCode ?? "",
     estado: (codigoDeId(o.idEstado) ?? "abierto") as Orden["estado"],
     versionesArchivadas: Number(o.versionesArchivadas ?? 0),
+    // Lo que escribió Proveeduría en la orden (solo lectura acá). Son columnas
+    // opcionales: si la base no las tiene, `o.*` viene undefined y se leen vacías /
+    // "normal" —lo mismo que Proveeduría cuando falta la columna—.
+    observaciones: o.notaCreador || undefined,   // para el proveedor; sale en el PDF
+    notaInterna: o.notaInterna || undefined,      // mensaje para quien aprueba; nunca en el PDF
+    prioridad: (o.prioridad === "alta" || o.prioridad === "urgente" ? o.prioridad : "normal") as Prioridad,
     bcNumber: o.bcNo || undefined,           // Nº del Pedido en BC (para relanzar/recibir/facturar)
     // Link al Pedido en BC. Se arma acá, del N.º, para TODA orden que tenga pedido: la
     // base no lo guarda y el que crea el pedido (Proveeduría o esta app al lanzar) no

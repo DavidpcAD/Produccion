@@ -207,6 +207,11 @@ export interface OrdenLinea {
   cantidadFacturada: number;
 }
 
+// Qué tan urgente es la orden. La fija Proveeduría al armarla (no viaja a BC); esta
+// app solo la lee para que Aprobación pueda priorizar la cola. Mismo orden y mismos
+// tonos que la app de Proveeduría (lib/types.ts allá).
+export type Prioridad = "normal" | "alta" | "urgente";
+
 export interface Orden {
   id: string;
   numero: string;           // CP-000862
@@ -224,6 +229,11 @@ export interface Orden {
   bcDeepLink?: string;      // link directo al Pedido en BC (editar / registrar / vista previa)
   notas?: string;           // motivo de la última devolución/denegación (Aprobación → Proveeduría)
   motivoRechazo?: string;   // motivo del rechazo (Aprobación); también queda en el histórico
+  // Lo que escribe Proveeduría al armar la orden (otro repo, misma tabla dbo.OrdenCompra;
+  // esta app solo lo LEE). Columnas opcionales: si faltan, se leen como vacío / "normal".
+  observaciones?: string;   // para el PROVEEDOR; salen en el PDF de la orden (col. notaCreador)
+  notaInterna?: string;     // mensaje para quien APRUEBA; nunca sale en el PDF (col. notaInterna)
+  prioridad?: Prioridad;    // normal | alta | urgente (col. prioridad)
 }
 
 // ============================ RECEPCIÓN / FACTURA (Bodega · Kattya) =========
