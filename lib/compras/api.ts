@@ -1,5 +1,5 @@
 // Cliente del front-end para las API routes (modo API).
-import type { Movimiento, Orden, Pedido, Recepcion, NotaCreditoLinea } from "./types";
+import type { Movimiento, Orden, OrdenSinAprobacion, Pedido, Recepcion, NotaCreditoLinea } from "./types";
 import { aplicarPermisoServidor } from "./cache-local";
 
 export const USE_API = process.env.NEXT_PUBLIC_USE_API === "1";
@@ -125,6 +125,9 @@ export const api = {
    *  necesitan las listas; el historial completo lo pide la pantalla de detalle. */
   movimientos: (entidad: string, id: string): Promise<Movimiento[]> =>
     fetch(`/api/compras/movimientos?entidad=${encodeURIComponent(entidad)}&id=${encodeURIComponent(id)}`).then(jsonOrThrow),
+  /** Las que Proveeduría lanzó sin pasar por Aprobación (histórico de la bandeja). */
+  ordenesSinAprobacion: (): Promise<OrdenSinAprobacion[]> =>
+    fetch("/api/compras/ordenes/sin-aprobacion", { cache: "no-store" }).then(jsonOrThrow),
 
   // Notas de crédito (líneas de factura con problema, para emitir NC).
   createNotasCredito: (body: unknown): Promise<{ ok: true }> =>

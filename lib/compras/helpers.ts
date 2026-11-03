@@ -814,7 +814,9 @@ const PASOS_SOLICITUD: { label: string; tip: string }[] = [
   { label: "Pedido", tip: "Solicitud creada" },
   { label: "Proveeduría", tip: "En Proveeduría" },
   { label: "Orden", tip: "En orden de compra" },
-  { label: "Aprobado", tip: "Orden aprobada y lanzada" },
+  // Sale del ESTADO de la orden (lanzada), no de quién la firmó: también llega acá la
+  // que Proveeduría lanzó sin aprobación (menor a ₡210 000 u Holcim).
+  { label: "Aprobado", tip: "Orden lanzada en Business Central (aprobada, o sin aprobación si no la necesitaba)" },
   { label: "Facturado", tip: "Recibido y facturado" },
 ];
 
@@ -1017,6 +1019,25 @@ export function ordenDevueltaPorBc(
   return ult?.tipoMovimiento === "sincronizado_bc" && ult.estadoNuevo === "pendiente_aprobacion";
 }
 
+// ---- órdenes que Proveeduría lanza SIN pasar por Aprobación ----
+// Desde nov 2026 la app de Proveeduría (repo OrdenesCompras, lib/aprobacion-automatica.ts)
+// LANZA ella misma en BC, al enviarla, la orden en colones con total con IVA menor a
+// ₡210 000 y toda orden de Holcim (PROV-000694). En la bitácora quedan dos renglones
+// seguidos: `enviado_aprobacion` (quien la envió) y `aprobado_automatico` (usuario
+// "Aprobación automática", con el porqué en `detalle`). La regla vive allá; acá solo
+// se lee. Para esta app esa orden está LANZADA (Bodega recibe contra ella como
+// cualquier otra), pero nadie la firmó: no es una aprobación de Luis Roberto.
+export const MOV_APROBACION_AUTOMATICA = "aprobado_automatico";
+
+/** De qué regla salió, leído del `detalle` que escribe Proveeduría:
+ *  "Total con IVA ₡X, menor a ₡210 000,00: …" o "Proveedor Holcim (PROV-000694): …". */
+export function motivoSinAprobacion(detalle?: string | null): "monto" | "proveedor" | "otro" {
+  const d = (detalle ?? "").trim();
+  if (/^proveedor\b/i.test(d)) return "proveedor";
+  if (/total con iva/i.test(d)) return "monto";
+  return "otro";
+}
+
 // ---- la orden ya se había aprobado y la volvieron a abrir ----
 // Proveeduría puede reabrir una orden YA LANZADA para corregirle algo —cambiar una
 // cantidad, agregar una línea, cambiar el precio— y volver a mandarla a aprobación.
@@ -1029,6 +1050,12 @@ export function ordenDevueltaPorBc(
 // (el que escribe "Volver a abrir" en Proveeduría). Ojo con el caso parecido pero
 // distinto: cuando es BC el que devuelve la orden el movimiento es `sincronizado_bc`,
 // nadie la editó, y de eso ya habla `ordenDevueltaPorBc` ("Sin lanzar en BC").
+//
+// Manda el ÚLTIMO lanzamiento, sea firmado o no. Si la última vez salió sola
+// (`aprobado_automatico`: menor a ₡210 000 u Holcim), lo que se lanzó no lo vio nadie:
+// si la reabren, la suben de ₡210 000 y la reenvían, llega como NUEVA y se revisa
+// completa. Tomar la firma de Luis de una vuelta anterior diría "lo demás ya se
+// había firmado" sobre una versión que él nunca aprobó.
 export interface OrdenReabierta {
   /** Cuántas veces se aprobó y lanzó ya (2 o más = van varias vueltas). */
   veces: number;
@@ -1055,8 +1082,9 @@ export function ordenReabiertaTrasAprobar(o: { id: string }, movimientos: Movimi
       const na = Number(a.id), nb = Number(b.id);
       return Number.isFinite(na) && Number.isFinite(nb) ? na - nb : 0;
     });
-  const iAprob = suyos.map((m) => m.tipoMovimiento).lastIndexOf("aprobado_lanzado");
-  if (iAprob < 0) return null;
+  const tipos = suyos.map((m) => m.tipoMovimiento);
+  const iAprob = tipos.lastIndexOf("aprobado_lanzado");
+  if (iAprob < 0 || tipos.lastIndexOf(MOV_APROBACION_AUTOMATICA) > iAprob) return null;
   const despues = suyos.slice(iAprob + 1);
   const iReab = despues.findIndex((m) => m.tipoMovimiento === "reabierto");
   // Sin reapertura posterior la orden sigue aprobada (o volvió por otra vía): no hay

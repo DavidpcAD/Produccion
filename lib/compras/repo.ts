@@ -1,8 +1,8 @@
 import { getPool, sql } from "./db";
 import { pedir } from "./pedir";
-import { etiquetaInterna } from "./helpers";
+import { etiquetaInterna, MOV_APROBACION_AUTOMATICA, motivoSinAprobacion } from "./helpers";
 import { bcDeepLinkPedido } from "./bc";
-import type { Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Prioridad, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
+import type { Movimiento, Orden, OrdenLinea, OrdenSinAprobacion, Pedido, PedidoLinea, Prioridad, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
 
 /* ============================================================================
    Capa de acceso a datos (SQL Server) para Compras Adelante.
@@ -1164,6 +1164,50 @@ export async function listMovimientosResumen() {
                            WHERE o.idOrdenCompra = m.idEntidad AND o.esEliminada = 0 AND e.estado = @pendiente))
        ORDER BY m.fecha DESC, m.idMovimiento DESC`);
   return r.recordset.map(mapMovimiento);
+}
+
+/** Las órdenes que la app de Proveeduría LANZÓ SOLA al enviarlas (menor a ₡210 000
+ *  en colones, u Holcim): el histórico «Aprobación automática» de la bandeja.
+ *
+ *  Va aparte de la carga inicial a propósito: son más de la mitad de las órdenes en
+ *  colones y la bitácora del bootstrap se recortó justamente para que no creciera
+ *  para siempre. Son renglones de bitácora, no órdenes: la orden (líneas, proveedor,
+ *  monto) ya la tiene el store, y la pantalla las cruza por id.
+ *
+ *  Quién la envió es el `enviado_aprobacion` INMEDIATAMENTE anterior de esa orden
+ *  (Proveeduría escribe los dos renglones seguidos; el idMovimiento es correlativo).
+ *
+ *  UNA fila por orden, la de la ÚLTIMA vez que pasó sola, con `veces`. Holcim pasa
+ *  casi siempre dos: al enviarla y cuando Bodega trae la boleta y Proveeduría la
+ *  reabre para ajustar la cantidad recibida y la reenvía. Una fila por pasada sacaba
+ *  cada orden de Holcim repetida. Todas las pasadas se leen en el historial. */
+export async function listOrdenesSinAprobacion(): Promise<OrdenSinAprobacion[]> {
+  const pool = await getPool();
+  const r = await pedir(pool)
+    .input("tipo", sql.NVarChar(50), MOV_APROBACION_AUTOMATICA)
+    .query(`SELECT a.idMovimiento, a.idEntidad, a.fecha, a.detalle, e.usuario AS enviadoPor, e.fecha AS enviadoEl
+       FROM dbo.Movimiento a
+       JOIN dbo.OrdenCompra o ON o.idOrdenCompra = a.idEntidad AND o.esEliminada = 0
+       OUTER APPLY (SELECT TOP 1 m.usuario, m.fecha FROM dbo.Movimiento m
+                     WHERE m.entidad = 'orden' AND m.idEntidad = a.idEntidad
+                       AND m.tipoMovimiento = 'enviado_aprobacion' AND m.idMovimiento < a.idMovimiento
+                     ORDER BY m.idMovimiento DESC) e
+       WHERE a.entidad = 'orden' AND a.tipoMovimiento = @tipo
+       ORDER BY a.fecha DESC, a.idMovimiento DESC`);
+  // Vienen de la más nueva a la más vieja: la primera de cada orden es la última pasada.
+  const porOrden = new Map<string, OrdenSinAprobacion>();
+  for (const f of r.recordset as { idMovimiento: number; idEntidad: number; fecha: Date | null; detalle: string | null; enviadoPor: string | null; enviadoEl: Date | null }[]) {
+    const ordenId = String(f.idEntidad);
+    const ya = porOrden.get(ordenId);
+    if (ya) { ya.veces++; continue; }
+    porOrden.set(ordenId, {
+      id: String(f.idMovimiento), ordenId, fecha: f.fecha?.toISOString() ?? "",
+      detalle: f.detalle ?? "", motivo: motivoSinAprobacion(f.detalle),
+      enviadoPor: f.enviadoPor ?? undefined, enviadoEl: f.enviadoEl?.toISOString() ?? undefined,
+      veces: 1,
+    });
+  }
+  return [...porOrden.values()];
 }
 
 // ----------------------------------------------------------------- MOVIMIENTOS

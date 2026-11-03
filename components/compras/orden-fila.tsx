@@ -13,17 +13,20 @@ import {
   ordenDevueltaPorBc, ordenLineaEsConsumoDirecto, ordenLineaImporte, ordenMaquinas,
   ordenReabiertaTrasAprobar, ordenTotalConIva,
 } from "@/lib/compras/helpers";
-import type { Orden } from "@/lib/compras/types";
+import type { Orden, OrdenSinAprobacion } from "@/lib/compras/types";
 
 // La orden en la lista. Vive aparte porque la usan las DOS bandejas —Aprobación y
 // Todas las órdenes— y tienen que verse igual: si una cambia, cambian las dos.
 // El desplegado de líneas es asunto suyo; afuera nadie lo administra.
 export function OrdenFila({
-  orden, abierta, marcada, onAbrir, onMarcar,
+  orden, abierta, marcada, onAbrir, onMarcar, sinAprobacion,
 }: {
   orden: Orden;
   /** Es la que se está revisando en el riel: se marca para no perderla de vista. */
   abierta: boolean;
+  /** Vista «Aprobación automática»: la fecha que importa es cuándo se lanzó, y la fila dice
+   *  quién la envió y por qué no pasó por Aprobación. */
+  sinAprobacion?: OrdenSinAprobacion;
   /** Solo donde se puede aprobar en lote. `undefined` = sin casilla. */
   marcada?: boolean;
   onAbrir: () => void;
@@ -54,6 +57,9 @@ export function OrdenFila({
   // La fecha NO va acá: ya se muestra arriba, al lado del número. Repetirla en esta
   // línea la sacaba dos veces en la misma tarjeta.
   const datos = [
+    sinAprobacion ? `La envió ${sinAprobacion.enviadoPor ?? "—"}` : null,
+    // Holcim casi siempre pasa dos veces (la segunda al ajustar la cantidad a la boleta).
+    sinAprobacion && sinAprobacion.veces > 1 ? `Pasó sola ${sinAprobacion.veces} veces` : null,
     `${articulos.length} ${articulos.length === 1 ? "línea" : "líneas"}`,
     alm.codigo ?? (alm.mixto ? "Varios almacenes" : null),
     maquinas.length > 0 ? maquinas.join(", ") : null,
@@ -70,7 +76,9 @@ export function OrdenFila({
           <span className="oc-fila__id">
             <span className="oc-fila__linea1">
               <span className="oc-fila__num">{numeroOrdenPlano(orden)}</span>
-              <span className="oc-fila__fecha">{formatDate(orden.fecha)}</span>
+              {sinAprobacion
+                ? <span className="oc-fila__fecha" title="Cuándo se lanzó en Business Central">{formatDateTime(sinAprobacion.fecha)}</span>
+                : <span className="oc-fila__fecha">{formatDate(orden.fecha)}</span>}
             </span>
             <span className="oc-fila__prov">
               <span className="oc-fila__prov-nom">{orden.proveedorNombre ?? prov?.nombre}</span>
@@ -79,6 +87,7 @@ export function OrdenFila({
             <span className="oc-fila__datos">
               {datos.map((d) => <span key={d}>{d}</span>)}
             </span>
+            {sinAprobacion?.detalle && <span className="oc-fila__nota">{sinAprobacion.detalle}</span>}
           </span>
           <span className="oc-fila__marcas">
             {prio && (

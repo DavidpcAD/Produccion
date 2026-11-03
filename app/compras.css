@@ -1946,6 +1946,10 @@
   display: inline-flex; align-items: center; gap: var(--ds-space-2); cursor: pointer; height: 48px;
   font-size: var(--ds-font-size-body-sm); font-weight: var(--ds-font-weight-semibold); color: var(--ds-color-gray-400);
 }
+/* «Quitar filtros» de la vista Sin aprobación: a la altura de los campos, no del rótulo. */
+.oc-scope .oc-filtros__limpiar { display: inline-flex; align-items: center; height: 48px; }
+/* Qué es la vista «Aprobación automática», encima de la lista: no es cola, es histórico. */
+.oc-scope .oc-bandeja__nota-vista { margin: 0 0 var(--ds-space-4); max-width: 72ch; }
 
 /* ---- La orden en la lista ---- */
 .oc-scope .oc-bandeja__filas { display: flex; flex-direction: column; gap: var(--ds-space-3); }
@@ -1985,6 +1989,10 @@
    los códigos ya traen guiones y se leían como uno solo). */
 .oc-scope .oc-fila__datos { display: flex; flex-wrap: wrap; align-items: center; font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-400); line-height: 1.5; }
 .oc-scope .oc-fila__datos > span + span { margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--ds-color-gray-200); }
+/* Vista «Aprobación automática»: por qué no pasó por Aprobación, tal cual lo dejó Proveeduría.
+   Va al final del bloque de identificación (en celular, `order: 6`; en PC, a todo el
+   ancho de la rejilla) y entera: es una frase, no se corta. */
+.oc-scope .oc-fila__nota { font-size: var(--ds-font-size-body-sm); color: var(--ds-color-gray-500); line-height: 1.45; overflow-wrap: break-word; }
 /* Ancho fijo para que los distintivos y los montos queden en columna entre filas. */
 .oc-scope .oc-fila__marcas { flex: 0 0 auto; width: 186px; display: flex; flex-wrap: wrap; gap: 6px; }
 .oc-scope .oc-fila__total {
@@ -2256,7 +2264,10 @@
      que la tarjeta entera abre la hoja. */
   .oc-scope .oc-fila__top { align-items: flex-start; gap: var(--ds-space-3); }
   .oc-scope .oc-fila__cbx { margin-top: 3px; }
-  .oc-scope .oc-fila__abrir { flex-direction: column; align-items: stretch; gap: 5px; }
+  /* Base 0 y no `auto`: con `auto` el ancho natural del contenido (dos distintivos, o
+     la frase del motivo en «Aprobación automática») pasaba del renglón y el chevron de abrir
+     se caía solo a la línea de abajo. */
+  .oc-scope .oc-fila__abrir { flex-direction: column; align-items: stretch; gap: 5px; flex-basis: 0; }
   /* `contents` disuelve el bloque de identificación para poder meter la plata y los
      distintivos ENTRE sus renglones, sin tener que cambiar el orden del HTML (que en
      PC sigue siendo identificación | distintivos | monto, en tres columnas). */
@@ -2271,6 +2282,7 @@
   }
   .oc-scope .oc-fila__marcas { order: 4; width: auto; }
   .oc-scope .oc-fila__datos { order: 5; }
+  .oc-scope .oc-fila__nota { order: 6; }
 
   /* La tabla de 5 columnas no se lee en 375px, pero esconder las líneas tampoco
      sirve: son lo que hay que mirar antes de aprobar. En celular van APILADAS y el
@@ -2354,6 +2366,9 @@
   .oc-scope .oc-fila__prov { grid-area: prov; color: var(--ds-color-gray-500); }
   .oc-scope .oc-fila__fecha { grid-area: fecha; }
   .oc-scope .oc-fila__datos { grid-area: datos; }
+  /* Sin área propia: cae en un renglón implícito debajo, solo cuando existe (con un
+     área fija en la plantilla, las filas que no la traen sumarían un hueco). */
+  .oc-scope .oc-fila__nota { grid-column: 1 / -1; }
   /* La fecha es un dato más de esa línea, así que lleva la misma raya fina. */
   .oc-scope .oc-fila__datos > span:first-child {
     margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--ds-color-gray-200);

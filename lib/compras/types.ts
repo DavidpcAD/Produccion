@@ -295,3 +295,22 @@ export interface Movimiento {
   rol: Role;
   fecha: string;                // ISO datetime
 }
+
+/** Una orden que Proveeduría lanzó en BC SIN pasar por Aprobación (el movimiento
+ *  `aprobado_automatico`), vista por su ÚLTIMA pasada. Ver listOrdenesSinAprobacion
+ *  en repo.ts. */
+export interface OrdenSinAprobacion {
+  /** idMovimiento del último `aprobado_automatico` de la orden. */
+  id: string;
+  ordenId: string;
+  /** Cuándo se lanzó la última vez. */
+  fecha: string;
+  /** Cuántas veces pasó sola (Holcim: casi siempre 2, la segunda al ajustar a la boleta). */
+  veces: number;
+  /** El porqué, tal cual lo escribió Proveeduría ("Total con IVA ₡…", "Proveedor Holcim …"). */
+  detalle: string;
+  motivo: "monto" | "proveedor" | "otro";
+  /** El `enviado_aprobacion` justo anterior: quién la mandó y cuándo. */
+  enviadoPor?: string;
+  enviadoEl?: string;
+}

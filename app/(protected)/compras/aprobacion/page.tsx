@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
-import { Button, Modal, Select, Textarea, useToast } from "@/components/compras/ui";
+import { Button, Input, Modal, Select, Textarea, useToast } from "@/components/compras/ui";
 import { AprobacionDetalle } from "@/components/compras/aprobacion-detalle";
 import { AprobarControl } from "@/components/compras/aprobar-control";
 import { ProveedorPanel } from "@/components/compras/proveedor-panel";
@@ -18,8 +18,8 @@ import {
   ordenDevueltaPorBc, ordenReabiertaTrasAprobar, ordenTotalConIva,
 } from "@/lib/compras/helpers";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
-import type { Movimiento, Orden } from "@/lib/compras/types";
-import type { EstadoBcOrden } from "@/lib/compras/api";
+import type { Movimiento, Orden, OrdenSinAprobacion } from "@/lib/compras/types";
+import { api, type EstadoBcOrden } from "@/lib/compras/api";
 
 // Bandeja de aprobación: la lista a la izquierda y la orden que se está revisando en un
 // riel a la derecha (en celular, una hoja que sube desde abajo). Aprobar es irreversible
@@ -29,14 +29,19 @@ import type { EstadoBcOrden } from "@/lib/compras/api";
 // Las tres fichas de arriba son VISTAS de la cola de aprobación, una dentro de otra:
 // pendientes ⊃ requieren atención ⊃ sin lanzar en BC. Los demás estados (lanzadas, en
 // proveeduría, completadas) no son cola de trabajo: se eligen desde "Filtros".
-type Vista = "pendientes" | "atencion" | "sin_bc" | "lanzado" | "abierto" | "completado";
+// «Aprobación automática» tampoco es cola —es el histórico de lo que Proveeduría lanzó sola—,
+// pero va como ficha a la vista: es lo que Luis Roberto revisa después, y escondida en
+// Filtros nadie sabría que existe.
+type Vista = "pendientes" | "atencion" | "sin_bc" | "sin_aprobacion" | "lanzado" | "abierto" | "completado";
 const FICHAS: Vista[] = ["pendientes", "atencion", "sin_bc"];
+const HISTORICO: Vista[] = ["sin_aprobacion"];
 const OTROS_ESTADOS: Vista[] = ["lanzado", "abierto", "completado"];
 // `corto`: el rótulo que entra en celular, donde las fichas se arrastran de lado.
 const VISTA: Record<Vista, { label: string; corto: string; vacio: string; ayuda: string }> = {
   pendientes: { label: "Pendientes", corto: "Pendientes", vacio: "No hay órdenes pendientes de aprobación.", ayuda: "Proveeduría ya las envió: falta aprobarlas o rechazarlas." },
   atencion: { label: "Requieren atención", corto: "Atención", vacio: "Ninguna pendiente trae algo que mirar antes de aprobar.", ayuda: "Pendientes que no conviene aprobar de corrido: algo quedó trabado en Business Central (el último intento de lanzar falló, BC dice otra cosa, o el pedido quedó sin lanzar), o la orden YA se había aprobado y Proveeduría la volvió a abrir para cambiarle algo." },
   sin_bc: { label: "Sin lanzar en BC", corto: "Sin lanzar", vacio: "Ninguna orden quedó sin lanzar en Business Central.", ayuda: "Ya se aprobaron, pero el pedido quedó sin lanzar en BC: Bodega no puede recibir contra él." },
+  sin_aprobacion: { label: "Aprobación automática", corto: "Automáticas", vacio: "Todavía no hay órdenes con aprobación automática.", ayuda: "Solo de consulta. Las aprobó el sistema: Proveeduría las lanzó en Business Central al enviarlas, sin pasar por acá. Son las órdenes en colones con total con IVA menor a ₡210 000 y todas las de Holcim." },
   lanzado: { label: "Lanzadas", corto: "Lanzadas", vacio: "Todavía no hay órdenes lanzadas.", ayuda: "Ya están en Business Central y el proveedor las tiene." },
   abierto: { label: "En proveeduría", corto: "Proveeduría", vacio: "No hay órdenes abiertas en proveeduría.", ayuda: "Todavía se están armando: aún no llegaron a aprobación." },
   completado: { label: "Completadas", corto: "Completadas", vacio: "Todavía no hay órdenes completadas.", ayuda: "Recibidas y facturadas." },
@@ -52,6 +57,17 @@ const MOTIVOS_RECHAZO = [
   "Va contra otra obra o proyecto",
   "Se pidió por error",
 ];
+
+// Filtro de «Aprobación automática» por la regla que la dejó pasar (ver motivoSinAprobacion).
+type MotivoSA = "todos" | "monto" | "proveedor";
+
+// Día LOCAL (aaaa-mm-dd) de una fecha ISO, para compararlo con los campos de fecha:
+// el día UTC de las 6 p. m. en Costa Rica ya es el siguiente.
+function diaLocal(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(+d)) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 const BUSCAR_LARGO = "Buscar por N.º de orden, proveedor, material, obra, quién la pidió o N.º de factura…";
 const BUSCAR_CORTO = "Buscar orden, proveedor u obra…";
@@ -136,6 +152,37 @@ export default function AprobacionPage() {
   const [confirmOrden, setConfirmOrden] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{ ok: number; fallos: string[] } | null>(null);
   const [motivo, setMotivo] = useState("");
+  // «Aprobación automática» no viene en la carga inicial (lib/compras/repo.ts →
+  // listOrdenesSinAprobacion): se pide aparte al entrar y cada vez que se abre la
+  // ficha. `null` = todavía no llegó; un número sería mentira.
+  const [sinAprob, setSinAprob] = useState<OrdenSinAprobacion[] | null>(null);
+  const [errorSinAprob, setErrorSinAprob] = useState<string | null>(null);
+  const [motivoSA, setMotivoSA] = useState<MotivoSA>("todos");
+  const [desdeSA, setDesdeSA] = useState("");
+  const [hastaSA, setHastaSA] = useState("");
+  // Sin mirar el modo SQL a propósito: ese lo decide el layout en runtime y el
+  // `USE_API` de api.ts es el del build, que en producción viene apagado.
+  // Vale solo la ÚLTIMA pedida: la de entrar y la de tocar la ficha pueden ir en
+  // vuelo a la vez, y si la vieja llega después pisaba la lista nueva.
+  const pedidoSA = useRef(0);
+  const cargarSinAprob = () => {
+    const n = ++pedidoSA.current;
+    api.ordenesSinAprobacion()
+      .then((r) => { if (n === pedidoSA.current) { setSinAprob(r); setErrorSinAprob(null); } })
+      .catch((e: unknown) => { if (n === pedidoSA.current) setErrorSinAprob(e instanceof Error ? e.message : String(e)); });
+  };
+  useEffect(() => { cargarSinAprob(); }, []);
+
+  // Cada vez que una orden salió sola, con la orden al lado (el renglón de bitácora
+  // solo trae el id). Una que ya no está entre las órdenes —eliminada— no se muestra.
+  // Hasta que bajen todas las órdenes (`cargandoExtra`) la lista sale corta.
+  const filasSA = useMemo(() => {
+    const porId = new Map(ordenes.map((o) => [o.id, o]));
+    return (sinAprob ?? []).flatMap((r) => {
+      const o = porId.get(r.ordenId);
+      return o ? [{ r, o }] : [];
+    });
+  }, [sinAprob, ordenes]);
 
   // Las de cada vista, sin buscador: sirve para el contador de la ficha y para
   // distinguir "no hay ninguna" de "ninguna coincide con lo que buscaste".
@@ -145,11 +192,12 @@ export default function AprobacionPage() {
       pendientes,
       atencion: pendientes.filter((o) => requiereAtencion(o, movimientos, bcEstados)),
       sin_bc: pendientes.filter((o) => ordenDevueltaPorBc(o, movimientos)),
+      sin_aprobacion: filasSA.map((f) => f.o),
       lanzado: ordenes.filter((o) => o.estado === "lanzado"),
       abierto: ordenes.filter((o) => o.estado === "abierto"),
       completado: ordenes.filter((o) => o.estado === "completado"),
     } as Record<Vista, Orden[]>;
-  }, [ordenes, movimientos, bcEstados]);
+  }, [ordenes, movimientos, bcEstados, filasSA]);
 
   // Se busca por lo que uno tiene a mano: N.º de orden (el de BC o el interno),
   // proveedor (código o nombre), solicitud de origen, obra/almacén de las líneas y
@@ -164,6 +212,32 @@ export default function AprobacionPage() {
     };
     return deVista[vista].filter((o) => !q || coincideBusqueda(textoBuscableOrden(o, { proveedores, pedidos, recepciones }), q)).sort(cmp);
   }, [deVista, vista, busca, orden, proveedores, pedidos, recepciones]);
+
+  // «Aprobación automática»: además del buscador (que acá también encuentra por el motivo y
+  // por quién la envió), el motivo y el rango de fechas. La fecha es la del ÚLTIMO
+  // lanzamiento (una fila por orden, ver listOrdenesSinAprobacion), no la de la orden.
+  const filtroSA = motivoSA !== "todos" || !!desdeSA || !!hastaSA;
+  const listaSA = useMemo(() => {
+    const q = busca.trim();
+    return filasSA
+      .filter(({ r, o }) => {
+        if (motivoSA !== "todos" && r.motivo !== motivoSA) return false;
+        const dia = diaLocal(r.fecha);
+        if (desdeSA && dia < desdeSA) return false;
+        if (hastaSA && dia > hastaSA) return false;
+        return !q || coincideBusqueda(`${textoBuscableOrden(o, { proveedores, pedidos, recepciones })} ${r.detalle} ${r.enviadoPor ?? ""}`, q);
+      })
+      .sort((a, b) => {
+        if (orden === "mayor") return ordenTotalConIva(b.o) - ordenTotalConIva(a.o);
+        if (orden === "menor") return ordenTotalConIva(a.o) - ordenTotalConIva(b.o);
+        const d = a.r.fecha.localeCompare(b.r.fecha) || Number(a.r.id) - Number(b.r.id);
+        return orden === "antiguas" ? d : -d;
+      });
+  }, [filasSA, motivoSA, desdeSA, hastaSA, busca, orden, proveedores, pedidos, recepciones]);
+  const enSA = vista === "sin_aprobacion";
+  // La lista de esta vista cruza la bitácora con las órdenes: mientras falte una de las
+  // dos, decir "no hay ninguna" sería mentira.
+  const esperandoSA = enSA && (sinAprob === null || cargandoExtra) && !errorSinAprob;
 
   useEffect(() => {
     const p = new URLSearchParams();
@@ -230,7 +304,11 @@ export default function AprobacionPage() {
     setProvAbierto((actual) => (actual ? codigoProveedor(o) : null));
   };
 
-  const cambiarVista = (v: Vista) => { setVista(v); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false); };
+  const cambiarVista = (v: Vista) => {
+    setVista(v); setSel(new Set()); setAbiertaId(null); setVerSeleccion(false);
+    // Es histórico, pero Proveeduría lanza órdenes todo el día: se trae fresco al abrirlo.
+    if (v === "sin_aprobacion") cargarSinAprob();
+  };
   const toggleSel = (id: string) => {
     const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id);
     setSel(n);
@@ -320,7 +398,8 @@ export default function AprobacionPage() {
     });
   };
 
-  const hayFiltro = busca.trim().length > 0 || OTROS_ESTADOS.includes(vista);
+  const hayFiltro = busca.trim().length > 0 || OTROS_ESTADOS.includes(vista) || (enSA && filtroSA);
+  const limpiarFiltrosSA = () => { setMotivoSA("todos"); setDesdeSA(""); setHastaSA(""); setBusca(""); };
 
   return (
     <AppShell role="aprobacion">
@@ -353,6 +432,14 @@ export default function AprobacionPage() {
                       bitácora, y los otros estados con las órdenes que todavía bajan:
                       hasta que llegue, un número sería mentira. */}
                   {" "}({cargandoExtra && v !== "pendientes" ? "…" : deVista[v].length})
+                </button>
+              ))}
+              {HISTORICO.map((v) => (
+                <button key={v} type="button" aria-pressed={vista === v} title={VISTA[v].ayuda}
+                  className={`oc-ficha${vista === v ? " is-active" : ""}`} onClick={() => cambiarVista(v)}>
+                  <span className="oc-ficha__largo">{VISTA[v].label}</span>
+                  <span className="oc-ficha__corto">{VISTA[v].corto}</span>
+                  {" "}({errorSinAprob && sinAprob === null ? "—" : sinAprob === null || cargandoExtra ? "…" : deVista[v].length})
                 </button>
               ))}
               {/* Un estado que no es de la cola (se eligió en Filtros): se muestra como
@@ -400,11 +487,36 @@ export default function AprobacionPage() {
               <label className="oc-filtros__campo oc-filtros__campo--corto">
                 <span className="oc-filtros__rot">Estado</span>
                 <Select value={vista} onChange={(e) => cambiarVista(e.target.value as Vista)}>
-                  {[...FICHAS, ...OTROS_ESTADOS].map((v) => (
+                  {[...FICHAS, ...HISTORICO, ...OTROS_ESTADOS].map((v) => (
                     <option key={v} value={v}>{VISTA[v].label} ({deVista[v].length})</option>
                   ))}
                 </Select>
               </label>
+              {enSA && (
+                <>
+                  <label className="oc-filtros__campo oc-filtros__campo--corto">
+                    <span className="oc-filtros__rot">Motivo</span>
+                    <Select value={motivoSA} onChange={(e) => setMotivoSA(e.target.value as MotivoSA)}>
+                      <option value="todos">Todos los motivos</option>
+                      <option value="monto">Menor a ₡210 000</option>
+                      <option value="proveedor">Proveedor (Holcim)</option>
+                    </Select>
+                  </label>
+                  <label className="oc-filtros__campo oc-filtros__campo--corto">
+                    <span className="oc-filtros__rot">Lanzadas desde</span>
+                    <Input type="date" value={desdeSA} max={hastaSA || undefined} onChange={(e) => setDesdeSA(e.target.value)} />
+                  </label>
+                  <label className="oc-filtros__campo oc-filtros__campo--corto">
+                    <span className="oc-filtros__rot">Hasta</span>
+                    <Input type="date" value={hastaSA} min={desdeSA || undefined} onChange={(e) => setHastaSA(e.target.value)} />
+                  </label>
+                  {filtroSA && (
+                    <button type="button" className="link-btn oc-filtros__limpiar" onClick={() => { setMotivoSA("todos"); setDesdeSA(""); setHastaSA(""); }}>
+                      Quitar filtros
+                    </button>
+                  )}
+                </>
+              )}
               {esPendiente && lista.length > 0 && (
                 <label className="oc-filtros__todas">
                   <input type="checkbox" className="ds-cbx"
@@ -417,6 +529,53 @@ export default function AprobacionPage() {
             </div>
           )}
 
+          {enSA && (
+            <p className="ds-muted ds-body-sm oc-bandeja__nota-vista">
+              Solo de consulta: las aprobó el sistema. Proveeduría las lanzó en Business Central al
+              enviarlas, sin pasar por acá: las órdenes en colones con total con IVA menor a ₡210 000 y
+              todas las de Holcim. Las de dólares o euros siempre llegan a aprobación.
+            </p>
+          )}
+          {esperandoSA && (
+            <div className="oc-espera" role="status">
+              <span className="oc-espera__punto" aria-hidden />
+              <span className="oc-espera__txt">Trayendo las órdenes con aprobación automática…</span>
+            </div>
+          )}
+          {enSA && errorSinAprob && (
+            <div className="oc-vacio" role="alert">
+              <span className="ds-strong">No se pudo traer el histórico de órdenes con aprobación automática.</span>
+              <span className="ds-muted ds-body-sm">
+                {errorSinAprob}{" "}
+                <button type="button" className="link-btn" onClick={cargarSinAprob}>Reintentar</button>
+              </span>
+            </div>
+          )}
+
+          {enSA ? (
+            <div className="oc-bandeja__filas">
+              {!esperandoSA && !errorSinAprob && filasSA.length === 0 && (
+                <div className="oc-vacio">
+                  <span className="ds-strong">{meta.vacio}</span>
+                  <span className="ds-muted ds-body-sm">Cuando Proveeduría envíe una orden menor a ₡210 000 o de Holcim, va a aparecer acá.</span>
+                </div>
+              )}
+              {filasSA.length > 0 && listaSA.length === 0 && (
+                <div className="oc-vacio">
+                  <span className="ds-strong">
+                    {busca.trim() ? `Ninguna orden con aprobación automática coincide con “${busca.trim()}”` : "Ninguna orden con aprobación automática"}
+                    {filtroSA ? " con los filtros puestos." : "."}
+                  </span>
+                  <span className="ds-muted ds-body-sm">
+                    <button type="button" className="link-btn" onClick={limpiarFiltrosSA}>Quitar búsqueda y filtros</button>
+                  </span>
+                </div>
+              )}
+              {listaSA.map(({ r, o }) => (
+                <OrdenFila key={r.id} orden={o} abierta={abiertaId === o.id} sinAprobacion={r} onAbrir={() => abrirOrden(o)} />
+              ))}
+            </div>
+          ) : (
           <div className="oc-bandeja__filas">
             {deVista[vista].length === 0 && (
               <div className="oc-vacio">
@@ -441,6 +600,7 @@ export default function AprobacionPage() {
                 onAbrir={() => abrirOrden(o)} />
             ))}
           </div>
+          )}
 
           {/* Celular: la barra del lote no cabe, así que la selección vive en una
               pastilla flotante que abre un panel. Siempre accesible mientras haya
@@ -629,6 +789,16 @@ export default function AprobacionPage() {
                   <Button block variant="outline" disabled={lote} onClick={pedirRechazoLote}>Rechazar seleccionadas</Button>
                 </div>
               </section>
+          ) : abierta && enSA ? (
+            // Histórico: se mira, no se aprueba. Si la orden volvió a la cola (la
+            // reabrieron y la reenviaron), se aprueba desde «Pendientes».
+            <AprobacionDetalle
+              key={abierta.id}
+              orden={abierta}
+              onCerrar={() => setAbiertaId(null)}
+              onVerProveedor={(c) => { setPedAbierto(null); setProvAbierto(c); }}
+              onVerPedido={(n) => { setProvAbierto(null); setPedAbierto(n); }}
+            />
           ) : abierta ? (
             <AprobacionDetalle
               key={abierta.id}

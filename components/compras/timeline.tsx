@@ -30,6 +30,9 @@ const LABEL: Record<string, string> = {
   cerrado: "Cerrado",
   enviado_aprobacion: "Enviado a aprobación",
   aprobado_lanzado: "Aprobado y lanzado",
+  // Lo escribe la app de Proveeduría cuando la lanza ella misma al enviarla (menor a
+  // ₡210 000 o Holcim): salió lanzada, pero nadie la aprobó. El porqué va en `detalle`.
+  aprobado_automatico: "Lanzada sin aprobación",
   completado: "Completado",
   recepcion_parcial: "Recepción parcial",
   recepcion_total: "Recepción total",
@@ -76,7 +79,8 @@ function colorPunto(m: Movimiento): string {
     switch (m.tipoMovimiento) {
       case "creado": return "var(--ds-color-gray-400)";   // En proveeduría · neutral (gris)
       case "enviado_aprobacion": return "var(--ds-color-yellow)"; // pendiente · amarillo
-      case "aprobado_lanzado": return "var(--ds-color-green-200)"; // lanzada · verde
+      case "aprobado_lanzado":
+      case "aprobado_automatico": return "var(--ds-color-green-200)"; // lanzada · verde
       case "recepcion_parcial": return "var(--ds-color-yellow)"; // recibido parcial · amarillo
       case "recepcion_total":
       case "completado": return "var(--ds-color-green-200)"; // recibido total / completado · verde fuerte
@@ -174,7 +178,11 @@ export function Timeline({
                   alguien tenía abierta. Se dice así, para no atribuirle el cambio. */}
               {m.tipoMovimiento === "sincronizado_bc"
                 ? <>Sincronización con Business Central (desde la pantalla de {m.usuario}) · {formatDateTime(m.fecha)}</>
-                : <>{m.usuario} · {ROL_LABEL[m.rol]} · {formatDateTime(m.fecha)}</>}
+                // "Aprobación automática" no es una persona: el rol que trae es el de
+                // quien la envió, y pegárselo la hacía leer como alguien de Proveeduría.
+                : m.tipoMovimiento === "aprobado_automatico"
+                  ? <>{m.usuario} · {formatDateTime(m.fecha)}</>
+                  : <>{m.usuario} · {ROL_LABEL[m.rol]} · {formatDateTime(m.fecha)}</>}
               {m.detalle ? ` · ${m.detalle}` : ""}
             </div>
           </div>
