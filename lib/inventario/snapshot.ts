@@ -1,11 +1,11 @@
 import { getDb, sql } from "@/lib/db";
-import { bcItemLedgerSinLiquidar, bcAlmacenes, bcItems } from "@/lib/compras/bc";
+import { bcItemLedgerSinLiquidar, bcAlmacenes, bcItems, bcObras } from "@/lib/compras/bc";
 
 // ─── SNAPSHOT DE INVENTARIO POR ALMACÉN ─────────────────────────────────────────
 // Baja de BC los movimientos de inventario SIN LIQUIDAR (Item Ledger Entry abiertas,
 // Remaining Quantity ≠ 0), les pega la CATEGORÍA del artículo (ItemCategoryCode, que
-// no vive en la entrada sino en el Item → se cruza con bcItems) y la marca de almacén
-// VIRTUAL (Location."GJW Tipo Almacen" → bcAlmacenes), y reemplaza el contenido de
+// no vive en la entrada sino en el Item → se cruza con bcItems) y la marca de
+// ALMACÉN DE PROYECTO (ver esVirtual abajo), y reemplaza el contenido de
 // dbo.InventarioAlmacen. Lo consume la app de Reportes por SQL. Ver la migración
 // migrations/2026-10-20_inventario_almacen.sql y la nota del flujo en lib/compras/bc.ts.
 
@@ -15,17 +15,25 @@ export async function refrescarInventarioAlmacen(): Promise<ResultadoSnapshot> {
   const t0 = Date.now();
 
   // 1) Fuentes de BC en paralelo: movimientos abiertos + clasificación de almacenes
-  //    + catálogo (para la categoría). bcAlmacenes y bcItems ya se cachean 5 min.
-  const [ile, almacenes, items] = await Promise.all([
+  //    + catálogo (para la categoría) + obras (para saber qué almacén es de proyecto).
+  //    bcAlmacenes y bcItems ya se cachean 5 min. bcObras SÍ puede tirar: sin obras
+  //    no se puede marcar nada como sin liquidar y la foto mentiría en silencio.
+  const [ile, almacenes, items, obras] = await Promise.all([
     bcItemLedgerSinLiquidar(),
     bcAlmacenes(),
     bcItems(),
+    bcObras(),
   ]);
 
   const tipoPorAlmacen = new Map<string, string>();
   for (const a of almacenes) tipoPorAlmacen.set(a.codigo, a.tipoAlmacen ?? "");
   const catPorItem = new Map<string, string>();
   for (const it of items) if (it.categoria) catPorItem.set(it.code, it.categoria);
+  // El almacén de proyecto de una obra es el almacén con SU MISMO CÓDIGO (VN-M.08 →
+  // almacén VN-M.08): la ficha de obra trae Location_Code vacío y la página
+  // "Almacén de proyecto" de BC filtra por ese código. Los que no son obra
+  // (ALM-GRAL, ALM-PP, LOTES, ALM-BAR…) son stock, no material de una obra.
+  const codigosObra = new Set(obras.map((o) => o.codigo).filter(Boolean));
 
   const filas = ile.map((e) => {
     const tipo = tipoPorAlmacen.get(e.locationCode) ?? "";
@@ -37,9 +45,13 @@ export async function refrescarInventarioAlmacen(): Promise<ResultadoSnapshot> {
       obra: e.obra || null,
       jobTaskNo: e.jobTaskNo || null,
       almacen: e.locationCode || null,
-      // "Virtual" = tiene material apartado en el almacén de PROYECTO sin liquidar
-      // (gomJobWarehouseQuantity > 0), NO la clasificación de la ubicación.
-      esVirtual: (e.cantidadProyecto ?? 0) > 0,
+      // "Virtual" = SIN LIQUIDAR: existencia abierta en el almacén de proyecto de una
+      // obra. Es TODO lo que lista la página "Almacén de proyecto" de BC, no solo lo
+      // que ya se repartió a una tarea (gomJobWarehouseQuantity > 0): eso es lo "listo
+      // para liquidar" y va aparte en cantidadProyecto. Antes se usaba ese > 0 y de
+      // VN-M.08 salía 1 artículo de 5. La clasificación Real/Virtual de la ubicación
+      // no sirve: está en blanco en todos los almacenes.
+      esVirtual: codigosObra.has(e.locationCode) && e.cantidad > 0,
       tipoAlmacen: tipo || null,
       variante: e.variante || null,
       unidad: e.unidad || null,

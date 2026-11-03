@@ -10,8 +10,9 @@ import { coincideBusqueda } from '@/lib/utilidades/buscar';
 
 // Reporte de inventario por almacén (SOLO Super Admin). Lee el snapshot
 // dbo.InventarioAlmacen vía /api/bc/inventario/almacen. Lo importante es lo SIN
-// LIQUIDAR: material apartado al almacén de proyecto (gomJobWarehouseQuantity > 0),
-// lo que muestra la página "Almacén de proyecto" de BC. Se actualiza SOLO al abrir
+// LIQUIDAR: toda la existencia en el almacén de proyecto de una obra (esVirtual), lo
+// mismo que lista la página "Almacén de proyecto" de BC. De eso, lo ya repartido a una
+// tarea (cantidadProyecto) es lo "listo para liquidar". Se actualiza SOLO al abrir
 // (si la foto está vieja, sincroniza en segundo plano). El detalle usa el DataTable
 // del DS: filtros por columna, orden, Columnas, búsqueda y exportar.
 
@@ -27,6 +28,7 @@ interface Fila {
   unidad: string | null;
   cantidad: number;
   cantidadProyecto: number;
+  jobTaskNo: string | null;
   costoActual: number | null;
   proveedor: string | null;
   documentoNo: string | null;
@@ -65,11 +67,17 @@ function enRango(iso: string | null, desde: string, hasta: string): boolean {
   return true;
 }
 
+// Lo sin liquidar de un movimiento: su existencia, si está en el almacén de una obra.
+// Fuera de ahí (ALM-GRAL y compañía) es stock, no material pendiente de liquidar.
+function sinLiquidar(f: Fila): number {
+  return f.esVirtual ? f.cantidad || 0 : 0;
+}
+
 function agrupar(filas: Fila[], key: (f: Fila) => string): { nombre: string; valor: number }[] {
   const m = new Map<string, number>();
   for (const f of filas) {
     const k = key(f);
-    m.set(k, (m.get(k) ?? 0) + (f.cantidadProyecto || 0));
+    m.set(k, (m.get(k) ?? 0) + sinLiquidar(f));
   }
   return Array.from(m, ([nombre, valor]) => ({ nombre, valor })).sort((a, b) => b.valor - a.valor);
 }
@@ -90,8 +98,12 @@ const COLUMNAS: ColumnDef<Fila>[] = [
   { id: 'obra', accessorKey: 'obra', header: 'Obra', meta: { label: 'Obra' }, cell: ({ row }) => <span className="whitespace-nowrap">{row.original.obra || '—'}</span> },
   { id: 'cantidad', accessorKey: 'cantidad', header: 'Existencia', meta: { label: 'Existencia', align: 'right', noFilter: true }, cell: ({ row }) => <span className="whitespace-nowrap">{num.format(row.original.cantidad)}</span> },
   {
-    id: 'cantidadProyecto', accessorKey: 'cantidadProyecto', header: 'Sin liquidar', meta: { label: 'Sin liquidar', align: 'right', noFilter: true },
-    cell: ({ row }) => row.original.cantidadProyecto > 0 ? <span className="font-semibold text-ds-yellow-ink whitespace-nowrap">{num.format(row.original.cantidadProyecto)}</span> : <span className="text-ds-gray-300">—</span>,
+    id: 'sinLiquidar', accessorFn: sinLiquidar, header: 'Sin liquidar', meta: { label: 'Sin liquidar', align: 'right', noFilter: true },
+    cell: ({ row }) => row.original.esVirtual ? <span className="font-semibold text-ds-yellow-ink whitespace-nowrap">{num.format(row.original.cantidad)}</span> : <span className="text-ds-gray-300">—</span>,
+  },
+  {
+    id: 'cantidadProyecto', accessorKey: 'cantidadProyecto', header: 'Listo para liquidar', meta: { label: 'Listo para liquidar', align: 'right', noFilter: true },
+    cell: ({ row }) => <ListoParaLiquidar fila={row.original} />,
   },
   { id: 'unidad', accessorKey: 'unidad', header: 'Unidad', meta: { label: 'Unidad' }, cell: ({ row }) => row.original.unidad || '—' },
   { id: 'proveedor', accessorKey: 'proveedor', header: 'Proveedor', meta: { label: 'Proveedor' }, cell: ({ row }) => row.original.proveedor || '—' },
@@ -164,7 +176,7 @@ export default function ReporteInventarioPage() {
   const base = useMemo(() => (desde || hasta ? filas.filter((f) => enRango(f.fechaMovimiento, desde, hasta)) : filas), [filas, desde, hasta]);
   const soloSinLiquidar = useMemo(() => base.filter((f) => f.esVirtual), [base]);
   const dataset = useMemo(() => (soloVirtuales ? soloSinLiquidar : base), [soloVirtuales, soloSinLiquidar, base]);
-  const totalSinLiquidar = useMemo(() => soloSinLiquidar.reduce((s, f) => s + (f.cantidadProyecto || 0), 0), [soloSinLiquidar]);
+  const totalSinLiquidar = useMemo(() => soloSinLiquidar.reduce((s, f) => s + sinLiquidar(f), 0), [soloSinLiquidar]);
 
   const kpis = useMemo(() => ({
     movimientos: dataset.length,
@@ -186,7 +198,7 @@ export default function ReporteInventarioPage() {
     <PageShell>
       <PageHeader
         title="Reporte de inventario"
-        subtitle="Material apartado al almacén de proyecto que aún no se liquidó, tomado de Business Central. Se actualiza solo al abrir."
+        subtitle="Material en el almacén de proyecto de cada obra que aún no se liquidó, tomado de Business Central. Se actualiza solo al abrir."
         actions={
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-2 text-body-sm text-ds-gray-500">
@@ -206,7 +218,7 @@ export default function ReporteInventarioPage() {
         <KpiCard titulo="Movimientos" valor={loading ? '—' : num.format(kpis.movimientos)} icono="list" />
         <KpiCard titulo="Almacenes" valor={loading ? '—' : num.format(kpis.almacenes)} icono="traslado" />
         <KpiCard titulo="Existencia total" valor={loading ? '—' : num.format(kpis.cantidad)} icono="calculator" />
-        <KpiCard titulo="Apartado sin liquidar" valor={loading ? '—' : num.format(kpis.sinLiquidar)} icono="alert" destacado={kpis.sinLiquidar > 0} />
+        <KpiCard titulo="Sin liquidar" valor={loading ? '—' : num.format(kpis.sinLiquidar)} icono="alert" destacado={kpis.sinLiquidar > 0} />
       </div>
 
       {/* Alcance + filtro por fecha de ingreso */}
@@ -234,11 +246,11 @@ export default function ReporteInventarioPage() {
       {/* Gráficos */}
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
-          <SeccionHeader icono="traslado" titulo="Apartado sin liquidar por almacén" />
+          <SeccionHeader icono="traslado" titulo="Sin liquidar por almacén" />
           <BarChart datos={porAlmacen} loading={loading} />
         </div>
         <div className="rounded-ds-lg border border-ds-gray-200 bg-ds-surface p-4 shadow-ds-01">
-          <SeccionHeader icono="list" titulo="Apartado sin liquidar por categoría" />
+          <SeccionHeader icono="list" titulo="Sin liquidar por categoría" />
           <Donut datos={donutCategoria} total={totalSinLiquidar} loading={loading} />
         </div>
       </div>
@@ -271,6 +283,18 @@ export default function ReporteInventarioPage() {
         )}
       </div>
     </PageShell>
+  );
+}
+
+// Lo ya repartido a una tarea de la obra (columna "Almacén" de BC), con la tarea al
+// lado: es lo que se puede liquidar ya. Lo sin repartir sigue sin liquidar igual.
+function ListoParaLiquidar({ fila }: { fila: Fila }) {
+  if (!(fila.cantidadProyecto > 0)) return <span className="text-ds-gray-300">—</span>;
+  return (
+    <span className="whitespace-nowrap">
+      <span className="font-semibold text-ds-ink">{num.format(fila.cantidadProyecto)}</span>
+      {fila.jobTaskNo && <span className="ml-1.5 text-ds-gray-400">tarea {fila.jobTaskNo}</span>}
+    </span>
   );
 }
 
@@ -331,7 +355,7 @@ function ArbolAlmacenes({ rows, loading, soloVirtuales }: { rows: Fila[]; loadin
       almacen,
       esVirtual: lineas.some((l) => l.esVirtual),
       lineas: [...lineas].sort((a, b) => a.itemNo.localeCompare(b.itemNo, undefined, { numeric: true })),
-      sinLiquidar: lineas.reduce((s, l) => s + (l.cantidadProyecto || 0), 0),
+      sinLiquidar: lineas.reduce((s, l) => s + sinLiquidar(l), 0),
       existencia: lineas.reduce((s, l) => s + (l.cantidad || 0), 0),
       articulos: new Set(lineas.map((l) => l.itemNo)).size,
     })).sort((a, b) => b.sinLiquidar - a.sinLiquidar || a.almacen.localeCompare(b.almacen));
@@ -382,6 +406,7 @@ function ArbolAlmacenes({ rows, loading, soloVirtuales }: { rows: Fila[]; loadin
                       <th className="px-3 py-2 text-left font-semibold">Obra</th>
                       <th className="px-3 py-2 text-right font-semibold">Existencia</th>
                       <th className="px-3 py-2 text-right font-semibold">Sin liquidar</th>
+                      <th className="px-3 py-2 text-right font-semibold">Listo para liquidar</th>
                       <th className="px-3 py-2 text-left font-semibold">Unidad</th>
                       <th className="px-3 py-2 text-left font-semibold">Fecha</th>
                     </tr>
@@ -394,7 +419,8 @@ function ArbolAlmacenes({ rows, loading, soloVirtuales }: { rows: Fila[]; loadin
                         <td className="px-3 py-2">{r.descripcion || '—'}</td>
                         <td className="px-3 py-2 whitespace-nowrap">{r.obra || '—'}</td>
                         <td className="px-3 py-2 text-right whitespace-nowrap">{num.format(r.cantidad)}</td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap">{r.cantidadProyecto > 0 ? <span className="font-semibold text-ds-yellow-ink">{num.format(r.cantidadProyecto)}</span> : <span className="text-ds-gray-300">—</span>}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">{r.esVirtual ? <span className="font-semibold text-ds-yellow-ink">{num.format(r.cantidad)}</span> : <span className="text-ds-gray-300">—</span>}</td>
+                        <td className="px-3 py-2 text-right"><ListoParaLiquidar fila={r} /></td>
                         <td className="px-3 py-2 whitespace-nowrap">{r.unidad || '—'}</td>
                         <td className="px-3 py-2 whitespace-nowrap">{r.fechaMovimiento ? r.fechaMovimiento.slice(0, 10) : '—'}</td>
                       </tr>

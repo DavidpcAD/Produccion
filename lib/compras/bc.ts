@@ -155,8 +155,9 @@ export type BcItem = { id: string; code: string; descripcion: string; unidad: st
 // pedido se crea y nunca se puede lanzar. En producción hay 82 de 221 obras así.
 export type BcObra = { id: string; codigo: string; nombre: string; bloqueada?: boolean };
 // tipoAlmacen: clasificación Real / Virtual del almacén (Location."GJW Tipo Almacen",
-// enum 50101). La expone la page 50234; se usa para marcar el inventario que quedó
-// "sin liquidar" en los almacenes virtuales (casas, comisiones, centros de costo…).
+// enum 50101). La expone la page 50234. Ojo: en Production está en blanco en TODOS los
+// almacenes (nov 2026), así que "sin liquidar" no sale de acá sino de que el almacén
+// tenga el código de una obra (lib/inventario/snapshot.ts).
 export type BcAlmacen = { codigo: string; nombre: string; tipoAlmacen?: string };
 
 // BC manda el tipo como "Inventory" | "Service" | "Non_x002D_Inventory"
@@ -934,8 +935,9 @@ export async function bcItemLedgerSinLiquidar(): Promise<BcIleAbierto[]> {
         obra: (r.globalDimension1Code ?? "").toString().trim(),
         jobTaskNo: (r.jobTaskNo ?? "").toString().trim(),
         cantidad: Number(r.stock ?? 0),
-        // Cantidad apartada en el almacén de PROYECTO que aún NO se liquidó. Es lo que
-        // muestra la página "Almacén de proyecto" (70720602); el "almacén virtual".
+        // Cantidad ya REPARTIDA a tareas de la obra (columna "Almacén" de la página
+        // "Almacén de proyecto" de BC): lo que está listo para liquidar. NO es todo lo
+        // sin liquidar — eso es `cantidad` en el almacén de la obra (ver snapshot.ts).
         cantidadProyecto: Number(r.gomJobWarehouseQuantity ?? 0),
         costoActual: Number(r.costAmountActual ?? 0),
         // entryType llega escapado estilo OData ("Positive_x0020_Adjmt_x002E_");
