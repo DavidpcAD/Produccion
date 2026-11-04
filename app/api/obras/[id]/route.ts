@@ -130,16 +130,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     // "Almacén físico (bodega)": es la marca única de almacenes (Business Central →
-    // Almacenes). Solo se escribe si la casilla CAMBIÓ respecto de cómo cuenta hoy;
-    // guardar otros campos no convierte una obra "sin marcar" en marcada. Al cambiar
-    // queda explícita (real o virtual), porque "sin marca" puede seguir diciendo
-    // bodega por el código (F-*, GEN-*…) y la casilla no se dejaría desmarcar.
+    // Almacenes). Solo se escribe si la casilla CAMBIÓ; guardar otros campos no toca
+    // la marca. Marcada = físico; desmarcada = sin marca (que ya no es físico).
     if (typeof body.esAlmacenFisico === 'boolean') {
       const codigo = String(actual.numeroObra);
       try {
         const hoy = almacenFisicoDe(await leerClasesAlmacen(), codigo);
         if (hoy.esAlmacenFisico !== body.esAlmacenFisico) {
-          const clase = body.esAlmacenFisico ? 'real' : 'virtual';
+          const clase = body.esAlmacenFisico ? 'real' : null;
           await guardarClaseAlmacen(codigo, clase, session.username || session.nombre || String(session.idCol));
           await logAudit({
             idColAccion: session.idCol,

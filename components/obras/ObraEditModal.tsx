@@ -32,7 +32,7 @@ export interface ObraEditData {
   esBC: boolean | null;
   esProcore: boolean | null;
   /** ¿Su almacén es una bodega física? Marca única de almacenes (dbo.AlmacenClase);
-   *  sin marca, cuenta por el código. Es lo mismo que arma "Bodegas" en el pedido. */
+   *  solo cuenta marcada Físico. Es lo mismo que decide qué almacenes ofrece el pedido. */
   esAlmacenFisico?: boolean | null;
   /** La marca explícita, si la hay: 'real' | 'virtual'. null = sin marcar. */
   claseAlmacen?: 'real' | 'virtual' | null;
@@ -296,9 +296,8 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
               Almacén físico (bodega)
             </label>
             <p className="text-xs text-ds-gray-400 mt-1.5">
-              Es la misma marca de Business Central → Almacenes: si está marcada, el almacén de esta obra sale en «Bodegas» al
-              hacer un pedido y en la tabla de Obras lleva la etiqueta «Almacén físico».
-              {obra?.claseAlmacen == null && ' Hoy no está marcada a mano: cuenta por su código.'}
+              Es la misma marca de Business Central → Almacenes: si está marcada, el almacén de esta obra sale al pedir
+              material a un almacén (ALM o Stock) y en la tabla de Obras lleva la etiqueta «Almacén físico».
             </p>
           </div>
           {renderDim('areaCosteo', 'Área de costeo (AC)', dimAC)}

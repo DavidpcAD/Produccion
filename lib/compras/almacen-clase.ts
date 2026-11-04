@@ -4,10 +4,10 @@ import { esBodegaReal, type ClaseAlmacen } from '@/lib/compras/helpers';
 
 // Marca manual Real/Virtual por almacén de BC (dbo.AlmacenClase, migración
 // 2026-11-04_almacen_clase.sql). Una fila = un almacén marcado; sin fila = sin
-// marcar (manda la regla por código de esAlmacenDeBodega). Es UNA sola marca para
+// marcar = NO es físico (esBodegaReal: solo cuenta "real"). Es UNA sola marca para
 // toda la app: se edita desde /bc/almacenes o con la casilla "Almacén físico" del
 // editor de obra (el almacén de BC de una obra tiene su mismo código), la lee el
-// "Nuevo pedido" para armar la lista de Bodegas y la columna "Clase" de Obras.
+// "Nuevo pedido" (ALM y Stock: solo los físicos) y la columna "Clase" de Obras.
 
 export interface MarcaAlmacen {
   clase: ClaseAlmacen;
@@ -17,7 +17,7 @@ export interface MarcaAlmacen {
 
 /** Marcas por código de almacén (en mayúscula). Si la tabla todavía no existe
  *  (la migración corre al arrancar en prod), devuelve vacío: todo queda "sin
- *  marcar" y el pedido sigue con la regla por código, como antes. */
+ *  marcar" y el pedido solo ofrece el almacén que ya estaba elegido. */
 export async function leerClasesAlmacen(): Promise<Map<string, MarcaAlmacen>> {
   const out = new Map<string, MarcaAlmacen>();
   try {
@@ -38,8 +38,8 @@ export async function leerClasesAlmacen(): Promise<Map<string, MarcaAlmacen>> {
   return out;
 }
 
-/** Cómo cuenta HOY un código: la marca si la hay; si no, la regla por código.
- *  Es lo mismo que decide la lista "Bodegas" del pedido. */
+/** ¿Es físico? Solo si está marcado real. Es lo mismo que decide qué almacenes
+ *  ofrece el pedido con ALM o Stock. */
 export function almacenFisicoDe(clases: Map<string, MarcaAlmacen>, codigo: string): {
   esAlmacenFisico: boolean; claseAlmacen: ClaseAlmacen | null;
 } {

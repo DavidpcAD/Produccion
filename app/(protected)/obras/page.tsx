@@ -42,7 +42,7 @@ interface Obra {
   esBC: boolean | null;
   esProcore: boolean | null;
   /** ¿Su almacén es una bodega física? Marca única de almacenes (Business Central →
-   *  Almacenes, dbo.AlmacenClase); sin marca, cuenta por el código. */
+   *  Almacenes, dbo.AlmacenClase); solo cuenta marcada Físico. */
   esAlmacenFisico?: boolean | null;
   claseAlmacen?: 'real' | 'virtual' | null;
 }

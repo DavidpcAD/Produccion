@@ -13,33 +13,29 @@ import { coincideBusqueda } from '@/lib/utilidades/buscar';
 // almacén es REAL (una bodega física) y cuál es VIRTUAL. BC tiene un campo para eso
 // ("Tipo almacén") pero viene casi todo vacío, así que la marca se lleva acá.
 //
-// Para qué sirve hoy: arma la lista "Bodegas" del Nuevo pedido (Destino ALM).
-//   Real ........ aparece en Bodegas.
-//   Virtual ..... sale de Bodegas; solo en "Todos", con la etiqueta Virtual.
-//   Sin marcar .. decide el código, como antes (ALM-*, F-*, GEN-*, HER, MAQ).
+// Para qué sirve hoy: SOLO los marcados Físico salen al elegir almacén en el Nuevo
+// pedido (ALM y Stock). Virtual y Sin marcar no salen; Virtual queda como dato.
+// Hoy son tres: ALM-GRAL, ALM-BAR y F-MADERAS (migración 2026-11-04_almacen_fisicos).
 
 type Clase = 'real' | 'virtual';
 interface AlmacenFila {
   codigo: string; nombre: string; tipoBC: string | null;
   clase: Clase | null; actualizadoPor: string | null; actualizadoEn: string | null;
-  bodegaPorCodigo: boolean;
 }
-type Filtro = 'bodegas' | 'real' | 'virtual' | 'sin' | 'todos';
+type Filtro = 'real' | 'virtual' | 'sin' | 'todos';
 
 const FILTROS: { v: Filtro; label: string }[] = [
-  { v: 'bodegas', label: 'En Bodegas' },
-  { v: 'real', label: 'Reales' },
+  { v: 'real', label: 'Físicos' },
   { v: 'virtual', label: 'Virtuales' },
   { v: 'sin', label: 'Sin marcar' },
   { v: 'todos', label: 'Todos' },
 ];
 const OPCIONES: { v: Clase | null; label: string }[] = [
-  { v: 'real', label: 'Real' },
+  { v: 'real', label: 'Físico' },
   { v: 'virtual', label: 'Virtual' },
   { v: null, label: 'Sin marcar' },
 ];
 
-const enBodegas = (a: AlmacenFila) => a.clase === 'real' || (a.clase === null && a.bodegaPorCodigo);
 const fecha = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '');
 
 export default function AlmacenesPage() {
@@ -47,11 +43,11 @@ export default function AlmacenesPage() {
   const [almacenes, setAlmacenes] = useState<AlmacenFila[]>([]);
   const [loading, setLoading] = useState(true);
   const [fallo, setFallo] = useState(false);
-  const [filtro, setFiltro] = useState<Filtro>('bodegas');
+  const [filtro, setFiltro] = useState<Filtro>('real');
   const [q, setQ] = useState('');
   const [guardando, setGuardando] = useState<Set<string>>(new Set());
   // Los que se marcaron en este filtro se quedan a la vista aunque ya no calcen
-  // (marcar Virtual estando en "En Bodegas" no los hace desaparecer de golpe, y se
+  // (desmarcar uno estando en "Físicos" no lo hace desaparecer de golpe, y se
   // puede deshacer ahí mismo). Se limpia al cambiar de filtro.
   const [tocados, setTocados] = useState<Set<string>>(new Set());
 
@@ -73,7 +69,6 @@ export default function AlmacenesPage() {
   useEffect(() => { cargar(); }, [cargar]);
 
   const conteo = useMemo(() => ({
-    bodegas: almacenes.filter(enBodegas).length,
     real: almacenes.filter(a => a.clase === 'real').length,
     virtual: almacenes.filter(a => a.clase === 'virtual').length,
     sin: almacenes.filter(a => a.clase === null).length,
@@ -84,7 +79,6 @@ export default function AlmacenesPage() {
     const term = q.trim().toLowerCase();
     return almacenes.filter(a => {
       const fijo = tocados.has(a.codigo);
-      if (!fijo && filtro === 'bodegas' && !enBodegas(a)) return false;
       if (!fijo && filtro === 'real' && a.clase !== 'real') return false;
       if (!fijo && filtro === 'virtual' && a.clase !== 'virtual') return false;
       if (!fijo && filtro === 'sin' && a.clase !== null) return false;
@@ -111,7 +105,9 @@ export default function AlmacenesPage() {
         ? { ...x, actualizadoPor: d.actualizadoPor ?? null, actualizadoEn: d.actualizadoEn ?? null }
         : x)));
       toast(
-        clase === null ? `${a.codigo}: sin marcar (decide el código)` : `${a.codigo} marcado como ${clase === 'real' ? 'real' : 'virtual'}`,
+        clase === 'real'
+          ? `${a.codigo} es físico: ya sale al pedir material`
+          : `${a.codigo} ${clase === 'virtual' ? 'marcado virtual' : 'sin marcar'}: no sale al pedir material`,
         'success',
       );
     } catch (e) {
@@ -124,7 +120,7 @@ export default function AlmacenesPage() {
 
   const subtitulo = loading && almacenes.length === 0
     ? 'Cargando almacenes de Business Central…'
-    : `${conteo.todos} almacenes · ${conteo.real} reales · ${conteo.virtual} virtuales · ${conteo.sin} sin marcar`;
+    : `${conteo.todos} almacenes · ${conteo.real} físicos · ${conteo.virtual} virtuales · ${conteo.sin} sin marcar`;
 
   return (
     <PageShell>
@@ -142,11 +138,10 @@ export default function AlmacenesPage() {
       <div className="bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 overflow-hidden">
         <div className="px-4 pt-3 pb-3 border-b border-ds-gray-200 space-y-3">
           <p className="text-body-sm text-ds-gray-500 max-w-3xl">
-            Marcá cuáles almacenes son <span className="font-semibold text-ds-ink">reales</span> (una bodega física) y
-            cuáles son <span className="font-semibold text-ds-ink">virtuales</span>. Al elegir almacén en
-            {' '}<span className="font-semibold text-ds-ink">Nuevo pedido</span>, la lista “Bodegas” muestra solo los reales;
-            los virtuales quedan en “Todos”. Los que no se marquen siguen la regla de siempre por su código
-            (ALM-*, F-*, GEN-*, HER, MAQ).
+            Marcá cuáles almacenes son <span className="font-semibold text-ds-ink">físicos</span> (una bodega de verdad) y
+            cuáles son <span className="font-semibold text-ds-ink">virtuales</span>. Al pedir material a un almacén
+            (<span className="font-semibold text-ds-ink">Nuevo pedido</span> con ALM o Stock) salen solo los físicos.
+            Los virtuales y los que no estén marcados no salen.
           </p>
 
           <div className="flex flex-wrap items-center gap-1">
@@ -191,7 +186,7 @@ export default function AlmacenesPage() {
                     <div className="text-sm text-ds-ink break-words">{a.nombre || a.codigo}</div>
                     <div className="text-[11px] text-ds-gray-400">
                       {a.clase === null
-                        ? (a.bodegaPorCodigo ? 'Sin marcar · hoy aparece en Bodegas por su código' : 'Sin marcar · hoy no aparece en Bodegas')
+                        ? 'Sin marcar · no sale al pedir material'
                         : `Marcado${a.actualizadoPor ? ` por ${a.actualizadoPor}` : ''}${a.actualizadoEn ? ` el ${fecha(a.actualizadoEn)}` : ''}`}
                       {a.tipoBC ? ` · en BC: ${a.tipoBC}` : ''}
                     </div>

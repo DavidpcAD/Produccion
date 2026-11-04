@@ -1240,26 +1240,18 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     if (esRepuesto) return catMaquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.placa ? `${m.no} · ${m.placa}` : m.no }));
     return obraItems;
   }, [esRepuesto, obraItems, catMaquinas]);
-  // Almacenes de BC donde se puede pedir: por defecto SOLO las bodegas FÍSICAS
-  // (Almacén General, Agregados, Maderas, Herramienta…), que es lo que se compra.
-  // Qué es físico lo marca la gente en Business Central → Almacenes (Real/Virtual);
-  // sin marca, decide el código (esBodegaReal). Con "Todos" salen también los
-  // virtuales y las ubicaciones de obra/casa, y los virtuales llevan su etiqueta.
-  // Los ALM-* van primero.
-  const [verTodosAlm, setVerTodosAlm] = useState(false);
+  // Almacenes donde se puede pedir con ALM o Stock: SOLO los FÍSICOS, o sea los
+  // marcados Real en Business Central → Almacenes (hoy Almacén General, Almacén
+  // Barani y Fábrica Maderas). Sin "Todos": ALM es pedir material a una bodega
+  // física; lo que es para una obra va por CD. El ya elegido se conserva aunque no
+  // sea físico (un pedido viejo que se edita o copia). Los ALM-* van primero.
   const almacenItems: Item[] = useMemo(() => {
     const orden = (c: string) => (c.toUpperCase().startsWith("ALM-") ? 0 : 1);
     return [...catAlm]
-      .filter((a) => verTodosAlm || esBodegaReal(a) || a.codigo === almacenSel)
+      .filter((a) => esBodegaReal(a) || a.codigo === almacenSel)
       .sort((a, b) => orden(a.codigo) - orden(b.codigo) || a.codigo.localeCompare(b.codigo))
-      .map((a) => ({ id: a.codigo, title: (a.nombre ?? "").trim() || a.codigo, sub: a.codigo, tag: a.clase === "virtual" ? "Virtual" : undefined }));
-  }, [catAlm, verTodosAlm, almacenSel]);
-  // Filtro arriba de la lista del dropdown de almacenes.
-  const filtroAlm = (
-    <Segmented size="sm" value={verTodosAlm ? "todos" : "bodegas"}
-      options={[{ v: "bodegas", label: "Bodegas" }, { v: "todos", label: "Todos" }]}
-      onChange={(v: string) => setVerTodosAlm(v === "todos")} />
-  );
+      .map((a) => ({ id: a.codigo, title: (a.nombre ?? "").trim() || a.codigo, sub: a.codigo }));
+  }, [catAlm, almacenSel]);
   const almacenNombre = almacenItems.find((a) => a.id === almacenSel)?.title ?? almacenSel;
   // La unidad NO va en la lista de búsqueda (solo el código); la unidad se muestra
   // en la línea ya agregada, junto a la cantidad.
@@ -2032,7 +2024,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                       <Segmented size="sm" value={destinoMat} options={DESTINOS} onChange={(v: DestinoMat) => setDestinoMat(v)} />
                       {usaAlmacen && (
                         <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                          <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} filterNode={filtroAlm} />
+                          <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} />
                         </div>
                       )}
                     </div>
@@ -2046,7 +2038,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                   <div className="row gap-3 wrap" style={{ alignItems: "flex-end" }}>
                     <div className="col gap-2" style={{ flex: "1 1 220px", minWidth: 0 }}>
                       <span className="ds-form-field__label">Almacén</span>
-                      <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} filterNode={filtroAlm} />
+                      <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} />
                     </div>
                     <div style={{ flex: "1 1 220px", minWidth: 0 }}>{plantillaBtn}</div>
                   </div>

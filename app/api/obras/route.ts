@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
       tipoObraOrigen: explicito ? 'obra' : 'area',
       // ¿Su almacén es una bodega física? Es la MISMA marca de Business Central →
       // Almacenes (dbo.AlmacenClase, por el código, que es el de la obra) y la que
-      // arma "Bodegas" en el Nuevo pedido; sin marca, la regla por código.
+      // decide qué almacenes ofrece el Nuevo pedido; sin marca, no es físico.
       ...(clases ? almacenFisicoDe(clases, String(o.numeroObra ?? '')) : {}),
     };
   });
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
          SYSUTCDATETIME(), @creadoPor)
     `);
     // "Almacén físico" marcado al crear: va a la marca única de almacenes. Si no
-    // viene, no se marca nada (decide la regla por código, como cualquier otro).
+    // viene, no se marca nada (sin marca = no es físico).
     if (body.esAlmacenFisico === true) {
       await guardarClaseAlmacen(String(body.numeroObra), 'real', session.username || session.nombre || String(session.idCol))
         .catch((e) => console.error('/api/obras POST marca de almacén:', e));

@@ -57,13 +57,13 @@ export function esAlmacenDeBodega(codigo: string): boolean {
 /** Marca manual de un almacén (dbo.AlmacenClase): físico o virtual. null = sin marcar. */
 export type ClaseAlmacen = "real" | "virtual";
 
-// ¿El almacén va en la lista "Bodegas" del pedido? La marca manual manda (se pone en
-// Business Central → Almacenes); sin marca, la regla por código de arriba. Así un
-// GEN-* marcado virtual sale de Bodegas y un almacén de obra marcado real entra.
+// ¿Es un almacén FÍSICO? Solo si está marcado Real en Business Central → Almacenes.
+// Son los únicos que ofrece el pedido con ALM o Stock (pedir material a una bodega
+// física). Decidido por David el 2026-11-04: Almacén General, Almacén Barani y
+// Fábrica Maderas (marcados por la migración 2026-11-04_almacen_fisicos.sql). Sin
+// marca NO cuenta: la regla por código de arriba metía virtuales (GEN-*, HER…).
 export function esBodegaReal(a: { codigo: string; clase?: ClaseAlmacen | null }): boolean {
-  if (a.clase === "real") return true;
-  if (a.clase === "virtual") return false;
-  return esAlmacenDeBodega(a.codigo);
+  return a.clase === "real";
 }
 
 // ─── Obra vs almacén de una línea de pedido ─────────────────────────────────────

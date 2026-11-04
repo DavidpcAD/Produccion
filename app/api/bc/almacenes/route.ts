@@ -4,7 +4,7 @@ import { logAudit } from '@/lib/audit';
 import { mensajeParaCliente } from '@/lib/errores';
 import { bcAlmacenes } from '@/lib/compras/bc';
 import { guardarClaseAlmacen, leerClasesAlmacen } from '@/lib/compras/almacen-clase';
-import { esAlmacenDeBodega, type ClaseAlmacen } from '@/lib/compras/helpers';
+import type { ClaseAlmacen } from '@/lib/compras/helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,8 +34,6 @@ export async function GET() {
         clase: marca?.clase ?? null,
         actualizadoPor: marca?.actualizadoPor ?? null,
         actualizadoEn: marca?.actualizadoEn ?? null,
-        // Sin marca, ¿la regla por código lo pone en "Bodegas"?
-        bodegaPorCodigo: esAlmacenDeBodega(a.codigo),
       };
     }).sort((x, y) => x.codigo.localeCompare(y.codigo, undefined, { numeric: true }));
     return NextResponse.json({ almacenes: lista });
