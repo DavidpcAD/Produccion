@@ -1,6 +1,4 @@
 'use client';
-import { useEffect, useRef } from 'react';
-import { registrarActividad } from '@/hooks/useInactividad';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Tablero de Gerencia = la app "KPI Adelante" de Marcos (github.com/onexmac/kpi)
@@ -19,36 +17,11 @@ import { registrarActividad } from '@/hooks/useInactividad';
 // el comentario en el <head> de public/gerencia-app/index.html).
 // ─────────────────────────────────────────────────────────────────────────
 
-/** Lo mismo que hooks/useInactividad escucha en esta ventana. */
-const EVENTOS = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
-
 export function KpiFrame() {
-  const ref = useRef<HTMLIFrameElement>(null);
-
-  // Los toques dentro del iframe no le llegan a esta ventana: sin esto el bloqueo
-  // por inactividad cerraría la sesión a los 30 min con el gerente usando el
-  // tablero. Al ser del mismo origen se le ponen los oyentes directo a su ventana.
-  // Repetir el mismo oyente no lo duplica, así que llamar dos veces no hace daño.
-  const conectar = () => {
-    const win = ref.current?.contentWindow;
-    if (!win) return;
-    for (const ev of EVENTOS) win.addEventListener(ev, registrarActividad, { passive: true });
-    win.addEventListener('scroll', registrarActividad, { passive: true, capture: true });
-  };
-
-  // El iframe viene en el HTML del servidor y puede terminar de cargar antes de
-  // que React hidrate: en ese caso su `load` ya pasó y onLoad nunca llega.
-  useEffect(() => {
-    const doc = ref.current?.contentDocument;
-    if (doc?.readyState === 'complete' && doc.location.href !== 'about:blank') conectar();
-  }, []);
-
   return (
     <iframe
-      ref={ref}
       src="/gerencia-app/index.html"
       title="KPI Adelante"
-      onLoad={conectar}
       className="block h-full w-full border-0"
     />
   );

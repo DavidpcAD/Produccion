@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { comparePassword, signToken, COOKIE_NAME } from '@/lib/auth';
+import { comparePassword, signToken, ponerCookieSesion } from '@/lib/auth';
 import { findUsuarioByLogin, buildSessionPayload } from '@/lib/users';
 import { logAudit } from '@/lib/audit';
 import { checkRateLimit, registrarFallo, limpiarIntentos, ipDeRequest } from '@/lib/rate-limit';
-
-function setSessionCookie(res: NextResponse, token: string) {
-  res.cookies.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 8 * 60 * 60,
-    path: '/',
-  });
-}
 
 // Dos techos a la vez, porque tapan ataques distintos: el de la cuenta frena el
 // que prueba mil contraseñas contra una cédula (aunque rote de IP), y el de la
@@ -86,13 +76,13 @@ export async function POST(req: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
     }
-    const token = signToken(payload);
+    const { token, segundos } = signToken(payload);
     // El nombre viaja en la respuesta para que el login pueda decidir, SIN otra
     // ida al servidor, si quien entra es la misma persona de antes o es otra y
     // hay que limpiar lo que dejó en esta tableta (ver lib/sesion-local.ts).
     // No es un dato nuevo: es el de la sesión que se acaba de emitir.
     const res = NextResponse.json({ ok: true, nombre: payload.nombre });
-    setSessionCookie(res, token);
+    ponerCookieSesion(res, token, segundos);
 
     // Entró bien: los fallos previos de esa cuenta dejan de contar.
     limpiarIntentos(llaveCuenta);

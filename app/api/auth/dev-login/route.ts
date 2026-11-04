@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { signToken, COOKIE_NAME } from '@/lib/auth';
+import { signToken, ponerCookieSesion } from '@/lib/auth';
 import { buildSessionPayload } from '@/lib/users';
 
 // Login de desarrollo: emite sesión para un Usuario real de AdelanteSBX
@@ -24,15 +24,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
     }
 
-    const token = signToken(payload);
+    const { token, segundos } = signToken(payload);
     const res = NextResponse.json({ ok: true, usuario: payload });
-    res.cookies.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 8 * 60 * 60,
-      path: '/',
-    });
+    ponerCookieSesion(res, token, segundos);
     return res;
   } catch (err) {
     console.error('/api/auth/dev-login error:', err);

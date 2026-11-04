@@ -2,15 +2,17 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ds/Button/Button';
 import { Icon } from '@/components/ds/Icon/Icon';
-import { useInactividad } from '@/hooks/useInactividad';
 import { irAlLogin, useSesionVencida } from '@/hooks/useSession';
 
 // ─── Aviso de sesión terminada ───────────────────────────────────────────────
-// La sesión dura 8 h y se vence con la pestaña abierta. Desde ese momento el
-// servidor contesta 401 a todo y la pantalla sigue pintando los datos de la
-// última carga buena: el usuario le pega a botones que no hacen nada (las
-// órdenes que decían "lanzado" sin tocar BC, el 26/08/2026; la subpartida que
-// no se guardó, el 25/09/2026).
+// Con la pantalla abierta la sesión se renueva sola (ver hooks/useSession.ts),
+// así que esto ya casi no sale. Sale cuando la sesión se acaba de verdad: llegó
+// al tope desde que se entró con contraseña, se cerró desde otro lado, cambió
+// la contraseña o RH desactivó a la persona (ver lib/auth.ts). Desde ese
+// momento el servidor contesta 401 a todo y la pantalla sigue pintando los
+// datos de la última carga buena: el usuario le pega a botones que no hacen
+// nada (las órdenes que decían "lanzado" sin tocar BC, el 26/08/2026; la
+// subpartida que no se guardó, el 25/09/2026).
 //
 // Va arriba de TODO —también de los modales, por eso el z-index 110— porque ahí
 // es justo donde lo agarra: llenando un formulario. Y no se cierra ni se va
@@ -20,13 +22,7 @@ import { irAlLogin, useSesionVencida } from '@/hooks/useSession';
 // Ocupa su propia franja en vez de flotar encima: así no le tapa el título de
 // la pantalla ni el botón del menú en móvil.
 export function AvisoSesion() {
-  const vencidaPorElServidor = useSesionVencida();
-  // Si la sesión la cerramos NOSOTROS por inactividad, el 401 que contesta el
-  // servidor desde ese momento es consecuencia, no noticia: lo que hay que leer
-  // es el bloqueo de encima, y esta barra solo repetiría el mensaje empujando la
-  // pantalla hacia abajo. Ver components/layout/BloqueoInactividad.tsx.
-  const { fase } = useInactividad();
-  const vencida = vencidaPorElServidor && fase !== 'cerrada';
+  const vencida = useSesionVencida();
   const barra = useRef<HTMLDivElement>(null);
 
   // Los toasts salen fijos arriba a la derecha, o sea encima de esta barra.

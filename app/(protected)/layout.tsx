@@ -3,10 +3,9 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { AvisoSesion } from '@/components/layout/AvisoSesion';
-import { BloqueoInactividad } from '@/components/layout/BloqueoInactividad';
 import { AvisoSinAcceso } from '@/components/layout/AvisoSinAcceso';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { useSession } from '@/hooks/useSession';
+import { useMantenerSesion, useSession } from '@/hooks/useSession';
 import { getInitials, rutaPermitida } from '@/lib/permissions';
 
 const NAVPIN_KEY = 'adelante_oc_navpin';
@@ -17,6 +16,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [navOpen, setNavOpen] = useState(false); // drawer (móvil)
   const [ready, setReady] = useState(false);     // evita animar al cargar
   const session = useSession();
+  // Con la app abierta la sesión no se cae por tiempo (ver lib/sesion-duracion.ts).
+  useMantenerSesion();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -139,13 +140,6 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           </motion.main>
         </AnimatePresence>
       </div>
-
-      {/* Tableta sola sobre la mesa: a los 30 min se cierra la sesión de verdad y
-          se tapa lo que haya quedado en pantalla. Va acá, fuera del <main> que
-          anima, para que cambiar de pantalla no lo desmonte y vuelva a arrancar
-          el contador desde cero. Mientras alguien la esté usando no pinta nada.
-          Ver hooks/useInactividad.ts. */}
-      <BloqueoInactividad />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { getDb, sql } from './db';
 import { JWTPayload } from './auth';
+import { HUELLA_CLAVE_SQL } from './sesiones';
 import { computeNivelAdmin, computeAllowedModules, rolLabelDeUsuario } from './permissions';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -79,7 +80,8 @@ export async function buildSessionPayload(idUsuario: number): Promise<JWTPayload
     .input('idUsuario', sql.Int, idUsuario)
     .query(`
       SELECT u.idUsuario, u.idColaborador, u.username, c.cedula,
-             c.calcNombreCompleto AS nombre
+             c.calcNombreCompleto AS nombre,
+             ${HUELLA_CLAVE_SQL} AS huella
       FROM dbo.Usuario u
       JOIN dbo.Colaborador c ON c.idColaborador = u.idColaborador
       WHERE u.idUsuario = @idUsuario
@@ -103,6 +105,9 @@ export async function buildSessionPayload(idUsuario: number): Promise<JWTPayload
     // rol se refleja al instante ahí y en el token en el siguiente login.
     modules: computeAllowedModules(roles) ?? undefined,
     nivelAdmin: computeNivelAdmin(roles),
+    // Con qué contraseña se entró: si después se la cambian, getSession deja de
+    // aceptar esta sesión (ver HUELLA_CLAVE_SQL en lib/sesiones.ts).
+    huella: u.huella?.trim() || undefined,
   };
 }
 

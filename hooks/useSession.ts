@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useSyncExternalStore } from 'react';
-import { JWTPayload } from '@/lib/auth';
+import type { JWTPayload } from '@/lib/auth';
+import { PEDIR_RENOVACION_CADA_MS } from '@/lib/sesion-duracion';
 
 // Cache en memoria — persiste entre navegaciones del mismo proceso
 let sessionCache: JWTPayload | null | 'pending' = 'pending';
@@ -120,4 +121,47 @@ export function useSession(): JWTPayload | null {
   }, []);
 
   return session;
+}
+
+/**
+ * Mantiene viva la sesión mientras la app esté abierta, aunque nadie la toque.
+ *
+ * Le pide al servidor renovar (/api/auth/renovar) al montar, cada rato y al
+ * volver a la vista —o a la red—. El servidor decide si de verdad firma (como
+ * mucho una vez por hora) y antes verifica en la base que la sesión siga
+ * valiendo. Ver lib/sesion-duracion.ts.
+ *
+ * El «al volver a la vista» es el que importa en las tabletas: con la pantalla
+ * apagada el navegador congela los intervalos, y al prenderla se renueva antes
+ * del primer toque.
+ *
+ * Si la sesión ya no vale, el servidor contesta el 401 marcado y el envoltorio
+ * de `fetch` de arriba prende el aviso amarillo, como con cualquier otra API.
+ * Un error de red no hace nada: el token que hay sigue valiendo días.
+ */
+// Fuera del efecto: visibilitychange y online llegan en ráfaga al prender la
+// tableta, y en desarrollo React monta el efecto dos veces.
+let ultimaRenovacion = 0;
+
+export function useMantenerSesion() {
+  useEffect(() => {
+    const renovar = () => {
+      const ahora = Date.now();
+      if (ahora - ultimaRenovacion < 60_000) return;
+      ultimaRenovacion = ahora;
+      fetch('/api/auth/renovar', { method: 'POST', credentials: 'include', cache: 'no-store' })
+        .catch(() => { /* sin red: se reintenta en el próximo turno */ });
+    };
+    const alVolver = () => { if (document.visibilityState === 'visible') renovar(); };
+
+    renovar();
+    const reloj = setInterval(renovar, PEDIR_RENOVACION_CADA_MS);
+    document.addEventListener('visibilitychange', alVolver);
+    window.addEventListener('online', renovar);
+    return () => {
+      clearInterval(reloj);
+      document.removeEventListener('visibilitychange', alVolver);
+      window.removeEventListener('online', renovar);
+    };
+  }, []);
 }
