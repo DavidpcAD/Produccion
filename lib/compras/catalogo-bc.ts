@@ -54,7 +54,8 @@ export interface ObraBc {
    *  caso raro: la pantalla que arme un pedido tiene que mirarlo. */
   bloqueada?: boolean;
 }
-export interface AlmacenBc { codigo: string; nombre: string }
+/** `clase`: marca manual Real/Virtual (Business Central → Almacenes); null = sin marcar. */
+export interface AlmacenBc { codigo: string; nombre: string; clase?: "real" | "virtual" | null }
 
 const TTL_MS = 5 * 60_000;
 

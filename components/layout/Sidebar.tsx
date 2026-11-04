@@ -63,6 +63,8 @@ const navItems: NavItemDef[] = [
       // el filtro por módulo de los hijos la esconde para el resto.
       { href: '/bc/reporte-inventario', label: 'Reporte de inventario' },
       { href: '/bc/presupuesto-liquidado', label: 'Presupuesto vs liquidado' },
+      // Marca Real/Virtual de cada almacén (solo Super Admin, módulo 'admin').
+      { href: '/bc/almacenes', label: 'Almacenes' },
     ],
   },
   {

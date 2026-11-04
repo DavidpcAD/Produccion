@@ -78,6 +78,8 @@ export interface Maquina {
 export interface Almacen {
   codigo: string;      // ALM-GRAL
   nombre: string;
+  /** Marca manual Real/Virtual (Business Central → Almacenes). null/ausente = sin marcar. */
+  clase?: "real" | "virtual" | null;
 }
 
 // ============================ PEDIDO (Ingeniería · Laura) ===================

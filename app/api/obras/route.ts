@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth';
 import { bindObra, sqlFechaObra } from '@/lib/obras';
 import { bcConfigured, createWork, createProject } from '@/lib/bc-client';
 import { getTipoObra, mapaAreaCosteoTipo, TIPO_POR_DEFECTO } from '@/lib/partidas/tipos-obra';
+import { almacenFisicoDe, guardarClaseAlmacen, leerClasesAlmacen } from '@/lib/compras/almacen-clase';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -65,7 +66,11 @@ export async function GET(req: NextRequest) {
   // Tipo de obra EFECTIVO: manda la columna tipoObra y, si está vacía, se deduce
   // del área de costeo. El mapeo vive en pro_obc (otra base), así que el cruce se
   // hace acá y no en el SELECT.
-  const mapa = await mapaAreaCosteoTipo().catch(() => new Map<string, string>());
+  const [mapa, clases] = await Promise.all([
+    mapaAreaCosteoTipo().catch(() => new Map<string, string>()),
+    // La marca de almacén solo la usa la tabla completa (columna "Clase").
+    soloBasico ? Promise.resolve(null) : leerClasesAlmacen(),
+  ]);
   const data = dataRes.recordset.map((o: Record<string, unknown>) => {
     const explicito = String(o.tipoObra ?? '').trim().toUpperCase();
     const porArea = mapa.get(String(o.areaCosteo ?? '').trim().toUpperCase()) ?? TIPO_POR_DEFECTO;
@@ -73,6 +78,10 @@ export async function GET(req: NextRequest) {
       ...o,
       tipoObraEfectivo: explicito || porArea,
       tipoObraOrigen: explicito ? 'obra' : 'area',
+      // ¿Su almacén es una bodega física? Es la MISMA marca de Business Central →
+      // Almacenes (dbo.AlmacenClase, por el código, que es el de la obra) y la que
+      // arma "Bodegas" en el Nuevo pedido; sin marca, la regla por código.
+      ...(clases ? almacenFisicoDe(clases, String(o.numeroObra ?? '')) : {}),
     };
   });
 
@@ -168,6 +177,12 @@ export async function POST(req: NextRequest) {
          @precioNormalMaquinaria, @precioConcretoMaquinaria, @origenPrincipal, @esBC, @esProcore,
          SYSUTCDATETIME(), @creadoPor)
     `);
+    // "Almacén físico" marcado al crear: va a la marca única de almacenes. Si no
+    // viene, no se marca nada (decide la regla por código, como cualquier otro).
+    if (body.esAlmacenFisico === true) {
+      await guardarClaseAlmacen(String(body.numeroObra), 'real', session.username || session.nombre || String(session.idCol))
+        .catch((e) => console.error('/api/obras POST marca de almacén:', e));
+    }
     return NextResponse.json({ idObra: Number(res.recordset[0].idObra) }, { status: 201 });
   } catch (err: unknown) {
     const msg = mensajeParaCliente(err);

@@ -41,6 +41,10 @@ interface Obra {
   origenPrincipal: string | null;
   esBC: boolean | null;
   esProcore: boolean | null;
+  /** ¿Su almacén es una bodega física? Marca única de almacenes (Business Central →
+   *  Almacenes, dbo.AlmacenClase); sin marca, cuenta por el código. */
+  esAlmacenFisico?: boolean | null;
+  claseAlmacen?: 'real' | 'virtual' | null;
 }
 
 const EMPTY: Record<string, string | boolean> = {
@@ -270,6 +274,17 @@ export default function ObrasPage() {
     col.accessor('centroCosto', {
       header: 'Centro de costo', meta: { label: 'Centro de costo' },
       cell: ({ getValue }) => (getValue() as string) || '—',
+    }),
+    col.display({
+      id: 'almacen', header: 'Clase',
+      meta: {
+        label: 'Clase',
+        noFilter: true,
+        exportValue: (o) => (o.esAlmacenFisico ? 'Almacén físico' : 'Obra'),
+      },
+      cell: ({ row }) => row.original.esAlmacenFisico
+        ? <Badge variant="green" dot>Almacén físico</Badge>
+        : <Badge variant="gray">Obra</Badge>,
     }),
     col.accessor('proyectoNombre', {
       header: 'Proyecto', meta: { label: 'Proyecto' },

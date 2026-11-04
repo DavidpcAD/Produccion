@@ -23,7 +23,7 @@ import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
 import type { Almacen, Articulo, Maquina, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, OBRA_MAQUINARIA, TAREA_PARQUE_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esAlmacenDeBodega, etiquetaTipoArticulo, money, num, numeroOrden, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, OBRA_MAQUINARIA, TAREA_PARQUE_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esBodegaReal, etiquetaTipoArticulo, money, num, numeroOrden, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
@@ -360,7 +360,13 @@ function Dropdown({ placeholder, items, value, onPick, mode = "select", small, w
               <button key={i.id} type="button" onClick={() => { onPick(i.id); setOpen(false); setQ(""); }}
                 className={`nsl-opt col${i.id === value ? " is-active" : ""}`} style={{ gap: 2, alignItems: "flex-start", width: "100%", textAlign: "left", padding: "11px 14px", border: 0, borderRadius: 12, cursor: "pointer", background: "transparent" }}>
                 <span className="ds-body-sm ds-strong">{i.title}</span>
-                {i.sub && <span className="ds-muted ds-label">{i.sub}</span>}
+                {(i.sub || i.tag) && (
+                  <span className="row gap-2" style={{ alignItems: "center" }}>
+                    {i.sub && <span className="ds-muted ds-label">{i.sub}</span>}
+                    {/* Almacén marcado Virtual (Business Central → Almacenes). */}
+                    {i.tag && <span className="nsl-tipotag">{i.tag}</span>}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -1234,17 +1240,19 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     if (esRepuesto) return catMaquinas.map((m) => ({ id: m.no, title: m.nombre, sub: m.placa ? `${m.no} · ${m.placa}` : m.no }));
     return obraItems;
   }, [esRepuesto, obraItems, catMaquinas]);
-  // Almacenes de BC donde se puede pedir: por defecto SOLO las bodegas (Almacén
-  // General, Agregados, Maderas, Herramienta, Maquinaria, Generales…), que es lo que
-  // se compra. Con "Ver todos" salen también las ubicaciones de obra/casa, por si
-  // alguna vez hace falta una. Los ALM-* van primero.
+  // Almacenes de BC donde se puede pedir: por defecto SOLO las bodegas FÍSICAS
+  // (Almacén General, Agregados, Maderas, Herramienta…), que es lo que se compra.
+  // Qué es físico lo marca la gente en Business Central → Almacenes (Real/Virtual);
+  // sin marca, decide el código (esBodegaReal). Con "Todos" salen también los
+  // virtuales y las ubicaciones de obra/casa, y los virtuales llevan su etiqueta.
+  // Los ALM-* van primero.
   const [verTodosAlm, setVerTodosAlm] = useState(false);
   const almacenItems: Item[] = useMemo(() => {
     const orden = (c: string) => (c.toUpperCase().startsWith("ALM-") ? 0 : 1);
     return [...catAlm]
-      .filter((a) => verTodosAlm || esAlmacenDeBodega(a.codigo) || a.codigo === almacenSel)
+      .filter((a) => verTodosAlm || esBodegaReal(a) || a.codigo === almacenSel)
       .sort((a, b) => orden(a.codigo) - orden(b.codigo) || a.codigo.localeCompare(b.codigo))
-      .map((a) => ({ id: a.codigo, title: (a.nombre ?? "").trim() || a.codigo, sub: a.codigo }));
+      .map((a) => ({ id: a.codigo, title: (a.nombre ?? "").trim() || a.codigo, sub: a.codigo, tag: a.clase === "virtual" ? "Virtual" : undefined }));
   }, [catAlm, verTodosAlm, almacenSel]);
   // Filtro arriba de la lista del dropdown de almacenes.
   const filtroAlm = (

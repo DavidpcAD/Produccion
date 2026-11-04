@@ -80,11 +80,16 @@ interface SubPartida {
 
 const EMPTY_SUB = { idEtapa: '', idPartida: '', codigo: '', nombre: '', numSprint: '1', esCritica: false, descripcion: '', activo: true, tiposCasa: [] as string[] };
 const EMPTY_PART = { idEtapa: '', codigo: '', nombre: '' };
-const EMPTY_ETAPA = { codigo: '', nombre: '', bcWorksNo: '', bcTaskNo: '' };
+// tipoObra: a qué catálogo va el grupo. Hace falta elegirlo porque una pestaña puede
+// mostrar dos (Obra Vivienda = Construcción + General): antes se iba siempre al
+// primero, y así "Generales Castilla" quedó como etapa de Construcción.
+const EMPTY_ETAPA = { codigo: '', nombre: '', bcWorksNo: '', bcTaskNo: '', tipoObra: '' };
 
 const SIN_OBRA = '—compartido—';
 const porCodigo = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
 const plural = (n: number, sing: string, plu: string) => `${n} ${n === 1 ? sing : plu}`;
+// "el área", no "la área": femenino que empieza con á tónica lleva "el".
+const elDe = (termino: string, fem: boolean) => (fem && !/^á/i.test(termino) ? 'la' : 'el');
 // Rótulo de nivel: en fábrica el mismo nombre se repite en los tres niveles a
 // propósito (la máquina es el proceso, la partida y la subpartida), así que el
 // nombre solo no dice en qué nivel estás parado. Cada fila lo dice.
@@ -158,8 +163,9 @@ export default function PartidasPage() {
   const [partForm, setPartForm] = useState({ ...EMPTY_PART });
   const setPart = (k: keyof typeof partForm, v: string) => setPartForm(p => ({ ...p, [k]: v }));
 
-  // Modal grupo (crear) — nivel 1 del árbol
+  // Modal grupo (crear/editar) — nivel 1 del árbol
   const [etapaOpen, setEtapaOpen] = useState(false);
+  const [etapaEditId, setEtapaEditId] = useState<number | null>(null);
   const [etapaForm, setEtapaForm] = useState({ ...EMPTY_ETAPA });
   const setEt = (k: keyof typeof etapaForm, v: string) => setEtapaForm(p => ({ ...p, [k]: v }));
 
@@ -481,31 +487,110 @@ export default function PartidasPage() {
   }
 
   // ---- Grupo (etapa / sistema / área / proceso / torre) ----
+  // El catálogo elegido en el modal manda sobre los rótulos ("Etapa" en
+  // Construcción, "Área" en General) y sobre si se pide la obra de BC.
+  const tipoEtapa = useMemo(
+    () => tipos.find(t => t.codigo === etapaForm.tipoObra) ?? tipo,
+    [tipos, etapaForm.tipoObra, tipo],
+  );
+  const etapaPorObra = !!tipoEtapa && !tipoEtapa.catalogoCompartido;
+  const termEtapa = (tipoEtapa?.terminoGrupo ?? termGrupo).toLowerCase();
+  const femEtapa = (tipoEtapa?.genero ?? 'F') === 'F';
+  // Obras para el grupo: las del catálogo elegido primero y, en una pestaña con dos
+  // catálogos, también las del otro — una obra de generales nueva puede no tener
+  // todavía el tipo puesto y caer deducida en Construcción.
+  const obrasParaEtapa = useMemo(() => {
+    const orden = [
+      ...(tipoEtapa ? [tipoEtapa] : []),
+      ...miembrosActivos.filter(m => m.codigo !== tipoEtapa?.codigo),
+    ];
+    const vistas = new Set<string>();
+    const out: { numeroObra: string; nombre: string }[] = [];
+    for (const t of orden) {
+      const lista = tipos.find(x => x.codigo === t.codigo)?.obrasBC ?? [];
+      for (const o of lista) {
+        if (vistas.has(o.numeroObra)) continue;
+        vistas.add(o.numeroObra);
+        out.push(o);
+      }
+    }
+    const actual = etapaForm.bcWorksNo.trim();
+    if (actual && !vistas.has(actual)) out.unshift({ numeroObra: actual, nombre: '' });
+    return out;
+  }, [tipos, tipoEtapa, miembrosActivos, etapaForm.bcWorksNo]);
+  const partidasDelGrupoEditado = etapaEditId != null
+    ? partidas.filter(p => p.idEtapa === etapaEditId).length
+    : 0;
+
   function abrirNuevaEtapa() {
-    setEtapaForm({ ...EMPTY_ETAPA, bcWorksNo: porObra ? obraFiltro : '' });
+    setEtapaEditId(null);
+    setEtapaForm({ ...EMPTY_ETAPA, tipoObra: tipoCodigo, bcWorksNo: porObra ? obraFiltro : '' });
     setEtapaOpen(true);
+  }
+  function abrirEditarEtapa(e: Etapa) {
+    setEtapaEditId(e.idEtapa);
+    setEtapaForm({
+      codigo: e.codigo, nombre: e.nombre,
+      bcWorksNo: e.bcWorksNo ?? '', bcTaskNo: e.bcTaskNo ?? '',
+      tipoObra: e.tipo ?? tipoCodigo,
+    });
+    setEtapaOpen(true);
+  }
+  function cambiarCatalogoEtapa(cod: string) {
+    const t = tipos.find(x => x.codigo === cod);
+    setEtapaForm(p => {
+      let obra = p.bcWorksNo;
+      if (t?.catalogoCompartido) obra = '';
+      // Las áreas de generales llevan de obra su mismo código (GEN-BAR → GEN-BAR):
+      // si el código ya es el de una obra, se propone esa.
+      else if (!obra.trim() && (t?.obrasBC ?? []).some(o => o.numeroObra === p.codigo.trim())) obra = p.codigo.trim();
+      return { ...p, tipoObra: cod, bcWorksNo: obra };
+    });
   }
   async function guardarEtapa() {
     if (!etapaForm.codigo.trim()) { toast('El código es requerido', 'warning'); return; }
     if (!etapaForm.nombre.trim()) { toast('El nombre es requerido', 'warning'); return; }
     setSaving(true);
     try {
-      const res = await fetch('/api/etapas', {
-        method: 'POST',
+      const editing = etapaEditId != null;
+      const tipoDestino = etapaForm.tipoObra || tipoCodigo;
+      const obra = etapaPorObra ? etapaForm.bcWorksNo.trim() : '';
+      const res = await fetch(editing ? `/api/etapas/${etapaEditId}` : '/api/etapas', {
+        method: editing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          codigo: etapaForm.codigo.trim(), nombre: etapaForm.nombre.trim(), tipoObra: tipoCodigo,
-          bcWorksNo: porObra ? etapaForm.bcWorksNo.trim() : '',
+          codigo: etapaForm.codigo.trim(), nombre: etapaForm.nombre.trim(), tipoObra: tipoDestino,
+          bcWorksNo: obra,
           bcTaskNo: etapaForm.bcTaskNo.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { toast(data.error || `No se pudo crear ${elGrupo}`, 'error'); return; }
-      toast(`${termGrupo} ${fem ? 'creada' : 'creado'}`, 'success');
+      if (!res.ok) { toast(data.error || `No se pudo guardar ${elDe(termEtapa, femEtapa)} ${termEtapa}`, 'error'); return; }
+      const rotulo = termEtapa.charAt(0).toUpperCase() + termEtapa.slice(1);
+      toast(`${rotulo} ${editing ? (femEtapa ? 'actualizada' : 'actualizado') : (femEtapa ? 'creada' : 'creado')}`, 'success');
       setEtapaOpen(false);
-      if (porObra && etapaForm.bcWorksNo.trim()) setObrasAbiertas(s => new Set(s).add(etapaForm.bcWorksNo.trim()));
+      // Que se vea dónde quedó: la rama del catálogo (Obra Vivienda) o de la obra.
+      const rama = miembrosActivos.length > 1 ? tipoDestino : obra;
+      if (rama) setObrasAbiertas(s => new Set(s).add(rama));
       await Promise.all([load(), cargarTipos()]);
     } finally { setSaving(false); }
+  }
+  async function borrarEtapa(e: Etapa) {
+    const t = tipos.find(x => x.codigo === (e.tipo ?? tipoCodigo)) ?? tipo;
+    const term = (t?.terminoGrupo ?? termGrupo).toLowerCase();
+    const f = (t?.genero ?? 'F') === 'F';
+    const ok = await confirm({
+      title: `Eliminar ${term}`,
+      message: `¿Eliminar ${elDe(term, f)} ${term} "${e.codigo} — ${e.nombre}"? (debe estar sin partidas)`,
+      confirmLabel: 'Eliminar', danger: true,
+    });
+    if (!ok) return;
+    const res = await fetch(`/api/etapas/${e.idEtapa}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { toast(data.error || 'No se pudo eliminar', 'error'); return; }
+    toast(`${term.charAt(0).toUpperCase() + term.slice(1)} ${f ? 'eliminada' : 'eliminado'}`, 'success');
+    setEtapaOpen(false);
+    await Promise.all([load(), cargarTipos()]);
   }
 
   // ---- Traer de BC ----
@@ -798,9 +883,14 @@ export default function PartidasPage() {
                         {subsGrupo > 0 ? ` · ${plural(subsGrupo, 'subpartida', 'subpartidas')}` : ''}
                       </span>
                       {puede && (
-                        <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-300 hover:text-brand shrink-0 transition-opacity sm:opacity-0 sm:group-hover/proc:opacity-100 sm:focus-visible:opacity-100" title={`Nueva partida en ${etapa.nombre}`}>
-                          <Icon name="plus" size="sm" color="currentColor" />
-                        </button>
+                        <>
+                          <button onClick={() => abrirEditarEtapa(etapa)} className="text-ds-gray-300 hover:text-ds-ink shrink-0 transition-opacity sm:opacity-0 sm:group-hover/proc:opacity-100 sm:focus-visible:opacity-100" title={`Editar ${(sec.tipoSec?.terminoGrupo ?? termGrupo).toLowerCase()}`}>
+                            <Icon name="edit" size="sm" color="currentColor" />
+                          </button>
+                          <button onClick={() => abrirNuevaPart(etapa.idEtapa)} className="text-ds-gray-300 hover:text-brand shrink-0 transition-opacity sm:opacity-0 sm:group-hover/proc:opacity-100 sm:focus-visible:opacity-100" title={`Nueva partida en ${etapa.nombre}`}>
+                            <Icon name="plus" size="sm" color="currentColor" />
+                          </button>
+                        </>
                       )}
                     </div>
 
@@ -1073,25 +1163,59 @@ export default function PartidasPage() {
         </div>
       </Modal>
 
-      {/* Modal: grupo (crear) */}
+      {/* Modal: grupo (crear/editar) */}
       <Modal
         open={etapaOpen}
         onClose={() => setEtapaOpen(false)}
-        title={nuevoGrupo}
+        title={etapaEditId != null ? `Editar ${termEtapa}` : `${femEtapa ? 'Nueva' : 'Nuevo'} ${termEtapa}`}
         footer={
           <div className="flex items-center gap-2 w-full">
+            {etapaEditId != null && (
+              <Button variant="outline" onClick={() => { const e = etapas.find(x => x.idEtapa === etapaEditId); if (e) borrarEtapa(e); }}>Eliminar</Button>
+            )}
             <div className="ml-auto flex items-center gap-2">
               <Button variant="outline" onClick={() => setEtapaOpen(false)}>Cancelar</Button>
-              <Button loading={saving} disabled={!etapaForm.codigo.trim() || !etapaForm.nombre.trim()} onClick={guardarEtapa}>{`Crear ${termGrupoLow}`}</Button>
+              <Button loading={saving} disabled={!etapaForm.codigo.trim() || !etapaForm.nombre.trim()} onClick={guardarEtapa}>{etapaEditId != null ? 'Guardar' : `Crear ${termEtapa}`}</Button>
             </div>
           </div>
         }
       >
         <div className="space-y-4">
-          <p className="text-body-sm text-ds-gray-500">
-            Se crea en el catálogo de <span className="font-semibold text-ds-ink">{tipo?.nombre.toLowerCase() ?? tipoCodigo.toLowerCase()}</span>.
-          </p>
-          {porObra && (
+          {miembrosActivos.length > 1 ? (
+            // Pestaña con dos catálogos (Obra Vivienda): se elige a cuál va. Mismo
+            // estilo que la barra de tipos de arriba.
+            <div>
+              <span className="block text-body-sm font-semibold text-ds-ink mb-1.5">Catálogo</span>
+              <div className="flex flex-wrap items-center gap-1">
+                {miembrosActivos.map(m => {
+                  const activo = (etapaForm.tipoObra || tipoCodigo) === m.codigo;
+                  const bloqueado = !activo && partidasDelGrupoEditado > 0;
+                  return (
+                    <button key={m.codigo} type="button" disabled={bloqueado}
+                      onClick={() => cambiarCatalogoEtapa(m.codigo)}
+                      aria-pressed={activo}
+                      className={'inline-flex items-center gap-1.5 rounded-ds px-3 py-1.5 text-label font-semibold transition-colors '
+                        + (activo ? 'bg-black text-white' : 'text-ds-gray-500 hover:bg-ds-gray-100 hover:text-ds-ink')
+                        + (bloqueado ? ' opacity-40 cursor-not-allowed hover:bg-transparent' : '')}>
+                      <span className={'font-mono text-body-sm font-bold ' + (activo ? 'text-white/60' : 'text-ds-gray-400')}>{m.letra}</span>
+                      {m.nombre}
+                      <span className={'text-body-sm font-normal ' + (activo ? 'text-white/70' : 'text-ds-gray-400')}>· {m.terminoGrupo.toLowerCase()}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {partidasDelGrupoEditado > 0 && (
+                <p className="text-body-sm text-ds-gray-400 mt-1.5">
+                  Tiene {plural(partidasDelGrupoEditado, 'partida', 'partidas')}: para pasarla al otro catálogo, primero movelas o eliminalas.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-body-sm text-ds-gray-500">
+              {etapaEditId != null ? 'Está' : 'Se crea'} en el catálogo de <span className="font-semibold text-ds-ink">{tipoEtapa?.nombre.toLowerCase() ?? tipoCodigo.toLowerCase()}</span>.
+            </p>
+          )}
+          {etapaPorObra && (
             <Combobox
               label="Obra de Business Central"
               value={etapaForm.bcWorksNo}
@@ -1099,7 +1223,7 @@ export default function PartidasPage() {
               placeholder="Compartida por todas las obras del tipo"
               options={[
                 { value: '', label: 'Compartida por todas las obras del tipo' },
-                ...obrasDelTipo.map(o => ({
+                ...obrasParaEtapa.map(o => ({
                   value: o.numeroObra,
                   label: o.nombre ? `${o.numeroObra} — ${o.nombre}` : o.numeroObra,
                   parts: [{ text: o.numeroObra, weight: 'bold' as const }, { text: o.nombre, weight: 'light' as const }],

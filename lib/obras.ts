@@ -50,4 +50,6 @@ export function bindObra(reqObj: SqlRequest, b: Record<string, unknown>): SqlReq
     .input('origenPrincipal', sql.NVarChar, str(b.origenPrincipal))
     .input('esBC', sql.Bit, b.esBC == null ? null : (b.esBC ? 1 : 0))
     .input('esProcore', sql.Bit, b.esProcore == null ? null : (b.esProcore ? 1 : 0));
+  // "Almacén físico" NO va acá: es la marca única de almacenes (dbo.AlmacenClase,
+  // lib/compras/almacen-clase.ts) y la escriben las rutas de obras aparte.
 }

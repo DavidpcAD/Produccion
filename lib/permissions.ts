@@ -109,6 +109,8 @@ export function getRouteLevel(pathname: string): number {
   // a N4 en su handler.
   if (pathname.startsWith('/bc/reporte-inventario')) return 4;
   if (pathname.startsWith('/bc/presupuesto-liquidado')) return 4;
+  // Almacenes (marca Real/Virtual): solo Super Admin, pantalla y API.
+  if (pathname.startsWith('/bc/almacenes') || pathname.startsWith('/api/bc/almacenes')) return 4;
   if (pathname.startsWith('/bc')) return 2;
   if (pathname.startsWith('/apps')) return 4;
   if (pathname.startsWith('/roles')) return 4;
@@ -419,6 +421,7 @@ export function getRouteModule(pathname: string): Modulo {
   // genérico que es del dominio Presupuesto. Así el menú lo esconde para el resto.
   if (p.startsWith('/bc/reporte-inventario')) return 'admin';
   if (p.startsWith('/bc/presupuesto-liquidado')) return 'admin';
+  if (p.startsWith('/bc/almacenes')) return 'admin';
   // Business Central (integración de avance + presupuestos por obra) = dominio Presupuesto.
   if (p.startsWith('/bc') || p.startsWith('/presupuestos')) return 'presupuesto';
   // Catálogos que viven bajo /avance pero son del dominio de Partidas (Presupuesto).

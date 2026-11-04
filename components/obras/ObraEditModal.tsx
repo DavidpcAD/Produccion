@@ -31,6 +31,11 @@ export interface ObraEditData {
   areaProrrateadaM2: number | null;
   esBC: boolean | null;
   esProcore: boolean | null;
+  /** ¿Su almacén es una bodega física? Marca única de almacenes (dbo.AlmacenClase);
+   *  sin marca, cuenta por el código. Es lo mismo que arma "Bodegas" en el pedido. */
+  esAlmacenFisico?: boolean | null;
+  /** La marca explícita, si la hay: 'real' | 'virtual'. null = sin marcar. */
+  claseAlmacen?: 'real' | 'virtual' | null;
 }
 
 interface ProyectoOpt { IDProyecto: number; Nombre: string; CodigoBC: string }
@@ -57,6 +62,15 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
   );
 }
 
+/** Estados del proyecto en BC (mismos que ESTADOS_BC de lib/bc/obra-sync.ts, que
+ *  es server-only). Se guarda el código en inglés, igual que lo trae el sync. */
+const ESTADOS_BC: ComboOption[] = [
+  { value: 'Planning', label: 'Planificación' },
+  { value: 'Quote', label: 'Oferta' },
+  { value: 'Open', label: 'Abierto' },
+  { value: 'Completed', label: 'Completado' },
+];
+
 /** Valores de dimensión (AC/CC) de BC → opciones de Combobox. */
 function toDimOpts(vals: { code: string; name: string }[]): ComboOption[] {
   return (vals ?? []).map(v => ({ value: v.code, label: v.name ? `${v.code} — ${v.name}` : v.code, search: v.name }));
@@ -77,14 +91,9 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
   const [dimCC, setDimCC] = useState<ComboOption[]>([]);
   const [dimLoading, setDimLoading] = useState(false);
 
-  // Paso de confirmación: al guardar una obra que existe en BC, se pregunta si
-  // los cambios también deben reflejarse en Business Central.
-  const [confirmBC, setConfirmBC] = useState(false);
-
   useEffect(() => {
     if (!open || !obra) return;
     const d = (v: string | null) => (v ? v.split('T')[0] : ''); // fecha sin conversión de zona
-    setConfirmBC(false);
     setForm({
       numeroObra: obra.numeroObra ?? '',
       nombreMostrado: obra.nombreMostrado ?? '',
@@ -103,6 +112,7 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
       areaProrrateadaM2: obra.areaProrrateadaM2 != null ? String(obra.areaProrrateadaM2) : '',
       esBC: !!obra.esBC,
       esProcore: !!obra.esProcore,
+      esAlmacenFisico: !!obra.esAlmacenFisico,
     });
   }, [open, obra]);
 
@@ -138,7 +148,10 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
     return [{ value: actual, label: `${actual} (actual)` }, ...base];
   }
 
-  async function guardar(actualizarBC: boolean) {
+  // En una obra de BC, lo que se cambió y vive en BC se escribe allá primero (lo
+  // decide el servidor, ver lib/bc/obra-sync.ts). Si BC lo rechaza no se guarda
+  // nada: el modal queda abierto con lo editado y el motivo de BC en el aviso.
+  async function guardar() {
     if (!obra) return;
     if (!form.numeroObra) { toast('El número de obra es requerido', 'warning'); return; }
     setSaving(true);
@@ -146,31 +159,18 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
       const res = await fetch(`/api/obras/${obra.idObra}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, actualizarBC }),
+        body: JSON.stringify(form),
       });
       const e = await res.json().catch(() => ({}));
       if (!res.ok) { toast(e.error || 'Error guardando la obra', 'error'); return; }
-      if (actualizarBC && e.bcSync === false) {
-        toast(`Obra actualizada en el sistema, pero BC falló: ${e.bcError ?? 'sin detalle'}`, 'warning');
-      } else if (actualizarBC && e.bcSync) {
-        toast('Obra actualizada (sistema + Business Central)', 'success');
-      } else {
-        toast('Obra actualizada', 'success');
-      }
+      const bc = e.bc as { enviados?: string[]; avisos?: string[] } | undefined;
+      toast(bc?.enviados?.length ? 'Obra actualizada en el sistema y en Business Central' : 'Obra actualizada', 'success');
+      if (bc?.avisos?.length) toast(bc.avisos.join(' '), 'warning');
       onClose();
       onSaved();
     } finally {
       setSaving(false);
     }
-  }
-
-  // "Guardar cambios": si la obra existe en BC, pasa por el paso de confirmación
-  // (¿reflejar también en BC?). Si no, guarda directo.
-  function handleGuardar() {
-    if (!obra) return;
-    if (!form.numeroObra) { toast('El número de obra es requerido', 'warning'); return; }
-    if (obra.esBC) { setConfirmBC(true); return; }
-    guardar(false);
   }
 
   const proyectoOptions = proyectos.map(p => ({
@@ -209,6 +209,23 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
     );
   }
 
+  // Estado: en una obra de BC es el estado del proyecto, así que solo se ofrecen
+  // los que BC acepta. El bloqueo no es un estado de BC: va por el botón
+  // «Bloquear / Desbloquear» del detalle (también avisa a postventa).
+  function renderEstado() {
+    const actual = String(form.estado ?? '');
+    if (!obra?.esBC) {
+      return <Input label="Estado" placeholder="Open / Blocked…" value={actual} onChange={e => set('estado', e.target.value)} />;
+    }
+    if (actual.toLowerCase() === 'blocked') {
+      return <Input label="Estado" value="Bloqueada" disabled hint="Se desbloquea con el botón «Desbloquear» del detalle" />;
+    }
+    return (
+      <Combobox label="Estado" value={actual} onChange={v => set('estado', v)}
+        options={opcionesDim(ESTADOS_BC, actual)} placeholder="Seleccionar estado…" emptyText="Sin estados" />
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -216,54 +233,38 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
       title={`Editar obra ${obra?.numeroObra ?? ''}`}
       size="lg"
       footer={
-        confirmBC ? (
-          <>
-            <Button variant="outline" onClick={() => setConfirmBC(false)}>Atrás</Button>
-            <Button variant="secondary" loading={saving} onClick={() => guardar(false)}>Solo en el sistema</Button>
-            <Button loading={saving} onClick={() => guardar(true)} icon={<Icon name="arrow-right" size="sm" color="currentColor" />}>
-              Guardar y actualizar en BC
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button loading={saving} onClick={handleGuardar}>Guardar cambios</Button>
-          </>
-        )
+        <>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button loading={saving} onClick={guardar}>Guardar cambios</Button>
+        </>
       }
     >
-      {confirmBC ? (
-        // Paso de confirmación de sincronización con Business Central.
-        <div className="space-y-4">
+      <div className="space-y-6">
+        {obra?.esBC && (
           <div className="flex items-start gap-3 rounded-ds-lg border border-brand/40 bg-brand-soft px-4 py-3">
             <Icon name="boleta" size="sm" color="currentColor" />
             <div className="text-sm">
-              <p className="font-semibold text-ds-ink">Esta obra existe en Business Central.</p>
-              <p className="text-ds-gray-500 mt-0.5">¿Querés que los cambios también se actualicen en BC?</p>
+              <p className="font-semibold text-ds-ink">Esta obra está en Business Central.</p>
+              <p className="text-ds-gray-500 mt-0.5">
+                Al guardar, el nombre, la descripción, el estado, las fechas, el gerente, el encargado y el área
+                prorrateada se actualizan también en BC. Si BC no acepta algún cambio, no se guarda nada y te dice por qué.
+              </p>
             </div>
           </div>
-          <ul className="text-sm text-ds-gray-500 space-y-1.5">
-            <li className="flex items-start gap-2">
-              <Icon name="check" size="sm" color="currentColor" />
-              <span>Se envía a BC el <strong className="text-ds-ink">área prorrateada</strong> (obra y proyecto/Job).</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-ds-gray-300 mt-0.5">·</span>
-              <span>Nombre, descripción y dimensiones se guardan en el sistema. Venta y costos se manejan desde <strong className="text-ds-ink">Presupuesto</strong>.</span>
-            </li>
-          </ul>
-        </div>
-      ) : (
-      <div className="space-y-6">
+        )}
         <Seccion titulo="General">
           <Input label="Número de obra" value={String(form.numeroObra ?? '')} disabled
             hint="Llave del registro (BC + avances) — no editable" />
-          <Input label="Estado" placeholder="Open / Blocked…" value={String(form.estado ?? '')} onChange={e => set('estado', e.target.value)} />
+          {renderEstado()}
           <div className="sm:col-span-2">
-            <Input label="Nombre mostrado" value={String(form.nombreMostrado ?? '')} onChange={e => set('nombreMostrado', e.target.value)} />
+            <Input label="Nombre mostrado" value={String(form.nombreMostrado ?? '')} onChange={e => set('nombreMostrado', e.target.value)}
+              maxLength={obra?.esBC ? 100 : undefined}
+              hint={obra?.esBC ? 'En BC es la descripción de la obra, del proyecto, del CC y del almacén (máx. 100)' : undefined} />
           </div>
           <div className="sm:col-span-2">
-            <Input label="Descripción" value={String(form.descripcion ?? '')} onChange={e => set('descripcion', e.target.value)} />
+            <Input label="Descripción" value={String(form.descripcion ?? '')} onChange={e => set('descripcion', e.target.value)}
+              maxLength={obra?.esBC ? 50 : undefined}
+              hint={obra?.esBC ? 'En BC es la «Descripción 2» de la obra y del proyecto (máx. 50)' : undefined} />
           </div>
         </Seccion>
 
@@ -289,11 +290,23 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
               Define contra qué catálogo de partidas trabaja la obra. Vacío = se deduce del área de costeo.
             </p>
           </div>
+          <div className="sm:col-span-2">
+            <label className="flex items-center gap-2 text-sm text-ds-ink cursor-pointer">
+              <input type="checkbox" checked={!!form.esAlmacenFisico} onChange={e => set('esAlmacenFisico', e.target.checked)} className="w-4 h-4 accent-brand" />
+              Almacén físico (bodega)
+            </label>
+            <p className="text-xs text-ds-gray-400 mt-1.5">
+              Es la misma marca de Business Central → Almacenes: si está marcada, el almacén de esta obra sale en «Bodegas» al
+              hacer un pedido y en la tabla de Obras lleva la etiqueta «Almacén físico».
+              {obra?.claseAlmacen == null && ' Hoy no está marcada a mano: cuenta por su código.'}
+            </p>
+          </div>
           {renderDim('areaCosteo', 'Área de costeo (AC)', dimAC)}
           {renderDim('centroCosto', 'Centro de costo (CC)', dimCC)}
           <Combobox label="Proyecto" value={String(form.idProyecto ?? '')} onChange={v => set('idProyecto', v)}
             placeholder="Seleccionar proyecto" options={proyectoOptions} />
-          <Input label="Gerente de proyecto" value={String(form.gerenteProyecto ?? '')} onChange={e => set('gerenteProyecto', e.target.value)} />
+          <Input label="Gerente de proyecto" value={String(form.gerenteProyecto ?? '')} onChange={e => set('gerenteProyecto', e.target.value)}
+            hint={obra?.esBC ? 'En BC es el «Responsable» del proyecto: código de un recurso' : undefined} />
           <Input label="Encargado" value={String(form.idEncargado ?? '')} onChange={e => set('idEncargado', e.target.value)} />
           <div className="sm:col-span-2">
             <Input label="Ubicación" value={String(form.ubicacion ?? '')} onChange={e => set('ubicacion', e.target.value)} />
@@ -320,7 +333,6 @@ export function ObraEditModal({ open, onClose, obra, proyectos, onSaved }: ObraE
           </div>
         </section>
       </div>
-      )}
     </Modal>
   );
 }

@@ -3,9 +3,11 @@ import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { bindObra, sqlFechaObra } from '@/lib/obras';
-import { bcConfigured, setAreaProrrateadaJob } from '@/lib/bc-client';
-import { bcConstructionConfigured, setAreaProrrateadaWork } from '@/lib/bc-construction';
+import { bcConfigured } from '@/lib/bc-client';
+import { actualizarObraEnBC, cambiosParaBC, type ResultadoSyncObra } from '@/lib/bc/obra-sync';
 import { getTipoObra, tipoObraDeAreaCosteo, TIPO_POR_DEFECTO } from '@/lib/partidas/tipos-obra';
+import { almacenFisicoDe, guardarClaseAlmacen, leerClasesAlmacen } from '@/lib/compras/almacen-clase';
+import { logAudit } from '@/lib/audit';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -29,8 +31,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // Tipo efectivo: manda la columna y, si está vacía, se deduce del área de costeo.
   const o = res.recordset[0] as Record<string, unknown>;
   const explicito = String(o.tipoObra ?? '').trim().toUpperCase();
-  const efectivo = explicito || (await tipoObraDeAreaCosteo(String(o.areaCosteo ?? '')).catch(() => TIPO_POR_DEFECTO));
-  return NextResponse.json({ ...o, tipoObraEfectivo: efectivo, tipoObraOrigen: explicito ? 'obra' : 'area' });
+  const [efectivo, clases] = await Promise.all([
+    explicito || tipoObraDeAreaCosteo(String(o.areaCosteo ?? '')).catch(() => TIPO_POR_DEFECTO),
+    leerClasesAlmacen(),
+  ]);
+  return NextResponse.json({
+    ...o, tipoObraEfectivo: efectivo, tipoObraOrigen: explicito ? 'obra' : 'area',
+    ...almacenFisicoDe(clases, String(o.numeroObra ?? '')),
+  });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -57,6 +65,42 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const db = await getDb();
   try {
+    const previa = await db.request().input('id', sql.BigInt, idObra).query(`
+      SELECT numeroObra, esBC, nombreMostrado, descripcion, estado,
+             ${sqlFechaObra('fechaInicio')} AS fechaInicio, ${sqlFechaObra('fechaFin')} AS fechaFin,
+             gerenteProyecto, idEncargado, areaProrrateadaM2
+      FROM dbo.Obra WHERE idObra = @id
+    `);
+    const actual = previa.recordset[0] as Record<string, unknown> | undefined;
+    if (!actual) {
+      return NextResponse.json({ error: 'Esa obra ya no existe' }, { status: 404 });
+    }
+
+    // Obra que existe en Business Central: lo que se cambió y vive en BC se escribe
+    // ALLÁ PRIMERO (ver lib/bc/obra-sync.ts). Si BC lo rechaza, no se guarda nada
+    // acá y se devuelve el motivo: el sistema y BC no quedan diciendo cosas
+    // distintas. Si no se tocó ningún campo de BC, no se llama a BC.
+    let bc: ResultadoSyncObra | undefined;
+    if (actual.esBC) {
+      const { cambios, error } = cambiosParaBC(actual, body);
+      if (error) return NextResponse.json({ error }, { status: 400 });
+      if (Object.keys(cambios).length > 0) {
+        if (!bcConfigured()) {
+          return NextResponse.json(
+            { error: 'Business Central no está configurado en este entorno: los cambios de una obra de BC no se pueden guardar.' },
+            { status: 503 },
+          );
+        }
+        try {
+          bc = await actualizarObraEnBC(String(actual.numeroObra), cambios);
+        } catch (e) {
+          console.error('/api/obras/[id] PATCH BC error:', e);
+          const motivo = mensajeParaCliente(e).replace(/[.\s]*$/, '');
+          return NextResponse.json({ error: `${motivo}. No se guardó nada.` }, { status: 502 });
+        }
+      }
+    }
+
     // El número de obra es la LLAVE del registro (BC, avances, presupuesto): no se
     // actualiza aquí aunque venga en el body (el campo llega deshabilitado desde el
     // editor). origenPrincipal es un campo de sistema (importación) y tampoco se toca.
@@ -79,40 +123,42 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         WHERE idObra = @id
       `);
 
-    // Si no actualizó NADA, la obra no existe (la borraron desde otra pantalla, o
-    // el id venía mal). Se corta ACÁ, antes de BC: si no, la sincronización de
-    // abajo —que trabaja con `body.numeroObra`, no con la fila— mandaba el área
-    // prorrateada a Business Central mientras la base de acá no cambiaba, y la
-    // pantalla decía "guardada" igual.
+    // La obra existía al leerla arriba; si ahora no actualizó NADA, la borraron en
+    // el medio desde otra pantalla.
     if (!r.rowsAffected[0]) {
       return NextResponse.json({ error: 'Esa obra ya no existe' }, { status: 404 });
     }
 
-    // Sincronización opcional con Business Central (pedida explícitamente desde el
-    // editor). Hoy BC solo acepta actualizar el área prorrateada de la obra/Job; el
-    // resto se guarda en el sistema. No es fatal: si BC falla, la obra ya quedó guardada.
-    let bcSync: boolean | undefined;
-    let bcError: string | undefined;
-    if (body.actualizarBC) {
-      const worksNo = String(body.numeroObra).trim();
-      const area = body.areaProrrateadaM2 != null && body.areaProrrateadaM2 !== ''
-        ? Number(body.areaProrrateadaM2) : null;
+    // "Almacén físico (bodega)": es la marca única de almacenes (Business Central →
+    // Almacenes). Solo se escribe si la casilla CAMBIÓ respecto de cómo cuenta hoy;
+    // guardar otros campos no convierte una obra "sin marcar" en marcada. Al cambiar
+    // queda explícita (real o virtual), porque "sin marca" puede seguir diciendo
+    // bodega por el código (F-*, GEN-*…) y la casilla no se dejaría desmarcar.
+    if (typeof body.esAlmacenFisico === 'boolean') {
+      const codigo = String(actual.numeroObra);
       try {
-        if (area != null && !Number.isNaN(area) && area > 0) {
-          if (bcConstructionConfigured()) await setAreaProrrateadaWork(worksNo, area);
-          if (bcConfigured()) await setAreaProrrateadaJob(worksNo, area);
-          bcSync = true;
-        } else {
-          bcSync = false;
-          bcError = 'Sin área prorrateada para enviar a BC';
+        const hoy = almacenFisicoDe(await leerClasesAlmacen(), codigo);
+        if (hoy.esAlmacenFisico !== body.esAlmacenFisico) {
+          const clase = body.esAlmacenFisico ? 'real' : 'virtual';
+          await guardarClaseAlmacen(codigo, clase, session.username || session.nombre || String(session.idCol));
+          await logAudit({
+            idColAccion: session.idCol,
+            accion: 'MARCAR_ALMACEN',
+            entidad: 'AlmacenClase',
+            detallePrevio: { codigo, clase: hoy.claseAlmacen },
+            detalleNuevo: { codigo, clase, desde: 'editor de obra' },
+            ip: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? '',
+          });
         }
       } catch (e) {
-        bcSync = false;
-        bcError = mensajeParaCliente(e);
-        console.error('/api/obras/[id] PATCH BC sync error:', e);
+        // Lo demás ya quedó guardado: se dice exactamente qué faltó.
+        console.error('/api/obras/[id] PATCH marca de almacén:', e);
+        return NextResponse.json({
+          error: `La obra se guardó, pero no la marca de almacén físico: ${mensajeParaCliente(e)}`,
+        }, { status: 500 });
       }
     }
-    return NextResponse.json({ ok: true, bcSync, bcError });
+    return NextResponse.json({ ok: true, bc });
   } catch (err: unknown) {
     const msg = mensajeParaCliente(err);
     console.error('/api/obras/[id] PATCH error:', err);
