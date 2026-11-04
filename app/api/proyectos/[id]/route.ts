@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { mensajeParaCliente } from '@/lib/errores';
 import { getDb, sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { bcObrasBloqueadas } from '@/lib/compras/bc';
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -22,7 +23,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   // Las tres consultas son independientes: van JUNTAS, un viaje a Azure SQL en vez
   // de tres. El 404 se decide después; un proyecto que no existe es el caso raro.
   const q = (sqlText: string) => db.request().input('id', sql.Int, idProyecto).query(sqlText);
-  const [proyRes, asigRes, obrasRes] = await Promise.all([
+  const [proyRes, asigRes, obrasRes, bloqueadasBC] = await Promise.all([
     q(`
       SELECT p.idProyecto AS IDProyecto, p.abreviatura AS CodigoBC,
              p.nombre AS Nombre, p.categoria AS Estado,
@@ -53,16 +54,34 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       WHERE o.idProyecto = @id
       ORDER BY o.numeroObra
     `),
+    // Obras BLOQUEADAS en Business Central (Job.Blocked, de la página FichaProyecto;
+    // cacheado 5 min, lo mismo que usa el Nuevo pedido para no ofrecerlas). Hace
+    // falta porque `estado` solo dice 'Blocked' si se bloqueó desde la app: una
+    // casa entregada que se bloqueó directo en BC seguía saliendo "Abierta" (la
+    // API de obras trae el Status, no el bloqueo). null = no se pudo leer BC.
+    // Tope de 4 s (en frío tarda ~1 s): si BC se cuelga, el proyecto carga igual con
+    // lo de la app, y la lectura sigue y deja el caché listo para la próxima.
+    Promise.race([
+      bcObrasBloqueadas().catch(() => null),
+      new Promise<null>((r) => setTimeout(() => r(null), 4000)),
+    ]),
   ]);
 
   if (!proyRes.recordset.length) {
     return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
   }
 
+  // BC manda para bloquear: si allá está bloqueada, acá sale "Bloqueada". No se
+  // desbloquea nada por esto (si BC no responde, queda lo que diga la app).
+  const bloqueadas = new Set([...(bloqueadasBC ?? [])].map((c) => c.trim().toUpperCase()));
+  const obras = (obrasRes.recordset as { NumeroObra: string | null; Estado: string | null }[]).map((o) =>
+    bloqueadas.has(String(o.NumeroObra ?? '').trim().toUpperCase()) ? { ...o, Estado: 'Blocked' } : o,
+  );
+
   return NextResponse.json({
     ...proyRes.recordset[0],
     asignaciones: asigRes.recordset,
-    obras: obrasRes.recordset,
+    obras,
   });
 }
 
