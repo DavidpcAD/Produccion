@@ -15,6 +15,7 @@ import { Stagger, StaggerItem, listStagger, listItem } from '@/components/ui/Mot
 import { motion } from 'motion/react';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { coincideBusqueda } from '@/lib/utilidades/buscar';
+import { CostoCuadrillas } from './CostoCuadrillas';
 
 interface ObraLite { idObra: number; numeroObra: string; nombreMostrado: string | null; idProyecto: number | null; tipoObra: string; }
 interface SubLite { idSubPartida: number; codigo: string; nombre: string; idPartida: number; partidaCodigo: string | null; partidaNombre: string | null; idProyecto?: number | null; }
@@ -333,7 +334,7 @@ export default function CuadrillasPage() {
   const [ocupadasByProy, setOcupadasByProy] = useState<Record<number, Map<number, string>>>({});
   const [q, setQ] = useState('');
   // Dos vistas: la grilla de cuadrillas y los encargados por subpartida.
-  const [vista, setVista] = useState<'cuadrillas' | 'encargados'>('cuadrillas');
+  const [vista, setVista] = useState<'cuadrillas' | 'encargados' | 'costos'>('cuadrillas');
   const [directos, setDirectos] = useState<EncargadoDirecto[]>([]);        // encargado por subpartida
   const [tablaFaltante, setTablaFaltante] = useState(false);
   const [expandedPart, setExpandedPart] = useState<Set<number>>(new Set());
@@ -715,7 +716,7 @@ export default function CuadrillasPage() {
     <PageShell>
       <PageHeader
         title="Cuadrillas"
-        subtitle={loading ? 'Cargando…' : vista === 'cuadrillas' ? `${cuadrillas.length} cuadrillas activas` : `${partidasConEnc} de ${partidas.length} partida(s) con encargados`}
+        subtitle={vista === 'costos' ? 'Cuánto costó cada cuadrilla por semana de planilla, por partida y obra' : loading ? 'Cargando…' : vista === 'cuadrillas' ? `${cuadrillas.length} cuadrillas activas` : `${partidasConEnc} de ${partidas.length} partida(s) con encargados`}
         actions={isAdmin && vista === 'cuadrillas' && (
           <Button onClick={openCreate} icon={<Icon name="plus" size="sm" color="currentColor" />}>
             Nueva cuadrilla
@@ -724,25 +725,28 @@ export default function CuadrillasPage() {
       />
 
       {/* Toggle: Cuadrillas | Encargados por partida */}
-      <div className="inline-flex gap-1 p-1 bg-ds-gray-100 rounded-full">
+      <div className="inline-flex max-w-full overflow-x-auto gap-1 p-1 bg-ds-gray-100 rounded-full">
         {([
           { val: 'cuadrillas', label: 'Cuadrillas', icon: 'cuadrillas' },
           { val: 'encargados', label: 'Encargados por partida', icon: 'user' },
+          { val: 'costos', label: 'Costo por semana', icon: 'calculator' },
         ] as const).map(opt => (
           <button key={opt.val} onClick={() => setVista(opt.val)}
-            className={`inline-flex items-center gap-2 px-5 h-11 rounded-full text-sm font-semibold transition-all ${vista === opt.val ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-ds-ink'}`}>
+            className={`inline-flex shrink-0 whitespace-nowrap items-center gap-2 px-5 h-11 rounded-full text-sm font-semibold transition-all ${vista === opt.val ? 'bg-black text-white shadow-ds-02' : 'text-ds-gray-400 hover:text-ds-ink'}`}>
             <Icon name={opt.icon} size="sm" color="currentColor" />
             {opt.label}
           </button>
         ))}
       </div>
 
+      {vista === 'costos' ? <CostoCuadrillas /> : (
       <Input
         value={q}
         onChange={e => setQ(e.target.value)}
         placeholder={vista === 'cuadrillas' ? 'Buscar por nombre, encargado, obra o subpartida…' : 'Buscar por partida, subpartida o encargado…'}
         leftIcon={<Icon name="search" size="sm" color="currentColor" className="text-ds-gray-400" />}
       />
+      )}
 
       {/* ── Vista: Encargados por partida ── */}
       {vista === 'encargados' && (
