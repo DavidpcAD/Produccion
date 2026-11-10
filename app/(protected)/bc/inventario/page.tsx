@@ -1,6 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { PageShell, PageHeader } from '@/components/layout/Page';
+import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Table } from '@/components/ui/Table';
 import { Modal } from '@/components/ui/Modal';
@@ -172,6 +174,7 @@ export default function InventarioBcPage() {
       <PageHeader
         title="Inventario de materiales (BC)"
         subtitle="Catálogo de artículos de Business Central: material, unidad, existencia y costo unitario. Abrí una fila para ver las existencias por almacén."
+        actions={<Link href="/bc/productos/nuevo"><Button variant="primary">Crear producto</Button></Link>}
       />
 
       <div className="flex flex-wrap items-end justify-between gap-4">

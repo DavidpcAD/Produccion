@@ -7,6 +7,7 @@
 
 import { odataStr } from "@/lib/odata";
 import { fetchConReloj, MS_LIMITE_BC } from "../bc-timeout";
+import { TIPO_BC, type NuevoProducto, type OpcionesProducto } from "@/lib/bc/productos";
 
 type TokenCache = { token: string; exp: number };
 let tokenCache: TokenCache | null = null;
@@ -194,15 +195,37 @@ let itemsCache: { items: BcItem[]; exp: number } | null = null;
 let itemsEnVuelo: Promise<BcItem[]> | null = null;
 
 export async function bcItems(): Promise<BcItem[]> {
-  if (itemsCache && itemsCache.exp > Date.now()) return itemsCache.items;
-  if (itemsEnVuelo) return itemsEnVuelo;
+  if (itemsCache && itemsCache.exp > Date.now()) return conRecientes(itemsCache.items);
+  if (itemsEnVuelo) return itemsEnVuelo.then(conRecientes);
   itemsEnVuelo = construirItems()
     .then((items) => {
       if (items.length) itemsCache = { items, exp: Date.now() + ITEMS_TTL_MS };
       return items;
     })
     .finally(() => { itemsEnVuelo = null; });
-  return itemsEnVuelo;
+  return itemsEnVuelo.then(conRecientes);
+}
+
+// ─── Los recién creados desde la app ──────────────────────────────────────────
+// El catálogo de arriba se arma con lecturas cacheadas 5 min (más los 5 min del
+// resultado memorizado), así que un producto que el presupuestista acaba de crear
+// en /bc/productos/nuevo tardaría hasta 10 min en aparecer en los buscadores — y
+// en la lista de parecidos de la misma pantalla, que es la que evita duplicarlo.
+// Se agregan acá por 15 min, hasta que las lecturas de BC ya lo traen solas.
+const RECIENTES_TTL_MS = 15 * 60_000;
+const itemsRecientes = new Map<string, { item: BcItem; exp: number }>();
+
+export function bcRegistrarItemNuevo(item: BcItem): void {
+  itemsRecientes.set(item.code, { item, exp: Date.now() + RECIENTES_TTL_MS });
+}
+
+function conRecientes(items: BcItem[]): BcItem[] {
+  if (!itemsRecientes.size) return items;
+  const ahora = Date.now();
+  for (const [code, r] of itemsRecientes) if (r.exp <= ahora) itemsRecientes.delete(code);
+  const ya = new Set(items.map((i) => i.code));
+  const faltan = [...itemsRecientes.values()].map((r) => r.item).filter((i) => !ya.has(i.code));
+  return faltan.length ? [...items, ...faltan] : items;
 }
 
 async function construirItems(): Promise<BcItem[]> {
@@ -365,6 +388,125 @@ export async function bcItemFichas(codes: string[]): Promise<Map<string, { tipo:
     }
   } catch { /* sin tipo: se trata como inventario, y sin base no se manda unidad */ }
   return out;
+}
+
+// ─── Crear productos (Item) ──────────────────────────────────────────────────
+// Lo usa /api/bc/productos (pantalla /bc/productos/nuevo del presupuestista).
+// Reglas de numeración, defaults y validación: lib/bc/productos.ts.
+
+// Las listas para el formulario (unidades, grupos contables, categorías). Son
+// datos maestros que casi no cambian: se memorizan 10 min.
+const OPCIONES_TTL_MS = 10 * 60_000;
+let opcionesProductoCache: { at: number; v: OpcionesProducto } | null = null;
+
+export async function bcOpcionesProducto(): Promise<OpcionesProducto> {
+  if (opcionesProductoCache && Date.now() - opcionesProductoCache.at < OPCIONES_TTL_MS) return opcionesProductoCache.v;
+  const cid = await getStdCompanyId();
+  const leer = async (url: string): Promise<any[]> => {
+    const out: any[] = [];
+    let next: string | null = url;
+    let guard = 0;
+    while (next && guard++ < 20) {
+      const res = await bcFetch(next, { cache: "no-store" });
+      if (!res.ok) throw new Error(`BC ${res.status}: ${mensajeBcLegible((await res.text()).slice(0, 400))}`);
+      const data: any = await res.json();
+      out.push(...(data.value ?? []));
+      next = data["@odata.nextLink"] ?? null;
+    }
+    return out;
+  };
+  const base = `${stdRoot()}/companies(${cid})`;
+  // La API v2.0 no trae la categoría PADRE (itemCategories no tiene parentCategory),
+  // y sin el padre no se sabe la familia del código (01.METALES → M01). La página
+  // publicada de la ficha de categoría sí lo trae.
+  const [unidades, gruposProducto, gruposInventario, categorias] = await Promise.all([
+    leer(`${base}/unitsOfMeasure?$select=code,displayName`),
+    leer(`${base}/generalProductPostingGroups?$select=code,description,defaultVATProductPostingGroup`),
+    leer(`${base}/inventoryPostingGroups?$select=code,description`),
+    leer(`${odataRoot()}/${encodeURIComponent("Ficha_de_categoría_de_artículo_Excel")}?company=${encodeURIComponent(cid)}&$select=Code,Description,Parent_Category`),
+  ]);
+  const v: OpcionesProducto = {
+    unidades: unidades.map((u) => ({ code: String(u.code ?? ""), nombre: String(u.displayName ?? "") })).filter((u) => u.code),
+    gruposProducto: gruposProducto.map((g) => ({ code: String(g.code ?? ""), nombre: String(g.description ?? ""), iva: String(g.defaultVATProductPostingGroup ?? "") })).filter((g) => g.code),
+    gruposInventario: gruposInventario.map((g) => ({ code: String(g.code ?? ""), nombre: String(g.description ?? "").trim() })).filter((g) => g.code),
+    categorias: categorias.map((c) => ({ code: String(c.Code ?? ""), nombre: String(c.Description ?? ""), padre: String(c.Parent_Category ?? "") })).filter((c) => c.code),
+  };
+  opcionesProductoCache = { at: Date.now(), v };
+  return v;
+}
+
+// TODOS los códigos de artículo de BC, bloqueados incluidos (un bloqueado también
+// ocupa su número). Para sugerir el siguiente código libre. Sin caché: dos
+// presupuestistas pueden estar creando productos de la misma familia a la vez.
+export async function bcNumerosProductos(): Promise<string[]> {
+  const cid = await getStdCompanyId();
+  const out: string[] = [];
+  let url: string | null = `${stdRoot()}/companies(${cid})/items?$select=number`;
+  let guard = 0;
+  while (url && guard++ < 30) {
+    const res = await bcFetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`BC ${res.status}: ${mensajeBcLegible((await res.text()).slice(0, 400))}`);
+    const data: any = await res.json();
+    for (const it of (data.value ?? [])) if (it.number) out.push(String(it.number));
+    url = data["@odata.nextLink"] ?? null;
+  }
+  for (const code of itemsRecientes.keys()) if (!out.includes(code)) out.push(code);
+  return out;
+}
+
+/** ¿Ya existe un artículo con ese número en BC? (lectura en vivo, sin caché) */
+export async function bcProductoExiste(numero: string): Promise<boolean> {
+  const cid = await getStdCompanyId();
+  const filtro = encodeURIComponent(`number eq '${odataStr(numero)}'`);
+  const res = await bcFetch(`${stdRoot()}/companies(${cid})/items?$select=number&$filter=${filtro}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`BC ${res.status}: ${mensajeBcLegible((await res.text()).slice(0, 400))}`);
+  const data = (await res.json()) as { value?: unknown[] };
+  return (data.value ?? []).length > 0;
+}
+
+/**
+ * Crea el producto en BC por la API estándar v2.0 (POST items).
+ * Probado contra el Sandbox (10/11/2026): con el grupo contable de producto BC pone
+ * SOLO el grupo de IVA (el "Def. VAT Prod. Posting Group" del grupo, todos con
+ * "Inserta genér. aut."), la descripción de búsqueda y las unidades de compra y de
+ * venta. Un número que ya existe lo rechaza ("The record in table Item already
+ * exists"), no lo pisa — igual se pregunta antes para dar un mensaje claro.
+ */
+export async function bcCrearProducto(p: NuevoProducto): Promise<BcItem> {
+  const cid = await getStdCompanyId();
+  const body: Record<string, unknown> = {
+    number: p.numero,
+    displayName: p.descripcion,
+    type: TIPO_BC[p.tipo],
+    itemCategoryCode: p.categoria,
+    baseUnitOfMeasureCode: p.unidad,
+    generalProductPostingGroupCode: p.grupoProducto,
+  };
+  // BC solo lo pide (y solo lo usa) en los de inventario.
+  if (p.tipo === "inventario" && p.grupoInventario) body.inventoryPostingGroupCode = p.grupoInventario;
+  if (p.precio != null && p.precio > 0) body.unitPrice = p.precio;
+  const res = await bcFetch(`${stdRoot()}/companies(${cid})/items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  const txt = await res.text();
+  if (!res.ok) {
+    if (/already exists|EntityWithSameKeyExists/i.test(txt)) throw new Error(`Ya existe un producto con el Nº ${p.numero} en Business Central.`);
+    throw new Error(`Business Central no creó el producto: ${mensajeBcLegible(txt.slice(0, 600))}`);
+  }
+  const it = JSON.parse(txt) as { id?: string; number?: string; displayName?: string; baseUnitOfMeasureCode?: string; type?: string; itemCategoryCode?: string; unitCost?: number };
+  const item: BcItem = {
+    id: it.id ?? p.numero,
+    code: it.number ?? p.numero,
+    descripcion: it.displayName ?? p.descripcion,
+    unidad: it.baseUnitOfMeasureCode ?? p.unidad,
+    tipo: tipoDeBc(it.type ?? TIPO_BC[p.tipo]),
+    categoria: it.itemCategoryCode ?? p.categoria,
+  };
+  bcRegistrarItemNuevo(item);
+  return item;
 }
 
 // Último costo directo de UN item (precio de su última compra), API estándar v2.0.
