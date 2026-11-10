@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { mensajeParaCliente } from '@/lib/errores';
-import { bcCrearProducto, bcNumerosProductos, bcOpcionesProducto, bcProductoExiste } from '@/lib/compras/bc';
+import { jsonComprimido } from '@/lib/http/json-comprimido';
+import { bcCatalogoProductos, bcCrearProducto, bcNumerosProductos, bcOpcionesProducto, bcProductoExiste } from '@/lib/compras/bc';
 import {
   normalizarNumero, siguientesNumeros, validarNuevoProducto,
   type NuevoProducto, type TipoProducto,
@@ -11,10 +12,13 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Business Central → Crear producto (pantalla /bc/productos/nuevo).
+// Business Central → Productos (pantalla /bc/productos/nuevo).
 //   GET  → listas del formulario (unidades, grupos contables, categorías con su
-//          padre) + el siguiente código libre de cada familia (M01 → M01-0265).
+//          padre) + TODO el catálogo leído en vivo de BC, bloqueados incluidos
+//          (para los parecidos, para sacar el siguiente Nº de cada familia y para
+//          que un cambio hecho en BC se vea al abrir la pantalla).
 //   POST → crea el artículo en BC.
+// Editar / bloquear uno que ya existe: /api/bc/productos/[code].
 // Va bajo /api/bc para que sea del módulo Presupuesto (getRouteModule: /bc →
 // presupuesto), igual que /api/bc/inventario; el proxy ya filtra por módulo y acá
 // se pide además sesión de nivel 2, como el resto de /api/bc.
@@ -24,11 +28,11 @@ async function autorizado() {
   return session && session.nivelAdmin >= 2 ? session : null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!(await autorizado())) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   try {
-    const [opciones, numeros] = await Promise.all([bcOpcionesProducto(), bcNumerosProductos()]);
-    return NextResponse.json({ ...opciones, siguientes: siguientesNumeros(numeros) }, { headers: { 'Cache-Control': 'no-store' } });
+    const [opciones, items] = await Promise.all([bcOpcionesProducto(), bcCatalogoProductos()]);
+    return jsonComprimido(req, { ...opciones, items, leidoEn: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     console.error('/api/bc/productos GET error:', e);
     return NextResponse.json({ error: mensajeParaCliente(e) }, { status: 500 });

@@ -66,6 +66,32 @@ export interface NuevoProducto {
   precio?: number;
 }
 
+/** Un artículo tal como está AHORA en BC (lectura en vivo, bloqueados incluidos). */
+export interface ProductoBc {
+  code: string;
+  descripcion: string;
+  tipo: TipoProducto;
+  categoria: string;
+  unidad: string;
+  grupoProducto: string;
+  grupoInventario: string;
+  precio: number;
+  bloqueado: boolean;
+  /** Última modificación en BC (ISO). */
+  modificado: string;
+}
+
+/** La ficha de UN artículo: lo de arriba + lo que hace falta para editarlo. */
+export interface FichaProductoBc extends ProductoBc {
+  /** Versión del registro en BC: si cambió entre que se abrió y se guardó, BC rechaza el guardado. */
+  etag: string;
+  /** Existencia total en la unidad base. */
+  existencia: number;
+}
+
+/** Lo que se puede cambiar de un artículo que ya existe (el Nº no). */
+export type CambiosProducto = Partial<Pick<NuevoProducto, 'descripcion' | 'tipo' | 'categoria' | 'unidad' | 'grupoProducto' | 'grupoInventario' | 'precio'>> & { bloqueado?: boolean };
+
 /** Normaliza un código de BC: mayúsculas y sin espacios en los bordes. */
 export const normalizarNumero = (s: string) => String(s ?? '').trim().toUpperCase();
 

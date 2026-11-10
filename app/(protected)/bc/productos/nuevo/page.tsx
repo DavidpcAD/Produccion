@@ -3,33 +3,42 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Button } from '@/components/ui/Button';
-import { Combobox, type ComboOption } from '@/components/ui/Combobox';
+import { Combobox } from '@/components/ui/Combobox';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/Confirm';
 import { OptionLabel } from '@/components/ds/Form/Form';
 import { Icon } from '@/components/ds/Icon/Icon';
 import { indiceParecidos, type Parecido } from '@/lib/utilidades/parecidos';
+import { BadgeBloqueado, BadgeTipo, TIPO_LABEL, combosProducto } from '@/components/bc/productos-ui';
+import { FichaProducto } from '@/components/bc/ficha-producto';
 import {
   GRUPO_INVENTARIO_DEFECTO, GRUPO_PRODUCTO_POR_TIPO, MAX_DESCRIPCION, MAX_NUMERO, TIPOS_PRODUCTO,
-  normalizarNumero, prefijoDe, primerNumero, raizDeCategoria, validarNuevoProducto,
-  type CategoriaBc, type OpcionesProducto, type TipoProducto,
+  normalizarNumero, prefijoDe, primerNumero, raizDeCategoria, siguientesNumeros, validarNuevoProducto,
+  type FichaProductoBc, type OpcionesProducto, type ProductoBc, type TipoProducto,
 } from '@/lib/bc/productos';
 
-// Business Central → Crear producto. El presupuestista da de alta un artículo en
-// BC sin entrar a BC: Nº, descripción, tipo, categoría, unidad base, grupos
-// contables y precio de venta. Mientras escribe la descripción se le muestran
-// los productos PARECIDOS que ya existen, para no duplicar el catálogo.
+// Business Central → Productos. El presupuestista da de alta un artículo en BC sin
+// entrar a BC: Nº, descripción, tipo, categoría, unidad base, grupos contables y
+// precio de venta. Mientras escribe la descripción se le muestran los productos
+// PARECIDOS que ya existen, para no duplicar el catálogo; tocando uno se abre su
+// ficha, leída en vivo de BC, para cambiarlo o bloquearlo (components/bc/ficha-producto).
+// El catálogo de esta pantalla se lee de BC cada vez que se abre (bloqueados
+// incluidos), así que lo que se cambie en BC se ve acá sin esperar cachés.
 
-interface Item { code: string; descripcion: string; unidad: string; tipo: TipoProducto; categoria?: string }
-type Opciones = OpcionesProducto & { siguientes: Record<string, string> };
+type Item = ProductoBc;
 
-const TIPO_LABEL: Record<TipoProducto, string> = { inventario: 'Inventario', servicio: 'Servicio', 'no-inventario': 'Fuera de inventario' };
-const TIPO_BADGE: Record<TipoProducto, string> = {
-  inventario: 'bg-ds-green-soft text-ds-green-ink',
-  servicio: 'bg-ds-yellow-soft text-ds-yellow-ink',
-  'no-inventario': 'bg-ds-gray-100 text-ds-gray-500',
-};
+/** Lo que devuelve la API v2.0 al crear, completado con lo que se mandó. */
+const productoDeCreado = (i: { code: string; descripcion: string; unidad: string; tipo: TipoProducto; categoria?: string }, extra: Partial<ProductoBc>): ProductoBc => ({
+  code: i.code, descripcion: i.descripcion, unidad: i.unidad, tipo: i.tipo, categoria: i.categoria ?? '',
+  grupoProducto: extra.grupoProducto ?? '', grupoInventario: extra.grupoInventario ?? '', precio: extra.precio ?? 0,
+  bloqueado: false, modificado: new Date().toISOString(),
+});
+
+const deFicha = (f: FichaProductoBc): ProductoBc => ({
+  code: f.code, descripcion: f.descripcion, tipo: f.tipo, categoria: f.categoria, unidad: f.unidad,
+  grupoProducto: f.grupoProducto, grupoInventario: f.grupoInventario, precio: f.precio, bloqueado: f.bloqueado, modificado: f.modificado,
+});
 
 /** A partir de este puntaje el parecido se trata como "probablemente es el mismo". */
 const CASI_IGUAL = 0.95;
@@ -47,14 +56,6 @@ function StepHeader({ n, title, hint }: { n: number; title: string; hint?: strin
   );
 }
 
-function BadgeTipo({ tipo }: { tipo: TipoProducto }) {
-  return (
-    <span className={`inline-flex items-center rounded-ds px-2 py-0.5 text-label font-medium whitespace-nowrap ${TIPO_BADGE[tipo]}`}>
-      {TIPO_LABEL[tipo]}
-    </span>
-  );
-}
-
 const cardCls = 'bg-ds-surface rounded-ds-lg border border-ds-gray-200 shadow-ds-01 p-5 space-y-4';
 
 /** Lo más repetido de una lista (para sugerir categoría y unidad desde los parecidos). */
@@ -66,7 +67,7 @@ function masComun(valores: (string | undefined)[]): string | null {
   return mejor;
 }
 
-function ListaParecidos({ parecidos, total, buscando }: { parecidos: Parecido<Item>[]; total: number; buscando: boolean }) {
+function ListaParecidos({ parecidos, total, buscando, onAbrir }: { parecidos: Parecido<Item>[]; total: number; buscando: boolean; onAbrir: (code: string) => void }) {
   const [verTodos, setVerTodos] = useState(false);
   const visibles = verTodos ? parecidos : parecidos.slice(0, PARECIDOS_VISIBLES);
   if (buscando) return <p className="text-body-sm text-ds-gray-400">Cargando el catálogo de Business Central…</p>;
@@ -84,14 +85,22 @@ function ListaParecidos({ parecidos, total, buscando }: { parecidos: Parecido<It
         <h3 className="text-label uppercase tracking-wide text-ds-gray-500">
           Parecidos que ya existen en BC ({total.toLocaleString('es-CR')})
         </h3>
+        <span className="text-xs text-ds-gray-400">Tocá uno para verlo, cambiarlo o bloquearlo</span>
       </div>
       <ul className="divide-y divide-ds-gray-100 overflow-hidden rounded-ds-lg border border-ds-gray-200">
         {visibles.map(({ item, puntaje }) => (
-          <li key={item.code} className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-body-sm ${puntaje >= CASI_IGUAL ? 'bg-ds-yellow-soft' : ''}`}>
-            <span className="font-mono font-semibold text-ds-ink whitespace-nowrap">{item.code}</span>
-            <span className="min-w-0 flex-1 break-words text-ds-ink">{item.descripcion}</span>
-            <span className="text-label text-ds-gray-400 whitespace-nowrap">{item.categoria || 'sin categoría'} · {item.unidad || '—'}</span>
-            <BadgeTipo tipo={item.tipo} />
+          <li key={item.code}>
+            <button
+              type="button"
+              onClick={() => onAbrir(item.code)}
+              className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left text-body-sm transition-colors hover:bg-ds-gray-100 ${puntaje >= CASI_IGUAL ? 'bg-ds-yellow-soft' : ''}`}
+            >
+              <span className={`font-mono font-semibold whitespace-nowrap ${item.bloqueado ? 'text-ds-gray-400 line-through' : 'text-ds-ink'}`}>{item.code}</span>
+              <span className={`min-w-0 flex-1 break-words ${item.bloqueado ? 'text-ds-gray-400' : 'text-ds-ink'}`}>{item.descripcion}</span>
+              <span className="text-label text-ds-gray-400 whitespace-nowrap">{item.categoria || 'sin categoría'} · {item.unidad || '—'}</span>
+              <BadgeTipo tipo={item.tipo} />
+              {item.bloqueado && <BadgeBloqueado />}
+            </button>
           </li>
         ))}
       </ul>
@@ -108,10 +117,12 @@ export default function NuevoProductoPage() {
   const { toast } = useToast();
   const confirmar = useConfirm();
 
-  const [opciones, setOpciones] = useState<Opciones | null>(null);
+  const [opciones, setOpciones] = useState<OpcionesProducto | null>(null);
   const [errorOpciones, setErrorOpciones] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [cargandoItems, setCargandoItems] = useState(true);
+  const [leidoEn, setLeidoEn] = useState('');
+  const [fichaCode, setFichaCode] = useState<string | null>(null);
 
   const [descripcion, setDescripcion] = useState('');
   const [tipo, setTipo] = useState<TipoProducto>('inventario');
@@ -126,7 +137,8 @@ export default function NuevoProductoPage() {
   const [intentoEnviar, setIntentoEnviar] = useState(false);
   const [creado, setCreado] = useState<Item | null>(null);
 
-  // Las listas del formulario. `recargas` sube con "Reintentar" y vuelve a pedirlas.
+  // Listas del formulario + TODO el catálogo, leído de BC en este momento (bloqueados
+  // incluidos). `recargas` sube con "Volver a leer de BC" / "Reintentar".
   const [recargas, setRecargas] = useState(0);
   useEffect(() => {
     let vivo = true;
@@ -134,27 +146,23 @@ export default function NuevoProductoPage() {
       .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
       .then(({ ok, d }) => {
         if (!vivo) return;
-        if (!ok) throw new Error(d?.error || 'No se pudieron cargar las listas de Business Central');
-        setOpciones(d as Opciones);
+        if (!ok) throw new Error(d?.error || 'No se pudo leer el catálogo de Business Central');
+        const { items: lista, leidoEn: cuando, ...resto } = d as OpcionesProducto & { items: Item[]; leidoEn: string };
+        setOpciones(resto);
+        setItems(Array.isArray(lista) ? lista : []);
+        setLeidoEn(cuando ?? '');
         setErrorOpciones(null);
       })
-      .catch((e) => { if (vivo) setErrorOpciones(e instanceof Error ? e.message : 'Error al cargar'); });
+      .catch((e) => { if (vivo) setErrorOpciones(e instanceof Error ? e.message : 'Error al cargar'); })
+      .finally(() => { if (vivo) setCargandoItems(false); });
     return () => { vivo = false; };
   }, [recargas]);
 
-  useEffect(() => {
-    let vivo = true;
-    fetch('/api/bc/inventario', { credentials: 'include' })
-      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
-      .then(({ ok, d }) => {
-        if (!vivo) return;
-        if (!ok) throw new Error(d?.error || 'No se pudo cargar el catálogo');
-        setItems(Array.isArray(d.items) ? d.items : []);
-      })
-      .catch((e) => { if (vivo) toast(e instanceof Error ? e.message : 'No se pudo cargar el catálogo', 'error'); })
-      .finally(() => { if (vivo) setCargandoItems(false); });
-    return () => { vivo = false; };
-  }, [toast]);
+  // Lo que se cambió o bloqueó en la ficha se refleja en la lista sin volver a leer todo.
+  const alCambiarEnFicha = (f: FichaProductoBc) => {
+    setItems((prev) => prev.map((i) => (i.code === f.code ? deFicha(f) : i)));
+    setCreado((c) => (c && c.code === f.code ? deFicha(f) : c));
+  };
 
   // ─── Parecidos ───────────────────────────────────────────────────────────
   const buscarParecidos = useMemo(() => indiceParecidos(items, (i) => i.descripcion, (i) => i.code), [items]);
@@ -178,7 +186,10 @@ export default function NuevoProductoPage() {
   // ─── Número sugerido ─────────────────────────────────────────────────────
   const categorias = useMemo(() => opciones?.categorias ?? [], [opciones]);
   const prefijo = categoria ? prefijoDe(tipo, categoria, categorias) : null;
-  const numeroSugerido = prefijo ? (opciones?.siguientes[prefijo] ?? primerNumero(prefijo)) : '';
+  // El siguiente libre de cada familia, sacado del catálogo recién leído de BC
+  // (bloqueados incluidos: también ocupan su número).
+  const siguientes = useMemo(() => siguientesNumeros(items.map((i) => i.code)), [items]);
+  const numeroSugerido = prefijo ? (siguientes[prefijo] ?? primerNumero(prefijo)) : '';
   const raiz = categoria ? raizDeCategoria(categoria, categorias) : '';
 
   // Mientras no lo toquen, el Nº es el sugerido (y sigue a la categoría y al tipo).
@@ -195,46 +206,11 @@ export default function NuevoProductoPage() {
   };
 
   // ─── Opciones de los combos ──────────────────────────────────────────────
-  const opcionesCategoria = useMemo<ComboOption[]>(() => {
-    const raices = categorias.filter((c) => !c.padre).sort((a, b) => a.code.localeCompare(b.code, 'es', { numeric: true }));
-    const hijos = (code: string) => categorias.filter((c) => c.padre === code).sort((a, b) => a.code.localeCompare(b.code, 'es'));
-    const out: ComboOption[] = [];
-    const opcion = (c: CategoriaBc, padre: string): ComboOption => ({
-      value: c.code,
-      label: c.code,
-      parts: [
-        { text: c.code, weight: 'bold' },
-        ...(c.nombre && c.nombre !== c.code ? [{ text: c.nombre, weight: 'normal' as const }] : []),
-        { text: padre || 'categoría general', weight: 'light' },
-      ],
-      search: `${c.code} ${c.nombre} ${padre}`,
-    });
-    for (const r of raices) {
-      for (const h of hijos(r.code)) out.push(opcion(h, r.code));
-      out.push(opcion(r, ''));
-    }
-    // Por si alguna categoría cuelga de un padre que no vino en la lista.
-    for (const c of categorias) if (c.padre && !categorias.some((r) => r.code === c.padre)) out.push(opcion(c, c.padre));
-    return out;
-  }, [categorias]);
-
-  const opcionesUnidad = useMemo<ComboOption[]>(() => (opciones?.unidades ?? []).map((u) => ({
-    value: u.code, label: u.code,
-    parts: [{ text: u.code, weight: 'bold' }, ...(u.nombre && u.nombre !== u.code ? [{ text: u.nombre, weight: 'light' as const }] : [])],
-    search: `${u.code} ${u.nombre}`,
-  })), [opciones]);
-
-  const opcionesGrupoProducto = useMemo<ComboOption[]>(() => (opciones?.gruposProducto ?? []).map((g) => ({
-    value: g.code, label: g.code,
-    parts: [{ text: g.code, weight: 'bold' }, ...(g.nombre && g.nombre !== g.code ? [{ text: g.nombre, weight: 'normal' as const }] : []), ...(g.iva ? [{ text: g.iva, weight: 'light' as const }] : [])],
-    search: `${g.code} ${g.nombre} ${g.iva}`,
-  })), [opciones]);
-
-  const opcionesGrupoInventario = useMemo<ComboOption[]>(() => (opciones?.gruposInventario ?? []).map((g) => ({
-    value: g.code, label: g.code,
-    parts: [{ text: g.code, weight: 'bold' }, ...(g.nombre ? [{ text: g.nombre, weight: 'light' as const }] : [])],
-    search: `${g.code} ${g.nombre}`,
-  })), [opciones]);
+  const combos = useMemo(() => combosProducto(opciones), [opciones]);
+  const opcionesCategoria = combos.categoria;
+  const opcionesUnidad = combos.unidad;
+  const opcionesGrupoProducto = combos.grupoProducto;
+  const opcionesGrupoInventario = combos.grupoInventario;
 
   const ivaDelGrupo = opciones?.gruposProducto.find((g) => g.code === grupoProducto)?.iva ?? '';
 
@@ -274,20 +250,10 @@ export default function NuevoProductoPage() {
         if (res.status === 409 && data.sugerido) { setNumero(data.sugerido); setNumeroManual(true); }
         throw new Error(data.error || 'Business Central no creó el producto');
       }
-      const item = data.item as Item;
+      const item = productoDeCreado(data.item, { grupoProducto, grupoInventario: borrador.grupoInventario, precio: precioNum });
       setCreado(item);
+      // Al sumarlo al catálogo, el siguiente Nº de la familia ya no es este.
       setItems((prev) => (prev.some((i) => i.code === item.code) ? prev : [...prev, item]));
-      // El siguiente de la familia ya no es este.
-      const pref = item.code.split('-')[0];
-      const m = item.code.match(/^([A-Z]\d{2})-(\d{4})$/);
-      if (m) {
-        setOpciones((o) => {
-          if (!o) return o;
-          const actual = o.siguientes[pref];
-          if (actual && actual > item.code) return o;
-          return { ...o, siguientes: { ...o.siguientes, [pref]: `${pref}-${String(Number(m[2]) + 1).padStart(4, '0')}` } };
-        });
-      }
       toast(`Producto ${item.code} creado en Business Central`, 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Error al crear el producto', 'error');
@@ -309,9 +275,19 @@ export default function NuevoProductoPage() {
   return (
     <PageShell width="narrow">
       <PageHeader
-        title="Crear producto"
-        subtitle="Da de alta un artículo en Business Central. Mientras escribís la descripción te mostramos los que ya existen parecidos, para no repetirlo."
-        actions={<Link href="/bc/inventario" className="text-body-sm font-semibold text-ds-ink underline underline-offset-2">Ver inventario de materiales</Link>}
+        title="Productos de Business Central"
+        subtitle="Creá un producto nuevo, o buscá uno que ya existe para cambiarlo o bloquearlo. Todo se lee y se guarda directo en BC."
+        actions={
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="text-xs text-ds-gray-400">
+              {cargandoItems ? 'Leyendo el catálogo de BC…' : leidoEn ? `Catálogo leído de BC a las ${new Date(leidoEn).toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+            </span>
+            <button type="button" disabled={cargandoItems} onClick={() => { setCargandoItems(true); setRecargas((n) => n + 1); }} className="text-body-sm font-semibold text-ds-ink underline underline-offset-2 disabled:text-ds-gray-400">
+              Volver a leer de BC
+            </button>
+            <Link href="/bc/inventario" className="text-body-sm font-semibold text-ds-ink underline underline-offset-2">Inventario de materiales</Link>
+          </div>
+        }
       />
 
       {errorOpciones && (
@@ -335,6 +311,7 @@ export default function NuevoProductoPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={crearOtro}>Crear otro producto</Button>
+            <Button variant="outline" onClick={() => setFichaCode(creado.code)}>Ver o cambiar en BC</Button>
           </div>
         </div>
       )}
@@ -343,7 +320,7 @@ export default function NuevoProductoPage() {
         <>
           {/* Paso 1 — Qué material es (y si ya existe) */}
           <div className={cardCls}>
-            <StepHeader n={1} title="¿Qué producto es?" hint="Escribilo como te salga: te traemos los parecidos aunque esté escrito distinto, abreviado o con faltas." />
+            <StepHeader n={1} title="¿Qué producto es?" hint="Escribilo como te salga (o su Nº, ej. M10-0042): te traemos los parecidos aunque esté escrito distinto, abreviado o con faltas." />
             <div>
               <Input
                 label="Descripción" required maxLength={MAX_DESCRIPCION}
@@ -359,14 +336,15 @@ export default function NuevoProductoPage() {
               <div className="flex items-start gap-2 rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow-soft px-4 py-3">
                 <Icon name="incompleto" size="sm" color="currentColor" />
                 <p className="text-body-sm text-ds-ink">
-                  Puede que ya exista: <span className="font-mono font-semibold">{casiIgual.item.code}</span> «{casiIgual.item.descripcion}».
-                  Revisalo antes de crear otro igual.
+                  Puede que ya exista: <span className="font-mono font-semibold">{casiIgual.item.code}</span> «{casiIgual.item.descripcion}»
+                  {casiIgual.item.bloqueado ? ', y está bloqueado: si es el mismo, desbloquealo en vez de crear otro.' : '. Revisalo antes de crear otro igual.'}{' '}
+                  <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setFichaCode(casiIgual.item.code)}>Abrir ficha</button>
                 </p>
               </div>
             )}
 
             {descripcion.trim().length >= 3 && (
-              <ListaParecidos key={consulta} parecidos={parecidos} total={parecidosTodos.length} buscando={cargandoItems} />
+              <ListaParecidos key={consulta} parecidos={parecidos} total={parecidosTodos.length} buscando={cargandoItems} onAbrir={setFichaCode} />
             )}
           </div>
 
@@ -481,6 +459,9 @@ export default function NuevoProductoPage() {
             </Button>
           </div>
         </>
+      )}
+      {fichaCode && (
+        <FichaProducto key={fichaCode} code={fichaCode} onClose={() => setFichaCode(null)} onCambio={alCambiarEnFicha} />
       )}
     </PageShell>
   );

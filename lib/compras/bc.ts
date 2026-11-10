@@ -7,7 +7,7 @@
 
 import { odataStr } from "@/lib/odata";
 import { fetchConReloj, MS_LIMITE_BC } from "../bc-timeout";
-import { TIPO_BC, type NuevoProducto, type OpcionesProducto } from "@/lib/bc/productos";
+import { TIPO_BC, type CambiosProducto, type FichaProductoBc, type NuevoProducto, type OpcionesProducto, type ProductoBc } from "@/lib/bc/productos";
 
 type TokenCache = { token: string; exp: number };
 let tokenCache: TokenCache | null = null;
@@ -206,26 +206,41 @@ export async function bcItems(): Promise<BcItem[]> {
   return itemsEnVuelo.then(conRecientes);
 }
 
-// ─── Los recién creados desde la app ──────────────────────────────────────────
-// El catálogo de arriba se arma con lecturas cacheadas 5 min (más los 5 min del
-// resultado memorizado), así que un producto que el presupuestista acaba de crear
-// en /bc/productos/nuevo tardaría hasta 10 min en aparecer en los buscadores — y
-// en la lista de parecidos de la misma pantalla, que es la que evita duplicarlo.
-// Se agregan acá por 15 min, hasta que las lecturas de BC ya lo traen solas.
-const RECIENTES_TTL_MS = 15 * 60_000;
-const itemsRecientes = new Map<string, { item: BcItem; exp: number }>();
+// ─── Lo que se tocó desde la app ──────────────────────────────────────────────
+// El catálogo de arriba se arma con lecturas cacheadas (5 min de las fuentes + 5 min
+// del resultado memorizado), así que un producto que el presupuestista crea, edita
+// o bloquea en /bc/productos/nuevo tardaría hasta 10 min en verse así en los
+// buscadores de Compras — un bloqueado se podría seguir pidiendo. Lo tocado se
+// superpone acá por 10 min: lo que tardan, como mucho, las lecturas de BC en
+// traerlo solas (memo 5 min + caché de los bloqueados 5 min). No más, porque
+// mientras dure le gana a un cambio que alguien haga después en BC a ese mismo
+// artículo. La pantalla de productos no usa esto: lee BC en vivo.
+const TOCADOS_TTL_MS = 10 * 60_000;
+const itemsTocados = new Map<string, { item: BcItem; bloqueado: boolean; exp: number }>();
 
-export function bcRegistrarItemNuevo(item: BcItem): void {
-  itemsRecientes.set(item.code, { item, exp: Date.now() + RECIENTES_TTL_MS });
+/** Avisa al catálogo de Compras que un artículo se creó o cambió desde la app. */
+export function bcRegistrarItem(item: BcItem, bloqueado = false): void {
+  itemsTocados.set(item.code, { item, bloqueado, exp: Date.now() + TOCADOS_TTL_MS });
 }
 
 function conRecientes(items: BcItem[]): BcItem[] {
-  if (!itemsRecientes.size) return items;
+  if (!itemsTocados.size) return items;
   const ahora = Date.now();
-  for (const [code, r] of itemsRecientes) if (r.exp <= ahora) itemsRecientes.delete(code);
-  const ya = new Set(items.map((i) => i.code));
-  const faltan = [...itemsRecientes.values()].map((r) => r.item).filter((i) => !ya.has(i.code));
-  return faltan.length ? [...items, ...faltan] : items;
+  for (const [code, r] of itemsTocados) if (r.exp <= ahora) itemsTocados.delete(code);
+  if (!itemsTocados.size) return items;
+  const vistos = new Set<string>();
+  const out: BcItem[] = [];
+  for (const i of items) {
+    const t = itemsTocados.get(i.code);
+    if (!t) { out.push(i); continue; }
+    vistos.add(i.code);
+    if (t.bloqueado) continue; // bloqueado desde la app: ya no se ofrece
+    // Se pisan solo los campos que se editan; el costo y lo demás quedan del catálogo.
+    out.push({ ...i, descripcion: t.item.descripcion, unidad: t.item.unidad, tipo: t.item.tipo, categoria: t.item.categoria });
+  }
+  // Recién creados o recién desbloqueados: todavía no están en el catálogo.
+  for (const [code, t] of itemsTocados) if (!vistos.has(code) && !t.bloqueado) out.push(t.item);
+  return out;
 }
 
 async function construirItems(): Promise<BcItem[]> {
@@ -450,7 +465,7 @@ export async function bcNumerosProductos(): Promise<string[]> {
     for (const it of (data.value ?? [])) if (it.number) out.push(String(it.number));
     url = data["@odata.nextLink"] ?? null;
   }
-  for (const code of itemsRecientes.keys()) if (!out.includes(code)) out.push(code);
+  for (const code of itemsTocados.keys()) if (!out.includes(code)) out.push(code);
   return out;
 }
 
@@ -505,8 +520,116 @@ export async function bcCrearProducto(p: NuevoProducto): Promise<BcItem> {
     tipo: tipoDeBc(it.type ?? TIPO_BC[p.tipo]),
     categoria: it.itemCategoryCode ?? p.categoria,
   };
-  bcRegistrarItemNuevo(item);
+  bcRegistrarItem(item);
   return item;
+}
+
+// Campos de la API v2.0 que forman un ProductoBc.
+const SELECT_PRODUCTO = "id,number,displayName,type,itemCategoryCode,baseUnitOfMeasureCode,blocked,unitPrice,generalProductPostingGroupCode,inventoryPostingGroupCode,lastModifiedDateTime";
+
+function aProductoBc(it: any): ProductoBc {
+  return {
+    code: String(it.number ?? ""),
+    descripcion: String(it.displayName ?? ""),
+    tipo: tipoDeBc(it.type),
+    categoria: String(it.itemCategoryCode ?? ""),
+    unidad: String(it.baseUnitOfMeasureCode ?? ""),
+    grupoProducto: String(it.generalProductPostingGroupCode ?? ""),
+    grupoInventario: String(it.inventoryPostingGroupCode ?? ""),
+    precio: Number(it.unitPrice ?? 0) || 0,
+    bloqueado: !!it.blocked,
+    modificado: String(it.lastModifiedDateTime ?? ""),
+  };
+}
+
+const bcItemDeProducto = (p: ProductoBc, id?: string): BcItem => ({
+  id: id ?? p.code, code: p.code, descripcion: p.descripcion, unidad: p.unidad, tipo: p.tipo, categoria: p.categoria || undefined,
+});
+
+/**
+ * TODO el catálogo como está AHORA en BC, bloqueados incluidos y SIN caché: es lo
+ * que ve la pantalla de productos, para que un cambio hecho en BC se vea al abrirla.
+ * Es una sola lectura (~5.900 artículos, ~1 s medido en Production el 10/11/2026).
+ * No reemplaza a bcItems(): Compras sigue con su catálogo cacheado y sin bloqueados.
+ */
+export async function bcCatalogoProductos(): Promise<ProductoBc[]> {
+  const cid = await getStdCompanyId();
+  const out: ProductoBc[] = [];
+  let url: string | null = `${stdRoot()}/companies(${cid})/items?$select=${SELECT_PRODUCTO}`;
+  let guard = 0;
+  while (url && guard++ < 30) {
+    const res = await bcFetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`BC ${res.status}: ${mensajeBcLegible((await res.text()).slice(0, 400))}`);
+    const data: any = await res.json();
+    for (const it of (data.value ?? [])) if (it.number) out.push(aProductoBc(it));
+    url = data["@odata.nextLink"] ?? null;
+  }
+  return out;
+}
+
+async function leerItemPorNumero(numero: string): Promise<any | null> {
+  const cid = await getStdCompanyId();
+  const filtro = encodeURIComponent(`number eq '${odataStr(numero)}'`);
+  const res = await bcFetch(`${stdRoot()}/companies(${cid})/items?$select=${SELECT_PRODUCTO},inventory&$filter=${filtro}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`BC ${res.status}: ${mensajeBcLegible((await res.text()).slice(0, 400))}`);
+  const data = (await res.json()) as { value?: any[] };
+  return data.value?.[0] ?? null;
+}
+
+const aFicha = (it: any): FichaProductoBc => ({ ...aProductoBc(it), etag: String(it["@odata.etag"] ?? ""), existencia: Number(it.inventory ?? 0) || 0 });
+
+/** Un artículo, leído en vivo de BC (con su versión para poder editarlo). null = no existe. */
+export async function bcFichaProducto(numero: string): Promise<FichaProductoBc | null> {
+  const it = await leerItemPorNumero(numero);
+  return it ? aFicha(it) : null;
+}
+
+/** BC rechazó el guardado porque alguien cambió el artículo después de abrirlo. */
+export class ProductoCambiadoEnBc extends Error {
+  constructor(public actual: FichaProductoBc | null) {
+    super("Este producto cambió en Business Central mientras lo tenías abierto. Te cargamos lo que hay ahora en BC: revisalo y volvé a guardar.");
+  }
+}
+
+/**
+ * Cambia un artículo en BC (PATCH de la API v2.0) y devuelve cómo quedó.
+ * `etag` es la versión que la persona tenía abierta: se manda en If-Match, así que
+ * si alguien lo cambió en BC entre medio, BC responde 409 "Another user has already
+ * changed the record" y NO se pisa nada (probado en el Sandbox el 10/11/2026).
+ * BC sigue validando lo suyo: no deja cambiar el tipo ni la unidad base de un
+ * artículo que ya tiene movimientos, y ese mensaje se devuelve tal cual.
+ */
+export async function bcEditarProducto(numero: string, etag: string, c: CambiosProducto): Promise<FichaProductoBc> {
+  const it = await leerItemPorNumero(numero);
+  if (!it) throw new Error(`El producto ${numero} ya no existe en Business Central.`);
+  const body: Record<string, unknown> = {};
+  if (c.descripcion !== undefined) body.displayName = c.descripcion;
+  if (c.tipo !== undefined) body.type = TIPO_BC[c.tipo];
+  if (c.categoria !== undefined) body.itemCategoryCode = c.categoria;
+  if (c.unidad !== undefined) body.baseUnitOfMeasureCode = c.unidad;
+  if (c.grupoProducto !== undefined) body.generalProductPostingGroupCode = c.grupoProducto;
+  if (c.grupoInventario !== undefined) body.inventoryPostingGroupCode = c.grupoInventario;
+  if (c.precio !== undefined) body.unitPrice = c.precio;
+  if (c.bloqueado !== undefined) body.blocked = c.bloqueado;
+  if (!Object.keys(body).length) return aFicha(it);
+  const cid = await getStdCompanyId();
+  const res = await bcFetch(`${stdRoot()}/companies(${cid})/items(${it.id})`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", "If-Match": etag || String(it["@odata.etag"] ?? "*") },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  const txt = await res.text();
+  if (!res.ok) {
+    if (res.status === 409 || res.status === 412 || /EntityChanged|already changed the record/i.test(txt)) {
+      throw new ProductoCambiadoEnBc(await bcFichaProducto(numero).catch(() => null));
+    }
+    throw new Error(`Business Central no guardó el cambio: ${mensajeBcLegible(txt.slice(0, 600))}`);
+  }
+  // La respuesta del PATCH no trae `inventory`: se relee para devolver la ficha entera.
+  const ficha = (await bcFichaProducto(numero)) ?? aFicha(JSON.parse(txt));
+  bcRegistrarItem(bcItemDeProducto(ficha, it.id), ficha.bloqueado);
+  return ficha;
 }
 
 // Último costo directo de UN item (precio de su última compra), API estándar v2.0.

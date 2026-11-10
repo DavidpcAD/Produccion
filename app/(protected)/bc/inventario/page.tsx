@@ -9,6 +9,8 @@ import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { formatCRC } from '@/lib/utilidades/format';
 import { coincideBusqueda } from '@/lib/utilidades/buscar';
+import { FichaProducto } from '@/components/bc/ficha-producto';
+import type { FichaProductoBc } from '@/lib/bc/productos';
 
 type Tipo = 'inventario' | 'servicio' | 'no-inventario';
 interface Item {
@@ -123,6 +125,20 @@ export default function InventarioBcPage() {
   const [filtro, setFiltro] = useState('');
   const [tipo, setTipo] = useState<Tipo | 'todos'>('todos');
   const [sel, setSel] = useState<Item | null>(null);
+  const [fichaCode, setFichaCode] = useState<string | null>(null);
+
+  // Cambiado o bloqueado desde la ficha: la lista solo muestra los que NO están
+  // bloqueados (es el catálogo de los pedidos), así que el bloqueado sale de acá.
+  const alCambiarEnFicha = (f: FichaProductoBc) => {
+    if (f.bloqueado) {
+      setItems((prev) => prev.filter((i) => i.code !== f.code));
+      setSel(null);
+      return;
+    }
+    const cambio = { descripcion: f.descripcion, unidad: f.unidad, tipo: f.tipo, categoria: f.categoria };
+    setItems((prev) => prev.map((i) => (i.code === f.code ? { ...i, ...cambio } : i)));
+    setSel((s) => (s && s.code === f.code ? { ...s, ...cambio } : s));
+  };
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -295,9 +311,17 @@ export default function InventarioBcPage() {
               <h4 className="mb-2 text-label uppercase tracking-wide text-ds-gray-500">Existencias en BC</h4>
               <FichaExistencias item={sel} stock={stock} estado={stockEstado} />
             </div>
+
+            <div className="flex justify-end border-t border-ds-gray-100 pt-4">
+              <Button variant="outline" onClick={() => setFichaCode(sel.code)}>Cambiar o bloquear en BC</Button>
+            </div>
           </div>
         )}
       </Modal>
+
+      {fichaCode && (
+        <FichaProducto key={fichaCode} code={fichaCode} onClose={() => setFichaCode(null)} onCambio={alCambiarEnFicha} />
+      )}
     </PageShell>
   );
 }
