@@ -143,24 +143,30 @@ const TIPOS: { v: TipoSolicitud; label: string; destino: string }[] = [
   { v: "subcontrato", label: "Subcontrato", destino: "Obra" },
   { v: "activo", label: "Activo fijo", destino: "Activo" },
 ];
-// TAG del pedido (chiquito, al lado del tipo): ALM = entra a inventario del almacén
-// REAL elegido · CD = consumo directo, no entra a inventario. Stock siempre es a un
-// almacén (es justamente la compra para inventario), así que no lleva tag.
+// DESTINO del material o del repuesto: ALM = entra a inventario de un almacén FÍSICO ·
+// CD = consumo directo, no entra a inventario. Stock siempre es a un almacén (es
+// justamente la compra para inventario) y Subcontrato/Activo no tienen destino.
 type DestinoMat = "almacen" | "consumo";
-const DESTINOS: { v: DestinoMat; label: string }[] = [
-  { v: "almacen", label: "ALM" },
-  { v: "consumo", label: "CD" },
+// Lo que dice cada tarjeta del paso 2 (ver DestinoCards). El tag ALM/CD se conserva
+// porque es como lo nombran Proveeduría y las listas.
+const DESTINOS: { v: DestinoMat; tag: string; titulo: string; texto: (tipo: TipoSolicitud) => string }[] = [
+  { v: "almacen", tag: "ALM", titulo: "Almacén", texto: () => "Entra a inventario de un almacén físico y se consume después." },
+  { v: "consumo", tag: "CD", titulo: "Consumo directo",
+    texto: (tipo) => tipo === "repuesto" ? "Se lo lleva una máquina: se consume contra el proyecto MAQ." : "Se consume de una vez contra la obra y su actividad." },
 ];
+// La letra chica, debajo de las tarjetas, una vez elegido el destino.
 const ayudaDestino = (tipo: TipoSolicitud, d: DestinoMat) =>
   d === "almacen"
     // Con ALM el gasto lo paga el ALMACÉN: en BC el centro de costo y el área de costo
     // salen de ahí, y la obra de cada tarjeta es control del ingeniero (para qué obra
     // pidió), no un consumo contra el proyecto. Se dice acá porque es la confusión que
     // hizo llegar compras de fábrica cargadas al centro de costo de una obra.
-    ? "ALM: entra a inventario del almacén elegido y se consume después. El centro de costo es el del almacén; la obra de cada tarjeta es solo tu control y no viaja a BC."
+    ? (tipo === "repuesto"
+      ? "El centro de costo es el del almacén y el repuesto no se amarra a ninguna máquina."
+      : "El centro de costo es el del almacén. La obra de cada tarjeta es solo tu control y no viaja a BC.")
     : tipo === "repuesto"
-      ? "CD (consumo directo): se lo lleva la máquina. En BC la línea va al almacén MAQ y se consume contra el proyecto MAQUINARIA (MAQ) · tarea PARQUE MAQUINARIA (CMAQ), con el N.º de máquina en la línea."
-      : "CD (consumo directo): se consume de una vez contra el proyecto y la tarea de la obra.";
+      ? "En BC la línea va al almacén MAQ y se consume contra el proyecto MAQUINARIA (MAQ) y la actividad que elijas, con el N.º de máquina en la línea."
+      : "Cada obra lleva su actividad (tarea): sin ella BC no puede consumir el material contra el proyecto.";
 // Almacén de inventario al que entra el material que no es de consumo inmediato.
 const ALM_GENERAL = ALMACEN_GENERAL;
 const PRIORIDADES: { v: Pedido["prioridad"]; label: string }[] = [
@@ -298,6 +304,47 @@ function Segmented<T extends string>({ value, options, onChange, size = "md", va
           <button key={o.v} type="button" onClick={() => onChange(o.v)} aria-pressed={active} className={size === "sm" ? "ds-label ds-strong" : "ds-body-sm ds-strong"}
             style={{ padding: pad, cursor: "pointer", border: 0, background: active ? "var(--ds-color-black)" : "transparent", color: active ? "var(--ds-color-white)" : "var(--ds-color-gray-400)" }}>
             {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Destino EN GRANDE (paso 2 del pedido de material o repuesto) ──────────────
+// Antes era un tag chico ALM|CD pegado al almacén, ya marcado en ALM, y la gente lo
+// pasaba de largo: elegía el almacén pensando en la obra (o en la fábrica a la que
+// le cargaba el gasto) sin haber decidido si el material iba a inventario o se
+// consumía directo. Ahora son dos tarjetas que dicen qué pasa con el material y
+// arrancan SIN elegir (`value` null): hasta que la persona decide, el panel no
+// muestra nada más. Elegida = negra, como la pastilla activa del tipo.
+function DestinoCards({ tipo, value, onChange }: {
+  tipo: TipoSolicitud; value: DestinoMat | null; onChange: (v: DestinoMat) => void;
+}) {
+  return (
+    <div className="row gap-3" style={{ flexWrap: "wrap", alignItems: "stretch" }}>
+      {DESTINOS.map((o) => {
+        const activo = value === o.v;
+        return (
+          <button key={o.v} type="button" onClick={() => onChange(o.v)} aria-pressed={activo}
+            className="col" style={{
+              flex: "1 1 220px", minWidth: 0, gap: 6, textAlign: "left", padding: "16px 18px", borderRadius: 18, cursor: "pointer",
+              border: `1.5px solid ${activo ? "var(--ds-color-black)" : "var(--ds-color-gray-200)"}`,
+              background: activo ? "var(--ds-color-black)" : "var(--ds-surface)",
+              color: activo ? "var(--ds-color-white)" : "var(--ds-color-ink)",
+              boxShadow: "var(--ds-shadow-01)", transition: "background .15s ease, color .15s ease, border-color .15s ease",
+            }}>
+            <span className="row row--between" style={{ alignItems: "center", gap: 8 }}>
+              <span className="ds-subtitle">{o.titulo}</span>
+              <span className="ds-label ds-strong" style={{
+                padding: "3px 9px", borderRadius: 999, flexShrink: 0,
+                background: activo ? "var(--ds-color-green-100)" : "var(--ds-color-gray-100)",
+                color: activo ? "var(--ds-color-black)" : "var(--ds-color-gray-500)",
+              }}>{o.tag}</span>
+            </span>
+            <span className="ds-body-sm" style={{ color: activo ? "color-mix(in srgb, var(--ds-color-white) 78%, transparent)" : "var(--ds-color-gray-500)" }}>
+              {o.texto(tipo)}
+            </span>
           </button>
         );
       })}
@@ -980,8 +1027,15 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const catProv = bcProv ?? proveedores;
 
   const [tipo, setTipo] = useState<TipoSolicitud>("material");
-  // Tag del pedido: ALM (a inventario de un almacén real) o CD (consumo directo).
+  // Destino: ALM (a inventario de un almacén físico) o CD (consumo directo).
   const [destinoMat, setDestinoMat] = useState<DestinoMat>("almacen");
+  // ¿La persona ya ELIGIÓ el destino? En material y repuesto el pedido arranca sin
+  // elegir y no muestra nada más hasta que lo decide (paso 2, ver DestinoCards).
+  // `destinoMat` conserva su valor por defecto para todo lo demás; esto solo dice si
+  // fue una decisión. Lo dan por elegido copiar/editar, el borrador y una plantilla
+  // de Bodega, que ya traen el destino.
+  const [destinoElegido, setDestinoElegido] = useState(false);
+  function elegirDestino(v: DestinoMat) { setDestinoMat(v); setDestinoElegido(true); }
   // Almacén REAL de BC elegido (ALM-GRAL, Agregados, Herramienta, Maquinaria…).
   // Se usa con el tag ALM (material/repuesto) y en el pedido de Stock.
   const [almacenSel, setAlmacenSel] = useState<string>(ALM_GENERAL);
@@ -1221,6 +1275,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // y el almacén MAQ—, lo único que se elige es la MÁQUINA, el material y la cantidad.
   // Con el tag ALM el repuesto entra a inventario del almacén elegido y no lleva máquina.
   const esRepuestoCD = esRepuesto && destinoMat === "consumo";
+  // Material y repuesto piden el DESTINO (paso 2). Mientras no se elija, lo que sigue
+  // (almacén, plantilla, obras, máquina, materiales) no aparece.
+  const llevaDestino = esMaterial || esRepuesto;
+  const faltaDestino = llevaDestino && !destinoElegido;
   // Las obras BLOQUEADAS en BC no se ofrecen: BC no les deja cargar material, así que
   // el pedido nacería condenado a no poder lanzarse (caso VN-K.26 / CP-005132). Si la
   // obra ya venía elegida (copiar/editar/Matriz) igual se muestra, marcada.
@@ -1327,14 +1385,14 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     () => [...new Set(grupos.map((g) => g.obraCodigo).filter((c): c is string => !!c && obrasBloqueadas.has(c)))],
     [grupos, obrasBloqueadas],
   );
-  const canContinue = validLines.length > 0 && destinoOk && almacenOk && comentarioOk && tareasOk && tareaMaqOk
+  const canContinue = !faltaDestino && validLines.length > 0 && destinoOk && almacenOk && comentarioOk && tareasOk && tareaMaqOk
     && proveedorOk && montosOk
     && obrasChocadas.length === 0 && validLines.every((l) => !necesitaVariante(l));
   // Total del subcontrato (para la confirmación y el pie del panel).
   const totalSub = useMemo(() => validLines.reduce((t, l) => t + l.cantidad * (l.monto ?? 0), 0), [validLines]);
 
   function reset() {
-    setTipo("material"); setDestinoMat("almacen"); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
+    setTipo("material"); setDestinoMat("almacen"); setDestinoElegido(false); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
     setTareaMaq(TAREA_PARQUE_MAQUINARIA); setTareaMaqNombre("PARQUE MAQUINARIA COSTES");
     setProveedorId(""); setCurrency("");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
@@ -1364,10 +1422,10 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     setProveedorId(""); setCurrency("");
     // Subcontrato: una sola obra (una tarjeta) y hace falta el catálogo de proveedores.
     if (v === "subcontrato") cargarProveedores();
-    // Cambiar de tipo arranca de nuevo: destino ALM (a inventario). Stock ADEMÁS es
-    // siempre a un almacén y sus plantillas son las de Bodega → el filtro del
-    // selector arranca ahí.
-    setDestinoMat("almacen");
+    // Cambiar de tipo arranca de nuevo: el destino vuelve a quedar SIN elegir (paso 2).
+    // Stock ADEMÁS es siempre a un almacén y sus plantillas son las de Bodega → el
+    // filtro del selector arranca ahí.
+    setDestinoMat("almacen"); setDestinoElegido(false);
     setFTipoPl(v === "stock" ? "bodega" : "todas");
     setLineas([]); setOpenMat([]); setCardMenuKey(null);
     // El subcontrato arranca con su tarjeta de obra ya puesta (siempre es una sola).
@@ -1526,7 +1584,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     avisarInexistentes(inexistentes, "el pedido copiado");
     const { rows: dedup } = mergeDedup(rows);
     setTipo(s.tipo);
-    setDestinoMat(s.consumo ? "consumo" : "almacen");
+    setDestinoMat(s.consumo ? "consumo" : "almacen"); setDestinoElegido(true);
     if (s.destino) setDestino(s.destino);
     // Repuesto de consumo directo: la actividad del parque de maquinaria viene en las
     // líneas del pedido copiado (no se pierde al copiar ni al editar).
@@ -1573,7 +1631,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function aplicarBorrador(b: BorradorPedido) {
-    setTipo(b.tipo); setDestinoMat(b.destinoMat); setAlmacenSel(b.almacenSel);
+    setTipo(b.tipo); setDestinoMat(b.destinoMat); setDestinoElegido(true); setAlmacenSel(b.almacenSel);
     setDestino(b.destino); setPrioridad(b.prioridad); setNotas(b.notas);
     setGrupos(b.grupos ?? []); setLineas(b.lineas ?? []);
     if (b.tipo === "subcontrato") { cargarProveedores(); setProveedorId(b.proveedorId ?? ""); setCurrency(b.currency ?? ""); }
@@ -1607,7 +1665,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     // La plantilla NO cambia el tipo que eligió la persona: antes forzaba "material" y
     // con el tipo Stock eso devolvía el pedido a material. Las de Bodega (listas de
     // reposición) sí fijan el destino en ALM: van a inventario, no a consumo directo.
-    if (esBodega(pl)) setDestinoMat("almacen");
+    if (esBodega(pl)) { setDestinoMat("almacen"); setDestinoElegido(true); }
     aplicarPlantilla(pl);
   }
 
@@ -1993,9 +2051,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                   <Segmented variant="pill" value={tipo} options={TIPOS.map((t) => ({ v: t.v, label: t.label }))} onChange={cambiarTipo} />
                 </Field>
 
-                {/* Material / Repuesto: TAG chico ALM|CD. Con ALM se elige el almacén
-                    REAL (Almacén General, Agregados, Herramienta, Maquinaria…), en la
-                    misma fila. Stock no lleva tag: siempre es a un almacén. */}
                 {/* SUBCONTRATO: subcontratista + moneda. Es lo que en un pedido normal
                     pondría Proveeduría; acá lo pone el ingeniero porque ya lo negoció. */}
                 {esSub && (
@@ -2014,27 +2069,37 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                   </div>
                 )}
 
-                {!esStock && !esSub && !esActivoTipo && (
-                  /* Sin <Field>: el DS le fija 370px de ancho y el almacén quedaba
-                     angosto. Rótulo propio + fila (el tag y el almacén en la misma
-                     línea, centrados por .row) a lo ancho del panel. */
+                {/* PASO 2 · DESTINO (material y repuesto), en grande y sin elegir de
+                    entrada. Sin <Field>: el DS le fija 370px de ancho y las tarjetas
+                    van a lo ancho del panel. */}
+                {llevaDestino && (
                   <div className="col gap-2">
                     <span className="ds-form-field__label">{esRepuesto ? "Destino del repuesto" : "Destino del material"}</span>
-                    <div className="row gap-3 wrap">
-                      <Segmented size="sm" value={destinoMat} options={DESTINOS} onChange={(v: DestinoMat) => setDestinoMat(v)} />
-                      {usaAlmacen && (
-                        <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                          <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} />
-                        </div>
-                      )}
-                    </div>
-                    <span className="ds-muted ds-label">{ayudaDestino(tipo, destinoMat)}</span>
+                    <DestinoCards tipo={tipo} value={destinoElegido ? destinoMat : null} onChange={elegirDestino} />
+                    <span className="ds-muted ds-label">
+                      {destinoElegido
+                        ? ayudaDestino(tipo, destinoMat)
+                        : lineas.length
+                          ? `Ya hay ${lineas.length} material(es) cargado(s). Elegí el destino para verlos y seguir.`
+                          : "Elegí el destino para seguir."}
+                    </span>
+                  </div>
+                )}
+
+                {/* PASO 3 con ALM: el almacén FÍSICO al que entra (solo los marcados
+                    Real en Business Central → Almacenes). Con CD no hay almacén que
+                    elegir: lo que sigue son las obras (o la máquina) del consumo. */}
+                {llevaDestino && destinoElegido && usaAlmacen && (
+                  <div className="col gap-2">
+                    <span className="ds-form-field__label">Almacén</span>
+                    <Dropdown placeholder="Elegí almacén…" items={almacenItems} value={almacenSel} onPick={cambiarAlmacen} />
                   </div>
                 )}
 
                 {/* USAR PLANTILLA. En Stock va EN COLUMNAS con el almacén (y el filtro
-                    de plantillas arranca en "Bodega", que son las de reposición). */}
-                {esStock ? (
+                    de plantillas arranca en "Bodega", que son las de reposición).
+                    Nada de esto ni de lo que sigue aparece sin destino elegido. */}
+                {faltaDestino ? null : esStock ? (
                   <div className="row gap-3 wrap" style={{ alignItems: "flex-end" }}>
                     <div className="col gap-2" style={{ flex: "1 1 220px", minWidth: 0 }}>
                       <span className="ds-form-field__label">Almacén</span>
@@ -2044,7 +2109,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
                   </div>
                 ) : (esSub || esActivoTipo) ? null : plantillaBtn}
 
-                {(esMaterial || esSub) ? (
+                {faltaDestino ? null : (esMaterial || esSub) ? (
                   /* MATERIAL: una TARJETA por obra; adentro, sus materiales. */
                   <div className="col gap-2">
                     <div className="row row--between" style={{ alignItems: "center" }}>
@@ -2293,7 +2358,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
               <Icon name="back" size="sm" color="currentColor" /> Cancelar
             </button>
             {/* Prioridad · Comentario · Guardar como plantilla — como botones de ícono */}
-            {hayMateriales && (
+            {hayMateriales && !faltaDestino && (
               <div className="row gap-2" style={{ alignItems: "center" }}>
                 <PrioridadBtn value={prioridad} onChange={setPrioridad} />
                 <ComentarioBtn value={notas} onChange={setNotas} required para={esSub ? "aprobación" : undefined} />
