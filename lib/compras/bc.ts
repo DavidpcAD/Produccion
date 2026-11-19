@@ -216,11 +216,18 @@ export async function bcItems(): Promise<BcItem[]> {
 // mientras dure le gana a un cambio que alguien haga después en BC a ese mismo
 // artículo. La pantalla de productos no usa esto: lee BC en vivo.
 const TOCADOS_TTL_MS = 10 * 60_000;
-const itemsTocados = new Map<string, { item: BcItem; bloqueado: boolean; exp: number }>();
+// `borrado` se trata como bloqueado (no se ofrece) y además libera el Nº para la
+// numeración sugerida.
+const itemsTocados = new Map<string, { item: BcItem; bloqueado: boolean; borrado?: boolean; exp: number }>();
 
 /** Avisa al catálogo de Compras que un artículo se creó o cambió desde la app. */
 export function bcRegistrarItem(item: BcItem, bloqueado = false): void {
   itemsTocados.set(item.code, { item, bloqueado, exp: Date.now() + TOCADOS_TTL_MS });
+}
+
+/** Avisa al catálogo de Compras que un artículo se borró de BC desde la app. */
+function bcOlvidarItem(code: string): void {
+  itemsTocados.set(code, { item: { id: code, code, descripcion: "", unidad: "", tipo: "inventario" }, bloqueado: true, borrado: true, exp: Date.now() + TOCADOS_TTL_MS });
 }
 
 function conRecientes(items: BcItem[]): BcItem[] {
@@ -465,7 +472,7 @@ export async function bcNumerosProductos(): Promise<string[]> {
     for (const it of (data.value ?? [])) if (it.number) out.push(String(it.number));
     url = data["@odata.nextLink"] ?? null;
   }
-  for (const code of itemsTocados.keys()) if (!out.includes(code)) out.push(code);
+  for (const [code, t] of itemsTocados) if (!t.borrado && !out.includes(code)) out.push(code);
   return out;
 }
 
@@ -630,6 +637,53 @@ export async function bcEditarProducto(numero: string, etag: string, c: CambiosP
   const ficha = (await bcFichaProducto(numero)) ?? aFicha(JSON.parse(txt));
   bcRegistrarItem(bcItemDeProducto(ficha, it.id), ficha.bloqueado);
   return ficha;
+}
+
+/**
+ * El primer movimiento de artículo (Item Ledger Entry) de un producto en BC, de
+ * CUALQUIER año, o null si nunca tuvo. Es lo que decide si se puede borrar (ver
+ * puedeBorrarProducto en lib/bc/productos.ts). Una sola fila, ~0,4 s medido en
+ * Production el 10/11/2026. Si BC no contesta, tira: mejor no dejar borrar que
+ * suponer que no tiene.
+ */
+export async function bcPrimerMovimientoProducto(numero: string): Promise<{ documento: string; fecha: string; tipo: string } | null> {
+  const cid = await getStdCompanyId();
+  const filtro = encodeURIComponent(`itemNumber eq '${odataStr(numero)}'`);
+  const res = await bcFetch(`${stdRoot()}/companies(${cid})/itemLedgerEntries?$filter=${filtro}&$top=1&$select=entryNumber,documentNumber,postingDate,entryType`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`BC ${res.status}: ${mensajeBcLegible((await res.text()).slice(0, 400))}`);
+  const r = ((await res.json()) as { value?: any[] }).value?.[0];
+  if (!r) return null;
+  return {
+    documento: String(r.documentNumber ?? ""),
+    fecha: String(r.postingDate ?? ""),
+    tipo: String(r.entryType ?? "").replace(/_x0020_/g, " ").replace(/_x002E_/g, "."),
+  };
+}
+
+/**
+ * Borra un artículo de BC (DELETE de la API v2.0). Igual que el PATCH, va con la
+ * versión que la persona tenía abierta: si alguien lo cambió en BC entre medio, BC
+ * lo rechaza y no se borra. Quien llama ya revisó que no tenga movimientos; BC
+ * igual valida lo suyo (documentos abiertos con el artículo, etc.) y ese mensaje
+ * se devuelve tal cual.
+ */
+export async function bcBorrarProducto(numero: string, etag: string): Promise<void> {
+  const it = await leerItemPorNumero(numero);
+  if (!it) throw new Error(`El producto ${numero} ya no existe en Business Central.`);
+  const cid = await getStdCompanyId();
+  const res = await bcFetch(`${stdRoot()}/companies(${cid})/items(${it.id})`, {
+    method: "DELETE",
+    headers: { "If-Match": etag || String(it["@odata.etag"] ?? "*") },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    if (res.status === 409 || res.status === 412 || /EntityChanged|already changed the record/i.test(txt)) {
+      throw new ProductoCambiadoEnBc(await bcFichaProducto(numero).catch(() => null));
+    }
+    throw new Error(`Business Central no borró el producto: ${mensajeBcLegible(txt.slice(0, 600))}`);
+  }
+  bcOlvidarItem(it.number ?? numero);
 }
 
 // Último costo directo de UN item (precio de su última compra), API estándar v2.0.

@@ -181,3 +181,60 @@ export function validarNuevoProducto(p: Partial<NuevoProducto>, opciones?: Opcio
   }
   return null;
 }
+
+// ─── Borrar un producto ──────────────────────────────────────────────────────
+// BC tiene Borrar Y Bloquear. Borrar es para lo que nunca se usó (un producto de
+// prueba, uno creado con un error): pedido de Franco Brenes, 10/11/2026. Lo que
+// tiene movimientos NO se borra: se bloquea. Ojo que BC solo no alcanza para
+// frenarlo: con movimientos de años fiscales CERRADOS, BC sí deja borrar el
+// artículo y pasa esos movimientos a un artículo en blanco (Move Entries), o sea
+// se pierde de qué eran. Por eso la app revisa los movimientos de TODOS los años
+// antes de mandar el borrado. Servicios y no inventariables también dejan
+// movimientos de artículo (medido: S24-0028 tiene compras), así que la regla es
+// la misma para los tres tipos.
+
+/** Lo que se sabe de un producto antes de borrarlo. */
+export interface UsoProducto {
+  /** Su primer movimiento de artículo en BC, o null si nunca tuvo. */
+  movimiento: { documento: string; fecha: string; tipo: string } | null;
+  /** Pedidos de la app (PedidoCompra) que lo tienen en alguna línea. */
+  pedidos: number[];
+}
+
+export interface PuedeBorrar {
+  puede: boolean;
+  /** Por qué no se puede, para mostrarlo tal cual en la ficha. */
+  motivo: string | null;
+}
+
+/** 2026-10-23 → 23/10/2026 (si no tiene esa forma, va como vino). */
+const fechaCorta = (iso: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ''));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso ?? '');
+};
+
+/** ¿Se puede borrar? `null` = no se pudo averiguar, y entonces tampoco se deja. */
+export function puedeBorrarProducto(uso: UsoProducto | null): PuedeBorrar {
+  if (!uso) {
+    return { puede: false, motivo: 'No se pudo revisar si tiene movimientos en Business Central, así que por ahora no se puede borrar. Volvé a leerlo de BC para intentar de nuevo.' };
+  }
+  if (uso.movimiento) {
+    // "Tiene movimientos en Business Central desde el 01/11/2025 (documento 1)."
+    const { documento, fecha } = uso.movimiento;
+    const desde = fecha ? ` desde el ${fechaCorta(fecha)}` : '';
+    const doc = documento ? ` (documento ${documento})` : '';
+    return {
+      puede: false,
+      motivo: `Tiene movimientos en Business Central${desde}${doc}. Un producto con movimientos no se borra: se bloquea.`,
+    };
+  }
+  if (uso.pedidos.length) {
+    const lista = uso.pedidos.slice(0, 3).map((n) => `#${n}`).join(', ') + (uso.pedidos.length > 3 ? ' y otros' : '');
+    const uno = uso.pedidos.length === 1;
+    return {
+      puede: false,
+      motivo: `Lo ${uno ? 'usa el pedido' : 'usan los pedidos'} ${lista} de la app. Si se borra, ${uno ? 'ese pedido queda' : 'esos pedidos quedan'} con un producto que ya no existe: bloquealo en vez de borrarlo.`,
+    };
+  }
+  return { puede: true, motivo: null };
+}

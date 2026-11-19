@@ -163,6 +163,11 @@ export default function NuevoProductoPage() {
     setItems((prev) => prev.map((i) => (i.code === f.code ? deFicha(f) : i)));
     setCreado((c) => (c && c.code === f.code ? deFicha(f) : c));
   };
+  // Borrado desde la ficha: sale de la lista (y de "recién creado", si era ese).
+  const alBorrarEnFicha = (code: string) => {
+    setItems((prev) => prev.filter((i) => i.code !== code));
+    setCreado((c) => (c && c.code === code ? null : c));
+  };
 
   // ─── Parecidos ───────────────────────────────────────────────────────────
   const buscarParecidos = useMemo(() => indiceParecidos(items, (i) => i.descripcion, (i) => i.code), [items]);
@@ -461,7 +466,7 @@ export default function NuevoProductoPage() {
         </>
       )}
       {fichaCode && (
-        <FichaProducto key={fichaCode} code={fichaCode} onClose={() => setFichaCode(null)} onCambio={alCambiarEnFicha} />
+        <FichaProducto key={fichaCode} code={fichaCode} onClose={() => setFichaCode(null)} onCambio={alCambiarEnFicha} onBorrado={alBorrarEnFicha} />
       )}
     </PageShell>
   );

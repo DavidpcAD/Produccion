@@ -11,15 +11,17 @@ import { Icon } from '@/components/ds/Icon/Icon';
 import { BadgeBloqueado, BadgeTipo, combosProducto, cuandoFue } from '@/components/bc/productos-ui';
 import {
   GRUPO_INVENTARIO_DEFECTO, GRUPO_PRODUCTO_POR_TIPO, MAX_DESCRIPCION, TIPOS_PRODUCTO,
-  type CambiosProducto, type FichaProductoBc, type OpcionesProducto, type TipoProducto,
+  type CambiosProducto, type FichaProductoBc, type OpcionesProducto, type PuedeBorrar, type TipoProducto,
 } from '@/lib/bc/productos';
 
 // Ficha de UN producto de Business Central: se lee en vivo de BC al abrirla (así se
-// ve lo que alguien haya cambiado allá) y desde acá se cambia o se bloquea.
+// ve lo que alguien haya cambiado allá) y desde acá se cambia, se bloquea o se borra.
 // Guardar manda la versión que se abrió: si en el medio alguien lo cambió en BC,
 // BC lo rechaza y la ficha se recarga con lo de BC, sin pisar nada.
+// Borrar solo aparece si el producto nunca tuvo movimientos en BC y ningún pedido
+// de la app lo usa (un producto de prueba); si no, se explica por qué y queda Bloquear.
 //
-// Uso: <FichaProducto key={code} code={code} onClose={…} onCambio={…} />
+// Uso: <FichaProducto key={code} code={code} onClose={…} onCambio={…} onBorrado={…} />
 // El `key` es para que cada producto arranque de cero.
 
 interface Form {
@@ -64,20 +66,23 @@ function cambiosDe(form: Form, f: FichaProductoBc): CambiosProducto {
   return c;
 }
 
-export function FichaProducto({ code, onClose, onCambio }: {
+export function FichaProducto({ code, onClose, onCambio, onBorrado }: {
   code: string;
   onClose: () => void;
   /** Se llama con la ficha como quedó en BC después de guardar o (des)bloquear. */
   onCambio?: (f: FichaProductoBc) => void;
+  /** Se llama con el Nº cuando el producto se borró de BC (la ficha se cierra sola). */
+  onBorrado?: (code: string) => void;
 }) {
   const { toast } = useToast();
   const confirmar = useConfirm();
   const [ficha, setFicha] = useState<FichaProductoBc | null>(null);
   const [opciones, setOpciones] = useState<OpcionesProducto | null>(null);
+  const [borrar, setBorrar] = useState<PuedeBorrar | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState<'guardar' | 'bloqueo' | null>(null);
+  const [guardando, setGuardando] = useState<'guardar' | 'bloqueo' | 'borrar' | null>(null);
   const [recargas, setRecargas] = useState(0);
 
   useEffect(() => {
@@ -89,6 +94,7 @@ export function FichaProducto({ code, onClose, onCambio }: {
         if (!ok) throw new Error(d?.error || 'No se pudo leer el producto de Business Central');
         setFicha(d.item as FichaProductoBc);
         setOpciones(d.opciones as OpcionesProducto);
+        setBorrar((d.borrar as PuedeBorrar) ?? null);
         setForm(formDe(d.item as FichaProductoBc));
         setError(null);
       })
@@ -181,6 +187,50 @@ export function FichaProducto({ code, onClose, onCambio }: {
     if (item) toast(item.bloqueado ? `${item.code} bloqueado en Business Central` : `${item.code} desbloqueado en Business Central`, 'success');
   };
 
+  const borrarProducto = async () => {
+    if (!ficha || !borrar?.puede) return;
+    const ok = await confirmar({
+      title: `Borrar ${ficha.code}`,
+      message: `«${ficha.descripcion}» se borra de Business Central para siempre y el Nº ${ficha.code} queda libre. No se puede deshacer. Se puede porque nunca tuvo movimientos ni está en ningún pedido.`,
+      confirmLabel: 'Borrar de BC',
+      danger: true,
+    });
+    if (!ok) return;
+    setGuardando('borrar');
+    setAviso(null);
+    try {
+      const res = await fetch(`/api/bc/productos/${encodeURIComponent(code)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ etag: ficha.etag }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 409 && d.actual) {
+        // Alguien lo cambió en BC: se muestra lo de BC y no se borra.
+        setFicha(d.actual as FichaProductoBc);
+        setForm(formDe(d.actual as FichaProductoBc));
+        setAviso(d.error);
+        onCambio?.(d.actual as FichaProductoBc);
+        return;
+      }
+      if (res.status === 409 && d.borrar) {
+        // Le entró un movimiento o un pedido después de abrir la ficha.
+        setBorrar(d.borrar as PuedeBorrar);
+        setAviso(d.error);
+        return;
+      }
+      if (!res.ok) throw new Error(d.error || 'Business Central no borró el producto');
+      toast(`${ficha.code} borrado de Business Central`, 'success');
+      onBorrado?.(ficha.code);
+      onClose();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Error al borrar en Business Central', 'error');
+    } finally {
+      setGuardando(null);
+    }
+  };
+
   const cerrar = async () => {
     if (hayCambios && !(await confirmar({ title: 'Cambios sin guardar', message: 'Cerrás la ficha sin guardar los cambios en Business Central.', confirmLabel: 'Cerrar sin guardar', danger: true }))) return;
     onClose();
@@ -194,9 +244,16 @@ export function FichaProducto({ code, onClose, onCambio }: {
       size="lg"
       footer={ficha && form ? (
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <Button variant={ficha.bloqueado ? 'outline' : 'danger'} onClick={alternarBloqueo} loading={guardando === 'bloqueo'} disabled={!!guardando}>
-            {ficha.bloqueado ? 'Desbloquear producto' : 'Bloquear producto'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant={ficha.bloqueado ? 'outline' : 'danger'} onClick={alternarBloqueo} loading={guardando === 'bloqueo'} disabled={!!guardando}>
+              {ficha.bloqueado ? 'Desbloquear producto' : 'Bloquear producto'}
+            </Button>
+            {borrar?.puede && (
+              <Button variant="outline" onClick={borrarProducto} loading={guardando === 'borrar'} disabled={!!guardando}>
+                Borrar de BC
+              </Button>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="ghost" onClick={cerrar} disabled={!!guardando}>Cerrar</Button>
             <Button variant="primary" onClick={guardar} loading={guardando === 'guardar'} disabled={!hayCambios || !!guardando}>
@@ -227,6 +284,10 @@ export function FichaProducto({ code, onClose, onCambio }: {
               Volver a leer de BC
             </button>
           </div>
+
+          {borrar && !borrar.puede && borrar.motivo && (
+            <p className="text-xs text-ds-gray-400">{borrar.motivo}</p>
+          )}
 
           {aviso && (
             <div className="flex items-start gap-2 rounded-ds-lg border border-ds-yellow/50 bg-ds-yellow-soft px-4 py-3">

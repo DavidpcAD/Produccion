@@ -139,6 +139,11 @@ export default function InventarioBcPage() {
     setItems((prev) => prev.map((i) => (i.code === f.code ? { ...i, ...cambio } : i)));
     setSel((s) => (s && s.code === f.code ? { ...s, ...cambio } : s));
   };
+  // Borrado desde la ficha: ya no existe en BC, sale de la lista.
+  const alBorrarEnFicha = (code: string) => {
+    setItems((prev) => prev.filter((i) => i.code !== code));
+    setSel(null);
+  };
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -320,7 +325,7 @@ export default function InventarioBcPage() {
       </Modal>
 
       {fichaCode && (
-        <FichaProducto key={fichaCode} code={fichaCode} onClose={() => setFichaCode(null)} onCambio={alCambiarEnFicha} />
+        <FichaProducto key={fichaCode} code={fichaCode} onClose={() => setFichaCode(null)} onCambio={alCambiarEnFicha} onBorrado={alBorrarEnFicha} />
       )}
     </PageShell>
   );

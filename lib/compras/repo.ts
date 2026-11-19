@@ -1599,3 +1599,14 @@ export async function listNotasCredito(): Promise<NotaCreditoLinea[]> {
     estado: (x.estado ?? "pendiente") as NotaCreditoLinea["estado"],
   }));
 }
+
+/** Pedidos de la app que tienen ese artículo de BC en alguna línea (hasta 4, del
+ *  más nuevo al más viejo). Lo usa la ficha de productos: un artículo que ya está
+ *  en un pedido no se borra de BC, porque el pedido quedaría apuntando a nada. */
+export async function pedidosConArticulo(itemNo: string): Promise<number[]> {
+  const pool = await getPool();
+  const r = await pedir(pool).input("itemNo", sql.NVarChar(50), itemNo).query(
+    "SELECT DISTINCT TOP 4 idPedidoCompra FROM dbo.PedidoCompraDet WHERE itemNo=@itemNo ORDER BY idPedidoCompra DESC",
+  );
+  return r.recordset.map((x: { idPedidoCompra: number }) => Number(x.idPedidoCompra));
+}
