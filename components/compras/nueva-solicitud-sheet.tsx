@@ -1966,11 +1966,18 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       // Subcontrato: el pedido y su ORDEN se corrigen juntos (los montos y el
       // subcontratista viven en la orden) y vuelve a quedar pendiente de aprobación.
       if (esSub) {
-        await editSubcontrato(editandoId, buildInput(), {
+        const r = await editSubcontrato(editandoId, buildInput(), {
           proveedorNo: provSel?.code ?? proveedorId, proveedorNombre: provSel?.nombre,
           currencyCode: currency, montos: validLines.map((l) => l.monto ?? 0),
         });
-        toast(`Subcontrato ${editar?.numero ?? ""} corregido · vuelve a aprobación`.trim(), "success");
+        // A dónde quedó: con la orden ya en BC, la reenvía Proveeduría (es la que le pasa
+        // las líneas nuevas al pedido de allá); si no, va derecho a aprobación.
+        const numero = editar?.numero ?? "";
+        toast(r.destino === "proveeduria"
+          ? `Subcontrato ${numero} corregido · volvió a la orden ${r.orden}; Proveeduría la reenvía a aprobación`
+          : r.nueva
+            ? `Subcontrato ${numero} corregido · orden nueva ${r.orden}, pendiente de aprobación`
+            : `Subcontrato ${numero} corregido · vuelve a aprobación`, "success");
         onGuardado?.({ numero: editar?.numero ?? "", enviado: false });
         close();
         return;

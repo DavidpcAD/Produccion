@@ -2,7 +2,7 @@ import { getPool, sql } from "./db";
 import { pedir } from "./pedir";
 import { etiquetaInterna, MOV_APROBACION_AUTOMATICA, motivoSinAprobacion } from "./helpers";
 import { bcDeepLinkPedido } from "./bc";
-import type { Movimiento, Orden, OrdenLinea, OrdenSinAprobacion, Pedido, PedidoLinea, Prioridad, Recepcion, RecepcionLinea, Role, NotaCreditoLinea } from "./types";
+import type { Movimiento, Orden, OrdenLinea, OrdenPreviaSubcontrato, OrdenSinAprobacion, Pedido, PedidoLinea, Prioridad, Recepcion, RecepcionLinea, ResultadoEdicionSubcontrato, Role, NotaCreditoLinea } from "./types";
 
 /* ============================================================================
    Capa de acceso a datos (SQL Server) para Compras Adelante.
@@ -382,8 +382,14 @@ export async function updatePedido(input: EditPedidoDB): Promise<void> {
  *  proveedor y los MONTOS, que la tabla del pedido no tiene). Corregirlo es rehacer las
  *  dos cosas juntas, y por eso va en una sola transacción.
  *
- *  Solo mientras la orden NO se haya lanzado a Business Central: en cuanto existe allá
- *  —o alguien recibió/facturó— lo que manda es BC y esto rebotaría en silencio.
+ *  Hasta dónde se puede:
+ *   - orden sin BC (pendiente o rechazada): se rehace y vuelve a aprobación.
+ *   - orden en BC pero Abierta/Rechazada (p. ej. Proveeduría devolvió el subcontrato y
+ *     la orden quedó esperando la corrección): se rehace y queda Abierta para que
+ *     Proveeduría la reenvíe, que es lo que le empuja las líneas al pedido de BC.
+ *   - SIN orden (Proveeduría la descartó al devolverlo, o falló el envío al crearlo):
+ *     se le arma una nueva, como al nacer.
+ *  Lanzada, en aprobación en BC, o con recepción/factura: no — ahí manda BC.
  */
 export interface EditSubcontratoDB {
   id: number;
@@ -398,10 +404,54 @@ export interface EditSubcontratoDB {
   }[];
 }
 
-export async function updateSubcontrato(input: EditSubcontratoDB): Promise<void> {
+/** La orden de la que Proveeduría DEVOLVIÓ un subcontrato (ver `OrdenPreviaSubcontrato`).
+ *  Como la devolución le borra la línea a la orden, el único rastro de cuál era es el
+ *  historial del pedido ("… · Devuelta desde la orden CP-006835 · Motivo: …"), así que
+ *  se lee de ahí — mismo criterio que `ordenDeDetalleDevolucion` del otro repo: si un
+ *  día cambia ese texto, cambia este regex con él. */
+async function ordenPreviaDeSubcontrato(fuente: sql.ConnectionPool | sql.Transaction, idPedido: number): Promise<OrdenPreviaSubcontrato | null> {
+  const mv = await pedir(fuente).input("id", sql.Int, idPedido).query(
+    `SELECT TOP 1 detalle FROM dbo.Movimiento
+      WHERE entidad='pedido' AND idEntidad=@id AND detalle LIKE '%desde la orden %'
+      ORDER BY fecha DESC, idMovimiento DESC`);
+  const n = /desde la orden\s+([A-Za-z0-9._/-]+)/i.exec(String(mv.recordset[0]?.detalle ?? ""))?.[1]?.trim();
+  if (!n) return null;
+  // El texto lleva el N.º de BC si lo había y si no el interno — y las dos series usan
+  // el mismo formato CP-000000. Un número interno solo vale para una orden que NO
+  // está en BC (si estuviera, el texto diría el de BC).
+  const r = await pedir(fuente).input("n", sql.NVarChar(50), n).query(
+    `SELECT TOP 1 oc.idOrdenCompra, oc.ordenNo, oc.bcNo, oc.idEstado, oc.esEliminada,
+            oc.proveedorNo, oc.proveedorNombre, oc.currencyCode,
+            (SELECT COUNT(*) FROM dbo.OrdenCompraDet od
+              WHERE od.idOrdenCompra = oc.idOrdenCompra
+                AND LOWER(LTRIM(RTRIM(ISNULL(od.tipoLinea, '')))) <> 'cargo') AS lineas
+       FROM dbo.OrdenCompra oc
+      WHERE oc.bcNo = @n OR (oc.ordenNo = @n AND ISNULL(oc.bcNo, '') = '')
+      ORDER BY CASE WHEN oc.bcNo = @n THEN 0 ELSE 1 END, oc.esEliminada, oc.idOrdenCompra DESC`);
+  const o = r.recordset[0];
+  if (!o) return null;
+  const bcNumber = String(o.bcNo ?? "").trim() || undefined;
+  const estado = codigoDeId(o.idEstado) ?? "abierto";
+  return {
+    id: Number(o.idOrdenCompra), numero: String(o.ordenNo ?? ""), bcNumber, estado,
+    proveedorNo: o.proveedorNo || undefined, proveedorNombre: o.proveedorNombre || undefined,
+    currencyCode: o.currencyCode || undefined,
+    espera: !o.esEliminada && !!bcNumber && Number(o.lineas) === 0 && (estado === "abierto" || estado === "rechazado"),
+  };
+}
+
+/** Para la pantalla del ingeniero: de qué orden salió el subcontrato devuelto (para
+ *  precargar el subcontratista y decirle a dónde va a volver). */
+export async function getOrdenPreviaSubcontrato(idPedido: number): Promise<OrdenPreviaSubcontrato | null> {
+  await ensureEstados();
+  return ordenPreviaDeSubcontrato(await getPool(), idPedido);
+}
+
+export async function updateSubcontrato(input: EditSubcontratoDB): Promise<ResultadoEdicionSubcontrato> {
   await ensureEstados();
   const pool = await getPool();
   const idPendiente = await idDeEstado("pendiente_aprobacion");
+  const idAbierto = await idDeEstado("abierto");
   const idEnOrden = await idDeEstado("en_orden");
 
   // La orden del subcontrato: la que referencia sus líneas y sigue viva.
@@ -413,20 +463,57 @@ export async function updateSubcontrato(input: EditSubcontratoDB): Promise<void>
        JOIN dbo.OrdenCompraDet od ON od.idOrdenCompra = oc.idOrdenCompra
        JOIN dbo.PedidoCompraDet d ON d.idPedidoCompraDet = od.idPedidoCompraDet
       WHERE d.idPedidoCompra = @id AND oc.esEliminada = 0`);
-  const orden = oq.recordset[0];
-  if (!orden) throw new Error("El subcontrato no tiene orden de compra: no hay nada que editar acá.");
-  if (orden.bcNo) throw new Error(`La orden ${orden.ordenNo} ya existe en Business Central (${orden.bcNo}): corregila allá.`);
-  const estadoOrden = codigoDeId(orden.idEstado);
-  if (estadoOrden === "lanzado" || estadoOrden === "completado") throw new Error(`La orden ${orden.ordenNo} ya está ${estadoOrden}: no se puede editar.`);
-  if (Number(orden.movido ?? 0) > 0) throw new Error(`La orden ${orden.ordenNo} ya tiene recepción o factura: no se puede editar.`);
+  // Sin orden viva = Proveeduría lo devolvió desde la orden (o el envío falló al
+  // crearlo). Se corrige igual: vuelve a la orden que espera la corrección, si la hay,
+  // y si no se le arma una nueva, como cuando nació.
+  const viva = oq.recordset[0];
+  const previa = viva ? null : await ordenPreviaDeSubcontrato(pool, input.id);
+  const orden: { idOrdenCompra: number; ordenNo: string; bcNo: string; estado?: string; movido: number } | undefined = viva
+    ? { idOrdenCompra: Number(viva.idOrdenCompra), ordenNo: String(viva.ordenNo ?? ""), bcNo: String(viva.bcNo ?? "").trim(), estado: codigoDeId(viva.idEstado), movido: Number(viva.movido ?? 0) }
+    : previa?.espera
+      ? { idOrdenCompra: previa.id, ordenNo: previa.numero, bcNo: previa.bcNumber ?? "", estado: previa.estado, movido: 0 }
+      : undefined;
+  const estadoOrden = orden?.estado;
+  const bcNo = orden?.bcNo ?? "";
+  if (orden) {
+    if (estadoOrden === "lanzado" || estadoOrden === "completado") throw new Error(`La orden ${bcNo || orden.ordenNo} ya está ${estadoOrden}: no se puede editar.`);
+    if (orden.movido > 0) throw new Error(`La orden ${bcNo || orden.ordenNo} ya tiene recepción o factura: no se puede editar.`);
+    // En BC y en aprobación: lo que se cambie acá no llegaría allá (Aprobación solo
+    // lanza, no reescribe). Abierta o rechazada sí: la reenvía Proveeduría y eso le
+    // empuja las líneas al pedido de BC.
+    if (bcNo && estadoOrden !== "abierto" && estadoOrden !== "rechazado") {
+      throw new Error(`La orden ${bcNo} ya está en aprobación en Business Central: pedile a Proveeduría que la devuelva para corregirla.`);
+    }
+  }
+  const destino: ResultadoEdicionSubcontrato["destino"] = bcNo ? "proveeduria" : "aprobacion";
 
   const tx = new sql.Transaction(pool);
   await tx.begin();
   try {
     const chk = await pedir(tx).input("id", sql.Int, input.id).query(
-      "SELECT pedidoNo FROM dbo.PedidoCompra WHERE idPedidoCompra=@id AND esEliminada=0");
+      "SELECT pedidoNo, idEstado FROM dbo.PedidoCompra WHERE idPedidoCompra=@id AND esEliminada=0");
     const pedidoNo = chk.recordset[0]?.pedidoNo as string | undefined;
     if (!pedidoNo) throw new Error("Pedido no encontrado");
+
+    // Sin orden a la que volver: se arma una nueva, igual que al crear el subcontrato
+    // (mismo correlativo que `createOrden`).
+    let idOrden = orden ? Number(orden.idOrdenCompra) : 0;
+    let ordenNo = orden?.ordenNo ?? "";
+    if (!orden) {
+      const max = await pedir(tx).query("SELECT MAX(CAST(SUBSTRING(ordenNo,4,20) AS INT)) AS m FROM dbo.OrdenCompra WHERE ordenNo LIKE 'CP-%'");
+      ordenNo = "CP-" + String((max.recordset[0].m ?? 0) + 1).padStart(6, "0");
+      const ins = await pedir(tx)
+        .input("idEstado", sql.Int, idPendiente)
+        .input("ordenNo", sql.NVarChar(50), ordenNo)
+        .input("proveedorNo", sql.NVarChar(20), input.proveedorNo)
+        .input("proveedorNombre", sql.NVarChar(150), input.proveedorNombre ?? null)
+        .input("currencyCode", sql.NVarChar(10), input.currencyCode || null)
+        .input("creadoPor", sql.NVarChar(100), input.usuario)
+        .query(`INSERT dbo.OrdenCompra (idEstado,ordenNo,proveedorNo,proveedorNombre,currencyCode,fechaEmision,esEliminada,fechaCreacion,creadoPor)
+                OUTPUT INSERTED.idOrdenCompra
+                VALUES (@idEstado,@ordenNo,@proveedorNo,@proveedorNombre,@currencyCode,CAST(getdate() AS date),0,getdate(),@creadoPor)`);
+      idOrden = Number(ins.recordset[0].idOrdenCompra);
+    }
 
     await pedir(tx)
       .input("id", sql.Int, input.id)
@@ -440,23 +527,42 @@ export async function updateSubcontrato(input: EditSubcontratoDB): Promise<void>
               WHERE idPedidoCompra=@id`);
 
     // Primero las líneas de la ORDEN (son las que sujetan a las del pedido con su FK),
-    // después las del pedido. Recién ahí se pueden reinsertar las dos tandas.
-    await pedir(tx).input("o", sql.Int, orden.idOrdenCompra)
-      .query("DELETE FROM dbo.OrdenCompraDet WHERE idOrdenCompra=@o");
+    // después las del pedido. Recién ahí se pueden reinsertar las dos tandas. Solo las
+    // de ESTE subcontrato: si la orden tiene otra cosa (un cargo que puso Proveeduría),
+    // se queda.
+    await pedir(tx).input("o", sql.Int, idOrden).input("id", sql.Int, input.id)
+      .query(`DELETE od FROM dbo.OrdenCompraDet od
+               JOIN dbo.PedidoCompraDet d ON d.idPedidoCompraDet = od.idPedidoCompraDet
+              WHERE od.idOrdenCompra = @o AND d.idPedidoCompra = @id`);
+    // Una orden DESCARTADA que todavía apunte a estas líneas trabaría el DELETE de
+    // abajo por la FK, y ya no cuenta para nada: se le suelta el enlace.
+    await pedir(tx).input("id", sql.Int, input.id)
+      .query(`UPDATE od SET od.idPedidoCompraDet = NULL
+                FROM dbo.OrdenCompraDet od
+                JOIN dbo.OrdenCompra oc ON oc.idOrdenCompra = od.idOrdenCompra
+                JOIN dbo.PedidoCompraDet d ON d.idPedidoCompraDet = od.idPedidoCompraDet
+               WHERE oc.esEliminada = 1 AND d.idPedidoCompra = @id`);
     await pedir(tx).input("id", sql.Int, input.id)
       .query("DELETE FROM dbo.PedidoCompraDet WHERE idPedidoCompra=@id");
 
+    // En BC (abierta o rechazada): queda ABIERTA, en manos de Proveeduría. Reenviarla
+    // es lo que le reescribe las líneas al pedido de allá; si quedara pendiente acá,
+    // Aprobación lanzaría el pedido de BC con las líneas (y el precio) viejos.
     await pedir(tx)
-      .input("o", sql.Int, orden.idOrdenCompra)
+      .input("o", sql.Int, idOrden)
       .input("proveedorNo", sql.NVarChar(20), input.proveedorNo)
       .input("proveedorNombre", sql.NVarChar(150), input.proveedorNombre ?? null)
       .input("currencyCode", sql.NVarChar(10), input.currencyCode || null)
-      .input("e", sql.Int, idPendiente)
+      .input("e", sql.Int, destino === "proveeduria" ? idAbierto : idPendiente)
       .input("u", sql.NVarChar(100), input.usuario)
       .query(`UPDATE dbo.OrdenCompra SET proveedorNo=@proveedorNo, proveedorNombre=@proveedorNombre,
               currencyCode=@currencyCode, idEstado=@e, fechaModificacion=getdate(), modificadoPor=@u
               WHERE idOrdenCompra=@o`);
 
+    // Las líneas de la orden siguen después de lo que haya quedado en ella.
+    const maxLinea = await pedir(tx).input("o", sql.Int, idOrden)
+      .query("SELECT ISNULL(MAX(lineNum), 0) AS m FROM dbo.OrdenCompraDet WHERE idOrdenCompra=@o");
+    let lineaOrden = Number(maxLinea.recordset[0]?.m ?? 0) + 10000;
     let line = 10000;
     for (const l of input.lineas) {
       const det = await pedir(tx)
@@ -479,9 +585,9 @@ export async function updateSubcontrato(input: EditSubcontratoDB): Promise<void>
                 VALUES (@idPedidoCompra,@lineNum,@descripcion,@itemNo,@unitOfMeasureCode,@locationCode,@obra,@quantitySolicitado,@quantitySolicitado,@notaCreador,@taskNo,@taskDescr,getdate(),@creadoPor)`);
       const idDet = det.recordset[0].idPedidoCompraDet as number;
       await pedir(tx)
-        .input("idOrdenCompra", sql.Int, orden.idOrdenCompra)
+        .input("idOrdenCompra", sql.Int, idOrden)
         .input("idPedidoCompraDet", sql.Int, idDet)
-        .input("lineNum", sql.Int, line)
+        .input("lineNum", sql.Int, lineaOrden)
         .input("descripcion", sql.NVarChar(250), l.descripcion)
         .input("itemNo", sql.NVarChar(50), l.itemNo)
         .input("unitOfMeasureCode", sql.NVarChar(20), l.unidad)
@@ -493,16 +599,33 @@ export async function updateSubcontrato(input: EditSubcontratoDB): Promise<void>
         .query(`INSERT dbo.OrdenCompraDet (idOrdenCompra,idPedidoCompraDet,lineNum,tipoLinea,descripcion,itemNo,unitOfMeasureCode,locationCode,quantity,quantityRecibida,quantityFacturada,directUnitCost,vatPct,lineDiscountPct,jobNo,taskNo,fechaCreacion,creadoPor)
                 VALUES (@idOrdenCompra,@idPedidoCompraDet,@lineNum,'articulo',@descripcion,@itemNo,@unitOfMeasureCode,'',@quantity,0,0,@directUnitCost,13,0,@jobNo,@taskNo,getdate(),@creadoPor)`);
       line += 10000;
+      lineaOrden += 10000;
     }
 
-    // El subcontrato queda como nació: todo ordenado y esperando aprobación.
+    // El subcontrato queda como nació: todo ordenado (y la línea ya no figura devuelta,
+    // porque se reinsertó).
     await pedir(tx).input("id", sql.Int, input.id).input("e", sql.Int, idEnOrden)
       .query("UPDATE dbo.PedidoCompra SET idEstado=@e, fechaModificacion=getdate() WHERE idPedidoCompra=@id");
 
     const detalle = `${input.lineas.length} servicio(s) · ${input.proveedorNombre ?? input.proveedorNo}`;
-    await logMov(tx, { entidad: "pedido", idEntidad: input.id, documentoNo: pedidoNo, tipoMovimiento: "editado", detalle, usuario: input.usuario, rol: input.rol });
-    await logMov(tx, { entidad: "orden", idEntidad: Number(orden.idOrdenCompra), documentoNo: orden.ordenNo ?? "", tipoMovimiento: "editado", estadoAnterior: estadoOrden, estadoNuevo: "pendiente_aprobacion", detalle: `Subcontrato ${pedidoNo} corregido · ${detalle}`, usuario: input.usuario, rol: input.rol });
+    const estadoPedido = codigoDeId(chk.recordset[0]?.idEstado ?? null);
+    const cambioPedido = estadoPedido && estadoPedido !== "en_orden" ? { estadoAnterior: estadoPedido, estadoNuevo: "en_orden" } : {};
+    const numeroVisible = bcNo || etiquetaInterna(ordenNo);
+    const detallePedido = !orden
+      ? `${detalle} · orden nueva ${numeroVisible}, pendiente de aprobación`
+      : !viva
+        ? `${detalle} · vuelve a la orden ${numeroVisible}`
+        : detalle;
+    await logMov(tx, { entidad: "pedido", idEntidad: input.id, documentoNo: pedidoNo, tipoMovimiento: "editado", ...cambioPedido, detalle: detallePedido, usuario: input.usuario, rol: input.rol });
+    if (!orden) {
+      await logMov(tx, { entidad: "orden", idEntidad: idOrden, documentoNo: ordenNo, tipoMovimiento: "creado", estadoNuevo: "pendiente_aprobacion", detalle: `Subcontrato ${pedidoNo} corregido por el ingeniero${previa ? ` (Proveeduría lo había devuelto de la orden ${previa.bcNumber || etiquetaInterna(previa.numero)})` : ""} · ${detalle}`, usuario: input.usuario, rol: input.rol });
+    } else if (destino === "proveeduria") {
+      await logMov(tx, { entidad: "orden", idEntidad: idOrden, documentoNo: ordenNo, tipoMovimiento: "editado", estadoAnterior: estadoOrden, estadoNuevo: "abierto", detalle: `Subcontrato ${pedidoNo} corregido por el ingeniero · ${detalle} · falta reenviarla a aprobación: eso le pasa las líneas nuevas al pedido ${bcNo} de Business Central`, usuario: input.usuario, rol: input.rol });
+    } else {
+      await logMov(tx, { entidad: "orden", idEntidad: idOrden, documentoNo: ordenNo, tipoMovimiento: "editado", estadoAnterior: estadoOrden, estadoNuevo: "pendiente_aprobacion", detalle: `Subcontrato ${pedidoNo} corregido · ${detalle}`, usuario: input.usuario, rol: input.rol });
+    }
     await tx.commit();
+    return { destino, orden: numeroVisible, nueva: !orden };
   } catch (e) {
     await tx.rollback();
     throw e;

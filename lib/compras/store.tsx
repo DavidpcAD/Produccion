@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { usePathname } from "next/navigation";
 import type {
   Almacen, Articulo, Maquina, Movimiento, Notificacion, Obra, Orden, OrdenLinea, Pedido, PedidoLinea,
-  PlanCategoria, PlanFila, Proveedor, Recepcion, RecepcionLinea, Role, TipoSolicitud,
+  PlanCategoria, PlanFila, Proveedor, Recepcion, RecepcionLinea, ResultadoEdicionSubcontrato, Role, TipoSolicitud,
   NotaCreditoLinea, MotivoNC,
 } from "./types";
 import * as seed from "./seed";
@@ -91,9 +91,10 @@ interface StoreShape {
   addPedido: (input: NewPedidoInput) => Promise<Pedido>;
   editPedido: (id: string, input: NewPedidoInput) => Promise<void>;
   /** SUBCONTRATO: el pedido y su orden se corrigen juntos — el proveedor, la moneda y
-   *  los MONTOS viven en la orden, no en la tabla del pedido. Vuelve a quedar pendiente
-   *  de aprobación. Solo mientras la orden no se haya lanzado a BC. */
-  editSubcontrato: (id: string, input: NewPedidoInput, orden: { proveedorNo: string; proveedorNombre?: string; currencyCode: string; montos: number[] }) => Promise<void>;
+   *  los MONTOS viven en la orden, no en la tabla del pedido. Si Proveeduría lo devolvió
+   *  y ya no tiene orden, se le arma una. Devuelve a dónde quedó (aprobación, o
+   *  Proveeduría cuando la orden ya vive en BC). */
+  editSubcontrato: (id: string, input: NewPedidoInput, orden: { proveedorNo: string; proveedorNombre?: string; currencyCode: string; montos: number[] }) => Promise<ResultadoEdicionSubcontrato>;
   updatePedido: (p: Pedido) => void;
   setPedidoEstado: (id: string, estado: Pedido["estado"]) => Promise<void>;
   deletePedido: (id: string) => Promise<void>;
@@ -545,7 +546,7 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
     // transacción). `montos[i]` es el monto de `input.lineas[i]`.
     const editSubcontrato: StoreShape["editSubcontrato"] = async (id, input, orden) => {
       if (USE_API) {
-        await api.putSubcontrato(id, {
+        const r = await api.putSubcontrato(id, {
           obra: input.obraCodigo, obraNombre: input.obraNombre, prioridad: input.prioridad,
           notas: input.notas, usuario: persona, rol: rolActual,
           proveedorNo: orden.proveedorNo, proveedorNombre: orden.proveedorNombre, currencyCode: orden.currencyCode,
@@ -555,32 +556,41 @@ export function StoreProvider({ children, useApi }: { children: React.ReactNode;
           })),
         });
         await refreshFromApi();
-        return;
+        return { destino: r.destino, orden: r.orden, nueva: r.nueva };
       }
+      // Sin orden ligada (devuelto desde la orden): en el modo demo se arma una nueva,
+      // igual que en el servidor. El número se calcula FUERA del updater (ver createOrden).
+      const prevData = data.pedidos.find((x) => x.id === id);
+      const ocData = data.ordenes.find((o) => o.lineas.some((ol) => prevData?.lineas.some((pl) => pl.id === ol.pedidoLineaId)));
+      const numeroNueva = ocData ? ocData.numero : nextNumero("CP", data.ordenes.map((o) => o.numero));
       setData((d) => {
         const prev = d.pedidos.find((x) => x.id === id);
         const lineas = input.lineas.map((l) => ({ ...l, id: uid(), cantidadOrdenada: l.cantidad, enOrden: true }));
         const oc = d.ordenes.find((o) => o.lineas.some((ol) => prev?.lineas.some((pl) => pl.id === ol.pedidoLineaId)));
         const mov = mkMov({ entidad: "pedido", idEntidad: id, documentoNo: prev?.numero ?? "", tipoMovimiento: "editado", detalle: `${lineas.length} servicio(s) · ${orden.proveedorNombre ?? orden.proveedorNo}` });
+        const lineasOrden: OrdenLinea[] = lineas.map((l, i) => ({
+          id: uid(), tipo: "articulo" as const, articuloId: l.articuloId, pedidoLineaId: l.id, pedidoNumero: prev?.numero,
+          descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad, almacen: "",
+          precioUnitario: orden.montos[i] ?? 0, ivaPct: 13, proyecto: l.obraCodigo, taskNo: l.taskNo,
+          cantidadRecibida: 0, cantidadFacturada: 0,
+        }));
+        const cabecera = {
+          proveedorNo: orden.proveedorNo, proveedorNombre: orden.proveedorNombre,
+          currencyCode: orden.currencyCode, estado: "pendiente_aprobacion" as Orden["estado"],
+        };
         return {
           ...d,
           pedidos: d.pedidos.map((x) => (x.id === id ? {
             ...x, obraCodigo: input.obraCodigo, obraNombre: input.obraNombre,
             prioridad: input.prioridad, notas: input.notas, estado: "en_orden" as Pedido["estado"], lineas,
           } : x)),
-          ordenes: oc ? d.ordenes.map((o) => (o.id === oc.id ? {
-            ...o, proveedorNo: orden.proveedorNo, proveedorNombre: orden.proveedorNombre,
-            currencyCode: orden.currencyCode, estado: "pendiente_aprobacion" as Orden["estado"],
-            lineas: lineas.map((l, i) => ({
-              id: uid(), tipo: "articulo" as const, articuloId: l.articuloId, pedidoLineaId: l.id, pedidoNumero: prev?.numero,
-              descripcion: l.descripcion, cantidad: l.cantidad, unidad: l.unidad, almacen: "",
-              precioUnitario: orden.montos[i] ?? 0, ivaPct: 13, proyecto: l.obraCodigo, taskNo: l.taskNo,
-              cantidadRecibida: 0, cantidadFacturada: 0,
-            })),
-          } : o)) : d.ordenes,
+          ordenes: oc
+            ? d.ordenes.map((o) => (o.id === oc.id ? { ...o, ...cabecera, lineas: lineasOrden } : o))
+            : [{ id: uid(), numero: numeroNueva, proveedorId: orden.proveedorNo, fecha: todayISO(), versionesArchivadas: 0, ...cabecera, lineas: lineasOrden }, ...d.ordenes],
           movimientos: [mov, ...d.movimientos],
         };
       });
+      return { destino: "aprobacion", orden: numeroOrden({ numero: numeroNueva, bcNumber: ocData?.bcNumber }), nueva: !ocData };
     };
 
     const updatePedido: StoreShape["updatePedido"] = (p) =>

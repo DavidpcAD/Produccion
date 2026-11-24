@@ -1,5 +1,5 @@
 // Cliente del front-end para las API routes (modo API).
-import type { Movimiento, Orden, OrdenSinAprobacion, Pedido, Recepcion, NotaCreditoLinea } from "./types";
+import type { Movimiento, Orden, OrdenPreviaSubcontrato, OrdenSinAprobacion, Pedido, Recepcion, ResultadoEdicionSubcontrato, NotaCreditoLinea } from "./types";
 import { aplicarPermisoServidor } from "./cache-local";
 
 export const USE_API = process.env.NEXT_PUBLIC_USE_API === "1";
@@ -101,8 +101,11 @@ export const api = {
   deletePedido: (id: string, body: unknown) =>
     fetch(`/api/compras/pedidos/${id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
   /** Subcontrato: pedido + orden se corrigen juntos (los montos viven en la orden). */
-  putSubcontrato: (id: string, body: unknown) =>
+  putSubcontrato: (id: string, body: unknown): Promise<ResultadoEdicionSubcontrato> =>
     fetch(`/api/compras/pedidos/${id}/subcontrato`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),
+  /** La orden de la que Proveeduría devolvió el subcontrato (null si no hay rastro). */
+  ordenPreviaSubcontrato: (id: string): Promise<{ orden: OrdenPreviaSubcontrato | null }> =>
+    fetch(`/api/compras/pedidos/${id}/subcontrato`, { cache: "no-store" }).then(jsonOrThrow),
 
   createOrden: (body: unknown): Promise<{ idOrdenCompra: number }> =>
     fetch("/api/compras/ordenes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(jsonOrThrow),

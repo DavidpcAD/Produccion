@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, LineaPedidaInfo, useToast } from "@/components/compras/ui";
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
-import { ALMACEN_GENERAL, destinoLabel, esConsumoInmediato, esSubcontrato, formatDate, money, montoDeLineaSubcontrato, num, numeroOrden, obraDeLinea, ordenesDePedido, pedidoBadge, pedidoLineaDadaDeBaja, pedidoLineaPorRecibir, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
+import { api, USE_API } from "@/lib/compras/api";
+import type { OrdenPreviaSubcontrato } from "@/lib/compras/types";
+import { ALMACEN_GENERAL, destinoLabel, esConsumoInmediato, esSubcontrato, etiquetaInterna, formatDate, money, montoDeLineaSubcontrato, num, numeroOrden, obraDeLinea, ordenesDePedido, pedidoBadge, pedidoLineaDadaDeBaja, pedidoLineaPorRecibir, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
 export default function PedidoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +20,21 @@ export default function PedidoDetallePage() {
   const [editarOpen, setEditarOpen] = useState(false);
 
   const pedido = pedidos.find((p) => p.id === id);
+  // SUBCONTRATO SIN ORDEN: Proveeduría lo devolvió desde la orden y la devolución le
+  // borró la línea, así que ya nada lo liga a ella. Se pregunta de cuál salió para
+  // precargar el subcontratista al corregirlo y decir a dónde va a volver.
+  const subSinOrden = !!pedido && esSubcontrato(pedido) && pedido.estado !== "cerrado"
+    && ordenesDePedido(ordenes, pedido).length === 0;
+  const [ordenPrevia, setOrdenPrevia] = useState<OrdenPreviaSubcontrato | null>(null);
+  useEffect(() => {
+    if (!subSinOrden || !USE_API) return;
+    let vivo = true;
+    api.ordenPreviaSubcontrato(id)
+      .then((r) => { if (vivo) setOrdenPrevia(r.orden); })
+      .catch(() => { /* sin el dato igual se corrige: el subcontratista se elige a mano */ });
+    return () => { vivo = false; };
+  }, [id, subSinOrden]);
+
   if (!pedido) {
     return (
       <AppShell role="ingenieria">
@@ -55,12 +72,20 @@ export default function PedidoDetallePage() {
   // Precio UNITARIO de la línea en la orden (lo que se teclea en el panel). Ojo:
   // `montoDeLineaSubcontrato` devuelve el total de la línea (cantidad × precio).
   const precioSub = (pedidoLineaId: string) => ordenSub?.lineas.find((ol) => ol.pedidoLineaId === pedidoLineaId)?.precioUnitario ?? 0;
-  // Un SUBCONTRATO se edita mientras su orden siga siendo de esta app: sin pedido en
-  // Business Central, sin lanzar y sin que nadie haya recibido o facturado. Después
-  // manda BC y tocarlo acá no cambiaría nada allá.
-  const subEditable = !!ordenSub && !ordenSub.bcNumber
-    && ordenSub.estado !== "lanzado" && ordenSub.estado !== "completado"
-    && ordenSub.lineas.every((l) => !l.cantidadRecibida && !l.cantidadFacturada);
+  // Un SUBCONTRATO se edita mientras su orden no se haya lanzado ni recibido/facturado.
+  // Si ya vive en Business Central, solo Abierta o Rechazada (en manos de Proveeduría,
+  // que al reenviarla le pasa las líneas nuevas a BC); en aprobación allá, no.
+  // SIN orden (Proveeduría lo devolvió desde la orden, o falló el envío al crearlo)
+  // también: al guardar vuelve a la orden que espera la corrección o se arma una nueva.
+  const subEditable = !ordenSub || (
+    ordenSub.estado !== "lanzado" && ordenSub.estado !== "completado"
+    && (!ordenSub.bcNumber || ordenSub.estado === "abierto" || ordenSub.estado === "rechazado")
+    && ordenSub.lineas.every((l) => !l.cantidadRecibida && !l.cantidadFacturada));
+  // Sin orden: a dónde va al corregirlo. `espera` = la orden sigue viva en BC.
+  const vuelveA = !ordenSub && ordenPrevia?.espera ? ordenPrevia.bcNumber : null;
+  // El subcontratista y la moneda para precargar el editor: de la orden viva, o de la
+  // que tenía antes de que se lo devolvieran.
+  const provSub = ordenSub ?? (ordenPrevia ? { proveedorNo: ordenPrevia.proveedorNo, proveedorId: undefined, currencyCode: ordenPrevia.currencyCode } : undefined);
   // Material / stock / repuesto / activo: se edita mientras quede alguna línea libre.
   const editable = pedido.estado !== "cerrado" && (esSub ? subEditable : lineasEditables.length > 0);
   // Ya salió de Ingeniería (está en la cola de Proveeduría / de Aprobación) pero
@@ -86,7 +111,9 @@ export default function PedidoDetallePage() {
     // unitario, que vive en la orden. Sin esto el panel abría el subcontrato vacío de
     // plata y el ingeniero tenía que volver a teclear todo.
     detalle: esSub ? l.descripcion : undefined,
-    monto: esSub ? precioSub(l.id) : undefined,
+    // Sin orden el monto se perdió con la devolución (vivía en la línea de la orden):
+    // va vacío para que se vuelva a escribir, no en 0.
+    monto: esSub ? (precioSub(l.id) || undefined) : undefined,
   });
   const seedBase = {
     tipo: pedido.tipoSolicitud,
@@ -99,8 +126,8 @@ export default function PedidoDetallePage() {
     almacen: pedido.lineas.find((l) => !!l.almacen && !l.taskNo)?.almacen || undefined,
     idClasificacion: pedido.idClasificacion ?? null,
     // Subcontrato: subcontratista y moneda son de la orden.
-    proveedorId: ordenSub?.proveedorNo ?? ordenSub?.proveedorId,
-    currency: ordenSub?.currencyCode,
+    proveedorId: provSub?.proveedorNo ?? provSub?.proveedorId,
+    currency: provSub?.currencyCode,
   };
   // "Copiar" arranca un pedido nuevo: lleva TODAS las líneas, incluidas las que ya
   // tienen orden de compra (son solo la semilla de un pedido distinto).
@@ -145,18 +172,12 @@ export default function PedidoDetallePage() {
                 ⧉ Copiar
               </Button>
             )}
-            {/* Subcontrato en borrador = su orden no se llegó a crear (falló el envío).
-                No se puede "mandar a proveeduría" ni editar sin los montos: se elimina y
-                se vuelve a crear (el panel recupera lo que se había tecleado). */}
+            {/* Subcontrato en borrador o devuelto: se corrige con el editor (al guardar
+                vuelve a tener orden) o, si ya no sirve, se elimina. */}
             {esSub && (pedido.estado === "borrador" || pedido.estado === "devuelto") && (
-              <>
-                <span className="ds-muted ds-label" style={{ alignSelf: "center", maxWidth: 320 }}>
-                  Este subcontrato quedó sin orden de compra. Eliminalo y volvé a crearlo desde “Nuevo pedido”.
-                </span>
-                <Button variant="outline" onClick={async () => { await deletePedido(pedido.id); toast("Subcontrato eliminado"); router.push("/compras/ingenieria"); }}>
-                  Eliminar
-                </Button>
-              </>
+              <Button variant="outline" onClick={async () => { await deletePedido(pedido.id); toast("Subcontrato eliminado"); router.push("/compras/ingenieria"); }}>
+                Eliminar
+              </Button>
             )}
             {!esSub && esBorrador && (
               <Button variant="outline" onClick={async () => { await deletePedido(pedido.id); toast("Pedido eliminado"); router.push("/compras/ingenieria"); }}>
@@ -174,8 +195,8 @@ export default function PedidoDetallePage() {
             {/* Editar vale también con el pedido YA enviado: el editor solo ofrece las
                 líneas que Proveeduría todavía no ordenó. */}
             {editable && (
-              <Button variant="outline" onClick={() => setEditarOpen(true)}>
-                {hayLineasDevueltas ? "Corregir línea(s) devuelta(s)" : "Editar"}
+              <Button variant={esSub && !ordenSub ? undefined : "outline"} onClick={() => setEditarOpen(true)}>
+                {hayLineasDevueltas ? "Corregir línea(s) devuelta(s)" : esSub && !ordenSub ? "Corregir y enviar" : "Editar"}
               </Button>
             )}
             {!esSub && esBorrador && (
@@ -186,8 +207,8 @@ export default function PedidoDetallePage() {
             {!esBorrador && !editable && (
               <span className="ds-muted ds-label" style={{ alignSelf: "center" }}>
                 {esSub
-                  ? (ordenSub?.bcNumber
-                      ? `La orden ya existe en Business Central (${ordenSub.bcNumber}) · se corrige allá`
+                  ? (ordenSub?.bcNumber && ordenSub.estado === "pendiente_aprobacion"
+                      ? `La orden ${ordenSub.bcNumber} está en aprobación en Business Central · para corregirla, pedile a Proveeduría que la devuelva`
                       : "La orden ya se lanzó o se recibió · no editable")
                   : "Proveeduría ya generó orden de compra · no editable"}
               </span>
@@ -330,9 +351,20 @@ export default function PedidoDetallePage() {
                 : <>Orden <strong>{numeroOrden(ordenSub)}</strong>. Falta recibir la factura del servicio.</>}
           </p>
         )}
-        {esSub && editableEnviado && (
+        {esSub && editableEnviado && ordenSub && (
           <p className="ds-muted ds-label mt-2">
-            Podés corregirlo con «Editar» (alcance, montos o subcontratista) mientras no se apruebe: al guardar vuelve a quedar pendiente de aprobación.
+            {ordenSub.bcNumber
+              ? <>Podés corregirlo con «Editar» (alcance, montos o subcontratista). Como la orden ya existe en Business Central, al guardar queda abierta para que Proveeduría la reenvíe a aprobación con los cambios.</>
+              : <>Podés corregirlo con «Editar» (alcance, montos o subcontratista) mientras no se apruebe: al guardar vuelve a quedar pendiente de aprobación.</>}
+          </p>
+        )}
+        {/* Sin orden: decir a dónde va al corregirlo y que el monto hay que volver a
+            escribirlo (vivía en la línea de la orden y la devolución la borró). */}
+        {esSub && !ordenSub && editable && (
+          <p className="ds-muted ds-label mt-4">
+            {vuelveA
+              ? <>Al corregirlo vuelve a la orden <strong>{vuelveA}</strong>, que ya existe en Business Central y lo está esperando: queda abierta para que Proveeduría la reenvíe a aprobación. Escribí el monto de nuevo.</>
+              : <>Este subcontrato ya no tiene orden de compra{ordenPrevia ? <> (Proveeduría lo devolvió desde la {ordenPrevia.bcNumber || etiquetaInterna(ordenPrevia.numero)})</> : null}. Al corregirlo se arma una orden nueva y va a aprobación. Escribí el monto de nuevo.</>}
           </p>
         )}
 

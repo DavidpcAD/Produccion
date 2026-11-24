@@ -162,6 +162,27 @@ export interface Pedido {
   lineas: PedidoLinea[];
 }
 
+/** La orden de la que Proveeduría DEVOLVIÓ un subcontrato.
+ *
+ *  Al devolverlo desde la orden (`devolverLineasDeOrden`, en OrdenesCompra) se le
+ *  BORRA la línea a la orden, así que el subcontrato se queda sin orden ligada y la
+ *  orden, o se descarta (no estaba en BC), o se queda viva y vacía "esperando la
+ *  corrección" (ya tenía N.º de BC y no se borra un pedido de allá).
+ *
+ *  `espera` = viva, sin nada que comprar y con N.º de BC: el servicio corregido tiene
+ *  que volver a ESA orden. Armarle otra dejaría dos pedidos en BC por lo mismo. */
+export interface OrdenPreviaSubcontrato {
+  id: number; numero: string; bcNumber?: string; estado: string;
+  proveedorNo?: string; proveedorNombre?: string; currencyCode?: string;
+  espera: boolean;
+}
+
+/** A dónde fue a parar un subcontrato corregido:
+ *   - "aprobacion": su orden (la misma o una nueva) quedó pendiente de aprobación.
+ *   - "proveeduria": la orden ya vive en BC; quedó Abierta para que Proveeduría la
+ *     reenvíe, que es el camino que le reescribe las líneas al pedido de allá. */
+export interface ResultadoEdicionSubcontrato { destino: "aprobacion" | "proveeduria"; orden: string; nueva: boolean }
+
 // ============================ ORDEN (Proveeduría · Angie) ===================
 export type OrdenEstado =
   | "abierto"
