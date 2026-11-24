@@ -1,6 +1,6 @@
 import type { Articulo, Movimiento, Orden, OrdenLinea, Pedido, PedidoLinea, Prioridad, Recepcion, Role, TipoSolicitud } from "./types";
 import type { EstadoBcOrden } from "./api";
-import { almacenesQueRecibe } from "../permissions";
+import { almacenQuePide, almacenesQueRecibe } from "../permissions";
 
 // Almacén de inventario por defecto (el General). El pedido puede elegir OTRO
 // almacén real (Agregados, Herramienta, Maquinaria…): eso viaja en `almacen` de la
@@ -64,6 +64,47 @@ export type ClaseAlmacen = "real" | "virtual";
 // marca NO cuenta: la regla por código de arriba metía virtuales (GEN-*, HER…).
 export function esBodegaReal(a: { codigo: string; clase?: ClaseAlmacen | null }): boolean {
   return a.clase === "real";
+}
+
+// Almacén de FÁBRICA ("ALMACEN FABRICA" en BC). Desde el 2026-11-19 todo lo que iba
+// a una bodega de fábrica (F-*) se pide acá, y desde el 2026-11-24 eso vale para
+// TODO el mundo, no solo para la fábrica (decisión de David).
+export const ALMACEN_FABRICA = "ALM-FAB";
+
+/** Bodegas propias de cada fábrica en BC: F-AGREGADO, F-MADERAS, F-MAD-NUE,
+ *  F-METALES, F-MUEBLES, F-PREFA. Ya no se piden: las reemplaza ALM-FAB. */
+export function esBodegaDeFabrica(codigo: string): boolean {
+  return (codigo ?? "").trim().toUpperCase().startsWith("F-");
+}
+
+/** El almacén al que se pide hoy en lugar de `codigo`: una bodega F-* pasa a
+ *  ALM-FAB; cualquier otro queda igual. Para un pedido copiado o un borrador. */
+export function almacenVigente(codigo: string): string {
+  return esBodegaDeFabrica(codigo) ? ALMACEN_FABRICA : codigo;
+}
+
+/**
+ * Almacenes que ofrece el pedido con ALM o Stock, ya ordenados.
+ *
+ *  · Los marcados Real en Business Central → Almacenes, los ALM-* primero. Sin
+ *    "Todos": lo que es para una obra va por CD.
+ *  · NUNCA las bodegas F-*, aunque estén marcadas Real: en su lugar va ALM-FAB, que
+ *    sale siempre, aunque nadie lo haya marcado y aunque BC todavía no lo devuelva.
+ *  · `primero`: el almacén de quien pide, arriba de todo (ALM-FAB para la fábrica,
+ *    ver `almacenQuePide`).
+ *  · El ya elegido se conserva aunque no toque: un pedido viejo que se edita.
+ */
+export function almacenesParaPedir(
+  catalogo: { codigo: string; nombre?: string; clase?: ClaseAlmacen | null }[],
+  elegido: string,
+  primero: string | null = null,
+): { codigo: string; nombre: string }[] {
+  const ofrece = (a: { codigo: string; clase?: ClaseAlmacen | null }) =>
+    a.codigo === elegido || a.codigo === ALMACEN_FABRICA || (esBodegaReal(a) && !esBodegaDeFabrica(a.codigo));
+  const lista = catalogo.filter(ofrece).map((a) => ({ codigo: a.codigo, nombre: (a.nombre ?? "").trim() || a.codigo }));
+  if (!lista.some((a) => a.codigo === ALMACEN_FABRICA)) lista.push({ codigo: ALMACEN_FABRICA, nombre: "Almacén Fábrica" });
+  const orden = (c: string) => (c === primero ? 0 : c.toUpperCase().startsWith("ALM-") ? 1 : 2);
+  return lista.sort((a, b) => orden(a.codigo) - orden(b.codigo) || a.codigo.localeCompare(b.codigo));
 }
 
 // ─── Obra vs almacén de una línea de pedido ─────────────────────────────────────
@@ -297,6 +338,14 @@ export function almacenesDeRecepcion(me: Sesion): string[] | null {
   const m = me?.modules ?? [];
   if (m.includes('ingenieria') || m.includes('admin')) return null;
   return almacenesQueRecibe(me?.roleNames);
+}
+
+/** Almacén al que pide esta persona por ser de una fábrica (ALM-FAB), o `null`.
+ *  Mismo corte que la recepción: Ingeniería y Super Admin no son "de fábrica". */
+export function almacenDeFabricaDe(me: Sesion): string | null {
+  const m = me?.modules ?? [];
+  if (m.includes('ingenieria') || m.includes('admin')) return null;
+  return almacenQuePide(me?.roleNames);
 }
 
 /** ¿Este pedido lo creó el usuario de la sesión? `creadoPorId` es el id estable

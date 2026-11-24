@@ -260,13 +260,19 @@ export function moduloPublicado(m: Modulo): boolean {
 
 const norm = (s?: string) => (s ?? '').trim().toLowerCase();
 
-/** Roles "satélite": una fábrica que pide su material y recibe SOLO lo que entra a
- *  SUS bodegas. La bodega central, en cambio, recibe todo lo que llega.
- *  Los códigos son los de la tabla Location de BC. Ojo con Maderas: son DOS bodegas
- *  de la misma fábrica —F-MADERAS ("Fabrica Maderas") y F-MAD-NUE ("Fabrica Maderas
- *  Nuevas")—, y en producción llega material a las dos. */
-const ALMACENES_DE_FABRICA: { rol: RegExp; almacenes: string[] }[] = [
-  { rol: /^fabrica.*madera/, almacenes: ['F-MADERAS', 'F-MAD-NUE'] },
+/** Roles "satélite": una fábrica que pide su material a SU almacén y recibe SOLO lo
+ *  que entra a SUS bodegas. La bodega central, en cambio, recibe todo lo que llega.
+ *  Los códigos son los de la tabla Location de BC.
+ *
+ *  · `pide`: el almacén con el que ARRANCA su pedido con ALM o Stock. Desde el
+ *    2026-11-19 la fábrica pide TODO a ALM-FAB ("ALMACEN FABRICA", nuevo en BC), que
+ *    reemplaza a las bodegas F-* (F-MADERAS, F-METALES, F-AGREGADO, F-PREFA…); desde
+ *    el 2026-11-24 las F-* no le salen a nadie (ver `almacenesParaPedir`).
+ *    Hoy el rol lo tienen solo Alessandra y Bryan.
+ *  · `recibe`: ALM-FAB y las dos de Maderas —F-MADERAS ("Fabrica Maderas") y
+ *    F-MAD-NUE ("Fabrica Maderas Nuevas")—, que todavía tienen órdenes en camino. */
+const ALMACENES_DE_FABRICA: { rol: RegExp; pide: string; recibe: string[] }[] = [
+  { rol: /^fabrica.*madera/, pide: 'ALM-FAB', recibe: ['ALM-FAB', 'F-MADERAS', 'F-MAD-NUE'] },
 ];
 
 /** Almacenes en los que recibe este usuario, o `null` si recibe TODO lo que llega.
@@ -278,9 +284,20 @@ export function almacenesQueRecibe(roleNames?: string[]): string[] | null {
   const codigos = new Set<string>();
   for (const r of roleNames ?? []) {
     const n = norm(r);
-    for (const f of ALMACENES_DE_FABRICA) if (f.rol.test(n)) f.almacenes.forEach((a) => codigos.add(a));
+    for (const f of ALMACENES_DE_FABRICA) if (f.rol.test(n)) f.recibe.forEach((a) => codigos.add(a));
   }
   return codigos.size ? [...codigos] : null;
+}
+
+/** Almacén al que pide este usuario por ser de una fábrica (ALM-FAB), o `null` si
+ *  no es de ninguna: ese pide a los almacenes físicos de siempre. */
+export function almacenQuePide(roleNames?: string[]): string | null {
+  for (const r of roleNames ?? []) {
+    const n = norm(r);
+    const f = ALMACENES_DE_FABRICA.find((x) => x.rol.test(n));
+    if (f) return f.pide;
+  }
+  return null;
 }
 
 /** ¿Es el rol de una fábrica satélite? (Fábrica de Maderas, hoy la única). */

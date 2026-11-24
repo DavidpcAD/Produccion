@@ -22,8 +22,9 @@ import { ToggleCards } from "@/components/ds/ToggleCards/ToggleCards";
 import { Icon } from "@/components/ds/Icon/Icon";
 import { Button, Field, Textarea, useToast } from "@/components/compras/ui";
 import { useStore, type NewPedidoInput } from "@/lib/compras/store";
+import { useSession } from "@/hooks/useSession";
 import type { Almacen, Articulo, Maquina, Obra, Pedido, TipoSolicitud } from "@/lib/compras/types";
-import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, OBRA_MAQUINARIA, TAREA_PARQUE_MAQUINARIA, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, esBodegaReal, etiquetaTipoArticulo, money, num, numeroOrden, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
+import { ALMACEN_GENERAL, ALMACEN_MAQUINARIA, OBRA_MAQUINARIA, TAREA_PARQUE_MAQUINARIA, almacenDeFabricaDe, almacenesParaPedir, almacenVigente, cantidadEntreUnidades, conversionFiel, equivalenciaUnidad, etiquetaTipoArticulo, money, num, numeroOrden, redondearCantidad, saltarCantidad, separarVariantePegada, unidadPorDefecto, unidadesOfrecidas, type UnidadItem } from "@/lib/compras/helpers";
 import { buscarOrdenado } from "@/lib/utilidades/buscar";
 
 type Variante = { code: string; descripcion: string };
@@ -940,6 +941,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
 }) {
   const { articulos, obras, almacenes, proveedores, usuario, addPedido, editPedido, editSubcontrato, setPedidoEstado, createOrden, setOrdenEstado } = useStore();
   const toast = useToast();
+  // La FÁBRICA (rol Fabrica Maderas: Alessandra y Bryan) arranca en ALM-FAB, el
+  // almacén de fábrica; para el resto es null y arranca en el General. Que nadie
+  // pida a las bodegas F-* lo resuelve `almacenesParaPedir` para todos.
+  const almFab = almacenDeFabricaDe(useSession());
+  const almacenDefecto = almFab ?? ALM_GENERAL;
 
   // Catálogo REAL de Business Central (respaldo al store si BC no responde).
   const [bcArt, setBcArt] = useState<Articulo[] | null>(null);
@@ -956,11 +962,16 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   // mientras lo hacía en el montaje toda lista pagaba el catálogo de artículos, las
   // obras, los almacenes, las plantillas y las existencias del almacén —varios
   // segundos contra BC— solo para mostrar una tabla que ya tenía todo lo que necesita.
+  //
+  // Sin "cancelar" al cerrar: si se abría y se cerraba antes de que llegaran (tardan
+  // ~25 s), la respuesta se tiraba, la bandera de abajo ya decía "pedidos" y al
+  // reabrir quedaba el respaldo del store —datos de DEMO— hasta recargar la página.
+  // El componente sigue montado con el panel cerrado, así que guardar lo que llega
+  // tarde es seguro.
   const catalogosPedidos = useRef(false);
   useEffect(() => {
     if (!open || catalogosPedidos.current) return;
     catalogosPedidos.current = true;
-    let cancel = false;
     (async () => {
       try {
         // Los tres catálogos van juntos: antes el de artículos se esperaba solo y
@@ -976,7 +987,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
           id: i.id, code: i.code, descripcion: i.descripcion, unidad: i.unidad || "UND", unidadCompra: i.unidadCompra || undefined, almacenDefault: "", precioReferencia: 0,
           tipo: (i.tipo === "servicio" || i.tipo === "no-inventario" ? i.tipo : "inventario") as Articulo["tipo"],
         }));
-        if (cancel) return;
         if (items.length) setBcArt(items);
         if (Array.isArray(dataItems.bloqueados) && dataItems.bloqueados.length) {
           setBcBloqueados(new Set(dataItems.bloqueados.map((c: unknown) => String(c).trim().toUpperCase())));
@@ -985,7 +995,6 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         if (almBc.length) setBcAlm(almBc);
       } catch { catalogosPedidos.current = false; /* respaldo del store; reintenta al reabrir */ }
     })();
-    return () => { cancel = true; };
   }, [open]);
   // Materiales sintetizados desde una plantilla cuando su código NO está en el
   // catálogo cargado (ej. BC no devolvió el catálogo completo). Así la plantilla
@@ -1038,7 +1047,11 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   function elegirDestino(v: DestinoMat) { setDestinoMat(v); setDestinoElegido(true); }
   // Almacén REAL de BC elegido (ALM-GRAL, Agregados, Herramienta, Maquinaria…).
   // Se usa con el tag ALM (material/repuesto) y en el pedido de Stock.
-  const [almacenSel, setAlmacenSel] = useState<string>(ALM_GENERAL);
+  // "" = el de siempre de quien pide: ALM-GRAL, o ALM-FAB para la fábrica. Se
+  // resuelve al leer y no con un efecto: el panel vive montado y la sesión llega
+  // después del primer render.
+  const [almacenElegido, setAlmacenSel] = useState<string>("");
+  const almacenSel = almacenElegido || almacenDefecto;
   const [destino, setDestino] = useState(""); // repuesto → máquina
   // REPUESTO en CD: el PROYECTO siempre es MAQ (MAQUINARIA), pero la ACTIVIDAD se
   // elige entre las tareas de ese proyecto en BC (CMAQ, MACT, FOR, POL, CERTIF).
@@ -1299,17 +1312,12 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
     return obraItems;
   }, [esRepuesto, obraItems, catMaquinas]);
   // Almacenes donde se puede pedir con ALM o Stock: SOLO los FÍSICOS, o sea los
-  // marcados Real en Business Central → Almacenes (hoy Almacén General, Almacén
-  // Barani y Fábrica Maderas). Sin "Todos": ALM es pedir material a una bodega
-  // física; lo que es para una obra va por CD. El ya elegido se conserva aunque no
-  // sea físico (un pedido viejo que se edita o copia). Los ALM-* van primero.
-  const almacenItems: Item[] = useMemo(() => {
-    const orden = (c: string) => (c.toUpperCase().startsWith("ALM-") ? 0 : 1);
-    return [...catAlm]
-      .filter((a) => esBodegaReal(a) || a.codigo === almacenSel)
-      .sort((a, b) => orden(a.codigo) - orden(b.codigo) || a.codigo.localeCompare(b.codigo))
-      .map((a) => ({ id: a.codigo, title: (a.nombre ?? "").trim() || a.codigo, sub: a.codigo }));
-  }, [catAlm, almacenSel]);
+  // marcados Real en Business Central → Almacenes, sin las bodegas F-* y con ALM-FAB
+  // (primero para la fábrica). Detalle en `almacenesParaPedir`.
+  const almacenItems: Item[] = useMemo(
+    () => almacenesParaPedir(catAlm, almacenSel, almFab).map((a) => ({ id: a.codigo, title: a.nombre, sub: a.codigo })),
+    [catAlm, almacenSel, almFab],
+  );
   const almacenNombre = almacenItems.find((a) => a.id === almacenSel)?.title ?? almacenSel;
   // La unidad NO va en la lista de búsqueda (solo el código); la unidad se muestra
   // en la línea ya agregada, junto a la cantidad.
@@ -1392,7 +1400,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   const totalSub = useMemo(() => validLines.reduce((t, l) => t + l.cantidad * (l.monto ?? 0), 0), [validLines]);
 
   function reset() {
-    setTipo("material"); setDestinoMat("almacen"); setDestinoElegido(false); setAlmacenSel(ALM_GENERAL); setDestino(""); setPrioridad("normal");
+    setTipo("material"); setDestinoMat("almacen"); setDestinoElegido(false); setAlmacenSel(""); setDestino(""); setPrioridad("normal");
     setTareaMaq(TAREA_PARQUE_MAQUINARIA); setTareaMaqNombre("PARQUE MAQUINARIA COSTES");
     setProveedorId(""); setCurrency("");
     setLineas([]); setGrupos([]); setNotas(""); setSaving(false); setFTipoPl("todas");
@@ -1592,7 +1600,9 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
       const t = s.lineas.find((l) => !!l.taskNo);
       if (t?.taskNo) { setTareaMaq(t.taskNo); setTareaMaqNombre(t.taskDescr ?? ""); }
     }
-    if (s.almacen) setAlmacenSel(s.almacen);
+    // Copiando un pedido que iba a una bodega F-*, el nuevo va a ALM-FAB. Editando
+    // uno que ya existe se respeta el suyo: se cambia a mano si hace falta.
+    if (s.almacen) setAlmacenSel(editandoId ? s.almacen : almacenVigente(s.almacen));
     // Subcontrato: el subcontratista y la moneda son de la orden, no del pedido.
     if (s.tipo === "subcontrato") { cargarProveedores(); setProveedorId(s.proveedorId ?? ""); setCurrency(s.currency ?? ""); }
     if (s.tipo === "stock") setFTipoPl("bodega");
@@ -1631,7 +1641,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function aplicarBorrador(b: BorradorPedido) {
-    setTipo(b.tipo); setDestinoMat(b.destinoMat); setDestinoElegido(true); setAlmacenSel(b.almacenSel);
+    setTipo(b.tipo); setDestinoMat(b.destinoMat); setDestinoElegido(true); setAlmacenSel(almacenVigente(b.almacenSel));
     setDestino(b.destino); setPrioridad(b.prioridad); setNotas(b.notas);
     setGrupos(b.grupos ?? []); setLineas(b.lineas ?? []);
     if (b.tipo === "subcontrato") { cargarProveedores(); setProveedorId(b.proveedorId ?? ""); setCurrency(b.currency ?? ""); }
