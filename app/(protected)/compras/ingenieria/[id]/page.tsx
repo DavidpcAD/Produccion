@@ -7,7 +7,7 @@ import { Badge, Button, Card, LineaPedidaInfo, useToast } from "@/components/com
 import { Timeline } from "@/components/compras/timeline";
 import { NuevaSolicitudSheet, type NuevaSolicitudSeed } from "@/components/compras/nueva-solicitud-sheet";
 import { useStore } from "@/lib/compras/store";
-import { api, USE_API } from "@/lib/compras/api";
+import { api } from "@/lib/compras/api";
 import type { OrdenPreviaSubcontrato } from "@/lib/compras/types";
 import { ALMACEN_GENERAL, destinoLabel, esConsumoInmediato, esSubcontrato, etiquetaInterna, formatDate, money, montoDeLineaSubcontrato, num, numeroOrden, obraDeLinea, ordenesDePedido, pedidoBadge, pedidoLineaDadaDeBaja, pedidoLineaPorRecibir, recibidoDeLineaPedido, tipoSolicitudBadge } from "@/lib/compras/helpers";
 
@@ -26,8 +26,12 @@ export default function PedidoDetallePage() {
   const subSinOrden = !!pedido && esSubcontrato(pedido) && pedido.estado !== "cerrado"
     && ordenesDePedido(ordenes, pedido).length === 0;
   const [ordenPrevia, setOrdenPrevia] = useState<OrdenPreviaSubcontrato | null>(null);
+  // Sin mirar el modo SQL a propósito (igual que Aprobación): ese lo decide el layout en
+  // runtime, y el `USE_API` de api.ts es el del BUILD, que en producción viene apagado.
+  // Con ese flag la pregunta nunca salía en producción y la pantalla prometía una orden
+  // nueva aunque la de BC estuviera esperando el subcontrato (PED-001171).
   useEffect(() => {
-    if (!subSinOrden || !USE_API) return;
+    if (!subSinOrden) return;
     let vivo = true;
     api.ordenPreviaSubcontrato(id)
       .then((r) => { if (vivo) setOrdenPrevia(r.orden); })
