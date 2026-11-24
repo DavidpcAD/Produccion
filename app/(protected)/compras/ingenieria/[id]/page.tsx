@@ -358,7 +358,7 @@ export default function PedidoDetallePage() {
         {esSub && editableEnviado && ordenSub && (
           <p className="ds-muted ds-label mt-2">
             {ordenSub.bcNumber
-              ? <>Podés corregirlo con «Editar» (alcance, montos o subcontratista). Como la orden ya existe en Business Central, al guardar queda abierta para que Proveeduría la reenvíe a aprobación con los cambios.</>
+              ? <>Podés corregirlo con «Editar» (alcance, montos o subcontratista). Como la orden ya existe en Business Central, al guardar queda abierta para que Proveeduría la lance con los cambios: si ya estaba aprobada sale de una vez, sin volver a aprobación.</>
               : <>Podés corregirlo con «Editar» (alcance, montos o subcontratista) mientras no se apruebe: al guardar vuelve a quedar pendiente de aprobación.</>}
           </p>
         )}
@@ -367,7 +367,7 @@ export default function PedidoDetallePage() {
         {esSub && !ordenSub && editable && (
           <p className="ds-muted ds-label mt-4">
             {vuelveA
-              ? <>Al corregirlo vuelve a la orden <strong>{vuelveA}</strong>, que ya existe en Business Central y lo está esperando: queda abierta para que Proveeduría la reenvíe a aprobación. Escribí el monto de nuevo.</>
+              ? <>Al corregirlo vuelve a la orden <strong>{vuelveA}</strong>, que ya existe en Business Central y lo está esperando: queda abierta para que Proveeduría la lance con el monto nuevo; si ya estaba aprobada sale de una vez, sin volver a aprobación. Escribí el monto de nuevo.</>
               : <>Este subcontrato ya no tiene orden de compra{ordenPrevia ? <> (Proveeduría lo devolvió desde la {ordenPrevia.bcNumber || etiquetaInterna(ordenPrevia.numero)})</> : null}. Al corregirlo se arma una orden nueva y va a aprobación. Escribí el monto de nuevo.</>}
           </p>
         )}

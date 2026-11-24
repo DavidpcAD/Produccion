@@ -620,7 +620,11 @@ export async function updateSubcontrato(input: EditSubcontratoDB): Promise<Resul
     if (!orden) {
       await logMov(tx, { entidad: "orden", idEntidad: idOrden, documentoNo: ordenNo, tipoMovimiento: "creado", estadoNuevo: "pendiente_aprobacion", detalle: `Subcontrato ${pedidoNo} corregido por el ingeniero${previa ? ` (Proveeduría lo había devuelto de la orden ${previa.bcNumber || etiquetaInterna(previa.numero)})` : ""} · ${detalle}`, usuario: input.usuario, rol: input.rol });
     } else if (destino === "proveeduria") {
-      await logMov(tx, { entidad: "orden", idEntidad: idOrden, documentoNo: ordenNo, tipoMovimiento: "editado", estadoAnterior: estadoOrden, estadoNuevo: "abierto", detalle: `Subcontrato ${pedidoNo} corregido por el ingeniero · ${detalle} · falta reenviarla a aprobación: eso le pasa las líneas nuevas al pedido ${bcNo} de Business Central`, usuario: input.usuario, rol: input.rol });
+      // CONTRATO con OrdenesCompra: tipo "editado" + "corregido por el ingeniero" en el
+      // detalle es la marca (MARCA_CORRECCION_INGENIERO allá). Con ella, una orden que
+      // Luis ya había aprobado se LANZA desde Proveeduría sin volver a aprobación (regla
+      // 3 de su lib/aprobacion-automatica.ts). Si cambia este texto, cambia allá también.
+      await logMov(tx, { entidad: "orden", idEntidad: idOrden, documentoNo: ordenNo, tipoMovimiento: "editado", estadoAnterior: estadoOrden, estadoNuevo: "abierto", detalle: `Subcontrato ${pedidoNo} corregido por el ingeniero ·${detalle} · falta que Proveeduría la lance: eso le pasa las líneas nuevas al pedido ${bcNo} de Business Central (si ya estaba aprobada, sin volver a aprobación)`, usuario: input.usuario, rol: input.rol });
     } else {
       await logMov(tx, { entidad: "orden", idEntidad: idOrden, documentoNo: ordenNo, tipoMovimiento: "editado", estadoAnterior: estadoOrden, estadoNuevo: "pendiente_aprobacion", detalle: `Subcontrato ${pedidoNo} corregido · ${detalle}`, usuario: input.usuario, rol: input.rol });
     }

@@ -1974,7 +1974,7 @@ export function NuevaSolicitudSheet({ open, setOpen, seed, editar, preset, onGua
         // las líneas nuevas al pedido de allá); si no, va derecho a aprobación.
         const numero = editar?.numero ?? "";
         toast(r.destino === "proveeduria"
-          ? `Subcontrato ${numero} corregido · volvió a la orden ${r.orden}; Proveeduría la reenvía a aprobación`
+          ? `Subcontrato ${numero} corregido · volvió a la orden ${r.orden}; Proveeduría la lanza con los cambios (si ya estaba aprobada no vuelve a aprobación)`
           : r.nueva
             ? `Subcontrato ${numero} corregido · orden nueva ${r.orden}, pendiente de aprobación`
             : `Subcontrato ${numero} corregido · vuelve a aprobación`, "success");
