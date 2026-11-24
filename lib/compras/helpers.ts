@@ -1038,12 +1038,18 @@ export function nextNumero(prefix: string, existentes: string[]): string {
   return `${prefix}-${String(max + 1).padStart(6, "0")}`;
 }
 
-// Almacenes físicos de recepción: los mismos de bodega que ofrece la solicitud
-// (ALM-*, fábricas F-*, GEN-*, Herramienta, Maquinaria). Oculta bodegas de obra
-// (VN-M.28, etc.), que no son ubicaciones físicas de recepción. Antes solo dejaba
-// ALM-* y una compra directa no podía recibirse en F-MADERAS (caso MEXICHEM 26/08).
-export function almacenesFisicos<T extends { codigo: string }>(list: T[]): T[] {
-  return list.filter((a) => esAlmacenDeBodega(a.codigo));
+// Almacenes físicos de recepción de Proveeduría: los de bodega (ALM-*, GEN-*,
+// Herramienta, Maquinaria). Oculta bodegas de obra (VN-M.28, etc.), que no son
+// ubicaciones físicas de recepción. Antes solo dejaba ALM-* y una compra directa no
+// podía recibirse en F-MADERAS (caso MEXICHEM 26/08).
+//
+// Sin las bodegas F-* de fábrica (David, 2026-11-24): desde ese día todo lo de la
+// fábrica entra a ALM-FAB (que es ALM-*, así que sale), igual que en el pedido
+// (`almacenesParaPedir`). `elegido` se conserva aunque sea una F-*: una orden vieja
+// que se edita no pierde su almacén en la lista.
+export function almacenesFisicos<T extends { codigo: string }>(list: T[], elegido = ""): T[] {
+  return list.filter((a) => (!!elegido && a.codigo === elegido)
+    || (esAlmacenDeBodega(a.codigo) && !esBodegaDeFabrica(a.codigo)));
 }
 
 // La orden figuraba LANZADA y la sincronización con BC la devolvió a "pendiente de

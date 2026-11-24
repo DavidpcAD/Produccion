@@ -7,7 +7,7 @@ import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, LineaPedidaInfo, Modal, Select, useToast } from "@/components/compras/ui";
 import { Combobox } from "@/components/compras/combobox";
 import { useStore } from "@/lib/compras/store";
-import { money, numeroOrden, ultimoPrecioProveedor, almacenesFisicos, pedidoLineaPendiente, precioEnUnidad, mismaMoneda, ALMACEN_GENERAL, esLineaConsumoDirecto, obraDeLinea, destinoDeLinea, type UnidadItem } from "@/lib/compras/helpers";
+import { money, numeroOrden, ultimoPrecioProveedor, almacenesFisicos, almacenVigente, pedidoLineaPendiente, precioEnUnidad, mismaMoneda, ALMACEN_GENERAL, esLineaConsumoDirecto, obraDeLinea, destinoDeLinea, type UnidadItem } from "@/lib/compras/helpers";
 import type { OrdenLinea } from "@/lib/compras/types";
 import { coincideBusqueda } from "@/lib/utilidades/buscar";
 
@@ -107,7 +107,8 @@ export default function ArmarOrdenPage() {
           const consumo = esLineaConsumoDirecto(l, p);
           info = { pedidoNumero: p.numero, articuloId: l.articuloId, variantCode: l.variantCode ?? "", notas: l.notas, descripcion: l.descripcion, unidad: l.unidad,
             // Un ACTIVO FIJO no lleva almacén (no entra a inventario): no cae al General.
-            almacen: p.tipoSolicitud === "activo" ? "" : consumo ? obraDeLinea(l, p) : (l.almacen || ALMACEN_GENERAL),
+            // Un pedido de antes del 24-nov que iba a una bodega F-* entra a ALM-FAB.
+            almacen: p.tipoSolicitud === "activo" ? "" : consumo ? obraDeLinea(l, p) : almacenVigente(l.almacen || ALMACEN_GENERAL),
             proyecto: consumo ? obraDeLinea(l, p) : "", tarea: l.taskNo ?? "" };
           break;
         }

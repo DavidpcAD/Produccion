@@ -47,7 +47,8 @@ export default function EditarOrdenPage() {
     getAlmacenesBc().then((alm) => { if (alm.length) setBcAlm(alm); }).catch(() => {});
   }, []);
   const catProv = bcProv ?? proveedores;
-  const catAlm = almacenesFisicos(bcAlm ?? almacenes);
+  // La orden que se edita conserva su almacén aunque sea una bodega F-* vieja.
+  const catAlm = almacenesFisicos(bcAlm ?? almacenes, orden?.almacenRecepcion ?? "");
 
   const cargo = orden?.lineas.find((l) => l.tipo === "cargo");
   const [proveedorId, setProveedorId] = useState(orden?.proveedorId ?? "");
