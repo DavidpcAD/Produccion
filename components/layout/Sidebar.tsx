@@ -115,6 +115,7 @@ const navItems: NavItemDef[] = [
       { href: '/mantenimiento/planes', label: 'Preventivo' },
       { href: '/mantenimiento/repuestos', label: 'Repuestos' },
       { href: '/mantenimiento/reportes', label: 'Reportes' },
+      { href: '/mantenimiento/app-movil', label: 'App móvil' },
     ],
   },
   {

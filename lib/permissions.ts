@@ -58,6 +58,9 @@ const MODULE_LEVEL: Record<string, number> = {
   // Gerencia solo VE KPIs (lectura): no debe elevar el nivel del usuario. El rol
   // "Gerencia" queda en nivel 1; entra a su tablero por módulo, no por nivel.
   gerencia: 1,
+  // Operario de maquinaria: solo la app móvil (checklist antes de arrancar). No
+  // eleva el nivel: con su rol no abre nada más de Producción.
+  maquinaria: 1,
 };
 
 /** Calcula el nivelAdmin efectivo a partir de los roles del usuario.
@@ -95,6 +98,10 @@ export function requireMinLevel(session: JWTPayload | null, level: number): bool
 
 export function getRouteLevel(pathname: string): number {
   if (pathname.startsWith('/login')) return 0;
+  // API de las apps móviles: no usan la cookie sino `Authorization: Bearer`, así
+  // que el proxy (que solo mira la cookie) las deja pasar y CADA handler valida
+  // el token, la sesión en la base y el módulo (ver lib/movil/sesion.ts).
+  if (pathname.startsWith('/api/movil/')) return 0;
   // Órdenes de Compra (Ingeniería / Proveeduría / Aprobación): por ahora SOLO superadmin,
   // hasta definir los roles reales (Ingeniería / Gerencia / etc.). Cubre páginas y API.
   if (pathname.startsWith('/compras') || pathname.startsWith('/api/compras')) return 4;
@@ -175,7 +182,12 @@ export type Modulo =
   // propio del rol "Gerencia" (idApp 10) y EXCLUSIVO: SOLO lo ve ese rol, ni
   // siquiera el Super Admin (ver MODULOS_EXCLUSIVOS). Es solo lectura (datos de
   // ejemplo del prototipo), sin API propia. Ver app/(protected)/gerencia.
-  | 'gerencia';
+  | 'gerencia'
+  // Operario de maquinaria (rol "Operario Maquinaria", idApp 10): SOLO la app
+  // móvil de maquinaria (checklist antes de arrancar, solicitar material,
+  // reportar avería), con su API en /api/movil/maquinaria. No tiene pantallas en
+  // la web. EXCLUSIVO: el Super Admin no lo hereda por el comodín.
+  | 'maquinaria';
 
 /** ── Interruptor de "Avance de obra" ──────────────────────────────────────
  *  El módulo está incompleto, así que NO sale a producción todavía: en `false`
@@ -186,7 +198,7 @@ export type Modulo =
 export const AVANCE_OBRA_ACTIVO = false;
 
 const MODULOS_BASE: Modulo[] =
-  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas', 'mantenimiento', 'gerencia'];
+  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas', 'mantenimiento', 'gerencia', 'maquinaria'];
 
 /** Módulos publicados (los apagados no salen para nadie). */
 export const MODULOS_TODOS: Modulo[] =
@@ -196,7 +208,7 @@ export const MODULOS_TODOS: Modulo[] =
  *  rol que los tiene asignado explícitamente. Gerencia es así por pedido de David
  *  (2026-10-29): el tablero de KPIs es SOLO del rol "Gerencia", ni el Super Admin
  *  lo ve. (Un usuario que tenga Super Admin Y Gerencia sí lo ve, por su rol Gerencia.) */
-export const MODULOS_EXCLUSIVOS: Modulo[] = ['gerencia'];
+export const MODULOS_EXCLUSIVOS: Modulo[] = ['gerencia', 'maquinaria'];
 
 /** Cómo se llama cada módulo para una persona. Se usa al rebotar a alguien de
  *  una ruta que no le toca: decirle "no tenés acceso a Desembolsos" es una
@@ -214,6 +226,7 @@ const NOMBRE_MODULO: Record<Modulo, string> = {
   cuadrillas: 'Cuadrillas',
   mantenimiento: 'Mantenimiento',
   gerencia: 'Gerencia',
+  maquinaria: 'la app de maquinaria',
 };
 
 /** Pantallas que comparten módulo pero tienen nombre propio. Casi todas caen en
@@ -349,6 +362,8 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   // recibe material ni entra a proveeduría/aprobación. Se matchea por NOMBRE (el
   // tipo del rol es "General"), igual que presupuestista/bodega.
   if (n === 'mantenimiento') return ['mantenimiento', 'bodega'];
+  // Operario de maquinaria: solo la app móvil. Por NOMBRE (tipo "General").
+  if (n === 'operario maquinaria' || n === 'operario de maquinaria') return ['maquinaria'];
   // Bodega (hoy solo jerson): pide material como un ingeniero Y recibe el material.
   // Nada más: no entra a proveeduría, aprobación ni a las herramientas del ingeniero.
   if (n === 'bodega') return ['bodega', 'recepcion'];
