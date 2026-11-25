@@ -1,14 +1,12 @@
-# Dueños de código por área (GitHub CODEOWNERS).
+# Dueños de código (GitHub CODEOWNERS).
 #
 # Con "Require review from Code Owners" activado en la protección de la rama
-# main, cualquier PR que toque estas carpetas necesita la aprobación de
-# @DavidpcAD antes de poder mergearse (y, por lo tanto, antes de desplegarse).
+# main, TODO PR necesita la aprobación de @DavidpcAD o de @aaronrsAd antes de
+# poder mergearse (y, por lo tanto, antes de desplegarse). La aprobación de
+# cualquier otro colaborador no alcanza: solo David y Aarón aprueban.
 #
-# El módulo de Mantenimiento es donde trabaja Steven (@StevenCVAD); David
-# aprueba cada cambio. Steven NO se lista como owner a propósito: el owner es
-# quien debe REVISAR, y el que revisa/aprueba es David.
+# Steven (@StevenCVAD) y los demás colaboradores NO se listan a propósito: el
+# owner es quien debe REVISAR, y los que revisan/aprueban son David y Aarón.
+# Nadie puede aprobar su propio PR: el de Aarón lo aprueba David.
 
-/app/(protected)/mantenimiento/   @DavidpcAD
-/app/api/mantenimiento/           @DavidpcAD
-/lib/mantenimiento/               @DavidpcAD
-/components/mantenimiento/        @DavidpcAD
+*   @DavidpcAD @aaronrsAd
