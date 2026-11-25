@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sesionMovil } from '@/lib/movil/sesion';
-import { equipoAsignado, operadorMant, solicitarMaterial, type LineaMaterial } from '@/lib/movil/maquinaria';
+import { equipoAsignado, leerFotos, operadorMant, solicitarMaterial, type LineaMaterial } from '@/lib/movil/maquinaria';
+import { guardarUbicacion, leerUbicacion } from '@/lib/movil/telefonos';
 
 // Solicitar material para una máquina (aceite, filtros, grasa…). Queda en
 // mant.SolicitudesMateriales con número SM-xxxx.
@@ -28,7 +29,12 @@ export async function POST(req: Request) {
     if (!(await equipoAsignado(op.id, equipoId))) {
       return NextResponse.json({ error: 'Esa máquina no está asignada a vos.' }, { status: 403 });
     }
-    const sm = await solicitarMaterial({ equipoId, operador: op, items, notas });
+    const sm = await solicitarMaterial({ equipoId, operador: op, items, notas, fotos: leerFotos(body?.fotos) });
+    await guardarUbicacion({
+      tipo: 'material', referenciaId: sm.id, equipoId, usuario: op.usuario,
+      identificador: typeof body?.identificador === 'string' ? body.identificador.slice(0, 100) : null,
+      ubicacion: leerUbicacion(body?.ubicacion),
+    });
     return NextResponse.json(sm);
   } catch (err) {
     console.error('/api/movil/maquinaria/solicitudes:', err);

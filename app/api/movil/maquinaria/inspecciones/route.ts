@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sesionMovil } from '@/lib/movil/sesion';
-import { checklistDelEquipo, equipoAsignado, guardarInspeccion, operadorMant, type RespuestaItem } from '@/lib/movil/maquinaria';
+import { checklistDelEquipo, equipoAsignado, guardarInspeccion, leerFotos, operadorMant, type RespuestaItem } from '@/lib/movil/maquinaria';
+import { guardarUbicacion, leerUbicacion } from '@/lib/movil/telefonos';
 
 // Guarda el checklist completo de una máquina. Cada punto tiene que venir
 // respondido (Bien, o Falla con lo que se encontró): la app no deja avanzar sin
@@ -36,7 +37,14 @@ export async function POST(req: Request) {
       if (!r.hecho && !r.observacion) return NextResponse.json({ error: `Contá qué problema tiene «${it.titulo}».` }, { status: 400 });
       checklist.push({ itemId: it.id, titulo: it.titulo, hecho: r.hecho, ...(r.observacion ? { observacion: r.observacion } : {}) });
     }
-    const id = await guardarInspeccion({ equipoId, usuarioId: op.id, horometro, checklist });
+    // Las fotos de los problemas van a la inspección (mant.InspeccionesDiarias.fotos),
+    // que es donde las muestra la ficha del equipo en la web.
+    const id = await guardarInspeccion({ equipoId, usuarioId: op.id, horometro, checklist, fotos: leerFotos(body?.fotos) });
+    await guardarUbicacion({
+      tipo: 'checklist', referenciaId: id, equipoId, usuario: op.usuario,
+      identificador: typeof body?.identificador === 'string' ? body.identificador.slice(0, 100) : null,
+      ubicacion: leerUbicacion(body?.ubicacion),
+    });
     return NextResponse.json({ id, fallas: checklist.filter((c) => !c.hecho).length });
   } catch (err) {
     console.error('/api/movil/maquinaria/inspecciones:', err);

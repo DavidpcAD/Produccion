@@ -16,6 +16,14 @@
 import { getDb, sql } from '@/lib/db';
 import type { SesionMovil } from './sesion';
 
+/** Fotos que manda la app con un reporte: ids de mant.Archivos que subió antes
+ *  por /api/movil/maquinaria/fotos. Se descarta lo que no parezca un id. */
+export function leerFotos(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const ok = v.filter((x): x is string => typeof x === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x));
+  return [...new Set(ok.map((x) => x.toUpperCase()))].slice(0, 10);
+}
+
 /** Zona horaria de la operación: el "día" del checklist es el de Costa Rica. */
 const OFFSET_CR = '-06:00';
 
@@ -170,6 +178,7 @@ export async function guardarInspeccion(args: {
   usuarioId: string;
   horometro: number | null;
   checklist: RespuestaItem[];
+  fotos: string[];
 }): Promise<string> {
   const db = await getDb();
   const tx = new sql.Transaction(db);
@@ -188,9 +197,10 @@ export async function guardarInspeccion(args: {
       .input('usuarioId', sql.UniqueIdentifier, args.usuarioId)
       .input('horometro', sql.Decimal(18, 2), args.horometro)
       .input('checklist', sql.NVarChar(sql.MAX), JSON.stringify(args.checklist))
+      .input('fotos', sql.NVarChar(sql.MAX), JSON.stringify(args.fotos))
       .query(`
         INSERT INTO mant.InspeccionesDiarias (equipoId, usuarioId, horometro, checklist, fotos)
-        OUTPUT INSERTED.id VALUES (@equipoId, @usuarioId, @horometro, @checklist, '[]')`);
+        OUTPUT INSERTED.id VALUES (@equipoId, @usuarioId, @horometro, @checklist, @fotos)`);
     await tx.commit();
     return String(ins.recordset[0].id);
   } catch (err) {
@@ -218,6 +228,7 @@ export async function reportarAveria(args: {
   titulo: string;
   descripcion: string;
   prioridad: 'baja' | 'media' | 'alta' | 'urgente';
+  fotos: string[];
 }): Promise<{ id: string; numero: string }> {
   const db = await getDb();
   const tx = new sql.Transaction(db);
@@ -233,12 +244,13 @@ export async function reportarAveria(args: {
       .input('titulo', sql.NVarChar(400), args.titulo)
       .input('descripcion', sql.NVarChar(sql.MAX), descripcion)
       .input('responsable', sql.NVarChar(300), '')
+      .input('fotos', sql.NVarChar(sql.MAX), JSON.stringify(args.fotos))
       .query(`
         INSERT INTO mant.OrdenesTrabajo (numero, equipoId, tipo, prioridad, titulo, descripcion, responsable,
           horometroApertura, estado, checklist, fotos, repuestosUsados)
         OUTPUT INSERTED.id
         SELECT @numero, @equipoId, 'correctivo', @prioridad, @titulo, @descripcion, @responsable,
-          e.horometroActual, 'abierta', '[]', '[]', '[]'
+          e.horometroActual, 'abierta', '[]', @fotos, '[]'
         FROM mant.Equipos e WHERE e.id = @equipoId`);
     await tx.commit();
     return { id: String(ins.recordset[0].id), numero };
@@ -259,6 +271,7 @@ export async function solicitarMaterial(args: {
   operador: OperadorMant;
   items: LineaMaterial[];
   notas: string;
+  fotos: string[];
 }): Promise<{ id: string; numero: string }> {
   const db = await getDb();
   const tx = new sql.Transaction(db);
@@ -273,9 +286,10 @@ export async function solicitarMaterial(args: {
       .input('equipoId', sql.UniqueIdentifier, args.equipoId)
       .input('items', sql.NVarChar(sql.MAX), JSON.stringify(items))
       .input('notas', sql.NVarChar(1000), args.notas || null)
+      .input('fotos', sql.NVarChar(sql.MAX), JSON.stringify(args.fotos))
       .query(`
         INSERT INTO mant.SolicitudesMateriales (numero, solicitante, equipoId, items, notas, fotos)
-        OUTPUT INSERTED.id VALUES (@numero, @solicitante, @equipoId, @items, @notas, '[]')`);
+        OUTPUT INSERTED.id VALUES (@numero, @solicitante, @equipoId, @items, @notas, @fotos)`);
     await tx.commit();
     return { id: String(ins.recordset[0].id), numero };
   } catch (err) {

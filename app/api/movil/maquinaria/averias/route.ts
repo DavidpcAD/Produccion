@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sesionMovil } from '@/lib/movil/sesion';
-import { equipoAsignado, operadorMant, reportarAveria } from '@/lib/movil/maquinaria';
+import { equipoAsignado, leerFotos, operadorMant, reportarAveria } from '@/lib/movil/maquinaria';
+import { guardarUbicacion, leerUbicacion } from '@/lib/movil/telefonos';
 
 const PRIORIDADES = ['baja', 'media', 'alta', 'urgente'] as const;
 
@@ -20,7 +21,12 @@ export async function POST(req: Request) {
     if (!(await equipoAsignado(op.id, equipoId))) {
       return NextResponse.json({ error: 'Esa máquina no está asignada a vos.' }, { status: 403 });
     }
-    const ot = await reportarAveria({ equipoId, operador: op, titulo, descripcion, prioridad });
+    const ot = await reportarAveria({ equipoId, operador: op, titulo, descripcion, prioridad, fotos: leerFotos(body?.fotos) });
+    await guardarUbicacion({
+      tipo: 'averia', referenciaId: ot.id, equipoId, usuario: op.usuario,
+      identificador: typeof body?.identificador === 'string' ? body.identificador.slice(0, 100) : null,
+      ubicacion: leerUbicacion(body?.ubicacion),
+    });
     return NextResponse.json(ot);
   } catch (err) {
     console.error('/api/movil/maquinaria/averias:', err);
