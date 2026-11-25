@@ -8,6 +8,7 @@ import { EstadoCarga } from "@/components/mantenimiento/local/EstadoCarga";
 import { Button } from "@/components/mantenimiento/ds/Button/Button";
 import { ManualesBox } from "@/components/mantenimiento/local/ManualesBox";
 import { ChecklistDiarioBox } from "@/components/mantenimiento/local/ChecklistDiarioBox";
+import { OperariosEquipo } from "@/components/mantenimiento/local/OperariosEquipo";
 import { FichaEncabezado, FichaTecnica, FallasEquipo } from "@/components/mantenimiento/local/FichaEquipo";
 import { esFalla, useTiposFalla } from "@/lib/mantenimiento/fallas";
 import { useToast } from "@/components/mantenimiento/local/Toast";
@@ -287,6 +288,10 @@ export default function EquipoDetallePage() {
       </Seccion>
 
       <FallasEquipo equipoId={equipo.id} fallas={fallasEquipo} tipos={tiposFalla} />
+
+      <Seccion id="operarios" titulo="Operarios" subtitulo="Quién ve este equipo en la app de maquinaria para hacer el checklist, pedir material y reportar averías.">
+        <OperariosEquipo equipoId={equipo.id} soloLectura={!puedeEditarChecklist} />
+      </Seccion>
 
       <Seccion id="checklist" titulo="Checklist diario" subtitulo="Lo que el operador completa antes de usar el equipo, desde Inspección diaria.">
         <ChecklistDiarioBox
