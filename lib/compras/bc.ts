@@ -8,6 +8,7 @@
 import { odataStr } from "@/lib/odata";
 import { fetchConReloj, MS_LIMITE_BC } from "../bc-timeout";
 import { TIPO_BC, type CambiosProducto, type FichaProductoBc, type NuevoProducto, type OpcionesProducto, type ProductoBc } from "@/lib/bc/productos";
+import { ivaBcDeLinea, tipoLineaBc, tipoPosteable, type BcLineasPedido, type LineaBc } from "./freno-registro";
 
 type TokenCache = { token: string; exp: number };
 let tokenCache: TokenCache | null = null;
@@ -2426,6 +2427,145 @@ export async function bcPedidoTieneRecepciones(orderNo: string): Promise<boolean
   } catch { return null; }
 }
 
+// ─── EL PEDIDO EN BC ANTES DE POSTEAR ────────────────────────────────────────────
+// Lo que leen los frenos de registro (lib/compras/frenar-registro.ts). Nada de esto
+// escribe en BC.
+
+/** El pedido leído por el codeunit: el ENCABEZADO (Status y Buy-from Vendor No., que
+ *  ninguna otra lectura de líneas trae) y las líneas, en una sola llamada. */
+export type PedidoCodeunitBc = { status?: string; vendorNo?: string; lineas: LineaBc[] };
+
+/** `AdelantePO_GetOrderLines`: el MISMO canal por el que la app escribe las líneas, así
+ *  que si escribir funciona, leer también. Su `status` es el del codeunit ("Open" =
+ *  Abierto; ver `estadoDesdeStatusCodeunit`). `null` = no se pudo leer. */
+export async function bcPedidoPorCodeunit(orderNo: string): Promise<PedidoCodeunitBc | null> {
+  const no = (orderNo ?? "").trim();
+  if (!no) return null;
+  try {
+    const cid = await getStdCompanyId();
+    const res = await bcFetch(`${odataRoot()}/AdelantePO_GetOrderLines?company=${encodeURIComponent(cid)}`, {
+      method: "POST", cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderNo: no }),
+    });
+    if (!res.ok) return null;
+    const d = (await res.json().catch(() => ({}))) as { value?: unknown };
+    type Fila = Record<string, unknown>;
+    const payload = JSON.parse(String(d?.value ?? "{}")) as { status?: unknown; vendorNo?: unknown; orderNo?: unknown; lines?: Fila[] };
+    return {
+      status: String(payload?.status ?? "").trim() || undefined,
+      vendorNo: String(payload?.vendorNo ?? "").trim() || undefined,
+      lineas: (payload?.lines ?? []).map((r: Fila): LineaBc => {
+        const cantidad = Number(r.quantity ?? 0) || 0;
+        const recibida = Number(r.quantityReceived ?? 0) || 0;
+        return {
+          documentNo: String(payload?.orderNo ?? no),
+          lineNo: Number(r.lineNo ?? 0) || 0,
+          tipo: tipoLineaBc(r.type, r.typeNo),
+          itemNo: String(r.no ?? "").trim(),
+          variantCode: String(r.variantCode ?? "").trim(),
+          descripcion: String(r.description ?? "").trim(),
+          unidad: String(r.unitOfMeasureCode ?? "").trim(),
+          almacen: String(r.locationCode ?? "").trim(),
+          cantidad,
+          recibida,
+          facturada: Number(r.quantityInvoiced ?? 0) || 0,
+          pendiente: Number(r.outstandingQuantity ?? Math.max(0, cantidad - recibida)) || 0,
+          precioUnitario: Number(r.directUnitCost ?? 0) || 0,
+          // El codeunit no lo manda hoy; se lee igual por si algún día lo agrega.
+          ivaPct: ivaBcDeLinea(r.vatPercent, r.taxPercent),
+        };
+      }),
+    };
+  } catch { return null; }
+}
+
+/** Las líneas del pedido de compra en BC, por el mejor camino que conteste:
+ *   1. la API custom `purchaseLines` (trae variante, saldos y el IVA% de la línea);
+ *   2. el codeunit — si ya se leyó para el encabezado, se REUSA (`codeunit`) y no se
+ *      le vuelve a preguntar a BC;
+ *   3. la API estándar v2.0, que no trae la variante (`fuente: "estandar"`).
+ *  `null` = no se pudo leer, o el pedido ya no está en BC: no afirma nada. */
+export async function bcLineasPedido(orderNo: string, codeunit?: PedidoCodeunitBc | null): Promise<BcLineasPedido | null> {
+  const no = (orderNo ?? "").trim();
+  if (!no) return null;
+
+  try {
+    const rows = await listCustom(
+      "purchasing",
+      `purchaseLines?$filter=${encodeURIComponent(`documentNo eq '${odataStr(no)}'`)}&$orderby=lineNo`,
+    );
+    // CERO líneas no es "el pedido está vacío": un filtro contra un pedido que ya no
+    // existe devuelve lo mismo, y BC borra el pedido cuando se recibe y factura todo.
+    // Si el pedido existe, esta lectura no está mirando lo mismo que la escritura: se
+    // baja al siguiente camino en vez de acusar.
+    if (!rows.length) {
+      if (!(await bcEstadoPedido(no)).existe) return null;
+      throw new Error("purchaseLines devolvió 0 líneas para un pedido que sí existe");
+    }
+    return {
+      fuente: "custom",
+      lineas: rows.map((r: Record<string, unknown>): LineaBc => ({
+        documentNo: String(r.documentNo ?? no),
+        lineNo: Number(r.lineNo ?? 0) || 0,
+        tipo: tipoLineaBc(r.type),
+        itemNo: String(r.no ?? "").trim(),
+        variantCode: String(r.variantCode ?? "").trim(),
+        descripcion: String(r.description ?? "").trim(),
+        unidad: String(r.unitOfMeasureCode ?? "").trim(),
+        almacen: String(r.locationCode ?? "").trim(),
+        cantidad: Number(r.quantity ?? 0) || 0,
+        recibida: Number(r.quantityReceived ?? 0) || 0,
+        facturada: Number(r.quantityInvoiced ?? 0) || 0,
+        pendiente: Number(r.outstandingQuantity ?? 0) || 0,
+        precioUnitario: Number(r.directUnitCost ?? 0) || 0,
+        ivaPct: ivaBcDeLinea(r.vatPercent),
+      })),
+    };
+  } catch { /* la custom puede no estar publicada en este entorno: se sigue probando */ }
+
+  const cu = codeunit !== undefined ? codeunit : await bcPedidoPorCodeunit(no);
+  if (cu?.lineas.length) return { fuente: "custom", lineas: cu.lineas };
+
+  try {
+    const cid = await getStdCompanyId();
+    const filtro = `$filter=${encodeURIComponent(`number eq '${odataStr(no)}'`)}&$select=id&$top=1`;
+    const res = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders?${filtro}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const id = ((await res.json())?.value ?? [])[0]?.id;
+    if (!id) return null;
+    // SIN $select a propósito: si un campo no existe en esta versión de la API, BC
+    // contesta 400 y se pierde la lectura entera justo cuando es el último recurso.
+    const resL = await bcFetch(`${stdRoot()}/companies(${cid})/purchaseOrders(${id})/purchaseOrderLines`, { cache: "no-store" });
+    if (!resL.ok) return null;
+    const filas = ((await resL.json())?.value ?? []);
+    if (!filas.length) return null;
+    return {
+      fuente: "estandar",
+      lineas: filas.map((l: Record<string, unknown>): LineaBc => {
+        const cantidad = Number(l.quantity ?? 0) || 0;
+        const recibida = Number(l.receivedQuantity ?? 0) || 0;
+        return {
+          documentNo: no,
+          lineNo: Number(l.sequence ?? 0) || 0,
+          tipo: tipoLineaBc(l.lineType),
+          itemNo: String(l.lineObjectNumber ?? "").trim(),
+          variantCode: "",
+          descripcion: String(l.description ?? "").trim(),
+          unidad: String(l.unitOfMeasureCode ?? "").trim(),
+          almacen: "",
+          cantidad,
+          recibida,
+          facturada: Number(l.invoicedQuantity ?? 0) || 0,
+          pendiente: Math.max(0, cantidad - recibida),
+          precioUnitario: Number(l.directUnitCost ?? l.unitCost ?? 0) || 0,
+          ivaPct: ivaBcDeLinea(l.taxPercent, l.vatPercent),
+        };
+      }),
+    };
+  } catch { return null; }
+}
+
 // Manda el pedido a APROBACIÓN en BC (workflows MS-POAPW-01/02) SIN aprobarlo:
 // queda "Pendiente de aprobación" con su solicitud abierta, así quien mira BC ve qué
 // está esperando visto bueno. Lo llama la app cuando una orden pasa a
@@ -2633,14 +2773,29 @@ export async function bcSetRealizadoPor(orderNo: string, realizadoPor: string): 
   return d?.value ?? realizadoPor;
 }
 
+// Las líneas que se le mandan a los procedures de registro (PostInvoice / PostReceipt /
+// PostInvoiceOfReceived). El `tipo` de la app viaja como el `type` del enum de BC para
+// que el codeunit busque la línea correcta del pedido: sin él busca solo entre las de
+// artículo, y una línea de activo fijo "no calza" y se salta en silencio. Para un
+// artículo se omite, así el JSON queda idéntico al de siempre.
+export type LineaPostBc = { itemNo: string; qty: number; variantCode?: string; tipo?: string };
+function lineasPost(lines: LineaPostBc[]): { itemNo: string; qty: number; variantCode?: string; type?: string }[] {
+  return (lines ?? []).map((l) => {
+    const t = tipoPosteable(l.tipo);
+    const { tipo: _tipo, ...resto } = l;
+    return t === "articulo" ? resto : { ...resto, type: t === "recurso" ? "Resource" : "Fixed Asset" };
+  });
+}
+
 // Registra (Recibir + Facturar) una factura parcial del pedido en BC con todos sus
 // movimientos contables, vía el web service custom AdelantePO_PostInvoice.
 // lines = cantidades recibidas en ESTA factura por item ({itemNo, qty}).
 // `realizadoPor` = usuario logueado que registra; se firma en BC antes del Post.
+// ANTES de llamar esto van los frenos de lib/compras/frenar-registro.ts.
 export async function bcRegistrarFactura(
   orderNo: string,
   vendorInvoiceNo: string,
-  lines: { itemNo: string; qty: number; variantCode?: string }[],
+  lines: LineaPostBc[],
   postingDate = "", // fecha de registro (ISO yyyy-mm-dd). "" → BC usa la fecha del día
   // Cargo de transporte de ESTA factura/viaje (opcional). Se agrega a la OC y se
   // reparte entre lo que se recibe en este registro, según `metodo`.
@@ -2668,7 +2823,7 @@ export async function bcRegistrarFactura(
   const res = await bcFetch(url, {
     method: "POST", cache: "no-store",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orderNo, vendorInvoiceNo, linesJson: JSON.stringify(lines), postingDate }),
+    body: JSON.stringify({ orderNo, vendorInvoiceNo, linesJson: JSON.stringify(lineasPost(lines)), postingDate }),
   });
   if (!res.ok) throw new Error(`BC registrar ${res.status}: ${(await res.text()).slice(0, 250)}`);
   const d: any = await res.json().catch(() => ({}));
@@ -2678,14 +2833,14 @@ export async function bcRegistrarFactura(
 // MODO 2 — Solo RECEPCIÓN (material llega bien, la factura queda en revisión).
 // Registra la recepción en BC (Receive=true, Invoice=false) vía AdelantePO_PostReceipt.
 // Mueve inventario/cantidad recibida sin tocar la factura ni el ledger del proveedor.
-export async function bcRecibir(orderNo: string, lines: { itemNo: string; qty: number; variantCode?: string }[], postingDate = ""): Promise<string> {
+export async function bcRecibir(orderNo: string, lines: LineaPostBc[], postingDate = ""): Promise<string> {
   if (!orderNo) throw new Error("Falta el número de pedido de BC.");
   const cid = await getStdCompanyId();
   const url = `${odataRoot()}/AdelantePO_PostReceipt?company=${encodeURIComponent(cid)}`;
   const res = await bcFetch(url, {
     method: "POST", cache: "no-store",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orderNo, linesJson: JSON.stringify(lines), postingDate }),
+    body: JSON.stringify({ orderNo, linesJson: JSON.stringify(lineasPost(lines)), postingDate }),
   });
   if (!res.ok) throw new Error(`BC recibir ${res.status}: ${(await res.text()).slice(0, 250)}`);
   const d: any = await res.json().catch(() => ({}));
@@ -2695,7 +2850,7 @@ export async function bcRecibir(orderNo: string, lines: { itemNo: string; qty: n
 // MODO 2 — Solo FACTURA de lo ya recibido (Kattya revisa y registra después).
 // Factura en BC lo que estaba recibido-no-facturado (Receive=false, Invoice=true)
 // vía AdelantePO_PostInvoiceOfReceived.
-export async function bcFacturarRecibido(orderNo: string, vendorInvoiceNo: string, lines: { itemNo: string; qty: number; variantCode?: string }[], postingDate = "", realizadoPor = ""): Promise<string> {
+export async function bcFacturarRecibido(orderNo: string, vendorInvoiceNo: string, lines: LineaPostBc[], postingDate = "", realizadoPor = ""): Promise<string> {
   if (!orderNo) throw new Error("Falta el número de pedido de BC.");
   if (!vendorInvoiceNo) throw new Error("Falta el N.º de factura del proveedor.");
   const cid = await getStdCompanyId();
@@ -2709,7 +2864,7 @@ export async function bcFacturarRecibido(orderNo: string, vendorInvoiceNo: strin
   const res = await bcFetch(url, {
     method: "POST", cache: "no-store",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orderNo, vendorInvoiceNo, linesJson: JSON.stringify(lines), postingDate }),
+    body: JSON.stringify({ orderNo, vendorInvoiceNo, linesJson: JSON.stringify(lineasPost(lines)), postingDate }),
   });
   if (!res.ok) throw new Error(`BC facturar ${res.status}: ${(await res.text()).slice(0, 250)}`);
   const d: any = await res.json().catch(() => ({}));

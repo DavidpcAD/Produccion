@@ -6,8 +6,10 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Tile, useToast } from "@/components/compras/ui";
 import { DataTable } from "@/components/compras/data-table";
+import { AvisoFrenoBc, frenoDeRespuesta, type FrenoBc } from "@/components/compras/aviso-freno-bc";
 import { useStore } from "@/lib/compras/store";
 import { money, formatDate, numeroOrden } from "@/lib/compras/helpers";
+import { tipoDeLineaOrden } from "@/lib/compras/freno-registro";
 import type { Recepcion } from "@/lib/compras/types";
 
 const esEnRevision = (r: Recepcion) => !!r.facturaEnRevision || !r.numeroFactura;
@@ -27,6 +29,10 @@ export default function ArchivoPage() {
   const [facObj, setFacObj] = useState<Recepcion | null>(null);
   const [numFac, setNumFac] = useState("");
   const [guardando, setGuardando] = useState(false);
+  // El "no" de un freno de registro: se queda en el modal hasta que se cierre o se
+  // vuelva a intentar (ver lib/compras/frenar-registro.ts).
+  const [frenoBc, setFrenoBc] = useState<FrenoBc | null>(null);
+  const cerrarModal = () => { setFacObj(null); setFrenoBc(null); };
   async function confirmarFactura() {
     const rec = facObj;
     if (!rec) return;
@@ -34,25 +40,30 @@ export default function ArchivoPage() {
     const o = ordenDe(rec);
     const bcLineas = rec.lineas
       .filter((l) => Number(l.cantidadRecibida) > 0)
-      .map((l) => { const ol = o?.lineas.find((x) => x.id === l.ordenLineaId); return { itemNo: ol?.articuloId ?? "", qty: l.cantidadRecibida, variantCode: ol?.variantCode }; })
+      .map((l) => { const ol = o?.lineas.find((x) => x.id === l.ordenLineaId); return { itemNo: ol?.articuloId ?? "", qty: l.cantidadRecibida, variantCode: ol?.variantCode, tipo: ol ? tipoDeLineaOrden(ol) : undefined }; })
       .filter((x) => x.itemNo);
     setGuardando(true);
+    setFrenoBc(null);
     let aviso = "";
     try {
       if (o?.bcNumber && bcLineas.length) {
         try {
           const r = await fetch("/api/compras/bc/facturar-recibido", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orderNo: o.bcNumber, vendorInvoiceNo: numFac.trim(), lineas: bcLineas }),
+            body: JSON.stringify({ orderNo: o.bcNumber, vendorInvoiceNo: numFac.trim(), ordenId: o.id, lineas: bcLineas }),
           });
           const d = await r.json().catch(() => ({}));
+          // Un freno dice que BC NO facturó nada: la recepción no se marca facturada
+          // acá y el motivo se queda en el modal.
+          const freno = r.ok ? null : frenoDeRespuesta(d);
+          if (freno) { setFrenoBc(freno); return; }
           aviso = r.ok ? ` · registrada en BC (${d.postedNo ?? "OK"})` : ` · NO se pudo registrar en BC: ${d.error ?? r.status}`;
         } catch (e: any) { aviso = ` · BC no disponible: ${String(e?.message ?? e)}`; }
       }
       await facturarRecepcion(rec.id, numFac.trim());
       const fallo = aviso.includes("NO se pudo") || aviso.includes("no disponible");
       toast(`Factura ${numFac} registrada${aviso}`, fallo ? "info" : "success");
-      setFacObj(null); setNumFac("");
+      cerrarModal(); setNumFac("");
     } catch (e: any) {
       toast(String(e?.message ?? e), "error");
     } finally { setGuardando(false); }
@@ -118,12 +129,15 @@ export default function ArchivoPage() {
         <DataTable data={registradas} columns={columns} tablaKey="recepciones" buscarPlaceholder="Buscar por N.º de factura o proveedor…" getRowId={(r) => r.id} onRowClick={(r) => router.push(`/compras/facturacion/recepcion/${r.id}`)} vacio="Sin facturas registradas." />
 
         {facObj && (
-          <Modal title={`Registrar factura · ${(() => { const o = ordenDe(facObj); return o ? numeroOrden(o) : ""; })()}`} onClose={() => setFacObj(null)}
-            footer={<><Button variant="outline" onClick={() => setFacObj(null)}>Cancelar</Button><Button variant="red" onClick={confirmarFactura} disabled={!numFac.trim() || guardando}>{guardando ? "Registrando…" : "Registrar factura"}</Button></>}>
+          <Modal title={`Registrar factura · ${(() => { const o = ordenDe(facObj); return o ? numeroOrden(o) : ""; })()}`} onClose={cerrarModal}
+            footer={<><Button variant="outline" onClick={cerrarModal}>Cancelar</Button><Button variant="red" onClick={confirmarFactura} disabled={!numFac.trim() || guardando}>{guardando ? "Registrando…" : "Registrar factura"}</Button></>}>
             <p className="ds-muted ds-body-sm" style={{ marginTop: 0 }}>El material ya se recibió. Registrá la factura del proveedor (se contabiliza en BC lo ya recibido).</p>
             <Field label="N.º de factura del proveedor">
               <Input value={numFac} onChange={(e) => setNumFac(e.target.value)} placeholder="Ej. F-0099281" />
             </Field>
+            {frenoBc && (
+              <AvisoFrenoBc className="mt-4" freno={frenoBc} pedido={ordenDe(facObj)?.bcNumber ?? ""} onCerrar={() => setFrenoBc(null)} />
+            )}
           </Modal>
         )}
       </main>
