@@ -4,7 +4,7 @@
 // rechaza las líneas, la orden queda como estaba (pendiente) y se devuelve el
 // motivo real, para que el estado en SQL/UI nunca mienta respecto a BC.
 import type { Orden } from "./types";
-import { ALMACEN_GENERAL, numeroOrden, ordenLineasSinObra } from "./helpers";
+import { ALMACEN_GENERAL, almacenVigente, numeroOrden, ordenLineasSinObra } from "./helpers";
 
 // El retorno (`bcAviso`) existe para los estados que el PATCH sincroniza con BC
 // (enviar a aprobación / reabrir); acá no aplica — "lanzado" lo maneja este archivo
@@ -61,7 +61,10 @@ export async function aprobarYLanzar(
       // General, Agregados, Herramienta…). Si viene el código de la OBRA (pedidos
       // viejos, donde la obra viajaba en el almacén) no sirve como almacén de
       // recepción → se descarta y cae al General.
-      const almacenReal = l.almacen && l.almacen !== l.proyecto ? l.almacen : "";
+      // Una bodega F- de fábrica ya no recibe stock: desde el 24-nov-2026 va a ALM-FAB
+      // (`almacenVigente`). Una orden de antes del cambio que se aprueba ahora no
+      // vuelve a dejar inventario en la F- (CP-006911/006914/006892, 25-nov).
+      const almacenReal = l.almacen && l.almacen !== l.proyecto ? almacenVigente(l.almacen) : "";
       return {
         // El N.º de línea viaja para poder emparejar con BC sin adivinar por artículo.
         lineNo: l.lineNo,
@@ -210,7 +213,7 @@ export async function aprobarYLanzar(
     res = await fetch("/api/compras/bc/lanzar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vendorNo: orden.proveedorNo, currencyCode: orden.currencyCode, locationCode: orden.almacenRecepcion || "ALM-GRAL", lineas: lineasBc, cargos, metodo: metodoCargo }),
+      body: JSON.stringify({ vendorNo: orden.proveedorNo, currencyCode: orden.currencyCode, locationCode: almacenVigente(orden.almacenRecepcion || "ALM-GRAL"), lineas: lineasBc, cargos, metodo: metodoCargo }),
     });
     d = await res.json().catch(() => ({}));
   } catch (e: any) {
