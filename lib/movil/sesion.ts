@@ -1,4 +1,6 @@
-// Sesión de las apps móviles (hoy: la app de maquinaria).
+// Sesión de las apps móviles (hoy: la app de maquinaria, con dos perfiles:
+// el operario —rol "Operario Maquinaria", módulo 'maquinaria'— y el mecánico
+// —rol "Mecánico", módulo 'mecanico'—).
 //
 // La web usa la cookie `adelante_session`; el teléfono no tiene cookies, así que
 // manda el MISMO token firmado en `Authorization: Bearer <token>`. El proxy deja
@@ -35,12 +37,31 @@ export function sesionVencida(mensaje = 'Tu sesión terminó. Entrá de nuevo.')
 }
 
 /** ¿Este conjunto de roles abre el módulo? El Super Admin NO hereda módulos
- *  exclusivos (maquinaria lo es): tiene que tener el rol. */
+ *  exclusivos (maquinaria y mecanico lo son): tiene que tener el rol. */
 export function tieneModulo(modules: readonly string[] | null | undefined, modulo: Modulo): boolean {
   return !!modules?.includes(modulo);
 }
 
-export async function sesionMovil(req: Request, modulo: Modulo): Promise<Resultado> {
+/** Cómo entra cada persona a la app: operario (checklist, material, averías)
+ *  o mecánico (taller: todas las máquinas, OT y repuestos). Puede tener los dos. */
+export type PerfilMovil = 'operario' | 'mecanico';
+const MODULO_DE_PERFIL: Record<PerfilMovil, Modulo> = { operario: 'maquinaria', mecanico: 'mecanico' };
+const ROL_DE_MODULO: Partial<Record<Modulo, string>> = { maquinaria: 'Operario Maquinaria', mecanico: 'Mecánico' };
+
+export function perfilesMovil(modules: readonly string[] | null | undefined): PerfilMovil[] {
+  return (Object.keys(MODULO_DE_PERFIL) as PerfilMovil[]).filter((p) => tieneModulo(modules, MODULO_DE_PERFIL[p]));
+}
+
+/** "Tu usuario no tiene el rol X (ni Y)": lo que se le dice a quien no puede entrar. */
+export function mensajeSinRol(modulos: readonly Modulo[] = ['maquinaria', 'mecanico']): string {
+  const roles = modulos.map((m) => ROL_DE_MODULO[m] ?? m);
+  return `Tu usuario no tiene el rol ${roles.join(' ni ')}. Pedilo a Recursos Humanos.`;
+}
+
+/** Valida el token y exige UNO de los módulos (las rutas comunes, como fotos o
+ *  el registro del teléfono, aceptan los dos perfiles). */
+export async function sesionMovil(req: Request, modulo: Modulo | readonly Modulo[]): Promise<Resultado> {
+  const pedidos: readonly Modulo[] = typeof modulo === 'string' ? [modulo] : modulo;
   const token = tokenDeRequest(req);
   if (!token) return { error: sesionVencida() };
   const payload = verifyToken(token);
@@ -51,10 +72,10 @@ export async function sesionMovil(req: Request, modulo: Modulo): Promise<Resulta
     const base = await cargarSesion(payload.idUsuario, payload.jti, payload.inicio ?? payload.iat);
     if (!sesionSigueValiendo(payload, base)) return { error: sesionVencida() };
     const modules = computeAllowedModules(base.roles) ?? [];
-    if (!tieneModulo(modules, modulo)) {
+    if (!pedidos.some((m) => tieneModulo(modules, m))) {
       return {
         error: NextResponse.json(
-          { error: 'Tu usuario no tiene el rol Operario Maquinaria. Pedilo a Recursos Humanos.' },
+          { error: mensajeSinRol(pedidos) },
           { status: 403, headers: { 'Cache-Control': 'no-store' } },
         ),
       };

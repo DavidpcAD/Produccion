@@ -34,8 +34,9 @@ export interface OperadorMant {
   rol: string;
 }
 
-/** Fila de mant.Usuarios del operario (la crea la primera vez). */
-export async function operadorMant(sesion: SesionMovil): Promise<OperadorMant> {
+/** Fila de mant.Usuarios del operario (la crea la primera vez). El mecánico usa
+ *  la misma, pero se crea con rol 'tecnico' (el que en la web ejecuta OT). */
+export async function operadorMant(sesion: SesionMovil, rolNuevo: 'operador' | 'tecnico' = 'operador'): Promise<OperadorMant> {
   const usuario = (sesion.username || sesion.cedula || String(sesion.idUsuario)).trim();
   const nombre = (sesion.nombre || usuario).trim();
   const db = await getDb();
@@ -44,10 +45,11 @@ export async function operadorMant(sesion: SesionMovil): Promise<OperadorMant> {
   const r = await db.request()
     .input('usuario', sql.NVarChar(100), usuario)
     .input('nombre', sql.NVarChar(300), nombre)
+    .input('rol', sql.NVarChar(40), rolNuevo)
     .query<OperadorMant>(`
       MERGE mant.Usuarios AS d USING (SELECT @usuario AS usuario) AS o ON d.usuario = o.usuario
       WHEN MATCHED THEN UPDATE SET nombre = @nombre
-      WHEN NOT MATCHED THEN INSERT (nombre, usuario, rol, activo) VALUES (@nombre, @usuario, 'operador', 1)
+      WHEN NOT MATCHED THEN INSERT (nombre, usuario, rol, activo) VALUES (@nombre, @usuario, @rol, 1)
       OUTPUT INSERTED.id, INSERTED.usuario, INSERTED.nombre, INSERTED.rol;`);
   const f = r.recordset[0];
   return { id: String(f.id), usuario: f.usuario, nombre: f.nombre, rol: f.rol };

@@ -3,11 +3,12 @@ import { sesionSigueValiendo, signToken, verifyToken } from '@/lib/auth';
 import { cargarSesion } from '@/lib/sesiones';
 import { buildSessionPayload } from '@/lib/users';
 import { RENOVAR_DESPUES_DE_S, SEGUNDOS_TOPE } from '@/lib/sesion-duracion';
-import { sesionVencida, tieneModulo, tokenDeRequest } from '@/lib/movil/sesion';
+import { perfilesMovil, sesionVencida, tokenDeRequest } from '@/lib/movil/sesion';
 
 // Renovación del token del teléfono. Igual que /api/auth/renovar (la de la web),
 // pero el token viaja en `Authorization` y el nuevo vuelve en el cuerpo:
-//   · 200 { token, venceEn } → guardar el nuevo
+//   · 200 { token, venceEn, perfiles } → guardar el nuevo (y los perfiles, por
+//     si RH le cambió el rol)
 //   · 204                    → no hace falta todavía (o ya llegó al tope)
 //   · 401 x-sesion: vencida  → al login
 // Falla CERRADO: si la base no contesta, no se renueva (503).
@@ -28,12 +29,11 @@ export async function POST(req: Request) {
     if (!sesionSigueValiendo(actual, base)) return sesionVencida();
     const payload = await buildSessionPayload(actual.idUsuario);
     if (!payload) return sesionVencida();
-    if (!tieneModulo(payload.modules, 'maquinaria')) {
-      return sesionVencida('Tu usuario ya no tiene el rol Operario Maquinaria.');
-    }
+    const perfiles = perfilesMovil(payload.modules);
+    if (!perfiles.length) return sesionVencida('Tu usuario ya no tiene el rol Operario Maquinaria ni Mecánico.');
     if (actual.huella) payload.huella = actual.huella;
     const { token: nuevo, segundos } = signToken(payload, { jti: actual.jti, inicio });
-    return NextResponse.json({ token: nuevo, venceEn: segundos }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ token: nuevo, venceEn: segundos, perfiles }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
     console.error('/api/movil/auth/renovar: no se pudo verificar la sesión; no se renueva:', err);
     return NextResponse.json({ error: 'No se pudo renovar la sesión ahora.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });

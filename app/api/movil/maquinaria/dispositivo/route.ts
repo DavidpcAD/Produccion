@@ -6,7 +6,7 @@ import { faltaTabla, leerRegistro, olvidarToken, registrarTelefono } from '@/lib
 // publicación corre, los permisos que dio, su token de avisos y dónde está.
 // Es lo que muestra Mantenimiento → App móvil.
 export async function POST(req: Request) {
-  const auth = await sesionMovil(req, 'maquinaria');
+  const auth = await sesionMovil(req, ['maquinaria', 'mecanico']);
   if (auth.error) return auth.error;
   const d = leerRegistro(await req.json().catch(() => null));
   if (!d) return NextResponse.json({ error: 'Datos del teléfono inválidos' }, { status: 400 });
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
 // DELETE → al cerrar sesión: el teléfono deja de recibir avisos a nombre de esa persona.
 export async function DELETE(req: Request) {
-  const auth = await sesionMovil(req, 'maquinaria');
+  const auth = await sesionMovil(req, ['maquinaria', 'mecanico']);
   if (auth.error) return auth.error;
   const body = (await req.json().catch(() => null)) as { identificador?: unknown } | null;
   const id = typeof body?.identificador === 'string' ? body.identificador.trim() : '';
