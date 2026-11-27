@@ -3,14 +3,15 @@ import { comparePassword, signToken } from '@/lib/auth';
 import { findUsuarioByLogin, buildSessionPayload } from '@/lib/users';
 import { logAudit } from '@/lib/audit';
 import { checkRateLimit, registrarFallo, limpiarIntentos, ipDeRequest } from '@/lib/rate-limit';
-import { tieneModulo } from '@/lib/movil/sesion';
+import { mensajeSinRol, perfilesMovil } from '@/lib/movil/sesion';
 
 // Login de la app móvil de maquinaria. Es el MISMO login de la web (cédula o
 // usuario + contraseña contra dbo.Usuario, mismos techos de intentos, misma
 // bitácora), con dos diferencias:
 //   · el token vuelve en el cuerpo (el teléfono lo guarda en SecureStore y lo
 //     manda en `Authorization: Bearer`), no en una cookie;
-//   · solo entra quien tiene el rol de Producción "Operario Maquinaria".
+//   · solo entra quien tiene el rol de Producción "Operario Maquinaria" o
+//     "Mecánico"; la respuesta dice con qué perfiles (la app arma sus pestañas).
 const LIMITE_CUENTA = { maxFallos: 5, ventanaMs: 15 * 60_000, bloqueoMs: 15 * 60_000 };
 const LIMITE_IP = { maxFallos: 25, ventanaMs: 15 * 60_000, bloqueoMs: 15 * 60_000 };
 
@@ -47,9 +48,8 @@ export async function POST(req: NextRequest) {
 
     const payload = await buildSessionPayload(user.idUsuario);
     if (!payload) return json({ error: 'Usuario no encontrado.' }, 404);
-    if (!tieneModulo(payload.modules, 'maquinaria')) {
-      return json({ error: 'Tu usuario no tiene el rol Operario Maquinaria. Pedilo a Recursos Humanos.' }, 403);
-    }
+    const perfiles = perfilesMovil(payload.modules);
+    if (!perfiles.length) return json({ error: mensajeSinRol() }, 403);
 
     const { token, segundos } = signToken(payload);
     limpiarIntentos(llaveCuenta);
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       idColAccion: user.idColaborador, accion: 'LOGIN_OK', ip,
       detalleNuevo: { login: login.slice(0, 64), idUsuario: user.idUsuario, app: 'maquinaria' },
     });
-    return json({ token, venceEn: segundos, nombre: payload.nombre, usuario: payload.username ?? null });
+    return json({ token, venceEn: segundos, nombre: payload.nombre, usuario: payload.username ?? null, perfiles });
   } catch (err) {
     console.error('/api/movil/auth/login error:', err);
     return json({ error: 'Error del servidor. Probá de nuevo.' }, 500);

@@ -61,6 +61,9 @@ const MODULE_LEVEL: Record<string, number> = {
   // Operario de maquinaria: solo la app móvil (checklist antes de arrancar). No
   // eleva el nivel: con su rol no abre nada más de Producción.
   maquinaria: 1,
+  // Mecánico: solo la app móvil (taller: máquinas, OT y repuestos). Igual que el
+  // operario, no eleva el nivel ni abre pantallas de la web.
+  mecanico: 1,
 };
 
 /** Calcula el nivelAdmin efectivo a partir de los roles del usuario.
@@ -187,7 +190,12 @@ export type Modulo =
   // móvil de maquinaria (checklist antes de arrancar, solicitar material,
   // reportar avería), con su API en /api/movil/maquinaria. No tiene pantallas en
   // la web. EXCLUSIVO: el Super Admin no lo hereda por el comodín.
-  | 'maquinaria';
+  | 'maquinaria'
+  // Mecánico (rol "Mecánico", idApp 10): SOLO la app móvil de maquinaria, en su
+  // vista de taller: ve TODAS las máquinas y sus OT, las empieza y las termina
+  // (cuánto duró y qué repuestos de mant.Repuestos usó). API en
+  // /api/movil/taller. EXCLUSIVO, igual que 'maquinaria'.
+  | 'mecanico';
 
 /** ── Interruptor de "Avance de obra" ──────────────────────────────────────
  *  El módulo está incompleto, así que NO sale a producción todavía: en `false`
@@ -198,7 +206,7 @@ export type Modulo =
 export const AVANCE_OBRA_ACTIVO = false;
 
 const MODULOS_BASE: Modulo[] =
-  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas', 'mantenimiento', 'gerencia', 'maquinaria'];
+  ['dashboard', 'presupuesto', 'ingenieria', 'avance', 'concreto', 'desembolsos', 'bodega', 'recepcion', 'admin', 'cuadrillas', 'mantenimiento', 'gerencia', 'maquinaria', 'mecanico'];
 
 /** Módulos publicados (los apagados no salen para nadie). */
 export const MODULOS_TODOS: Modulo[] =
@@ -208,7 +216,7 @@ export const MODULOS_TODOS: Modulo[] =
  *  rol que los tiene asignado explícitamente. Gerencia es así por pedido de David
  *  (2026-10-29): el tablero de KPIs es SOLO del rol "Gerencia", ni el Super Admin
  *  lo ve. (Un usuario que tenga Super Admin Y Gerencia sí lo ve, por su rol Gerencia.) */
-export const MODULOS_EXCLUSIVOS: Modulo[] = ['gerencia', 'maquinaria'];
+export const MODULOS_EXCLUSIVOS: Modulo[] = ['gerencia', 'maquinaria', 'mecanico'];
 
 /** Cómo se llama cada módulo para una persona. Se usa al rebotar a alguien de
  *  una ruta que no le toca: decirle "no tenés acceso a Desembolsos" es una
@@ -227,6 +235,7 @@ const NOMBRE_MODULO: Record<Modulo, string> = {
   mantenimiento: 'Mantenimiento',
   gerencia: 'Gerencia',
   maquinaria: 'la app de maquinaria',
+  mecanico: 'la app de maquinaria (taller)',
 };
 
 /** Pantallas que comparten módulo pero tienen nombre propio. Casi todas caen en
@@ -364,6 +373,8 @@ function modulosDeRol(nombre?: string, tipo?: string): Modulo[] | '*' | undefine
   if (n === 'mantenimiento') return ['mantenimiento', 'bodega'];
   // Operario de maquinaria: solo la app móvil. Por NOMBRE (tipo "General").
   if (n === 'operario maquinaria' || n === 'operario de maquinaria') return ['maquinaria'];
+  // Mecánico: la app móvil en su vista de taller. Por NOMBRE, con o sin tilde.
+  if (n === 'mecánico' || n === 'mecanico') return ['mecanico'];
   // Bodega (hoy solo jerson): pide material como un ingeniero Y recibe el material.
   // Nada más: no entra a proveeduría, aprobación ni a las herramientas del ingeniero.
   if (n === 'bodega') return ['bodega', 'recepcion'];

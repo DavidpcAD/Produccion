@@ -10,7 +10,7 @@ const MAXIMO = 8 * 1024 * 1024; // la app las manda comprimidas (~300 KB); esto 
 const TIPOS = ['image/jpeg', 'image/png', 'image/webp'];
 
 export async function POST(req: Request) {
-  const auth = await sesionMovil(req, 'maquinaria');
+  const auth = await sesionMovil(req, ['maquinaria', 'mecanico']);
   if (auth.error) return auth.error;
 
   let archivo: FormDataEntryValue | null;
