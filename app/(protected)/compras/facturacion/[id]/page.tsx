@@ -6,9 +6,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/compras/shell";
 import { Badge, Button, Card, Field, Input, Modal, Select, Textarea, useToast } from "@/components/compras/ui";
 import { IconWarning } from "@/components/compras/icons";
+import { AvisoFrenoBc, frenoDeRespuesta, type FrenoBc } from "@/components/compras/aviso-freno-bc";
 import { DateField } from "@/components/compras/date-field";
 import { useStore } from "@/lib/compras/store";
 import { money, cantidadEntreUnidades, codigoDeItem, distribuirCargo, formatDate, num, numeroOrden, ordenBadge, ordenLineaPendiente, ordenRecibidoPct, todayISO, type UnidadItem } from "@/lib/compras/helpers";
+import { tipoDeLineaOrden } from "@/lib/compras/freno-registro";
 import type { MotivoNC, Orden } from "@/lib/compras/types";
 
 const MOTIVO_NC: { v: MotivoNC; label: string }[] = [
@@ -91,6 +93,10 @@ export default function RegistrarFacturaPage() {
   const [fechaRecepcion, setFechaRecepcion] = useState(todayISO());
   const [preview, setPreview] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  // El "no" de un freno de registro (ver lib/compras/frenar-registro.ts): BC tiene
+  // otro proveedor, el pedido no está lanzado, le faltan líneas o los montos no son
+  // los de la orden. Se queda en pantalla hasta "Entendido" o el próximo intento.
+  const [frenoBc, setFrenoBc] = useState<FrenoBc | null>(null);
   // Confirmación de inventario (stock BC antes → después de registrar).
   // antes/despues vienen de BC en unidad BASE; recibido es lo que tecleó bodega, en la
   // unidad de la LÍNEA (desde que la solicitud elige unidad, puede ser EST). Para
@@ -253,12 +259,14 @@ export default function RegistrarFacturaPage() {
       .filter((l) => Number(recibir[l.id] || 0) > 0)
       .map((l) => ({ ordenLineaId: l.id, cantidadRecibida: Number(recibir[l.id]) }));
     if (nadaRecibidoAun && cargo) lineas.push({ ordenLineaId: cargo.id, cantidadRecibida: cargo.cantidad });
-    // Líneas para BC: cantidad recibida en esta factura por item (solo artículos).
+    // Líneas para BC: cantidad recibida en esta factura por item (solo artículos). El
+    // `tipo` le dice al codeunit (y al freno de líneas) si es un artículo o un activo fijo.
     const bcLineas = articulo
       .filter((l) => Number(recibir[l.id] || 0) > 0 && l.articuloId)
-      .map((l) => ({ itemNo: l.articuloId as string, qty: Number(recibir[l.id]), variantCode: l.variantCode }));
+      .map((l) => ({ itemNo: l.articuloId as string, qty: Number(recibir[l.id]), variantCode: l.variantCode, tipo: tipoDeLineaOrden(l) }));
 
     setGuardando(true);
+    setFrenoBc(null);
     let aviso = ""; let bcOk = false;
     const items = [...new Set(bcLineas.map((l) => l.itemNo))];
     let antes: Record<string, StockItem> = {};
@@ -271,12 +279,20 @@ export default function RegistrarFacturaPage() {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               orderNo: orden!.bcNumber, vendorInvoiceNo: numeroFactura.trim(), lineas: bcLineas, postingDate: fechaRegistro,
+              // Para los frenos: el servidor lee la orden de la base y la compara contra el
+              // pedido de BC (proveedor, líneas y precios). Va el id, no los datos.
+              ordenId: orden!.id,
               cargo: cargoOn && cargoTipo && cargoNuevoMonto > 0 ? { itemChargeNo: cargoTipo, descripcion: cargoNuevoDesc, monto: cargoNuevoMonto, metodo: cargoMetodo } : undefined,
             }),
           });
           const d = await r.json().catch(() => ({}));
           if (r.ok) { aviso = ` · registrada en BC (${d.postedNo ?? "OK"})`; bcOk = true; }
-          else aviso = ` · NO se pudo registrar en BC: ${d.error ?? r.status}`;
+          else {
+            // Un freno no se reintenta a ciegas: va al aviso fijo, no al toast.
+            const freno = frenoDeRespuesta(d);
+            if (freno) { setFrenoBc(freno); setGuardando(false); return; }
+            aviso = ` · NO se pudo registrar en BC: ${d.error ?? r.status}`;
+          }
         } catch (e: any) { aviso = ` · BC no disponible: ${String(e?.message ?? e)}`; }
       } else if (!orden!.bcNumber) {
         aviso = " · (la orden no tiene N.º de BC, no se registró en BC)";
@@ -359,20 +375,25 @@ export default function RegistrarFacturaPage() {
       .map((l) => ({ ordenLineaId: l.id, cantidadRecibida: Number(recibir[l.id]) }));
     const bcLineas = articulo
       .filter((l) => Number(recibir[l.id] || 0) > 0 && l.articuloId)
-      .map((l) => ({ itemNo: l.articuloId as string, qty: Number(recibir[l.id]), variantCode: l.variantCode }));
+      .map((l) => ({ itemNo: l.articuloId as string, qty: Number(recibir[l.id]), variantCode: l.variantCode, tipo: tipoDeLineaOrden(l) }));
 
     setGuardando(true);
+    setFrenoBc(null);
     let aviso = ""; let bcOk = false;
     try {
       if (orden!.bcNumber && bcLineas.length) {
         try {
           const r = await fetch("/api/compras/bc/recibir", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orderNo: orden!.bcNumber, lineas: bcLineas, postingDate: fechaRecepcion }),
+            body: JSON.stringify({ orderNo: orden!.bcNumber, ordenId: orden!.id, lineas: bcLineas, postingDate: fechaRecepcion }),
           });
           const d = await r.json().catch(() => ({}));
           if (r.ok) { aviso = ` · recibido en BC (${d.receiptNo ?? "OK"})`; bcOk = true; }
-          else aviso = ` · NO se pudo recibir en BC: ${d.error ?? r.status}`;
+          else {
+            const freno = frenoDeRespuesta(d);
+            if (freno) { setFrenoBc(freno); setGuardando(false); return; }
+            aviso = ` · NO se pudo recibir en BC: ${d.error ?? r.status}`;
+          }
         } catch (e: any) { aviso = ` · BC no disponible: ${String(e?.message ?? e)}`; }
       } else if (!orden!.bcNumber) {
         aviso = " · (sin N.º de BC, no se recibió en BC)";
@@ -665,6 +686,11 @@ export default function RegistrarFacturaPage() {
             </div>
           )}
         </Card>
+
+        {/* Justo encima de los botones: ahí es donde está mirando quien registra. */}
+        {frenoBc && (
+          <AvisoFrenoBc className="mt-6" freno={frenoBc} pedido={orden.bcNumber ?? ""} onCerrar={() => setFrenoBc(null)} />
+        )}
 
         <div className="row row--between wrap gap-4 mt-6" style={{ alignItems: "flex-end" }}>
           <div className="totals" style={{ minWidth: 320 }}>
